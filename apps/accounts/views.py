@@ -244,7 +244,7 @@ class ResetPasswordAPIView(APIView):
                 {
                     "error": "Invalid password reset link."
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status,
             )
 
         try:
