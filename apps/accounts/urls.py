@@ -1,5 +1,10 @@
 from django.urls import path
-from .views import MeAPIView
+
+from .views import (
+    RegisterAPIView,
+    MeAPIView,
+    VerifyEmailAPIView,
+)
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -16,6 +21,7 @@ urlpatterns = [
         RegisterAPIView.as_view(),
         name="register"
     ),
+
 
     path(
         "login/",
@@ -34,4 +40,12 @@ urlpatterns = [
     MeAPIView.as_view(),
     name="me"
     ),
+    path(
+    "verify-email/",
+    VerifyEmailAPIView.as_view(),
+    name="verify-email",
+    ),
 ]
+
+
+
