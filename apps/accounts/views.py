@@ -8,12 +8,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import User
-from .serializers import RegisterSerializer
+from .serializers import (
+    RegisterSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
+)
 from .utils import (
     generate_email_verification_token,
     verify_email_verification_token,
+    generate_password_reset_token,
+    verify_password_reset_token,
 )
-
 class RegisterAPIView(APIView):
     permission_classes = [AllowAny]
 
@@ -157,6 +162,111 @@ class VerifyEmailAPIView(APIView):
                 "message": "Email verified successfully.",
                 "email": user.email,
                 "is_email_verified": True,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class ForgotPasswordAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(
+                email=email,
+                is_active=True,
+            )
+        except User.DoesNotExist:
+            return Response(
+                {
+                    "message": "If an account exists with this email, "
+                               "a password reset link has been sent."
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        token = generate_password_reset_token(user)
+
+        reset_url = (
+            "http://127.0.0.1:8000/api/auth/reset-password/"
+            f"?token={token}"
+        )
+
+        send_mail(
+            subject="Reset your Procurement AI password",
+            message=(
+                f"Hello {user.first_name or 'User'},\n\n"
+                f"Use the following link to reset your password:\n\n"
+                f"{reset_url}\n\n"
+                f"This link is valid for 1 hour."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
+        return Response(
+            {
+                "message": "If an account exists with this email, "
+                           "a password reset link has been sent."
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResetPasswordAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        token = serializer.validated_data["token"]
+        new_password = serializer.validated_data["new_password"]
+
+        try:
+            data = verify_password_reset_token(token)
+
+        except signing.SignatureExpired:
+            return Response(
+                {
+                    "error": "Password reset link has expired."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except signing.BadSignature:
+            return Response(
+                {
+                    "error": "Invalid password reset link."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.get(
+                id=data["user_id"],
+                email=data["email"],
+                is_active=True,
+            )
+        except User.DoesNotExist:
+            return Response(
+                {
+                    "error": "User not found."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+
+        return Response(
+            {
+                "message": "Password reset successfully."
             },
             status=status.HTTP_200_OK,
         )

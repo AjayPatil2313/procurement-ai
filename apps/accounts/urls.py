@@ -4,6 +4,8 @@ from .views import (
     RegisterAPIView,
     MeAPIView,
     VerifyEmailAPIView,
+    ForgotPasswordAPIView,
+    ResetPasswordAPIView,
 )
 
 from rest_framework_simplejwt.views import (
@@ -45,6 +47,18 @@ urlpatterns = [
     VerifyEmailAPIView.as_view(),
     name="verify-email",
     ),
+    path(
+    "forgot-password/",
+    ForgotPasswordAPIView.as_view(),
+    name="forgot-password",
+    ),
+
+    path(
+    "reset-password/",
+    ResetPasswordAPIView.as_view(),
+    name="reset-password",
+   ),
+   
 ]
 
 

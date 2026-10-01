@@ -6,15 +6,12 @@ from apps.companies.models import Company, CompanyMember
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-
     password = serializers.CharField(
         write_only=True,
         min_length=8
     )
 
-    company_name = serializers.CharField(
-        write_only=True
-    )
+    company_name = serializers.CharField(write_only=True)
 
     company_type = serializers.ChoiceField(
         choices=Company.CompanyType.choices,
@@ -35,7 +32,6 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-
         fields = [
             "email",
             "password",
@@ -58,12 +54,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-
         company_name = validated_data.pop("company_name")
         company_type = validated_data.pop("company_type")
         industry = validated_data.pop("industry", "")
         country = validated_data.pop("country", "India")
-
         password = validated_data.pop("password")
 
         user = User.objects.create_user(
@@ -86,3 +80,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
 
         return user
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+    new_password = serializers.CharField(
+        min_length=8,
+        write_only=True,
+    )
