@@ -250,6 +250,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Media files uploaded by users
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # ============================================================
 # DEFAULT PRIMARY KEY

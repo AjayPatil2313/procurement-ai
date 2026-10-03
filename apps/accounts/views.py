@@ -8,17 +8,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import User
+from apps.companies.models import CompanyMember
+
 from .serializers import (
     RegisterSerializer,
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
 )
+
 from .utils import (
     generate_email_verification_token,
     verify_email_verification_token,
     generate_password_reset_token,
     verify_password_reset_token,
 )
+
+
 class RegisterAPIView(APIView):
     permission_classes = [AllowAny]
 
@@ -70,24 +75,28 @@ class MeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-
         user = request.user
 
-        memberships = user.company_memberships.select_related(
-            "company"
-        ).filter(
-            is_active=True
-        )
+        try:
+            membership = (
+                user.company_membership
+            )
+        except CompanyMember.DoesNotExist:
+            membership = None
 
-        companies = []
+        company = None
 
-        for membership in memberships:
-            companies.append({
-                "company_id": membership.company.id,
-                "company_name": membership.company.name,
-                "company_type": membership.company.company_type,
+        if (
+            membership
+            and membership.is_active
+            and membership.company.is_active
+        ):
+            company = {
+                "id": membership.company.id,
+                "name": membership.company.name,
+                "type": membership.company.company_type,
                 "role": membership.role,
-            })
+            }
 
         return Response({
             "id": user.id,
@@ -97,7 +106,7 @@ class MeAPIView(APIView):
             "phone": user.phone,
             "is_email_verified": user.is_email_verified,
             "is_superuser": user.is_superuser,
-            "companies": companies,
+            "company": company,
         })
 
 class VerifyEmailAPIView(APIView):
