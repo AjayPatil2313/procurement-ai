@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}API Logs & Costs — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div>
+    <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200 mb-2">
+      <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+    </div>
+    <h1 class="text-2xl font-black text-slate-900 tracking-tight">API Logs & External Provider Costs</h1>
+    <p class="text-xs text-slate-500 mt-0.5">Audit log of Anthropic/OpenAI LLM extractions, Google Places API, and Search endpoints</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-xs space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b border-slate-100">
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <span class="text-slate-500 block text-[11px]">Monthly API Budget</span>
+        <span class="text-lg font-black text-slate-900">$250.00</span>
+      </div>
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <span class="text-slate-500 block text-[11px]">Current Month Incurred Cost</span>
+        <span class="text-lg font-black text-emerald-600">$42.80</span>
+      </div>
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <span class="text-slate-500 block text-[11px]">Total AI Search Invocations</span>
+        <span class="text-lg font-black text-blue-600">1,842 calls</span>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-3">Provider</th>
+            <th class="py-2.5 px-3">Endpoint</th>
+            <th class="py-2.5 px-3">Status</th>
+            <th class="py-2.5 px-3">Cost ($)</th>
+            <th class="py-2.5 px-3">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-3 font-bold text-slate-800">Anthropic Claude 3.5</td>
+            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">/v1/messages (JSON Schema Extraction)</td>
+            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">200 OK</span></td>
+            <td class="py-3 px-3 font-semibold text-slate-800">$0.0120</td>
+            <td class="py-3 px-3 text-slate-400">Just now</td>
+          </tr>
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-3 font-bold text-slate-800">Google Custom Search</td>
+            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">/customsearch/v1</td>
+            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">200 OK</span></td>
+            <td class="py-3 px-3 font-semibold text-slate-800">$0.0050</td>
+            <td class="py-3 px-3 text-slate-400">2 mins ago</td>
+          </tr>
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-3 font-bold text-slate-800">Google Places API</td>
+            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">/maps/api/place/nearbysearch/json</td>
+            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">200 OK</span></td>
+            <td class="py-3 px-3 font-semibold text-slate-800">$0.0170</td>
+            <td class="py-3 px-3 text-slate-400">5 mins ago</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

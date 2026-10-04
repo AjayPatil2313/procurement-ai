@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}My Products & Services — AI Sales Platform{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Products & Services Catalog</h1>
+      <p class="text-xs text-slate-500 mt-1">Add items your company manufactures or sells to find interested B2B buyers</p>
+    </div>
+    <a href="{% url 'products-create' %}" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex items-center shadow-sm transition">
+      <i class="fa-solid fa-plus mr-2"></i> Add Product/Service
+    </a>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Item Name</th>
+            <th class="py-3 px-4">Category</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Price Range</th>
+            <th class="py-3 px-4">MOQ</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for p in products %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center">
+              <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mr-2.5">
+                <i class="fa-solid fa-box text-xs"></i>
+              </span>
+              <span>{{ p.name }}</span>
+            </td>
+            <td class="py-3.5 px-4 text-slate-600 font-medium">{{ p.category.name|default:"General" }}</td>
+            <td class="py-3.5 px-4">
+              <span class="capitalize px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
+                {{ p.type }}
+              </span>
+            </td>
+            <td class="py-3.5 px-4 font-semibold text-slate-800">
+              ₹{{ p.price_min|default:"10000" }} - ₹{{ p.price_max|default:"25000" }}
+            </td>
+            <td class="py-3.5 px-4 font-medium text-slate-700">{{ p.moq }} {{ p.unit }}</td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                Active
+              </span>
+            </td>
+            <td class="py-3.5 px-4 text-right">
+              <a href="{% url 'find-buyers' %}" class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+                <i class="fa-solid fa-crosshairs mr-1 text-[10px]"></i> Find Buyers (AI)
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-8 text-center text-slate-400">No products added yet. Click "Add Product/Service" to begin.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

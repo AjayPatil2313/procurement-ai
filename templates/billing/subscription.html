@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Subscription & Credits — {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div>
+    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Subscription & AI Credits</h1>
+    <p class="text-xs text-slate-500 mt-1">Manage search quota, billing period, and platform tiers</p>
+  </div>
+
+  <!-- Usage Overview Card -->
+  <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+    <div class="flex items-center space-x-5">
+      <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl border border-amber-100">
+        <i class="fa-solid fa-crown"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h2 class="text-xl font-black text-slate-900">{{ subscription.get_plan_display }}</h2>
+          <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">Active</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-0.5">Next Renewal Date: <strong>May 27, 2025</strong></p>
+      </div>
+    </div>
+
+    <div class="w-full md:w-64 space-y-2">
+      <div class="flex justify-between text-xs font-semibold">
+        <span class="text-slate-500">Credits Remaining:</span>
+        <span class="text-slate-900 font-bold">{{ subscription.credits_remaining }} / {{ subscription.credits_total }}</span>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
+        <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ subscription.usage_percentage }}%"></div>
+      </div>
+      <div class="text-[11px] text-right text-slate-400">{{ subscription.usage_percentage }}% utilized</div>
+    </div>
+  </div>
+
+  <!-- Plans Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+    <!-- Free -->
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div>
+        <h3 class="font-bold text-slate-900 text-base">Free Plan</h3>
+        <div class="mt-2 text-2xl font-black text-slate-900">₹0 <span class="text-xs font-normal text-slate-400">/mo</span></div>
+        <ul class="mt-4 space-y-2 text-xs text-slate-600">
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> 50 monthly search credits</li>
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Domestic suppliers only</li>
+          <li><i class="fa-solid fa-xmark text-slate-300 mr-2"></i> No global cheaper options</li>
+        </ul>
+      </div>
+      <div class="mt-6">
+        <span class="w-full text-center block bg-slate-100 text-slate-400 text-xs font-semibold py-2 rounded-lg">Default</span>
+      </div>
+    </div>
+
+    <!-- Pro Plan (Current) -->
+    <div class="bg-white rounded-2xl p-6 border-2 border-blue-600 shadow-lg relative flex flex-col justify-between">
+      <span class="absolute -top-3 right-6 bg-blue-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+        Current Plan
+      </span>
+      <div>
+        <h3 class="font-bold text-slate-900 text-base">Pro Plan</h3>
+        <div class="mt-2 text-2xl font-black text-slate-900">₹14,999 <span class="text-xs font-normal text-slate-400">/mo</span></div>
+        <ul class="mt-4 space-y-2 text-xs text-slate-600">
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> 500 monthly search credits</li>
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Global suppliers & exporters</li>
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Cheaper option detection</li>
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Excel & PDF exports</li>
+        </ul>
+      </div>
+      <div class="mt-6">
+        <button disabled class="w-full text-center bg-blue-50 text-blue-600 font-bold text-xs py-2 rounded-lg border border-blue-200">
+          Active Plan
+        </button>
+      </div>
+    </div>
+
+    <!-- Enterprise Plan -->
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div>
+        <h3 class="font-bold text-slate-900 text-base">Enterprise Plan</h3>
+        <div class="mt-2 text-2xl font-black text-slate-900">₹49,999 <span class="text-xs font-normal text-slate-400">/mo</span></div>
+        <ul class="mt-4 space-y-2 text-xs text-slate-600">
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Unlimited / 2,500 credits</li>
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Custom crawler integrations</li>
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Dedicated account manager</li>
+          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Priority API throughput</li>
+        </ul>
+      </div>
+      <form method="POST" class="mt-6">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upgrade_plan">
+        <input type="hidden" name="plan" value="enterprise">
+        {% if rbac.is_company_admin or rbac.is_super_admin %}
+        <button type="submit" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2 rounded-lg transition shadow">
+          Upgrade to Enterprise
+        </button>
+        {% else %}
+        <button disabled class="w-full bg-slate-100 text-slate-400 font-semibold text-xs py-2 rounded-lg cursor-not-allowed">
+          Admin Upgrade Only
+        </button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

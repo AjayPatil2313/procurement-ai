@@ -109,13 +109,14 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.companies.context_processors.rbac_context",
             ],
         },
     },
@@ -167,9 +168,10 @@ AUTH_USER_MODEL = "accounts.User"
 
 REST_FRAMEWORK = {
 
-    # JWT Authentication
+    # Authentication classes
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ),
 
     # By default every API requires authentication
@@ -270,6 +272,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "noreply@procurement-ai.com"
+
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/dashboard/"
+LOGOUT_REDIRECT_URL = "/login/"
 
 
 

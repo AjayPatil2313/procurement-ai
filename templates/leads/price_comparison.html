@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Price Comparison — AI Procurement Platform{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Price Comparison & Landed Cost Analysis</h1>
+      <p class="text-xs text-slate-500 mt-1">Compare nearby suppliers vs. global exporters to find significant cost savings</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for r in results %}
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wide">{{ r.external_company.country }}</span>
+          {% if r.is_global_cheaper %}
+          <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+            Cheaper Option ({{ r.savings_percent|default:"18" }}% savings)
+          </span>
+          {% endif %}
+        </div>
+
+        <h3 class="font-bold text-slate-900 text-base mt-2">{{ r.external_company.name }}</h3>
+        <p class="text-xs text-slate-500">{{ r.product_title }}</p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl space-y-1.5 text-xs">
+          <div class="flex justify-between">
+            <span class="text-slate-400">Unit Price:</span>
+            <span class="font-black text-slate-900 text-sm">₹{{ r.price|default:"38000" }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Distance:</span>
+            <span class="font-semibold text-slate-700">{{ r.distance_km|default:"15" }} km</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Match Score:</span>
+            <span class="font-bold text-emerald-600">{{ r.match_score }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-[11px] text-slate-400">Source: {{ r.external_company.city }}</span>
+        <a href="mailto:{{ r.external_company.email }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+          Inquire Now
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

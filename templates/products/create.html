@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Add Product or Service — AI Sales Platform{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+  <div>
+    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Add Product / Service</h1>
+    <p class="text-xs text-slate-500 mt-1">Provide specifications to identify matching buyers, tender announcements, and procurers</p>
+  </div>
+
+  <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+    <form method="POST" class="space-y-5">
+      {% csrf_token %}
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Product / Service Name *</label>
+        <input type="text" name="name" required placeholder="e.g. High Pressure Centrifugal ANSI Valves" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Category</label>
+          <select name="category_id" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">Select Category...</option>
+            {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Search Scope for Buyers</label>
+          <select name="search_scope" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="global" selected>Global (International Markets)</option>
+            <option value="country">Country (Domestic Companies)</option>
+            <option value="nearby">Nearby (Local Industrial Hubs)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Min Price (INR)</label>
+          <input type="number" step="0.01" name="price_min" placeholder="15000" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Max Price (INR)</label>
+          <input type="number" step="0.01" name="price_max" placeholder="28000" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">MOQ & Unit</label>
+          <div class="flex space-x-2">
+            <input type="number" name="moq" value="5" class="w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800">
+            <input type="text" name="unit" value="pieces" class="w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Description & Target Industries</label>
+        <textarea name="description" rows="3" placeholder="Targeting Petrochemical, Oil & Gas refineries, water utilities..." class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
+        <a href="{% url 'products-list' %}" class="text-xs font-semibold text-slate-500 hover:text-slate-800">
+          Cancel
+        </a>
+        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-lg text-sm transition shadow-md shadow-emerald-500/20 flex items-center">
+          <i class="fa-solid fa-plus mr-2"></i> Save Product
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

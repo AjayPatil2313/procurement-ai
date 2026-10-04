@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}All Users — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Users</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Manage user credentials, staff status, and company memberships</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">User</th>
+            <th class="py-3 px-4">Email</th>
+            <th class="py-3 px-4">Staff / Superuser</th>
+            <th class="py-3 px-4">Verified</th>
+            <th class="py-3 px-4">Joined Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for u in users %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3.5 px-4 font-bold text-slate-900">{{ u.first_name }} {{ u.last_name }}</td>
+            <td class="py-3.5 px-4 text-slate-700 font-medium">{{ u.email }}</td>
+            <td class="py-3.5 px-4">
+              {% if u.is_superuser %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800">
+                  Super Admin
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">
+                  Standard
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3.5 px-4">
+              {% if u.is_email_verified %}
+                <span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Yes</span>
+              {% else %}
+                <span class="text-slate-400">No</span>
+              {% endif %}
+            </td>
+            <td class="py-3.5 px-4 text-slate-500">{{ u.created_at|date:"M d, Y" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Saved Leads — AI Sales{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Saved Leads</h1>
+      <p class="text-xs text-slate-500 mt-1">Bookmarked prospective buyer organizations and outreach tracking</p>
+    </div>
+    <div class="flex items-center gap-2.5">
+      <a href="{% url 'leads-list' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-users-viewfinder text-blue-600"></i>
+        <span>All Leads</span>
+      </a>
+      <a href="{% url 'find-buyers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>Find New Buyers</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Saved Leads Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Company Name</th>
+            <th class="py-3 px-4">Location</th>
+            <th class="py-3 px-4">Target Requirement</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4">Match Score</th>
+            <th class="py-3 px-4">Notes</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for item in saved_items %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center">
+                <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-3 font-semibold text-xs">
+                  <i class="fa-solid fa-building"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">{{ item.search_result.external_company.name }}</div>
+                  {% if item.search_result.external_company.domain %}
+                    <div class="text-[11px] text-slate-400 font-normal">{{ item.search_result.external_company.domain }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="py-3.5 px-4 text-slate-600 font-medium">
+              {% if item.search_result.external_company.city %}{{ item.search_result.external_company.city }}, {% endif %}{{ item.search_result.external_company.country|default:"Global" }}
+            </td>
+            <td class="py-3.5 px-4 font-semibold text-slate-800">
+              {{ item.search_result.product_title }}
+            </td>
+            <td class="py-3.5 px-4">
+              {% if item.status == 'new' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800">New</span>
+              {% elif item.status == 'contacted' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800">Contacted</span>
+              {% elif item.status == 'negotiating' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800">Negotiating</span>
+              {% elif item.status == 'interested' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-100 text-indigo-800">Interested</span>
+              {% elif item.status == 'won' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">Won</span>
+              {% elif item.status == 'lost' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800">Lost</span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800">{{ item.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                {{ item.search_result.match_score }}%
+              </span>
+            </td>
+            <td class="py-3.5 px-4 text-slate-500 max-w-xs truncate text-[11px]">
+              {{ item.notes|default:"—" }}
+            </td>
+            <td class="py-3.5 px-4 text-right space-x-2">
+              {% if item.search_result.external_company.email %}
+              <a href="mailto:{{ item.search_result.external_company.email }}" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
+                Contact
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                <i class="fa-regular fa-bookmark text-lg"></i>
+              </div>
+              <p class="font-medium text-slate-600">No saved leads yet</p>
+              <p class="text-xs text-slate-400 mt-1">Shortlist prospective clients from AI search results to track your outreach.</p>
+              <a href="{% url 'find-buyers' %}" class="inline-block mt-4 text-xs font-bold text-blue-600 hover:underline">Find Prospective Buyers &rarr;</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

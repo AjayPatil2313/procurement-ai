@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
-from .models import Company, CompanyMember
+from .models import (
+    Company,
+    CompanyMember,
+    CompanyPermission,
+)
 from apps.accounts.models import User
 
 class CompanyProfileSerializer(serializers.ModelSerializer):
@@ -166,3 +170,40 @@ class CompanyMemberSerializer(serializers.ModelSerializer):
             "joined_at",
         ]
         read_only_fields = fields
+
+class PermissionAssignmentSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    permissions = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=True,
+    )
+
+    def validate_user_id(self, value):
+        try:
+            member = CompanyMember.objects.get(
+                user_id=value,
+                company=self.context["company"],
+                is_active=True,
+            )
+        except CompanyMember.DoesNotExist:
+            raise serializers.ValidationError(
+                "User does not belong to this company."
+            )
+
+        return value
+
+    def validate_permissions(self, value):
+        valid_permissions = set(
+            CompanyPermission.objects.filter(
+                id__in=value
+            ).values_list("id", flat=True)
+        )
+
+        invalid_permissions = set(value) - valid_permissions
+
+        if invalid_permissions:
+            raise serializers.ValidationError(
+                f"Invalid permission IDs: {list(invalid_permissions)}"
+            )
+
+        return value

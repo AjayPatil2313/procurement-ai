@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Leads — AI Sales{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Sales Leads</h1>
+      <p class="text-xs text-slate-500 mt-1">AI-discovered companies and buyers matching your products and services</p>
+    </div>
+    <div class="flex items-center gap-2.5">
+      <a href="{% url 'find-buyers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>Find New Buyers</span>
+      </a>
+      <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-regular fa-bookmark text-blue-600"></i>
+        <span>Saved Leads</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Leads Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Company Name</th>
+            <th class="py-3 px-4">Location</th>
+            <th class="py-3 px-4">Target Need / Product</th>
+            <th class="py-3 px-4">Match Score</th>
+            <th class="py-3 px-4">Need Signal / Rationale</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for lead in leads %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center">
+                <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-3 font-semibold text-xs">
+                  <i class="fa-solid fa-building"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">{{ lead.external_company.name }}</div>
+                  {% if lead.external_company.industry %}
+                    <div class="text-[11px] text-slate-400 font-normal">{{ lead.external_company.industry }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="py-3.5 px-4 text-slate-600 font-medium">
+              {% if lead.external_company.city %}{{ lead.external_company.city }}, {% endif %}{{ lead.external_company.country|default:"Global" }}
+            </td>
+            <td class="py-3.5 px-4 font-semibold text-slate-800">
+              {{ lead.product_title }}
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if lead.match_score >= 85 %}bg-emerald-100 text-emerald-800{% elif lead.match_score >= 70 %}bg-blue-100 text-blue-800{% else %}bg-slate-100 text-slate-800{% endif %}">
+                {{ lead.match_score }}% Match
+              </span>
+            </td>
+            <td class="py-3.5 px-4 text-slate-600 max-w-xs truncate">
+              {{ lead.need_signal|default:lead.match_reason|default:"High synergy requirement identified" }}
+            </td>
+            <td class="py-3.5 px-4 text-right space-x-2">
+              {% if lead.external_company.website %}
+              <a href="{{ lead.external_company.website }}" target="_blank" class="text-slate-400 hover:text-blue-600 transition p-1.5" title="Visit Website">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              </a>
+              {% endif %}
+              {% if lead.external_company.email %}
+              <a href="mailto:{{ lead.external_company.email }}" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
+                Contact
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="py-12 text-center text-slate-400">
+              <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-users-viewfinder text-lg"></i>
+              </div>
+              <p class="font-medium text-slate-600">No sales leads found yet</p>
+              <p class="text-xs text-slate-400 mt-1">Use the "Find New Buyers" tool to start an AI search for prospective customers.</p>
+              <a href="{% url 'find-buyers' %}" class="inline-block mt-4 text-xs font-bold text-blue-600 hover:underline">Launch Buyer Search &rarr;</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Find Buyers — AI Sales Leads{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">AI Buyer Leads (Sales Engine)</h1>
+      <p class="text-xs text-slate-500 mt-1">Companies matched by AI that actively purchase or require your products</p>
+    </div>
+    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-orange-100 text-orange-800">
+      <i class="fa-solid fa-crosshairs mr-1"></i> Intent Signal Radar Active
+    </span>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
+      <div>
+        <div class="flex items-start justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 font-bold flex items-center justify-center text-sm border border-purple-100">
+              <i class="fa-solid fa-industry"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm leading-tight">Apex Petrochemicals Ltd.</h3>
+              <span class="text-xs text-slate-500">Vadodara, India</span>
+            </div>
+          </div>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800">
+            94% Fit
+          </span>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
+          <div>
+            <span class="text-slate-400 block text-[11px]">Why they are a fit:</span>
+            <p class="font-medium text-slate-700 mt-0.5">Operating multi-plant refinery with ongoing procurement for high-pressure ANSI control valves.</p>
+          </div>
+          <div class="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px] font-semibold flex items-center">
+            <i class="fa-solid fa-signal mr-1.5 text-blue-600"></i> Need Signal: Active Tender Notice #IND-2025-081
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+        <a href="https://apexpetro.example.com" target="_blank" class="text-xs text-blue-600 hover:underline font-medium">
+          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Company Web
+        </a>
+        <button class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+          Save as Lead
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
+      <div>
+        <div class="flex items-start justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-sm border border-blue-100">
+              <i class="fa-solid fa-water"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm leading-tight">Metro Water Supply Board</h3>
+              <span class="text-xs text-slate-500">Pune, India</span>
+            </div>
+          </div>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800">
+            89% Fit
+          </span>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
+          <div>
+            <span class="text-slate-400 block text-[11px]">Why they are a fit:</span>
+            <p class="font-medium text-slate-700 mt-0.5">Upgrading municipal filtration plants; regularly procures industrial grade centrifugal pumps & valves.</p>
+          </div>
+          <div class="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px] font-semibold flex items-center">
+            <i class="fa-solid fa-signal mr-1.5 text-blue-600"></i> Need Signal: Annual vendor empanelement open
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+        <a href="#" class="text-xs text-blue-600 hover:underline font-medium">
+          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Company Web
+        </a>
+        <button class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+          Save as Lead
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

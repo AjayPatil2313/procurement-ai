@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Export Reports — AI Procurement & Sales{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+  <div>
+    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Export Reports</h1>
+    <p class="text-xs text-slate-500 mt-1">Export search jobs, supplier price comparisons, and sales lead reports in Excel or PDF</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+      <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+        <i class="fa-solid fa-file-excel"></i>
+      </div>
+      <h3 class="font-bold text-slate-900 text-sm">Excel Format (.xlsx)</h3>
+      <p class="text-xs text-slate-500">Includes complete tables: supplier contact details, MOQ, price breakdown, match score, and verified URLs.</p>
+      <button class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs transition">
+        Download Excel
+      </button>
+    </div>
+
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+      <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl">
+        <i class="fa-solid fa-file-pdf"></i>
+      </div>
+      <h3 class="font-bold text-slate-900 text-sm">Executive Summary PDF</h3>
+      <p class="text-xs text-slate-500">Formatted procurement memo with landed cost charts, cheaper exporter options, and company credentials.</p>
+      <button class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">
+        Download PDF
+      </button>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

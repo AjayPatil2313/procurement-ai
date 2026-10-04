@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results: {{ q }} — AI Procurement Platform{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header & Query Stats -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>/</span>
+        <span class="text-slate-700 font-medium">Search Results</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">
+        {% if q %}
+          Search Results for <span class="text-blue-600">"{{ q }}"</span>
+        {% else %}
+          Global Platform Search
+        {% endif %}
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Found <strong class="text-slate-800">{{ total_results }}</strong> matching items across suppliers, products, leads, and requirements
+      </p>
+    </div>
+
+    <!-- Quick Search Adjustment Input -->
+    <div class="w-full md:w-80">
+      <form method="GET" action="{% url 'global-search' %}" class="relative">
+        <input 
+          type="text" 
+          name="q" 
+          value="{{ q }}" 
+          placeholder="Refine search..."
+          class="w-full bg-white border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm"
+        >
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+      </form>
+    </div>
+  </div>
+
+  {% if total_results > 0 %}
+
+    <!-- Result Category Badges / Counters -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+      <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold">
+        All Matches ({{ total_results }})
+      </span>
+      {% if suppliers or external_suppliers %}
+      <a href="#suppliers-section" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition">
+        Suppliers ({{ suppliers|length|add:external_suppliers|length }})
+      </a>
+      {% endif %}
+      {% if leads %}
+      <a href="#leads-section" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition">
+        Leads ({{ leads|length }})
+      </a>
+      {% endif %}
+      {% if products %}
+      <a href="#products-section" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition">
+        Products ({{ products|length }})
+      </a>
+      {% endif %}
+      {% if requirements %}
+      <a href="#requirements-section" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition">
+        Requirements ({{ requirements|length }})
+      </a>
+      {% endif %}
+      {% if companies %}
+      <a href="#companies-section" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition">
+        Companies ({{ companies|length }})
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- 1. SUPPLIERS SECTION -->
+    {% if suppliers or external_suppliers %}
+    <div id="suppliers-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">
+            <i class="fa-solid fa-truck-field"></i>
+          </span>
+          <h2 class="text-sm font-bold text-slate-900">Matching Suppliers</h2>
+        </div>
+        <span class="text-xs text-slate-400 font-medium">{{ suppliers|length|add:external_suppliers|length }} results</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Supplier / Company</th>
+              <th class="py-3 px-4">Location</th>
+              <th class="py-3 px-4">Product / Capability</th>
+              <th class="py-3 px-4">Price</th>
+              <th class="py-3 px-4">Match Score</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for s in suppliers %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3.5 px-4 font-bold text-slate-900">
+                <div class="font-bold text-slate-900">{{ s.external_company.name }}</div>
+                <div class="text-[11px] text-slate-400 font-normal">{{ s.external_company.domain }}</div>
+              </td>
+              <td class="py-3.5 px-4 text-slate-600 font-medium">{{ s.external_company.city }}, {{ s.external_company.country }}</td>
+              <td class="py-3.5 px-4 font-semibold text-slate-800">{{ s.product_title }}</td>
+              <td class="py-3.5 px-4 font-semibold text-slate-800">
+                {% if s.price %}₹{{ s.price }} / {{ s.price_unit|default:"pcs" }}{% else %}Contact for Quote{% endif %}
+              </td>
+              <td class="py-3.5 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                  {{ s.match_score }}%
+                </span>
+              </td>
+              <td class="py-3.5 px-4 text-right">
+                <a href="mailto:{{ s.external_company.email }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
+                  Send RFQ
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+
+            {% for ext in external_suppliers %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3.5 px-4 font-bold text-slate-900">
+                <div class="font-bold text-slate-900">{{ ext.name }}</div>
+                <div class="text-[11px] text-slate-400 font-normal">{{ ext.industry|default:"Supplier" }}</div>
+              </td>
+              <td class="py-3.5 px-4 text-slate-600 font-medium">{{ ext.city }}, {{ ext.country }}</td>
+              <td class="py-3.5 px-4 font-medium text-slate-600 max-w-xs truncate">{{ ext.description|default:ext.name }}</td>
+              <td class="py-3.5 px-4 text-slate-500 italic">Upon Request</td>
+              <td class="py-3.5 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800">
+                  Directory
+                </span>
+              </td>
+              <td class="py-3.5 px-4 text-right">
+                {% if ext.website %}
+                <a href="{{ ext.website }}" target="_blank" class="text-blue-600 hover:underline font-semibold text-xs">
+                  Visit Site &rarr;
+                </a>
+                {% elif ext.email %}
+                <a href="mailto:{{ ext.email }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+                  Contact
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 2. LEADS SECTION -->
+    {% if leads %}
+    <div id="leads-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs font-bold">
+            <i class="fa-solid fa-users-viewfinder"></i>
+          </span>
+          <h2 class="text-sm font-bold text-slate-900">Matching Sales Leads</h2>
+        </div>
+        <span class="text-xs text-slate-400 font-medium">{{ leads|length }} results</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Company Name</th>
+              <th class="py-3 px-4">Location</th>
+              <th class="py-3 px-4">Target Need</th>
+              <th class="py-3 px-4">Match Score</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for l in leads %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3.5 px-4 font-bold text-slate-900">{{ l.external_company.name }}</td>
+              <td class="py-3.5 px-4 text-slate-600">{{ l.external_company.city }}, {{ l.external_company.country }}</td>
+              <td class="py-3.5 px-4 font-semibold text-slate-800">{{ l.product_title }}</td>
+              <td class="py-3.5 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800">
+                  {{ l.match_score }}% Match
+                </span>
+              </td>
+              <td class="py-3.5 px-4 text-right">
+                <a href="mailto:{{ l.external_company.email }}" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
+                  Contact Lead
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 3. PRODUCTS & REQUIREMENTS GRID -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Products -->
+      {% if products %}
+      <div id="products-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center space-x-2">
+            <span class="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-xs font-bold">
+              <i class="fa-solid fa-box"></i>
+            </span>
+            <h2 class="text-sm font-bold text-slate-900">Products Catalog ({{ products|length }})</h2>
+          </div>
+          <a href="{% url 'products-list' %}" class="text-xs font-semibold text-blue-600 hover:underline">View Catalog &rarr;</a>
+        </div>
+        <div class="divide-y divide-slate-100">
+          {% for p in products %}
+          <div class="py-3 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-slate-900 text-xs">{{ p.name }}</div>
+              <div class="text-[11px] text-slate-500">₹{{ p.price_min }} - ₹{{ p.price_max }} / {{ p.unit }}</div>
+            </div>
+            <a href="{% url 'find-buyers' %}" class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-[11px] px-2.5 py-1.5 rounded-lg transition shadow-sm">
+              Find Buyers
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Requirements -->
+      {% if requirements %}
+      <div id="requirements-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center space-x-2">
+            <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">
+              <i class="fa-solid fa-clipboard-list"></i>
+            </span>
+            <h2 class="text-sm font-bold text-slate-900">Requirements ({{ requirements|length }})</h2>
+          </div>
+          <a href="{% url 'requirements-list' %}" class="text-xs font-semibold text-blue-600 hover:underline">View All &rarr;</a>
+        </div>
+        <div class="divide-y divide-slate-100">
+          {% for r in requirements %}
+          <div class="py-3 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-slate-900 text-xs">{{ r.item_name }}</div>
+              <div class="text-[11px] text-slate-500">{{ r.quantity }} {{ r.unit }} &bull; {{ r.delivery_city }}</div>
+            </div>
+            <a href="{% url 'find-suppliers' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] px-2.5 py-1.5 rounded-lg transition shadow-sm">
+              Find Suppliers
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- 4. COMPANIES (If Super Admin) -->
+    {% if companies %}
+    <div id="companies-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span class="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-xs font-bold">
+            <i class="fa-solid fa-sitemap"></i>
+          </span>
+          <h2 class="text-sm font-bold text-slate-900">Registered Platform Companies (Super Admin)</h2>
+        </div>
+        <span class="text-xs text-slate-400 font-medium">{{ companies|length }} companies</span>
+      </div>
+
+      <div class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for c in companies %}
+        <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-1.5 text-xs">
+          <div class="font-bold text-slate-900 text-sm">{{ c.name }}</div>
+          <div class="text-slate-500 text-[11px]">{{ c.industry }} &bull; {{ c.city }}, {{ c.country }}</div>
+          <span class="inline-block px-2 py-0.5 rounded font-bold text-[10px] bg-blue-100 text-blue-800 uppercase">
+            {{ c.company_type }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-xl mx-auto shadow-sm">
+      <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4 text-2xl">
+        <i class="fa-solid fa-magnifying-glass"></i>
+      </div>
+      <h3 class="text-lg font-bold text-slate-900 mb-1">No direct matches found</h3>
+      <p class="text-xs text-slate-500 mb-6">
+        We couldn't find any direct database records matching <strong>"{{ q }}"</strong>. You can use our AI Web Search Engine to crawl live suppliers or buyers worldwide.
+      </p>
+      
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <a href="{% url 'find-suppliers' %}" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm">
+          <i class="fa-solid fa-robot"></i>
+          <span>AI Supplier Search</span>
+        </a>
+        <a href="{% url 'find-buyers' %}" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm">
+          <i class="fa-solid fa-bullhorn"></i>
+          <span>AI Buyer Lead Search</span>
+        </a>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

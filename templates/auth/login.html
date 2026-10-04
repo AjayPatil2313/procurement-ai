@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — AI Procurement & Sales Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0F172A; }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen px-4 py-12">
+  <div class="max-w-md w-full space-y-6">
+    
+    <!-- Brand Header -->
+    <div class="text-center space-y-2">
+      <div class="inline-flex w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 items-center justify-center text-white text-2xl shadow-lg shadow-blue-500/30">
+        <i class="fa-solid fa-hexagon-nodes"></i>
+      </div>
+      <h1 class="text-2xl font-black text-white tracking-tight">AI Procurement & Sales</h1>
+      <p class="text-xs text-slate-400">Sign in to your B2B enterprise workspace</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
+      {% if messages %}
+        <div class="mb-4 space-y-2">
+          {% for message in messages %}
+            <div class="p-3 text-xs rounded-lg {% if message.tags == 'error' %}bg-red-500/20 text-red-300 border border-red-500/30{% else %}bg-blue-500/20 text-blue-300 border border-blue-500/30{% endif %}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="POST" class="space-y-4">
+        {% csrf_token %}
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
+          <input 
+            type="email" 
+            name="email" 
+            required 
+            placeholder="ajay@abctrading.com" 
+            value="ajay@abctrading.com"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          >
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
+          <input 
+            type="password" 
+            name="password" 
+            required 
+            placeholder="••••••••" 
+            value="Admin@12345"
+            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+          >
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-lg shadow-blue-600/30">
+          Sign In
+        </button>
+      </form>
+
+      <!-- Quick 1-Click Role Logins for Testing -->
+      <div class="mt-6 pt-6 border-t border-slate-800 space-y-2">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Quick Role Switch (Demo)</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <a href="{% url 'demo-login-as' 'admin' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
+            <i class="fa-solid fa-user-tie text-blue-400 mr-1"></i> Company Admin
+          </a>
+          <a href="{% url 'demo-login-as' 'superadmin' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
+            <i class="fa-solid fa-crown text-yellow-400 mr-1"></i> Super Admin
+          </a>
+          <a href="{% url 'demo-login-as' 'buyer' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
+            <i class="fa-solid fa-cart-shopping text-emerald-400 mr-1"></i> Buyer User
+          </a>
+          <a href="{% url 'demo-login-as' 'seller' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
+            <i class="fa-solid fa-bullhorn text-purple-400 mr-1"></i> Sales User
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

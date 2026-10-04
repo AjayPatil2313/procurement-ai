@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Find Suppliers — AI Search Results{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">AI Supplier Results</h1>
+      <p class="text-xs text-slate-500 mt-1">Found verified global manufacturers, exporters, and domestic suppliers</p>
+    </div>
+    <div class="flex items-center space-x-2">
+      <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-800">
+        <i class="fa-solid fa-sparkles mr-1"></i> AI Match Engine Active
+      </span>
+    </div>
+  </div>
+
+  <!-- Results List -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for r in results %}
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
+      <div>
+        <div class="flex items-start justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-sm border border-slate-200">
+              <i class="fa-solid fa-building"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm leading-tight">{{ r.external_company.name }}</h3>
+              <span class="text-xs text-slate-500">{{ r.external_company.city }}, {{ r.external_company.country }}</span>
+            </div>
+          </div>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold {% if r.match_score >= 80 %}bg-emerald-100 text-emerald-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+            {{ r.match_score }}% Match
+          </span>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
+          <div class="flex justify-between">
+            <span class="text-slate-400">Product / Part:</span>
+            <span class="font-semibold text-slate-800">{{ r.product_title }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Price:</span>
+            <span class="font-bold text-slate-900">
+              {% if r.price %}₹{{ r.price }} / {{ r.price_unit|default:"unit" }}{% else %}Contact for Quote{% endif %}
+            </span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">MOQ:</span>
+            <span class="font-medium text-slate-700">{{ r.moq|default:"Flexible" }}</span>
+          </div>
+          {% if r.is_global_cheaper %}
+          <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] font-semibold flex items-center">
+            <i class="fa-solid fa-tag mr-1.5 text-emerald-600"></i> Global Cheaper Alternative ({{ r.savings_percent|default:"15" }}% lower landed cost)
+          </div>
+          {% endif %}
+          <p class="text-[11px] text-slate-500 italic mt-2">
+            "{{ r.match_reason|truncatewords:20 }}"
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+        <a href="{{ r.source_url }}" target="_blank" class="text-xs text-blue-600 hover:underline font-medium">
+          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Verify Source
+        </a>
+        <a href="mailto:{{ r.external_company.email }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+          Send RFQ
+        </a>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-span-3 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
+      <i class="fa-solid fa-magnifying-glass text-3xl mb-3 text-slate-300"></i>
+      <p>No supplier search results generated yet. Click "Create Requirement" to initiate an AI search.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

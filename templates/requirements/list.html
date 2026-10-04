@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}My Requirements — AI Procurement{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Buyer Requirements</h1>
+      <p class="text-xs text-slate-500 mt-1">List of items and services your company needs AI to search suppliers for</p>
+    </div>
+    <a href="{% url 'requirements-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex items-center shadow-sm transition">
+      <i class="fa-solid fa-plus mr-2"></i> Create Requirement
+    </a>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Item Name</th>
+            <th class="py-3 px-4">Category</th>
+            <th class="py-3 px-4">Quantity</th>
+            <th class="py-3 px-4">Target Price</th>
+            <th class="py-3 px-4">Search Scope</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for r in requirements %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center">
+              <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-2.5">
+                <i class="fa-solid fa-cart-shopping text-xs"></i>
+              </span>
+              <span>{{ r.item_name }}</span>
+            </td>
+            <td class="py-3.5 px-4 text-slate-600 font-medium">{{ r.category.name|default:"General" }}</td>
+            <td class="py-3.5 px-4 font-semibold text-slate-800">{{ r.quantity }} {{ r.unit }}</td>
+            <td class="py-3.5 px-4 font-semibold text-slate-800">
+              {% if r.target_price %}₹{{ r.target_price }}{% else %}<span class="text-slate-400">Open</span>{% endif %}
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700">
+                {{ r.get_search_scope_display }}
+              </span>
+            </td>
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                {{ r.get_status_display }}
+              </span>
+            </td>
+            <td class="py-3.5 px-4 text-right">
+              <a href="{% url 'find-suppliers' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1 text-[10px]"></i> View Suppliers
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-8 text-center text-slate-400">No requirements created yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,458 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — AI Procurement & Sales Platform{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- TOP GREETING & CONTEXT HEADER -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
+      <p class="text-sm text-slate-500 mt-0.5">
+        Welcome back, <strong class="text-slate-700">{% if request.user.first_name %}{{ request.user.first_name }} {{ request.user.last_name }}{% else %}{{ request.user.get_full_name|default:request.user.email }}{% endif %}</strong>! Here's what's happening with your business.
+      </p>
+    </div>
+
+    <!-- Company Dropdown & Badges -->
+    <div class="flex items-center flex-wrap gap-2.5">
+      <div class="relative">
+        <button type="button" class="bg-white border border-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2 rounded-lg shadow-sm flex items-center space-x-2 hover:bg-slate-50 transition">
+          <span>{{ current_company.name|default:"ABC Trading Pvt. Ltd." }}</span>
+          <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+        </button>
+      </div>
+
+      <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold 
+        {% if rbac.is_super_admin %}bg-red-50 text-red-700 border border-red-200
+        {% elif rbac.role_label == 'Buyer' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+        {% elif rbac.role_label == 'Seller' %}bg-purple-50 text-purple-700 border border-purple-200
+        {% elif rbac.is_company_admin %}bg-blue-50 text-blue-700 border border-blue-200
+        {% else %}bg-indigo-50 text-indigo-700 border border-indigo-200{% endif %}">
+        <i class="fa-solid {% if rbac.is_super_admin %}fa-crown text-red-500{% elif rbac.role_label == 'Buyer' %}fa-cart-shopping text-emerald-500{% elif rbac.role_label == 'Seller' %}fa-bullhorn text-purple-500{% elif rbac.is_company_admin %}fa-user-tie text-blue-500{% else %}fa-user text-indigo-500{% endif %} text-[10px] mr-1.5"></i>
+        {{ rbac.role_label }}
+      </span>
+
+      <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <i class="fa-solid fa-circle-check text-emerald-600 text-[10px] mr-1.5"></i> Pro Plan
+      </span>
+    </div>
+  </div>
+
+  <!-- 1. TOP 4 METRICS CARDS -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+    
+    <!-- Total Searches -->
+    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
+      <div class="space-y-2">
+        <span class="text-xs font-semibold text-slate-500 tracking-wide">Total Searches</span>
+        <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.total_searches }}</div>
+        <div class="flex items-center text-xs text-slate-500 font-medium">
+          <span class="text-emerald-600 font-bold mr-1.5 flex items-center">
+            <i class="fa-solid fa-arrow-up text-[10px] mr-1"></i> 12%
+          </span>
+          <span>vs last 30 days</span>
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+        <i class="fa-solid fa-magnifying-glass text-lg"></i>
+      </div>
+    </div>
+
+    <!-- Found Suppliers -->
+    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
+      <div class="space-y-2">
+        <span class="text-xs font-semibold text-slate-500 tracking-wide">Found Suppliers</span>
+        <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.found_suppliers }}</div>
+        <div class="flex items-center text-xs text-slate-500 font-medium">
+          <span class="text-emerald-600 font-bold mr-1.5 flex items-center">
+            <i class="fa-solid fa-arrow-up text-[10px] mr-1"></i> 18%
+          </span>
+          <span>vs last 30 days</span>
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 shrink-0">
+        <i class="fa-solid fa-users text-lg"></i>
+      </div>
+    </div>
+
+    <!-- Active Leads -->
+    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
+      <div class="space-y-2">
+        <span class="text-xs font-semibold text-slate-500 tracking-wide">Active Leads</span>
+        <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.active_leads }}</div>
+        <div class="flex items-center text-xs text-slate-500 font-medium">
+          <span class="text-emerald-600 font-bold mr-1.5 flex items-center">
+            <i class="fa-solid fa-arrow-up text-[10px] mr-1"></i> 22%
+          </span>
+          <span>vs last 30 days</span>
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
+        <i class="fa-solid fa-user-group text-lg"></i>
+      </div>
+    </div>
+
+    <!-- Credits Remaining -->
+    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between transition hover:shadow-md">
+      <div class="flex items-start justify-between">
+        <div class="space-y-1">
+          <span class="text-xs font-semibold text-slate-500 tracking-wide">Credits Remaining</span>
+          <div class="text-3xl font-extrabold text-slate-900 tracking-tight">
+            {{ metrics.credits_remaining }} <span class="text-sm font-semibold text-slate-400">of {{ metrics.credits_total }}</span>
+          </div>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
+          <i class="fa-solid fa-layer-group text-lg"></i>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center space-x-2">
+        <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+          <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: {{ metrics.credits_used_percent }}%"></div>
+        </div>
+        <span class="text-xs font-bold text-slate-600">{{ metrics.credits_used_percent }}%</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- QUICK ACTIONS -->
+  <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+    <div class="flex items-center justify-between mb-3.5">
+      <h2 class="text-sm font-bold text-slate-900 flex items-center">
+        <i class="fa-solid fa-bolt text-amber-500 mr-2"></i> Quick Actions
+      </h2>
+      <span class="text-xs text-slate-400">Common procurement & sales shortcuts</span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      
+      <!-- Create New Requirement (Blue) -->
+      <a href="{% url 'requirements-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
+        <i class="fa-solid fa-file-circle-plus mr-2 text-sm"></i>
+        <span>Create Requirement</span>
+      </a>
+
+      <!-- Add Product/Service (Green) -->
+      <a href="{% url 'products-create' %}" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
+        <i class="fa-solid fa-box-open mr-2 text-sm"></i>
+        <span>Add Product/Service</span>
+      </a>
+
+      <!-- Find Suppliers (AI) (Purple) -->
+      <a href="{% url 'find-suppliers' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
+        <i class="fa-solid fa-wand-magic-sparkles mr-2 text-sm"></i>
+        <span>Find Suppliers (AI)</span>
+      </a>
+
+      <!-- Find Buyers (AI) (Orange) -->
+      <a href="{% url 'find-buyers' %}" class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
+        <i class="fa-solid fa-crosshairs mr-2 text-sm"></i>
+        <span>Find Buyers (AI)</span>
+      </a>
+
+      <!-- Invite Team Member (Dark Slate) -->
+      {% if rbac.is_company_admin or rbac.is_super_admin %}
+      <a href="{% url 'company-team-web' %}" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
+        <i class="fa-solid fa-user-plus mr-2 text-sm"></i>
+        <span>Invite Team Member</span>
+      </a>
+      {% else %}
+      <button disabled class="bg-slate-100 text-slate-400 font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center cursor-not-allowed text-center border border-slate-200">
+        <i class="fa-solid fa-user-plus mr-2 text-sm"></i>
+        <span>Invite Member</span>
+      </button>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- 3. THIRD ROW: RECENT SEARCHES & RECENT ACTIVITY -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    
+    <!-- Recent Searches Table -->
+    <div class="lg:col-span-8 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-bold text-slate-900">Recent Searches</h2>
+        <a href="{% url 'requirements-list' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
+          View all <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
+        </a>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-semibold">
+              <th class="pb-3 pl-2 w-8">#</th>
+              <th class="pb-3">Item / Product</th>
+              <th class="pb-3">Search Scope</th>
+              <th class="pb-3">Results</th>
+              <th class="pb-3">Status</th>
+              <th class="pb-3 pr-2 text-right">Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for item in recent_searches %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3.5 pl-2 font-medium text-slate-400">{{ item.id }}</td>
+              <td class="py-3.5 font-semibold text-slate-800 flex items-center">
+                <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-2.5 shrink-0 text-xs">
+                  {% if item.icon == 'cart' %}
+                    <i class="fa-solid fa-cart-shopping"></i>
+                  {% elif item.icon == 'gear' %}
+                    <i class="fa-solid fa-gear"></i>
+                  {% elif item.icon == 'chair' %}
+                    <i class="fa-solid fa-couch"></i>
+                  {% else %}
+                    <i class="fa-solid fa-box"></i>
+                  {% endif %}
+                </span>
+                <span>{{ item.item }}</span>
+              </td>
+              <td class="py-3.5 font-medium text-blue-600">{{ item.scope }}</td>
+              <td class="py-3.5 font-medium text-slate-700">{{ item.results }}</td>
+              <td class="py-3.5">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                  {{ item.status }}
+                </span>
+              </td>
+              <td class="py-3.5 pr-2 text-right text-slate-500 font-medium">{{ item.date }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent Activity Timeline -->
+    <div class="lg:col-span-4 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-bold text-slate-900">Recent Activity</h2>
+        <a href="#" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
+          View all <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
+        </a>
+      </div>
+
+      <div class="space-y-4 flex-1">
+        {% for act in recent_activities %}
+        <div class="flex items-start space-x-3">
+          <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs mt-0.5
+            {% if act.color == 'green' %}bg-emerald-100 text-emerald-600
+            {% elif act.color == 'blue' %}bg-blue-100 text-blue-600
+            {% elif act.color == 'orange' %}bg-amber-100 text-amber-600
+            {% elif act.color == 'purple' %}bg-purple-100 text-purple-600
+            {% else %}bg-slate-100 text-slate-600{% endif %}">
+            {% if act.icon_type == 'building' %}
+              <i class="fa-solid fa-building"></i>
+            {% elif act.icon_type == 'users' %}
+              <i class="fa-solid fa-user-check"></i>
+            {% elif act.icon_type == 'file-text' %}
+              <i class="fa-solid fa-file-circle-check"></i>
+            {% elif act.icon_type == 'user-plus' %}
+              <i class="fa-solid fa-user-plus"></i>
+            {% elif act.icon_type == 'credit-card' %}
+              <i class="fa-solid fa-shield-check"></i>
+            {% else %}
+              <i class="fa-solid fa-bell"></i>
+            {% endif %}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-semibold text-slate-800 leading-snug">{{ act.title }}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">{{ act.time_ago }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 4. FOURTH ROW: MY COMPANY, TOP SUPPLIERS, SUBSCRIPTION & CREDITS -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    
+    <!-- My Company Card -->
+    <div class="lg:col-span-4 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div>
+        <h2 class="text-sm font-bold text-slate-900 mb-4">My Company</h2>
+        
+        <div class="flex items-start space-x-3 pb-4 border-b border-slate-100">
+          <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg shrink-0">
+            <i class="fa-solid fa-building"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-slate-900 text-sm truncate">{{ company_summary.name }}</div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 mt-1">
+              {{ company_summary.type_display }}
+            </span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-y-2.5 pt-4 text-xs">
+          <div>
+            <span class="text-slate-400 block text-[11px]">Industry</span>
+            <span class="font-semibold text-slate-800">{{ company_summary.industry }}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[11px]">Total Users</span>
+            <span class="font-bold text-slate-900">{{ company_summary.total_users }}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[11px]">Company Size</span>
+            <span class="font-semibold text-slate-800">{{ company_summary.company_size }}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[11px]">Active Searches</span>
+            <span class="font-bold text-slate-900">{{ company_summary.active_searches }}</span>
+          </div>
+          <div class="col-span-1">
+            <span class="text-slate-400 block text-[11px]">Website</span>
+            <a href="https://{{ company_summary.website }}" target="_blank" class="font-semibold text-blue-600 hover:underline truncate block">
+              {{ company_summary.website }}
+            </a>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[11px]">Active Leads</span>
+            <span class="font-bold text-slate-900">{{ company_summary.active_leads }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
+        <a href="{% url 'company-profile-web' %}" class="w-full text-center px-3 py-2 border border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold rounded-lg text-xs transition">
+          Edit Profile
+        </a>
+      </div>
+    </div>
+
+    <!-- Top Suppliers (Based on Recent Searches) -->
+    <div class="lg:col-span-5 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-sm font-bold text-slate-900">Top Suppliers</h2>
+          <span class="text-[11px] text-slate-400">(Based on Recent Searches)</span>
+        </div>
+        <a href="{% url 'saved-suppliers' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
+          View all <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
+        </a>
+      </div>
+
+      <div class="overflow-x-auto flex-1">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-semibold">
+              <th class="pb-2.5 pl-2 w-8">#</th>
+              <th class="pb-2.5">Supplier</th>
+              <th class="pb-2.5">Location</th>
+              <th class="pb-2.5 pr-2 text-right">Match Score</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for sup in top_suppliers %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-2.5 pl-2 font-medium text-slate-400">{{ sup.id }}</td>
+              <td class="py-2.5 font-semibold text-slate-800 flex items-center">
+                <span class="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center mr-2 shrink-0 text-xs">
+                  {% if sup.icon == 'globe' %}
+                    <i class="fa-solid fa-globe"></i>
+                  {% elif sup.icon == 'building' %}
+                    <i class="fa-solid fa-building"></i>
+                  {% elif sup.icon == 'chip' %}
+                    <i class="fa-solid fa-microchip"></i>
+                  {% else %}
+                    <i class="fa-solid fa-gear"></i>
+                  {% endif %}
+                </span>
+                <span class="truncate">{{ sup.name }}</span>
+              </td>
+              <td class="py-2.5 text-slate-500 font-medium">{{ sup.location }}</td>
+              <td class="py-2.5 pr-2 text-right">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold 
+                  {% if sup.score >= 80 %}bg-emerald-100 text-emerald-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                  {{ sup.score }}%
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Subscription & Credits -->
+    <div class="lg:col-span-3 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+      <div>
+        <h2 class="text-sm font-bold text-slate-900 mb-3">Subscription & Credits</h2>
+        
+        <!-- Circular usage gauge & Next billing -->
+        <div class="flex items-center space-x-3 mb-4">
+          <div class="relative w-16 h-16 flex items-center justify-center shrink-0">
+            <canvas id="creditGaugeChart"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+              <span class="text-xs font-black text-slate-800 leading-none">{{ metrics.credits_used_percent }}%</span>
+              <span class="text-[8px] text-slate-400 font-semibold">used</span>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center text-xs font-bold text-amber-600">
+              <i class="fa-solid fa-crown mr-1 text-amber-500"></i> Pro Plan
+            </div>
+            <div class="text-[11px] text-slate-400 mt-0.5">Next Billing</div>
+            <div class="text-xs font-semibold text-slate-800">{{ subscription.next_billing }}</div>
+          </div>
+        </div>
+
+        <!-- Upgrade Button -->
+        <a href="{% url 'subscription-billing-web' %}" class="w-full text-center block bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 px-3 rounded-lg transition shadow-sm mb-4">
+          Upgrade Plan
+        </a>
+
+        <!-- Plan Features List -->
+        <div class="space-y-1.5 text-xs text-slate-600">
+          <div class="font-bold text-slate-700 text-[11px] uppercase tracking-wider mb-1">Plan Features</div>
+          <div class="flex items-center text-slate-600">
+            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Advanced AI Search
+          </div>
+          <div class="flex items-center text-slate-600">
+            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Global Suppliers Access
+          </div>
+          <div class="flex items-center text-slate-600">
+            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Export Reports
+          </div>
+          <div class="flex items-center text-slate-600">
+            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Priority Support
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Mini Donut Gauge: Credits Used
+  const gaugeCtx = document.getElementById('creditGaugeChart').getContext('2d');
+  new Chart(gaugeCtx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [{{ metrics.credits_used_percent }}, 100 - {{ metrics.credits_used_percent }}],
+        backgroundColor: ['#2563EB', '#E2E8F0'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '80%',
+      rotation: -90,
+      circumference: 360,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      }
+    }
+  });
+</script>
+{% endblock %}
