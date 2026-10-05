@@ -5,7 +5,7 @@ from apps.accounts.utils import generate_password_reset_token
 from apps.companies.models import Company, CompanyMember, CompanyPermission, MemberPermission
 from apps.billing.models import Subscription
 from apps.requirements.models import Requirement
-from apps.catalog.models import Product
+from apps.catalog.models import Product, Category, ProductImage
 from apps.ai_search.models import SearchJob
 
 
@@ -872,6 +872,330 @@ class DynamicCompanyTypeAndRBACTestCase(TestCase):
         self.assertEqual(del_resp.status_code, 200)
         self.buyer_employee.refresh_from_db()
         self.assertFalse(self.buyer_employee.is_active)
+
+
+class SellerModuleTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        # 1. Company ABC (Seller)
+        self.abc_admin = User.objects.create_user(
+            email="admin@abctraders.com",
+            password="Password@123",
+            first_name="Ajay",
+            last_name="Traders",
+        )
+        self.abc_company = Company.objects.create(
+            name="ABC Traders",
+            company_type=Company.CompanyType.SELLER,
+            created_by=self.abc_admin,
+            city="Pune",
+        )
+        CompanyMember.objects.create(
+            user=self.abc_admin,
+            company=self.abc_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # ABC Reader (Company User with only READ permission)
+        self.abc_reader = User.objects.create_user(
+            email="reader@abctraders.com",
+            password="Password@123",
+            first_name="Ramesh",
+            last_name="Reader",
+        )
+        self.abc_reader_member = CompanyMember.objects.create(
+            user=self.abc_reader,
+            company=self.abc_company,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+        perm_read, _ = CompanyPermission.objects.get_or_create(module="products", permission="READ")
+        MemberPermission.objects.create(member=self.abc_reader_member, permission=perm_read)
+
+        # 2. Company XYZ (Seller)
+        self.xyz_admin = User.objects.create_user(
+            email="admin@xyztraders.com",
+            password="Password@123",
+            first_name="Xavier",
+            last_name="Traders",
+        )
+        self.xyz_company = Company.objects.create(
+            name="XYZ Traders",
+            company_type=Company.CompanyType.SELLER,
+            created_by=self.xyz_admin,
+            city="Ahmedabad",
+        )
+        CompanyMember.objects.create(
+            user=self.xyz_admin,
+            company=self.xyz_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # 3. Company Buyer (Buyer only)
+        self.buyer_admin = User.objects.create_user(
+            email="admin@buyeronly.com",
+            password="Password@123",
+            first_name="Bharat",
+            last_name="Buyer",
+        )
+        self.buyer_company = Company.objects.create(
+            name="Buyer Only Corp",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.buyer_admin,
+        )
+        CompanyMember.objects.create(
+            user=self.buyer_admin,
+            company=self.buyer_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Category
+        self.category = Category.objects.create(name="Pumps & Valves", hsn_code="8413")
+
+        # Existing Products:
+        # ABC Traders: Product A, Product B
+        self.prod_a = Product.objects.create(
+            company=self.abc_company,
+            name="Product A - ANSI Pump",
+            category=self.category,
+            price=15000.00,
+            minimum_order_quantity=2,
+            availability=Product.Availability.IN_STOCK,
+            created_by=self.abc_admin,
+        )
+        self.prod_b = Product.objects.create(
+            company=self.abc_company,
+            name="Product B - Control Valve",
+            category=self.category,
+            price=8500.00,
+            minimum_order_quantity=5,
+            availability=Product.Availability.MADE_TO_ORDER,
+            created_by=self.abc_admin,
+        )
+
+        # XYZ Traders: Product X
+        self.prod_x = Product.objects.create(
+            company=self.xyz_company,
+            name="Product X - XYZ Boiler",
+            category=self.category,
+            price=95000.00,
+            minimum_order_quantity=1,
+            availability=Product.Availability.IN_STOCK,
+            created_by=self.xyz_admin,
+        )
+
+    def test_seller_dashboard_view(self):
+        """Seller Company Admin sees Seller Dashboard with real active products count"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Seller Dashboard")
+        self.assertContains(response, "Products Catalog")
+        # ABC Traders has 2 active products
+        self.assertContains(response, "2")
+        # Buyer procurement section is not shown for seller-only company
+        self.assertNotContains(response, "My Requirements")
+
+    def test_seller_product_list_and_detail_web(self):
+        """Seller can view their product list and product details"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+
+        # Product list
+        list_resp = self.client.get(reverse("products-list"))
+        self.assertEqual(list_resp.status_code, 200)
+        self.assertContains(list_resp, "Product A - ANSI Pump")
+        self.assertContains(list_resp, "Product B - Control Valve")
+        # Multi-tenancy: XYZ's product X is NOT visible
+        self.assertNotContains(list_resp, "Product X - XYZ Boiler")
+
+        # Product detail
+        detail_resp = self.client.get(reverse("product-detail", kwargs={"pk": self.prod_a.id}))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertContains(detail_resp, "Product A - ANSI Pump")
+        self.assertContains(detail_resp, "15000.00")
+        self.assertContains(detail_resp, "In Stock")
+
+    def test_seller_product_create_web(self):
+        """Seller Admin can add a new product to their catalog"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+
+        post_data = {
+            "name": "Product C - Industrial Flange",
+            "category_id": self.category.id,
+            "description": "High pressure carbon steel pipe flanges",
+            "specifications": "Material: ASTM A105, Pressure Class: 300#",
+            "price": "450.00",
+            "currency": "INR",
+            "minimum_order_quantity": "25",
+            "unit": "pcs",
+            "availability": "IN_STOCK",
+            "location": "Pune, India",
+            "image_url": "https://example.com/flange.jpg",
+            "search_scope": "country",
+        }
+        create_resp = self.client.post(reverse("products-create"), post_data)
+        self.assertEqual(create_resp.status_code, 302)
+
+        new_prod = Product.objects.get(name="Product C - Industrial Flange")
+        self.assertEqual(new_prod.company, self.abc_company)
+        self.assertEqual(new_prod.created_by, self.abc_admin)
+        self.assertEqual(float(new_prod.price), 450.00)
+        self.assertEqual(float(new_prod.minimum_order_quantity), 25.0)
+        self.assertFalse(new_prod.is_deleted)
+        self.assertEqual(new_prod.images.count(), 1)
+        self.assertEqual(new_prod.images.first().image_url, "https://example.com/flange.jpg")
+
+    def test_seller_product_edit_web(self):
+        """Seller Admin can update existing product specifications and price"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+
+        edit_data = {
+            "name": "Product A - ANSI Pump (Updated Edition)",
+            "category_id": self.category.id,
+            "description": "Updated high performance pump",
+            "specifications": "Power: 75HP",
+            "price": "18500.00",
+            "currency": "INR",
+            "minimum_order_quantity": "4",
+            "unit": "sets",
+            "availability": "MADE_TO_ORDER",
+            "location": "Mumbai Factory",
+        }
+        edit_resp = self.client.post(reverse("product-edit", kwargs={"pk": self.prod_a.id}), edit_data)
+        self.assertEqual(edit_resp.status_code, 302)
+
+        self.prod_a.refresh_from_db()
+        self.assertEqual(self.prod_a.name, "Product A - ANSI Pump (Updated Edition)")
+        self.assertEqual(float(self.prod_a.price), 18500.00)
+        self.assertEqual(float(self.prod_a.minimum_order_quantity), 4.0)
+        self.assertEqual(self.prod_a.availability, Product.Availability.MADE_TO_ORDER)
+
+    def test_seller_product_soft_delete_web(self):
+        """Deleting a product performs a soft delete (is_deleted=True), never hard delete"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+
+        delete_resp = self.client.post(reverse("product-delete", kwargs={"pk": self.prod_a.id}))
+        self.assertEqual(delete_resp.status_code, 302)
+
+        # Record still exists in MySQL DB!
+        self.prod_a.refresh_from_db()
+        self.assertTrue(self.prod_a.is_deleted)
+        self.assertIsNotNone(self.prod_a.deleted_at)
+
+        # Removed from product list context and table links
+        list_resp = self.client.get(reverse("products-list"))
+        self.assertNotIn(self.prod_a, list_resp.context["products"])
+        self.assertNotContains(list_resp, f"/sales/products/{self.prod_a.id}/")
+
+    def test_seller_multi_tenant_isolation(self):
+        """Strict isolation: ABC Traders cannot view, edit, or delete XYZ's products"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+
+        # 1. ABC cannot view XYZ's product X (404)
+        detail_resp = self.client.get(reverse("product-detail", kwargs={"pk": self.prod_x.id}))
+        self.assertEqual(detail_resp.status_code, 404)
+
+        # 2. ABC cannot edit XYZ's product X (404)
+        edit_resp = self.client.post(reverse("product-edit", kwargs={"pk": self.prod_x.id}), {
+            "name": "Hacked Product",
+            "price": "1.00",
+        })
+        self.assertEqual(edit_resp.status_code, 404)
+
+        # 3. ABC cannot delete XYZ's product X (404)
+        del_resp = self.client.post(reverse("product-delete", kwargs={"pk": self.prod_x.id}))
+        self.assertEqual(del_resp.status_code, 404)
+        self.prod_x.refresh_from_db()
+        self.assertFalse(self.prod_x.is_deleted)
+
+    def test_seller_product_api_crud_and_soft_delete(self):
+        """REST API: Scoped list, create, detail, update, and soft-delete"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+
+        # 1. GET products list API
+        list_resp = self.client.get(reverse("api-products-list"))
+        self.assertEqual(list_resp.status_code, 200)
+        items = list_resp.json()
+        item_names = [i["name"] for i in items]
+        self.assertIn("Product A - ANSI Pump", item_names)
+        self.assertIn("Product B - Control Valve", item_names)
+        self.assertNotIn("Product X - XYZ Boiler", item_names)
+
+        # 2. POST create product API
+        post_resp = self.client.post(
+            reverse("api-products-list"),
+            {
+                "name": "Product D - High Temp Gasket",
+                "price": "120.00",
+                "minimum_order_quantity": 50,
+                "unit": "pcs",
+                "availability": "IN_STOCK",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(post_resp.status_code, 201)
+        new_id = post_resp.json()["id"]
+
+        # 3. GET detail API
+        detail_resp = self.client.get(reverse("api-products-detail", kwargs={"pk": new_id}))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertEqual(detail_resp.json()["name"], "Product D - High Temp Gasket")
+
+        # 4. PATCH update API
+        patch_resp = self.client.patch(
+            reverse("api-products-detail", kwargs={"pk": new_id}),
+            {"price": "135.00"},
+            content_type="application/json",
+        )
+        self.assertEqual(patch_resp.status_code, 200)
+        self.assertEqual(float(patch_resp.json()["price"]), 135.00)
+
+        # 5. DELETE API (soft-delete)
+        del_resp = self.client.delete(reverse("api-products-detail", kwargs={"pk": new_id}))
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertTrue(del_resp.json()["is_deleted"])
+
+        del_prod = Product.objects.get(id=new_id)
+        self.assertTrue(del_prod.is_deleted)
+
+    def test_seller_rbac_permission_checks(self):
+        """Company User with only READ permission can view but cannot create, edit, or delete"""
+        self.client.login(email="reader@abctraders.com", password="Password@123")
+
+        # Can view list and detail
+        self.assertEqual(self.client.get(reverse("products-list")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("product-detail", kwargs={"pk": self.prod_a.id})).status_code, 200)
+
+        # Cannot create
+        create_resp = self.client.post(reverse("products-create"), {"name": "Blocked Item"})
+        self.assertEqual(create_resp.status_code, 302)
+
+        # Cannot edit
+        edit_resp = self.client.post(reverse("product-edit", kwargs={"pk": self.prod_a.id}), {"name": "Blocked Edit"})
+        self.assertEqual(edit_resp.status_code, 302)
+
+        # Cannot delete
+        del_resp = self.client.post(reverse("product-delete", kwargs={"pk": self.prod_a.id}))
+        self.assertEqual(del_resp.status_code, 302)
+        self.prod_a.refresh_from_db()
+        self.assertFalse(self.prod_a.is_deleted)
+
+    def test_buyer_company_cannot_access_seller_products(self):
+        """Buyer-only company is blocked from Seller product management"""
+        self.client.login(email="admin@buyeronly.com", password="Password@123")
+
+        # Web view redirects to dashboard
+        web_resp = self.client.get(reverse("products-list"))
+        self.assertEqual(web_resp.status_code, 302)
+
+        # REST API returns 403 Forbidden
+        api_resp = self.client.get(reverse("api-products-list"))
+        self.assertEqual(api_resp.status_code, 403)
+
 
 
 

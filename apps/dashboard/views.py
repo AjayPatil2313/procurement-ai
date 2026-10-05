@@ -49,13 +49,17 @@ def get_dashboard_data_for_company(company):
     if total_searches == 0:
         total_searches = 28
 
-    # 2. Found Suppliers
-    found_suppliers_count = SearchResult.objects.filter(
-        search_job__company=company,
-        result_type=SearchResult.ResultType.SUPPLIER,
-    ).count()
-    if found_suppliers_count == 0:
-        found_suppliers_count = 186
+    # 2. Found Suppliers / Products
+    real_products_count = Product.objects.filter(company=company, is_deleted=False).count()
+    if company.company_type == Company.CompanyType.SELLER:
+        found_suppliers_count = real_products_count
+    else:
+        found_suppliers_count = SearchResult.objects.filter(
+            search_job__company=company,
+            result_type=SearchResult.ResultType.SUPPLIER,
+        ).count()
+        if found_suppliers_count == 0:
+            found_suppliers_count = 186
 
     # 3. Active Leads
     active_leads_count = SavedItem.objects.filter(
@@ -65,11 +69,15 @@ def get_dashboard_data_for_company(company):
     if active_leads_count == 0:
         active_leads_count = 54
 
-    # 4. Search Scope breakdown
-    # Nearby, Country, Global
-    nearby_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.NEARBY).count()
-    country_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.COUNTRY).count()
-    global_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.GLOBAL).count()
+    # 4. Search Scope breakdown (Requirements for Buyer, Products for Seller)
+    if company.company_type == Company.CompanyType.SELLER:
+        nearby_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.NEARBY, is_deleted=False).count()
+        country_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.COUNTRY, is_deleted=False).count()
+        global_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.GLOBAL, is_deleted=False).count()
+    else:
+        nearby_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.NEARBY).count()
+        country_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.COUNTRY).count()
+        global_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.GLOBAL).count()
     scope_total = nearby_count + country_count + global_count
 
     if scope_total == 0:

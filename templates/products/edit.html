@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Add Product — AI Sales Platform{% endblock %}
+{% block title %}Edit {{ product.name }} — AI Sales Platform{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6">
@@ -13,22 +13,24 @@
         <span>&bull;</span>
         <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Products</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">Add Product</span>
+        <a href="{% url 'product-detail' product.id %}" class="hover:text-blue-600 transition">{{ product.name|truncatechars:20 }}</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Edit</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-        <i class="fa-solid fa-plus-circle text-blue-600"></i>
-        <span>Add New Product / Item</span>
+        <i class="fa-solid fa-pen-to-square text-blue-600"></i>
+        <span>Edit Product</span>
       </h1>
       <p class="text-xs text-slate-500 mt-0.5">
-        Register an item in your catalog for company: <strong class="text-slate-700">{{ company.name }}</strong>
+        Update catalog specifications and commercial terms for: <strong class="text-slate-700">{{ product.name }}</strong>
       </p>
     </div>
-    <a href="{% url 'products-list' %}" class="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-xl bg-white border border-slate-200 transition">
-      <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Catalog
+    <a href="{% url 'product-detail' product.id %}" class="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-xl bg-white border border-slate-200 transition">
+      <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Detail
     </a>
   </div>
 
-  <!-- Product Creation Form -->
+  <!-- Product Edit Form -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
     <form method="POST" class="space-y-6">
       {% csrf_token %}
@@ -50,8 +52,8 @@
               type="text" 
               name="name" 
               required 
-              value="{{ form_data.name|default:'' }}"
-              placeholder="e.g., Industrial Centrifugal Water Pump 50HP" 
+              value="{{ product.name }}"
+              placeholder="Product Name" 
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
             >
           </div>
@@ -62,7 +64,7 @@
             <select name="category_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
               <option value="">Select Category...</option>
               {% for cat in categories %}
-                <option value="{{ cat.id }}" {% if form_data.category_id == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                <option value="{{ cat.id }}" {% if product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -74,9 +76,9 @@
           <textarea 
             name="description" 
             rows="3" 
-            placeholder="Comprehensive description of product features, use cases, target industries..."
+            placeholder="Comprehensive description of product features..."
             class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-          >{{ form_data.description|default:'' }}</textarea>
+          >{{ product.description }}</textarea>
         </div>
 
         <!-- Technical Specifications -->
@@ -87,9 +89,9 @@
           <textarea 
             name="specifications" 
             rows="3" 
-            placeholder="Material: SS316, Flow Rate: 1200 LPM, Head: 45m, Power: 3-Phase 415V 50Hz, Certifications: ISO 9001, CE"
+            placeholder="Material, Flow Rate, Power, Certifications..."
             class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-          >{{ form_data.specifications|default:'' }}</textarea>
+          >{{ product.specifications }}</textarea>
         </div>
       </div>
 
@@ -108,7 +110,7 @@
               type="number" 
               step="0.01" 
               name="price" 
-              value="{{ form_data.price|default:'' }}"
+              value="{{ product.price|default:product.price_min|default:'' }}"
               placeholder="e.g., 25000" 
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
             >
@@ -118,11 +120,11 @@
           <div>
             <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Currency</label>
             <select name="currency" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
-              <option value="INR" selected>INR (₹)</option>
-              <option value="USD">USD ($)</option>
-              <option value="EUR">EUR (€)</option>
-              <option value="GBP">GBP (£)</option>
-              <option value="AED">AED (د.إ)</option>
+              <option value="INR" {% if product.currency == 'INR' %}selected{% endif %}>INR (₹)</option>
+              <option value="USD" {% if product.currency == 'USD' %}selected{% endif %}>USD ($)</option>
+              <option value="EUR" {% if product.currency == 'EUR' %}selected{% endif %}>EUR (€)</option>
+              <option value="GBP" {% if product.currency == 'GBP' %}selected{% endif %}>GBP (£)</option>
+              <option value="AED" {% if product.currency == 'AED' %}selected{% endif %}>AED (د.إ)</option>
             </select>
           </div>
 
@@ -133,7 +135,7 @@
               type="number" 
               step="1" 
               name="minimum_order_quantity" 
-              value="{{ form_data.minimum_order_quantity|default:'1' }}"
+              value="{{ product.minimum_order_quantity|default:product.moq|default:'1' }}"
               placeholder="1" 
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
             >
@@ -145,8 +147,8 @@
             <input 
               type="text" 
               name="unit" 
-              value="{{ form_data.unit|default:'pcs' }}"
-              placeholder="pcs, kg, tons, meters" 
+              value="{{ product.unit|default:'pcs' }}"
+              placeholder="pcs, kg, tons" 
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
             >
           </div>
@@ -157,10 +159,10 @@
           <div>
             <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Availability / Stock</label>
             <select name="availability" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
-              <option value="IN_STOCK" selected>In Stock</option>
-              <option value="MADE_TO_ORDER">Made to Order</option>
-              <option value="AVAILABLE_ON_REQUEST">Available on Request</option>
-              <option value="OUT_OF_STOCK">Out of Stock</option>
+              <option value="IN_STOCK" {% if product.availability == 'IN_STOCK' %}selected{% endif %}>In Stock</option>
+              <option value="MADE_TO_ORDER" {% if product.availability == 'MADE_TO_ORDER' %}selected{% endif %}>Made to Order</option>
+              <option value="AVAILABLE_ON_REQUEST" {% if product.availability == 'AVAILABLE_ON_REQUEST' %}selected{% endif %}>Available on Request</option>
+              <option value="OUT_OF_STOCK" {% if product.availability == 'OUT_OF_STOCK' %}selected{% endif %}>Out of Stock</option>
             </select>
           </div>
 
@@ -170,7 +172,7 @@
             <input 
               type="text" 
               name="location" 
-              value="{{ form_data.location|default:company.city|default:'Mumbai, India' }}"
+              value="{{ product.location }}"
               placeholder="e.g., Pune Warehouse, Maharashtra" 
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
             >
@@ -180,9 +182,9 @@
           <div>
             <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Buyer Target Scope</label>
             <select name="search_scope" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
-              <option value="country" selected>Country (Domestic Buyers)</option>
-              <option value="global">Global (International Buyers)</option>
-              <option value="nearby">Nearby (Local Industrial Hubs)</option>
+              <option value="country" {% if product.search_scope == 'country' %}selected{% endif %}>Country (Domestic Buyers)</option>
+              <option value="global" {% if product.search_scope == 'global' %}selected{% endif %}>Global (International Buyers)</option>
+              <option value="nearby" {% if product.search_scope == 'nearby' %}selected{% endif %}>Nearby (Local Industrial Hubs)</option>
             </select>
           </div>
         </div>
@@ -199,25 +201,24 @@
             <input 
               type="url" 
               name="image_url" 
-              value="{{ form_data.image_url|default:'' }}"
+              value="{{ primary_image_url }}"
               placeholder="https://example.com/images/pump-50hp.jpg" 
               class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
             >
           </div>
-          <p class="text-[11px] text-slate-400 mt-1">Provide an image link to show high-resolution photos on your product catalog.</p>
         </div>
       </div>
 
       <!-- Action Buttons -->
       <div class="pt-6 border-t border-slate-100 flex items-center justify-between">
-        <a href="{% url 'products-list' %}" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition">
+        <a href="{% url 'product-detail' product.id %}" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition">
           Cancel
         </a>
         <button 
           type="submit" 
           class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center shadow-md shadow-blue-500/20 transition"
         >
-          <i class="fa-solid fa-check mr-2"></i> Save & Publish Product
+          <i class="fa-solid fa-check mr-2"></i> Update Product
         </button>
       </div>
 

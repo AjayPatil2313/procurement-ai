@@ -23,6 +23,9 @@ from apps.requirements.web_views import (
 from apps.catalog.web_views import (
     products_list_view,
     product_create_view,
+    product_detail_view,
+    product_edit_view,
+    product_delete_view,
     find_buyers_view,
 )
 from apps.leads.web_views import (
@@ -76,6 +79,9 @@ urlpatterns = [
     path("sales/find-buyers/", find_buyers_view, name="find-buyers"),
     path("sales/products/", products_list_view, name="products-list"),
     path("sales/products/create/", product_create_view, name="products-create"),
+    path("sales/products/<int:pk>/", product_detail_view, name="product-detail"),
+    path("sales/products/<int:pk>/edit/", product_edit_view, name="product-edit"),
+    path("sales/products/<int:pk>/delete/", product_delete_view, name="product-delete"),
     path("sales/leads/", leads_list_view, name="leads-list"),
     path("sales/saved-leads/", saved_leads_view, name="saved-leads"),
     path("sales/export-reports/", export_reports_view, name="sales-export-reports"),
