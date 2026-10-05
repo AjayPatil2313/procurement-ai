@@ -20,14 +20,13 @@ urlpatterns = [
     path(
         "register/",
         RegisterAPIView.as_view(),
-        name="register"
+        name="api-register"
     ),
-
 
     path(
         "login/",
         TokenObtainPairView.as_view(),
-        name="login"
+        name="api-login"
     ),
 
     path(
@@ -47,17 +46,16 @@ urlpatterns = [
     name="verify-email",
     ),
     path(
-    "forgot-password/",
-    ForgotPasswordAPIView.as_view(),
-    name="forgot-password",
+        "forgot-password/",
+        ForgotPasswordAPIView.as_view(),
+        name="api-forgot-password",
     ),
 
     path(
-    "reset-password/",
-    ResetPasswordAPIView.as_view(),
-    name="reset-password",
-   ),
-   
+        "reset-password/",
+        ResetPasswordAPIView.as_view(),
+        name="api-reset-password",
+    ),
 ]
 
 

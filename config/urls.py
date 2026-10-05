@@ -2,7 +2,13 @@ from django.contrib import admin
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from apps.accounts.web_views import login_view, logout_view
+from apps.accounts.web_views import (
+    login_view,
+    logout_view,
+    register_view,
+    forgot_password_view,
+    reset_password_view,
+)
 from apps.dashboard.views import global_search_view
 from apps.companies.web_views import (
     company_profile_web_view,
@@ -39,10 +45,14 @@ urlpatterns = [
 
     # Web Auth
     path("login/", login_view, name="login"),
+    path("register/", register_view, name="register"),
+    path("signup/", lambda request: redirect("register"), name="signup"),
     path("logout/", logout_view, name="logout-web"),
+    path("forgot-password/", forgot_password_view, name="forgot-password"),
+    path("reset-password/<str:token>/", reset_password_view, name="reset-password"),
 
-    # Root redirect to Dashboard
-    path("", lambda request: redirect("dashboard"), name="root-redirect"),
+    # Root redirect: Login first, then enter project
+    path("", lambda request: redirect("dashboard") if request.user.is_authenticated else redirect("login"), name="root-redirect"),
 
     # Dashboard & Switchers
     path("dashboard/", include("apps.dashboard.urls")),
@@ -78,4 +88,7 @@ urlpatterns = [
     # REST APIs
     path("api/auth/", include("apps.accounts.urls")),
     path("api/companies/", include("apps.companies.urls")),
+    path("api/requirements/", include("apps.requirements.urls")),
+    path("api/catalog/", include("apps.catalog.urls")),
+    path("api/leads/", include("apps.leads.urls")),
 ]

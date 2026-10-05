@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Team Members & Access Control — {{ company.name }}{% endblock %}
+{% block title %}Users & Access Control — {{ company.name }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -8,18 +8,70 @@
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Team Members & Access Control</h1>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <i class="fa-solid fa-users text-blue-600"></i>
+        <span>User Management</span>
+      </h1>
       <p class="text-xs text-slate-500 mt-1">
-        Configure company users and granular 6-action access permissions
+        Team Members & Access Control &bull; Manage company users, configure accounts, and assign granular 6-action permissions
       </p>
     </div>
-    <button onclick="document.getElementById('addMemberModal').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex items-center shadow-sm transition">
-      <i class="fa-solid fa-user-plus mr-2"></i> Add Team Member
-    </button>
+    <div class="flex items-center gap-2">
+      <button onclick="document.getElementById('addMemberModal').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center shadow-md shadow-blue-500/20 transition">
+        <i class="fa-solid fa-user-plus mr-2"></i> Add User
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Stats Cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <!-- Total Users -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Users</div>
+        <div class="text-2xl font-black text-slate-900 mt-1">{{ total_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-users"></i>
+      </div>
+    </div>
+
+    <!-- Active Users -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Active Accounts</div>
+        <div class="text-2xl font-black text-emerald-600 mt-1">{{ active_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-user-check"></i>
+      </div>
+    </div>
+
+    <!-- Inactive Users -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Inactive Accounts</div>
+        <div class="text-2xl font-black text-slate-600 mt-1">{{ inactive_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center text-base">
+        <i class="fa-solid fa-user-slash"></i>
+      </div>
+    </div>
+
+    <!-- Company Admins -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Company Admins</div>
+        <div class="text-2xl font-black text-purple-600 mt-1">{{ admin_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-user-shield"></i>
+      </div>
+    </div>
   </div>
 
   <!-- RBAC Rules Callout -->
-  <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+  <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
     <div class="flex items-start space-x-3">
       <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 text-sm shadow">
         <i class="fa-solid fa-shield-halved"></i>
@@ -27,84 +79,139 @@
       <div>
         <div class="font-bold text-slate-900 text-sm">6-Action Role-Based Access Control (RBAC)</div>
         <p class="text-slate-600 mt-0.5">
-          <strong>Company Admin</strong> automatically has <strong>All 6 Permissions</strong> (<span class="font-semibold text-blue-700">Read, Edit, Update, Delete, Import, Export</span>). For <strong>Company Users</strong>, admins can assign any combination of these 6 permissions.
+          <strong>Company Admin</strong> automatically has <strong>All 6 Permissions</strong> (<span class="font-semibold text-blue-700">Read, Edit, Update, Delete, Import, Export</span>). For <strong>Company Users</strong>, admin can configure any specific permissions.
         </p>
       </div>
     </div>
     <div class="flex items-center space-x-2 shrink-0">
-      <span class="px-2 py-1 rounded bg-blue-100 text-blue-800 font-bold text-[11px]">Admin: All 6</span>
-      <span class="px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold text-[11px]">Users: Custom 6</span>
+      <span class="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-bold text-[11px]">Admin: All 6 Actions</span>
+      <span class="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-bold text-[11px]">User: Custom RBAC</span>
     </div>
   </div>
 
-  <!-- Members Table -->
+  <!-- Users Section Card -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-      <h2 class="text-sm font-bold text-slate-900">Current Members ({{ members|length }})</h2>
-      <span class="text-xs text-slate-400">Company: <strong class="text-slate-700">{{ company.name }}</strong></span>
+    
+    <!-- Table Header Toolbar -->
+    <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <h2 class="text-sm font-bold text-slate-900">User List ({{ members|length }})</h2>
+        <span class="text-xs text-slate-400">Company: <strong class="text-slate-700">{{ company.name }}</strong></span>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Search Input -->
+        <div class="relative w-full sm:w-60">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </span>
+          <input 
+            type="text" 
+            id="userSearchInput" 
+            onkeyup="filterUsers()" 
+            placeholder="Search by name, email..." 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
+
+        <!-- Role Filter -->
+        <select id="roleFilter" onchange="filterUsers()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          <option value="ALL">All Roles</option>
+          <option value="ADMIN">Company Admin</option>
+          <option value="USER">Company User</option>
+        </select>
+
+        <!-- Status Filter -->
+        <select id="statusFilter" onchange="filterUsers()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          <option value="ALL">All Status</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+        </select>
+      </div>
     </div>
 
+    <!-- Table -->
     <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
+      <table class="w-full text-left text-xs" id="usersTable">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-3 px-4">Member</th>
+            <th class="py-3 px-4">User</th>
             <th class="py-3 px-4">Role</th>
             <th class="py-3 px-4">Status</th>
-            <th class="py-3 px-4">Joined</th>
             <th class="py-3 px-4">Assigned Permissions (6 Actions)</th>
+            <th class="py-3 px-4">Joined Date</th>
             <th class="py-3 px-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for m in members %}
-          <tr class="hover:bg-slate-50/80 transition">
+          <tr class="user-row hover:bg-slate-50/80 transition" 
+              data-email="{{ m.user.email|lower }}" 
+              data-name="{{ m.user.first_name|lower }} {{ m.user.last_name|lower }}"
+              data-role="{{ m.role }}"
+              data-status="{% if m.user.is_active and m.is_active %}ACTIVE{% else %}INACTIVE{% endif %}">
+            
             <!-- User Info -->
-            <td class="py-4 px-4">
+            <td class="py-3.5 px-4">
               <div class="flex items-center space-x-3">
-                <div class="w-9 h-9 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center border border-slate-200 shrink-0">
-                  {{ m.user.first_name|first|default:"U" }}
+                <div class="w-9 h-9 rounded-xl {% if m.role == 'ADMIN' %}bg-purple-100 text-purple-700 border border-purple-200{% else %}bg-blue-100 text-blue-700 border border-blue-200{% endif %} font-black flex items-center justify-center shrink-0 text-xs">
+                  {{ m.user.first_name|first|default:"U"|upper }}
                 </div>
                 <div>
-                  <div class="font-bold text-slate-900">{{ m.user.first_name|default:"User" }} {{ m.user.last_name }}</div>
-                  <div class="text-[11px] text-slate-400">{{ m.user.email }}</div>
+                  <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>{{ m.user.first_name|default:"User" }} {{ m.user.last_name }}</span>
+                    {% if m.user.id == request.user.id %}
+                      <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 text-slate-700">You</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <span>{{ m.user.email }}</span>
+                    {% if m.user.is_email_verified %}
+                      <span title="Email verified" class="text-emerald-600"><i class="fa-solid fa-circle-check text-[10px]"></i></span>
+                    {% endif %}
+                  </div>
+                  {% if m.user.phone %}
+                    <div class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-phone text-[9px] mr-1"></i>{{ m.user.phone }}</div>
+                  {% endif %}
                 </div>
               </div>
             </td>
 
             <!-- Role -->
-            <td class="py-4 px-4">
+            <td class="py-3.5 px-4">
               {% if m.role == 'ADMIN' %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                  <i class="fa-solid fa-user-shield mr-1.5 text-blue-600"></i> Company Admin
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                  <i class="fa-solid fa-user-shield mr-1.5 text-purple-600"></i> Company Admin
                 </span>
               {% else %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                  <i class="fa-solid fa-user mr-1.5 text-slate-500"></i> Company User
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <i class="fa-solid fa-user-gear mr-1.5 text-blue-500"></i> Company User
                 </span>
               {% endif %}
             </td>
 
             <!-- Status -->
-            <td class="py-4 px-4">
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800">
-                <i class="fa-solid fa-circle text-[6px] mr-1 text-emerald-600"></i> Active
-              </span>
-            </td>
-
-            <!-- Joined Date -->
-            <td class="py-4 px-4 text-slate-500 font-medium">
-              {{ m.joined_at|date:"M d, Y" }}
+            <td class="py-3.5 px-4">
+              {% if m.user.is_active and m.is_active %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <i class="fa-solid fa-circle text-[6px] mr-1.5 text-emerald-600"></i> Active
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                  <i class="fa-solid fa-circle text-[6px] mr-1.5 text-rose-600"></i> Inactive
+                </span>
+              {% endif %}
             </td>
 
             <!-- 6 Permissions List / Badges -->
-            <td class="py-4 px-4">
+            <td class="py-3.5 px-4">
               {% if m.role == 'ADMIN' %}
                 <div class="space-y-1">
-                  <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    <i class="fa-solid fa-crown mr-1 text-amber-500"></i> All 6 Permissions (Admin Full Access)
+                  <div class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                    <i class="fa-solid fa-crown mr-1 text-amber-500"></i> Full Access (All 6 Permissions)
                   </div>
-                  <div class="flex flex-wrap gap-1 text-[10px]">
+                  <div class="flex flex-wrap gap-1 text-[9px]">
                     <span class="px-1.5 py-0.2 rounded font-semibold bg-blue-100 text-blue-800">Read</span>
                     <span class="px-1.5 py-0.2 rounded font-semibold bg-emerald-100 text-emerald-800">Edit</span>
                     <span class="px-1.5 py-0.2 rounded font-semibold bg-amber-100 text-amber-800">Update</span>
@@ -141,38 +248,98 @@
               {% endif %}
             </td>
 
-            <!-- Action Button -->
-            <td class="py-4 px-4 text-right">
-              {% if m.role == 'ADMIN' %}
-                <span class="text-xs text-slate-400 italic">
-                  <i class="fa-solid fa-lock text-[10px] mr-1"></i> Admin (Locked)
-                </span>
-              {% else %}
+            <!-- Joined Date -->
+            <td class="py-3.5 px-4 text-slate-500 font-medium">
+              {{ m.joined_at|date:"M d, Y" }}
+            </td>
+
+            <!-- Action Buttons -->
+            <td class="py-3.5 px-4 text-right">
+              <div class="flex items-center justify-end space-x-1.5">
+                <!-- Edit User -->
                 <button 
                   type="button" 
-                  onclick="openPermissionModal('{{ m.id }}', '{{ m.user.email }}', [{% for p in m.active_permissions %}'{{ p }}'{% if not forloop.last %},{% endif %}{% endfor %}])"
-                  class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs px-3 py-1.5 rounded-lg transition inline-flex items-center"
+                  onclick="openEditUserModal('{{ m.id }}', '{{ m.user.email }}', '{{ m.user.first_name }}', '{{ m.user.last_name }}', '{{ m.user.phone }}', '{{ m.role }}', {% if m.user.is_active and m.is_active %}true{% else %}false{% endif %}, {% if m.user.is_email_verified %}true{% else %}false{% endif %})"
+                  class="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-slate-200 transition"
+                  title="Edit User Details"
                 >
-                  <i class="fa-solid fa-sliders mr-1.5"></i> Edit Permissions
+                  <i class="fa-solid fa-pen-to-square text-xs"></i>
                 </button>
-              {% endif %}
+
+                <!-- Permissions (if not Admin) -->
+                {% if m.role == 'ADMIN' %}
+                  <span class="p-1.5 text-slate-300 cursor-not-allowed" title="Admin permissions cannot be restricted">
+                    <i class="fa-solid fa-lock text-xs"></i>
+                  </span>
+                {% else %}
+                  <button 
+                    type="button" 
+                    onclick="openPermissionModal('{{ m.id }}', '{{ m.user.email }}', [{% for p in m.active_permissions %}'{{ p }}'{% if not forloop.last %},{% endif %}{% endfor %}])"
+                    class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg border border-blue-200 transition"
+                    title="Manage 6 Permissions"
+                  >
+                    <i class="fa-solid fa-sliders text-xs"></i>
+                  </button>
+                {% endif %}
+
+                <!-- Activate / Deactivate Toggle -->
+                {% if m.user.id == request.user.id %}
+                  <span class="p-1.5 text-slate-300 cursor-not-allowed" title="You cannot deactivate your own account">
+                    <i class="fa-solid fa-ban text-xs"></i>
+                  </span>
+                {% else %}
+                  <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to {% if m.user.is_active and m.is_active %}deactivate{% else %}activate{% endif %} this user?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_status">
+                    <input type="hidden" name="member_id" value="{{ m.id }}">
+                    {% if m.user.is_active and m.is_active %}
+                      <button 
+                        type="submit" 
+                        title="Deactivate User Account"
+                        class="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg border border-amber-200 transition"
+                      >
+                        <i class="fa-solid fa-user-slash text-xs"></i>
+                      </button>
+                    {% else %}
+                      <button 
+                        type="submit" 
+                        title="Activate User Account"
+                        class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition"
+                      >
+                        <i class="fa-solid fa-user-check text-xs"></i>
+                      </button>
+                    {% endif %}
+                  </form>
+                {% endif %}
+              </div>
             </td>
+
           </tr>
           {% endfor %}
         </tbody>
       </table>
+
+      <!-- Empty state if table filtered out -->
+      <div id="noMatchMessage" class="hidden p-8 text-center text-slate-400 text-xs">
+        <i class="fa-solid fa-user-xmark text-2xl text-slate-300 mb-2 block"></i>
+        No users match the search filter.
+      </div>
     </div>
   </div>
 
 </div>
 
-<!-- ADD MEMBER MODAL -->
+<!-- 1. ADD USER MODAL -->
 <div id="addMemberModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+    
     <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-      <h3 class="font-bold text-slate-900 text-sm flex items-center">
-        <i class="fa-solid fa-user-plus text-blue-600 mr-2"></i> Add Team Member
-      </h3>
+      <div>
+        <h3 class="font-bold text-slate-900 text-sm flex items-center">
+          <i class="fa-solid fa-user-plus text-blue-600 mr-2"></i> Add Company User
+        </h3>
+        <p class="text-[11px] text-slate-500 mt-0.5">Create user login credentials and configure permissions</p>
+      </div>
       <button onclick="document.getElementById('addMemberModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
         <i class="fa-solid fa-xmark text-lg"></i>
       </button>
@@ -182,48 +349,319 @@
       {% csrf_token %}
       <input type="hidden" name="action" value="add_member">
       
+      <!-- Email Address (VARCHAR 254 UNIQUE) -->
       <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1">Email Address *</label>
-        <input type="email" name="email" required placeholder="colleague@company.com" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500">
+        <label class="block text-xs font-semibold text-slate-700 mb-1">
+          Email Address <span class="text-rose-500">*</span>
+          <span class="text-[10px] font-normal text-slate-400">(Login identifier)</span>
+        </label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-envelope"></i>
+          </span>
+          <input 
+            type="email" 
+            name="email" 
+            maxlength="254"
+            required 
+            placeholder="colleague@company.com" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
       </div>
 
+      <!-- Password (VARCHAR 128) -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">
+          Initial Password <span class="text-rose-500">*</span>
+          <span class="text-[10px] font-normal text-slate-400">(Hashed on save)</span>
+        </label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-lock"></i>
+          </span>
+          <input 
+            type="password" 
+            id="newMemberPassword"
+            name="password" 
+            maxlength="128"
+            required 
+            placeholder="Min. 6 characters" 
+            value="User@12345"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+          <button 
+            type="button" 
+            onclick="toggleNewMemberPasswordVisibility()" 
+            class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+          >
+            <i class="fa-solid fa-eye text-xs" id="newMemberPasswordIcon"></i>
+          </button>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1">Default suggested: <code class="text-slate-600 bg-slate-100 px-1 rounded">User@12345</code></p>
+      </div>
+
+      <!-- First Name & Last Name (VARCHAR 100) -->
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">First Name</label>
-          <input type="text" name="first_name" placeholder="John" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">First Name</label>
+          <input 
+            type="text" 
+            name="first_name" 
+            maxlength="100"
+            placeholder="Rahul" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name</label>
-          <input type="text" name="last_name" placeholder="Doe" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Last Name</label>
+          <input 
+            type="text" 
+            name="last_name" 
+            maxlength="100"
+            placeholder="Sharma" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
         </div>
       </div>
 
+      <!-- Phone (VARCHAR 20) -->
       <div>
-        <label class="block text-xs font-semibold text-slate-600 mb-1">Company Role *</label>
-        <select name="role" id="newMemberRole" onchange="toggleRoleNotice(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs">
+        <label class="block text-xs font-semibold text-slate-700 mb-1">
+          Phone Number 
+          <span class="text-[10px] font-normal text-slate-400">(Optional)</span>
+        </label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-phone"></i>
+          </span>
+          <input 
+            type="text" 
+            name="phone" 
+            maxlength="20"
+            placeholder="+91 98765 43210" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
+      </div>
+
+      <!-- Company Role -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Company Role <span class="text-rose-500">*</span></label>
+        <select name="role" id="newMemberRole" onchange="toggleRoleNotice(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
           <option value="USER" selected>Company User (Configurable 6 Permissions)</option>
           <option value="ADMIN">Company Admin (All 6 Permissions Full Access)</option>
         </select>
-        <p id="adminNotice" class="hidden text-[11px] text-blue-700 bg-blue-50 p-2 rounded mt-1.5 border border-blue-200">
-          <i class="fa-solid fa-info-circle mr-1"></i> Note: Company Admins automatically receive all 6 permissions (Read, Edit, Update, Delete, Import, Export).
+        <p id="adminNotice" class="hidden text-[11px] text-purple-700 bg-purple-50 p-2.5 rounded-xl mt-1.5 border border-purple-200">
+          <i class="fa-solid fa-crown mr-1"></i> Note: Company Admins automatically receive all 6 permissions (Read, Edit, Update, Delete, Import, Export).
         </p>
       </div>
 
+      <!-- Initial Permissions Selection -->
+      <div id="initialPermissionsSection">
+        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+          Assign Initial Permissions (6 Actions)
+        </label>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" name="permissions" value="READ" checked class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+            <span class="font-medium">Read</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" name="permissions" value="EDIT" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+            <span class="font-medium">Edit</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" name="permissions" value="UPDATE" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+            <span class="font-medium">Update</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" name="permissions" value="DELETE" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+            <span class="font-medium">Delete</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" name="permissions" value="IMPORT" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+            <span class="font-medium">Import</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" name="permissions" value="EXPORT" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+            <span class="font-medium">Export</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Verification & Active Status (BOOL) -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+          <input 
+            type="checkbox" 
+            name="is_email_verified" 
+            checked 
+            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+          >
+          <span>Mark Email as Verified (<code class="text-[10px] text-slate-500">is_email_verified = True</code>)</span>
+        </label>
+
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+          <input 
+            type="checkbox" 
+            name="is_active" 
+            checked 
+            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+          >
+          <span>Active Account (<code class="text-[10px] text-slate-500">is_active = True</code>)</span>
+        </label>
+      </div>
+
       <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
-        <button type="button" onclick="document.getElementById('addMemberModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">
+        <button type="button" onclick="document.getElementById('addMemberModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
           Cancel
         </button>
-        <button type="submit" class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">
-          Add Member
+        <button type="submit" class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/20 transition">
+          Add User
         </button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- 6 PERMISSIONS MODAL -->
+<!-- 2. EDIT USER MODAL -->
+<div id="editMemberModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+    
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div>
+        <h3 class="font-bold text-slate-900 text-sm flex items-center">
+          <i class="fa-solid fa-user-pen text-blue-600 mr-2"></i> Edit User Profile
+        </h3>
+        <p id="editModalUserEmail" class="text-[11px] text-slate-500 mt-0.5"></p>
+      </div>
+      <button onclick="document.getElementById('editMemberModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <form method="POST" class="space-y-4 mt-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="edit_member">
+      <input type="hidden" name="member_id" id="editMemberId">
+      
+      <!-- First Name & Last Name -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">First Name</label>
+          <input 
+            type="text" 
+            name="first_name" 
+            id="editFirstName"
+            maxlength="100"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Last Name</label>
+          <input 
+            type="text" 
+            name="last_name" 
+            id="editLastName"
+            maxlength="100"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
+      </div>
+
+      <!-- Phone -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-phone"></i>
+          </span>
+          <input 
+            type="text" 
+            name="phone" 
+            id="editPhone"
+            maxlength="20"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
+      </div>
+
+      <!-- Reset Password -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">
+          Change Password 
+          <span class="text-[10px] font-normal text-slate-400">(Leave blank to keep current)</span>
+        </label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-lock"></i>
+          </span>
+          <input 
+            type="password" 
+            id="editMemberPassword"
+            name="password" 
+            maxlength="128"
+            placeholder="Enter new password (optional)" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-9 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+          <button 
+            type="button" 
+            onclick="toggleEditPasswordVisibility()" 
+            class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+          >
+            <i class="fa-solid fa-eye text-xs" id="editMemberPasswordIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Company Role -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Company Role</label>
+        <select name="role" id="editMemberRole" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          <option value="USER">Company User (Configurable 6 Permissions)</option>
+          <option value="ADMIN">Company Admin (All 6 Permissions Full Access)</option>
+        </select>
+      </div>
+
+      <!-- Active & Verified Status -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+          <input 
+            type="checkbox" 
+            name="is_active" 
+            id="editIsActive"
+            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+          >
+          <span>Account Active (<code class="text-[10px] text-slate-500">is_active</code>)</span>
+        </label>
+
+        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+          <input 
+            type="checkbox" 
+            name="is_email_verified" 
+            id="editIsEmailVerified"
+            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+          >
+          <span>Email Verified (<code class="text-[10px] text-slate-500">is_email_verified</code>)</span>
+        </label>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+        <button type="button" onclick="document.getElementById('editMemberModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
+          Cancel
+        </button>
+        <button type="submit" class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/20 transition">
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 3. 6 PERMISSIONS MODAL -->
 <div id="permissionModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 flex flex-col">
+  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
     
     <!-- Modal Header -->
     <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -252,7 +690,7 @@
       </div>
     </div>
 
-    <!-- Form with ONLY the 6 permissions -->
+    <!-- Form with the 6 permissions -->
     <form method="POST" class="space-y-4 mt-3 flex-1 overflow-y-auto">
       {% csrf_token %}
       <input type="hidden" name="action" value="update_permissions">
@@ -286,10 +724,10 @@
           <i class="fa-solid fa-circle-info mr-1 text-blue-500"></i> Admins automatically have all 6
         </div>
         <div class="flex space-x-2">
-          <button type="button" onclick="document.getElementById('permissionModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">
+          <button type="button" onclick="document.getElementById('permissionModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
             Cancel
           </button>
-          <button type="submit" class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition">
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/20 transition">
             Save Permissions
           </button>
         </div>
@@ -300,24 +738,69 @@
 </div>
 
 <script>
+  function toggleNewMemberPasswordVisibility() {
+    const input = document.getElementById('newMemberPassword');
+    const icon = document.getElementById('newMemberPasswordIcon');
+    if (!input || !icon) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  }
+
+  function toggleEditPasswordVisibility() {
+    const input = document.getElementById('editMemberPassword');
+    const icon = document.getElementById('editMemberPasswordIcon');
+    if (!input || !icon) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  }
+
   function toggleRoleNotice(role) {
     const notice = document.getElementById('adminNotice');
+    const permSection = document.getElementById('initialPermissionsSection');
     if (role === 'ADMIN') {
-      notice.classList.remove('hidden');
+      if (notice) notice.classList.remove('hidden');
+      if (permSection) permSection.classList.add('hidden');
     } else {
-      notice.classList.add('hidden');
+      if (notice) notice.classList.add('hidden');
+      if (permSection) permSection.classList.remove('hidden');
     }
+  }
+
+  function openEditUserModal(memberId, email, firstName, lastName, phone, role, isActive, isEmailVerified) {
+    document.getElementById('editMemberId').value = memberId;
+    document.getElementById('editModalUserEmail').innerText = 'User: ' + email;
+    document.getElementById('editFirstName').value = firstName || '';
+    document.getElementById('editLastName').value = lastName || '';
+    document.getElementById('editPhone').value = phone || '';
+    document.getElementById('editMemberRole').value = role || 'USER';
+    document.getElementById('editIsActive').checked = Boolean(isActive);
+    document.getElementById('editIsEmailVerified').checked = Boolean(isEmailVerified);
+    document.getElementById('editMemberPassword').value = '';
+
+    document.getElementById('editMemberModal').classList.remove('hidden');
   }
 
   function openPermissionModal(memberId, email, activePerms) {
     document.getElementById('permModalMemberId').value = memberId;
     document.getElementById('permModalUserEmail').innerText = 'User: ' + email;
 
-    // Reset all checkboxes
     const checkboxes = document.querySelectorAll('.perm-checkbox');
     checkboxes.forEach(cb => cb.checked = false);
 
-    // Check active permissions
     if (activePerms && activePerms.length > 0) {
       activePerms.forEach(code => {
         const el = document.getElementById('perm_' + code);
@@ -331,6 +814,42 @@
   function toggleAllPerms(check) {
     const checkboxes = document.querySelectorAll('.perm-checkbox');
     checkboxes.forEach(cb => cb.checked = check);
+  }
+
+  function filterUsers() {
+    const searchVal = document.getElementById('userSearchInput').value.toLowerCase().trim();
+    const roleVal = document.getElementById('roleFilter').value;
+    const statusVal = document.getElementById('statusFilter').value;
+
+    const rows = document.querySelectorAll('.user-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const email = row.getAttribute('data-email') || '';
+      const name = row.getAttribute('data-name') || '';
+      const role = row.getAttribute('data-role') || '';
+      const status = row.getAttribute('data-status') || '';
+
+      const matchesSearch = !searchVal || email.includes(searchVal) || name.includes(searchVal);
+      const matchesRole = (roleVal === 'ALL') || (role === roleVal);
+      const matchesStatus = (statusVal === 'ALL') || (status === statusVal);
+
+      if (matchesSearch && matchesRole && matchesStatus) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    const noMatch = document.getElementById('noMatchMessage');
+    if (noMatch) {
+      if (visibleCount === 0) {
+        noMatch.classList.remove('hidden');
+      } else {
+        noMatch.classList.add('hidden');
+      }
+    }
   }
 </script>
 {% endblock %}

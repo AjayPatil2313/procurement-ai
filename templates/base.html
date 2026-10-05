@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -45,42 +45,11 @@
   </style>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased flex flex-col min-h-screen">
+<body class="bg-slate-100 text-slate-800 antialiased h-screen overflow-hidden flex flex-col">
 
-  <!-- DEMO RBAC QUICK SWITCHER BAR -->
-  <header class="bg-slate-900 border-b border-slate-800 text-xs px-4 py-1.5 flex flex-wrap items-center justify-between text-slate-300 z-50">
-    <div class="flex items-center space-x-2">
-      <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-        <i class="fa-solid fa-shield-halved mr-1"></i> RBAC Switcher
-      </span>
-      <span class="hidden sm:inline text-slate-400">Current Role:</span>
-      <span class="font-bold text-white px-2 py-0.5 rounded {% if rbac.is_super_admin %}bg-red-900/60 text-red-200{% elif rbac.is_company_admin %}bg-blue-900/60 text-blue-200{% else %}bg-indigo-900/60 text-indigo-200{% endif %}">
-        {{ rbac.role|default:"Company Admin" }}
-      </span>
-      {% if current_company %}
-        <span class="text-slate-400 hidden md:inline">| Company: <strong class="text-slate-200">{{ current_company.name }}</strong> ({{ current_company.get_company_type_display }})</span>
-      {% endif %}
-    </div>
-    <div class="flex items-center space-x-1.5 mt-1 sm:mt-0">
-      <span class="text-slate-400 text-[11px] mr-1 hidden lg:inline">Test Roles:</span>
-      <a href="{% url 'demo-login-as' 'admin' %}" class="px-2 py-0.5 rounded text-[11px] transition {% if request.user.email == 'ajay@abctrading.com' %}bg-blue-600 text-white font-bold{% else %}bg-slate-800 hover:bg-slate-700 text-slate-200{% endif %}" title="Company Admin with full company control">
-        <i class="fa-solid fa-user-tie mr-1"></i> Ajay (Co. Admin)
-      </a>
-      <a href="{% url 'demo-login-as' 'buyer' %}" class="px-2 py-0.5 rounded text-[11px] transition {% if request.user.email == 'rahul@abctrading.com' %}bg-blue-600 text-white font-bold{% else %}bg-slate-800 hover:bg-slate-700 text-slate-200{% endif %}" title="Company User with Buyer Module Permissions">
-        <i class="fa-solid fa-cart-shopping mr-1"></i> Rahul (Buyer User)
-      </a>
-      <a href="{% url 'demo-login-as' 'seller' %}" class="px-2 py-0.5 rounded text-[11px] transition {% if request.user.email == 'priya@abctrading.com' %}bg-blue-600 text-white font-bold{% else %}bg-slate-800 hover:bg-slate-700 text-slate-200{% endif %}" title="Company User with Sales Module Permissions">
-        <i class="fa-solid fa-chart-line mr-1"></i> Priya (Sales User)
-      </a>
-      <a href="{% url 'demo-login-as' 'superadmin' %}" class="px-2 py-0.5 rounded text-[11px] transition {% if rbac.is_super_admin %}bg-red-600 text-white font-bold{% else %}bg-slate-800 hover:bg-slate-700 text-slate-200{% endif %}" title="System Super Admin managing all companies & logs">
-        <i class="fa-solid fa-crown mr-1 text-yellow-400"></i> Super Admin
-      </a>
-    </div>
-  </header>
-
-  <div class="flex flex-1 overflow-hidden">
+  <div class="flex flex-1 h-full min-h-0 overflow-hidden">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="w-64 bg-darknav text-slate-300 flex flex-col shrink-0 border-r border-slate-800 custom-scrollbar overflow-y-auto transition-all duration-200">
+    <aside id="sidebar" class="w-64 h-full bg-darknav text-slate-300 flex flex-col shrink-0 border-r border-slate-800 custom-scrollbar overflow-y-auto transition-all duration-200">
       <!-- Brand Header -->
       <div class="h-16 flex items-center px-5 border-b border-slate-800/80 bg-slate-900/60">
         <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20 mr-3">
@@ -98,27 +67,27 @@
         <div>
           <a href="{% url 'dashboard' %}" class="flex items-center px-3 py-2.5 rounded-lg text-sm font-semibold transition {% if request.path == '/dashboard/' or request.path == '/' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}">
             <i class="fa-solid fa-house w-5 text-center mr-2.5"></i>
-            <span>Dashboard</span>
+            <span>{% if rbac.is_buyer_only %}Buyer Dashboard{% elif rbac.is_seller_only %}Seller Dashboard{% else %}Dashboard{% endif %}</span>
           </a>
         </div>
 
         <!-- Buyer (Procurement) Section -->
-        {% if rbac.can_view_buyer or rbac.is_super_admin or rbac.is_company_admin %}
+        {% if rbac.can_view_buyer or rbac.is_super_admin %}
         <div>
           <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-            <span>PROCUREMENT (Buyer)</span>
+            <span>BUYER</span>
             <i class="fa-solid fa-cart-shopping text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
-            <a href="{% url 'find-suppliers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/find-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-magnifying-glass-chart w-5 text-center mr-2.5 text-xs"></i> Find Suppliers
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
-            </a>
             <a href="{% url 'requirements-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/requirements/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-clipboard-list w-5 text-center mr-2.5 text-xs"></i> My Requirements
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
+            <a href="{% url 'find-suppliers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/find-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-magnifying-glass-chart w-5 text-center mr-2.5 text-xs"></i> Find Suppliers
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -130,7 +99,7 @@
             </a>
             <a href="{% url 'inquiries-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-regular fa-paper-plane w-5 text-center mr-2.5 text-xs"></i> RFQs & Inquiries
+                <i class="fa-regular fa-paper-plane w-5 text-center mr-2.5 text-xs"></i> {% if rbac.is_both %}Supplier Inquiries{% else %}Inquiries{% endif %}
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -151,34 +120,40 @@
         {% endif %}
 
         <!-- Seller (Sales) Section -->
-        {% if rbac.can_view_seller or rbac.is_super_admin or rbac.is_company_admin %}
+        {% if rbac.can_view_seller or rbac.is_super_admin %}
         <div>
           <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-            <span>SALES (Seller)</span>
+            <span>SELLER</span>
             <i class="fa-solid fa-bullhorn text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
+            <a href="{% url 'products-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/products/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-box-open w-5 text-center mr-2.5 text-xs"></i> My Products
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
             <a href="{% url 'find-buyers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/find-buyers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-crosshairs w-5 text-center mr-2.5 text-xs"></i> Find Buyers
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
-            <a href="{% url 'products-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/products/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-box-open w-5 text-center mr-2.5 text-xs"></i> My Products/Services
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
-            </a>
             <a href="{% url 'leads-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-users-viewfinder w-5 text-center mr-2.5 text-xs"></i> Leads
+                <i class="fa-solid fa-users-viewfinder w-5 text-center mr-2.5 text-xs"></i> Buyer Leads
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             <a href="{% url 'saved-leads' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/saved-leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Saved Leads
+                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Saved Buyers
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
+            <a href="{% url 'inquiries-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-regular fa-paper-plane w-5 text-center mr-2.5 text-xs"></i> {% if rbac.is_both %}Buyer Inquiries{% else %}Inquiries{% endif %}
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -199,18 +174,11 @@
             <i class="fa-solid fa-building text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
-            <a href="{% url 'company-profile-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/profile/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-building w-5 text-center mr-2.5 text-xs"></i> Company Profile
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
-            </a>
-
             <!-- Team Members: visible to Company Admin & Super Admin -->
             {% if rbac.is_company_admin or rbac.is_super_admin %}
             <a href="{% url 'company-team-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/team/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-users-gear w-5 text-center mr-2.5 text-xs"></i> Team Members
+                <i class="fa-solid fa-users w-5 text-center mr-2.5 text-xs"></i> Users
               </span>
               <span class="px-1.5 py-0.2 bg-blue-900/60 text-blue-300 text-[10px] rounded font-semibold">Admin</span>
             </a>
@@ -270,9 +238,9 @@
     </aside>
 
     <!-- MAIN APP CONTENT AREA -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <div id="mainContentScroll" class="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-y-auto custom-scrollbar relative">
       <!-- TOP NAVBAR -->
-      <header class="h-16 bg-darknav border-b border-slate-800 flex items-center justify-between px-6 shrink-0 sticky top-0 z-30 shadow-sm">
+      <header class="h-16 bg-darknav border-b border-slate-800 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40 shadow-md">
         <div class="flex items-center flex-1 max-w-xl">
           <button id="toggleSidebarBtn" class="text-slate-400 hover:text-white mr-4 p-1 rounded transition focus:outline-none">
             <i class="fa-solid fa-bars text-lg"></i>
@@ -308,68 +276,201 @@
             </span>
           </button>
 
-          <!-- Company Dropdown Selector -->
-          {% if all_user_companies %}
-          <div class="relative hidden sm:block">
-            <form method="POST" action="{% url 'switch-company' %}" id="companySwitchForm">
-              {% csrf_token %}
-              <select name="company_id" onchange="document.getElementById('companySwitchForm').submit();" class="bg-slate-800 text-slate-200 text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
-                {% for comp in all_user_companies %}
-                  <option value="{{ comp.id }}" {% if current_company.id == comp.id %}selected{% endif %}>
-                    {{ comp.name }}
-                  </option>
-                {% endfor %}
-              </select>
-            </form>
-          </div>
-          {% else %}
-          <span class="text-xs text-slate-300 font-medium px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700 hidden sm:inline">
-            {{ current_company.name|default:"ABC Trading Pvt. Ltd." }}
-          </span>
-          {% endif %}
+          <!-- User Profile Icon with Interactive Company & Account Dropdown -->
+          <div class="relative" id="profileDropdownContainer">
+            <button 
+              id="profileDropdownBtn" 
+              type="button" 
+              class="flex items-center pl-2 space-x-2.5 rounded-xl py-1 px-2 hover:bg-slate-800/80 transition focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer group"
+              aria-haspopup="true" 
+              aria-expanded="false"
+              title="Click to open Company Profile & Account settings"
+            >
+              <div class="relative">
+                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 border border-blue-400/30 flex items-center justify-center text-white font-bold text-xs shadow-md shadow-blue-600/20 shrink-0">
+                  {% if request.user.first_name and request.user.last_name %}
+                    {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+                  {% elif request.user.first_name %}
+                    {{ request.user.first_name|slice:":2"|upper }}
+                  {% elif request.user.email %}
+                    {{ request.user.email|slice:":2"|upper }}
+                  {% else %}
+                    <i class="fa-solid fa-user text-slate-300"></i>
+                  {% endif %}
+                </div>
+                <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
+              </div>
+              <div class="hidden md:block text-left">
+                <div class="text-sm font-semibold text-white leading-tight flex items-center gap-1.5">
+                  <span>
+                    {% if request.user.first_name %}
+                      {{ request.user.first_name }} {{ request.user.last_name }}
+                    {% else %}
+                      {{ request.user.get_full_name|default:request.user.email }}
+                    {% endif %}
+                  </span>
+                  <i id="profileChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-400 group-hover:text-white transition duration-200"></i>
+                </div>
+                <div class="text-[11px] text-slate-400 truncate max-w-[140px]">
+                  {{ request.user.email }}
+                </div>
+              </div>
+            </button>
 
-          <!-- User Avatar & Dynamic Person Name -->
-          <div class="flex items-center pl-2 space-x-2.5">
-            <div class="w-9 h-9 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-white font-bold text-xs shadow shrink-0">
-              {% if request.user.first_name and request.user.last_name %}
-                {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
-              {% elif request.user.first_name %}
-                {{ request.user.first_name|slice:":2"|upper }}
-              {% elif request.user.email %}
-                {{ request.user.email|slice:":2"|upper }}
-              {% else %}
-                <i class="fa-solid fa-user text-slate-300"></i>
+            <!-- Profile & Full Company Dropdown Panel -->
+            <div 
+              id="profileDropdownMenu" 
+              class="hidden absolute right-0 top-full mt-2 w-80 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-800/80 backdrop-blur-xl"
+            >
+              <!-- 1. User Header -->
+              <div class="p-4 bg-slate-800/60">
+                <div class="flex items-center space-x-3">
+                  <div class="w-11 h-11 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 border border-blue-400/30 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0">
+                    {% if request.user.first_name and request.user.last_name %}
+                      {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
+                    {% elif request.user.first_name %}
+                      {{ request.user.first_name|slice:":2"|upper }}
+                    {% elif request.user.email %}
+                      {{ request.user.email|slice:":2"|upper }}
+                    {% else %}
+                      <i class="fa-solid fa-user text-slate-300"></i>
+                    {% endif %}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-bold text-white truncate">
+                      {% if request.user.first_name %}
+                        {{ request.user.first_name }} {{ request.user.last_name }}
+                      {% else %}
+                        {{ request.user.get_full_name|default:request.user.email }}
+                      {% endif %}
+                    </div>
+                    <div class="text-xs text-slate-400 truncate">{{ request.user.email }}</div>
+                    <div class="mt-1.5 flex items-center gap-1.5">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold 
+                        {% if rbac.is_super_admin %}bg-red-500/20 text-red-300 border border-red-500/30
+                        {% elif rbac.role_label == 'Buyer' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30
+                        {% elif rbac.role_label == 'Seller' %}bg-purple-500/20 text-purple-300 border border-purple-500/30
+                        {% elif rbac.is_company_admin %}bg-blue-500/20 text-blue-300 border border-blue-500/30
+                        {% else %}bg-indigo-500/20 text-indigo-300 border border-indigo-500/30{% endif %}">
+                        <i class="fa-solid {% if rbac.is_super_admin %}fa-crown text-red-400{% elif rbac.role_label == 'Buyer' %}fa-cart-shopping text-emerald-400{% elif rbac.role_label == 'Seller' %}fa-bullhorn text-purple-400{% elif rbac.is_company_admin %}fa-user-tie text-blue-400{% else %}fa-user text-indigo-400{% endif %} text-[9px] mr-1"></i>
+                        {{ rbac.role_label }}
+                      </span>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Pro Plan
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Organization / Company Overview -->
+              {% if current_company %}
+              <div class="p-3.5 bg-slate-900/90">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+                  <span>Organization</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">
+                    {{ current_company.get_company_type_display }}
+                  </span>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 space-y-2">
+                  <div class="font-bold text-white text-xs flex items-center gap-1.5 truncate">
+                    <i class="fa-solid fa-building text-blue-400 text-xs shrink-0"></i>
+                    <span class="truncate">{{ current_company.name }}</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400 flex items-center gap-2">
+                    <span>{{ current_company.industry|default:"B2B Commerce" }}</span>
+                    <span>&bull;</span>
+                    <span>{{ current_company.city|default:"India" }}</span>
+                  </div>
+                  {% if all_user_companies and all_user_companies|length > 1 %}
+                  <div class="pt-2 border-t border-slate-700/60">
+                    <form method="POST" action="{% url 'switch-company' %}" id="profileCompanySwitchForm">
+                      {% csrf_token %}
+                      <label class="block text-[9px] uppercase tracking-wider font-semibold text-slate-400 mb-1">Switch Organization</label>
+                      <select name="company_id" onchange="document.getElementById('profileCompanySwitchForm').submit();" class="w-full bg-slate-900 text-slate-200 text-xs font-medium py-1 px-2 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
+                        {% for comp in all_user_companies %}
+                          <option value="{{ comp.id }}" {% if current_company.id == comp.id %}selected{% endif %}>
+                            {{ comp.name }}
+                          </option>
+                        {% endfor %}
+                      </select>
+                    </form>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
               {% endif %}
-            </div>
-            <div class="hidden md:block text-left">
-              <div class="text-sm font-semibold text-white leading-tight">
-                {% if request.user.first_name %}
-                  {{ request.user.first_name }} {{ request.user.last_name }}
-                {% else %}
-                  {{ request.user.get_full_name|default:request.user.email }}
+
+              <!-- 3. Full Company & Workspace Menu Items -->
+              <div class="p-2 space-y-1">
+                <!-- Company Profile -->
+                <a 
+                  href="{% url 'company-profile-web' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/company/profile/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-blue-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-building"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Company Profile</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Manage your organization's business profile and settings</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition"></i>
+                </a>
+
+                <!-- Team Members (Admin only) -->
+                {% if rbac.is_company_admin or rbac.is_super_admin %}
+                <a 
+                  href="{% url 'company-team-web' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/company/team/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-indigo-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-users-gear"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Team Members & Access</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Manage users & 6-action RBAC permissions</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition"></i>
+                </a>
                 {% endif %}
+
+                <!-- Subscription & Billing -->
+                <a 
+                  href="{% url 'subscription-billing-web' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/company/billing/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-amber-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-coins"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Subscription & Credits</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Plan overview & AI search quota</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition"></i>
+                </a>
               </div>
-              <div class="text-[11px] text-slate-400">
-                {{ request.user.email }}
+
+              <!-- 4. Sign Out -->
+              <div class="p-2 bg-slate-900">
+                <a 
+                  href="{% url 'logout-web' %}" 
+                  class="flex items-center space-x-3 p-2.5 rounded-xl hover:bg-rose-500/10 text-slate-300 hover:text-rose-400 transition group"
+                >
+                  <div class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-rose-500/20 group-hover:text-rose-400 transition">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                  </div>
+                  <div class="text-xs font-bold">Sign Out</div>
+                </a>
               </div>
             </div>
           </div>
-
-          <!-- Single Logged-in Role Badge (Only 1 role shown) -->
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tracking-wide 
-            {% if rbac.is_super_admin %}bg-red-500/20 text-red-300 border border-red-500/30
-            {% elif rbac.role_label == 'Buyer' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30
-            {% elif rbac.role_label == 'Seller' %}bg-purple-500/20 text-purple-300 border border-purple-500/30
-            {% elif rbac.is_company_admin %}bg-blue-500/20 text-blue-300 border border-blue-500/30
-            {% else %}bg-indigo-500/20 text-indigo-300 border border-indigo-500/30{% endif %}">
-            <i class="fa-solid {% if rbac.is_super_admin %}fa-crown text-red-400{% elif rbac.role_label == 'Buyer' %}fa-cart-shopping text-emerald-400{% elif rbac.role_label == 'Seller' %}fa-bullhorn text-purple-400{% elif rbac.is_company_admin %}fa-user-tie text-blue-400{% else %}fa-user text-indigo-400{% endif %} text-[10px] mr-1.5"></i>
-            {{ rbac.role_label }}
-          </span>
-
-          <!-- Plan Badge -->
-          <span class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            <i class="fa-solid fa-circle-check text-[10px] mr-1 text-emerald-400"></i> Pro Plan
-          </span>
         </div>
       </header>
 
@@ -413,6 +514,45 @@
       toggleBtn.addEventListener('click', () => {
         sidebar.classList.toggle('-translate-x-full');
         sidebar.classList.toggle('hidden');
+      });
+    }
+
+    // Profile & Company dropdown toggle
+    const profileDropdownBtn = document.getElementById('profileDropdownBtn');
+    const profileDropdownMenu = document.getElementById('profileDropdownMenu');
+    const profileChevron = document.getElementById('profileChevron');
+
+    if (profileDropdownBtn && profileDropdownMenu) {
+      profileDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = profileDropdownMenu.classList.contains('hidden');
+        if (isHidden) {
+          profileDropdownMenu.classList.remove('hidden');
+          profileDropdownBtn.setAttribute('aria-expanded', 'true');
+          if (profileChevron) profileChevron.classList.add('rotate-180');
+        } else {
+          profileDropdownMenu.classList.add('hidden');
+          profileDropdownBtn.setAttribute('aria-expanded', 'false');
+          if (profileChevron) profileChevron.classList.remove('rotate-180');
+        }
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!profileDropdownMenu.contains(e.target) && !profileDropdownBtn.contains(e.target)) {
+          profileDropdownMenu.classList.add('hidden');
+          profileDropdownBtn.setAttribute('aria-expanded', 'false');
+          if (profileChevron) profileChevron.classList.remove('rotate-180');
+        }
+      });
+
+      // Close dropdown on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !profileDropdownMenu.classList.contains('hidden')) {
+          profileDropdownMenu.classList.add('hidden');
+          profileDropdownBtn.setAttribute('aria-expanded', 'false');
+          if (profileChevron) profileChevron.classList.remove('rotate-180');
+        }
       });
     }
   </script>

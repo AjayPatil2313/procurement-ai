@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logged Out — AI Procurement & Sales Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0F172A; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
+
+  <!-- Ambient Glow Effects -->
+  <div class="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+  <div class="max-w-md w-full relative z-10">
+    
+    <!-- Logout Card -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl backdrop-blur-xl text-center space-y-6">
+      
+      <!-- Logout Icon -->
+      <div class="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-3xl mx-auto shadow-lg shadow-emerald-500/10">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+      </div>
+
+      <!-- Text Header -->
+      <div class="space-y-2">
+        <h1 class="text-2xl font-black text-white tracking-tight">Logged Out Successfully</h1>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          {% if user_name %}
+            Goodbye <strong class="text-slate-200">{{ user_name }}</strong>. 
+          {% endif %}
+          Your session on <span class="text-blue-400 font-semibold">AI Procurement & Sales Platform</span> has ended securely.
+        </p>
+      </div>
+
+      <!-- Security Notice -->
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 text-[11px] text-slate-300 flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-shield-check text-emerald-400 text-sm"></i>
+        <span>Browser authentication tokens & session data cleared safely.</span>
+      </div>
+
+      <!-- Actions -->
+      <div class="space-y-3 pt-2">
+        <a 
+          href="{% url 'login' %}" 
+          class="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl text-sm transition shadow-lg shadow-blue-600/25 group"
+        >
+          <i class="fa-solid fa-arrow-right-to-bracket text-xs transition group-hover:translate-x-0.5"></i>
+          <span>Sign In Again</span>
+        </a>
+      </div>
+
+      <!-- Countdown redirect note -->
+      <div class="pt-2 text-[11px] text-slate-500 flex items-center justify-center gap-1.5" id="redirectContainer">
+        <i class="fa-regular fa-clock"></i>
+        <span>Redirecting to login in <strong id="countdown" class="text-slate-300 font-bold">5</strong>s...</span>
+        <button type="button" onclick="cancelRedirect()" class="text-blue-400 hover:underline ml-1 font-semibold">Cancel</button>
+      </div>
+
+    </div>
+
+    <!-- Footer Copyright -->
+    <div class="mt-8 text-center text-xs text-slate-500">
+      &copy; 2025 AI Procurement & Sales Platform. Enterprise RBAC.
+    </div>
+
+  </div>
+
+  <script>
+    let seconds = 5;
+    const countdownEl = document.getElementById('countdown');
+    let timer = setInterval(() => {
+      seconds--;
+      if (countdownEl) countdownEl.innerText = seconds;
+      if (seconds <= 0) {
+        clearInterval(timer);
+        window.location.href = "{% url 'login' %}";
+      }
+    }, 1000);
+
+    function cancelRedirect() {
+      clearInterval(timer);
+      const container = document.getElementById('redirectContainer');
+      if (container) {
+        container.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i> Auto-redirect cancelled.</span>';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -12,6 +12,10 @@ def saved_suppliers_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
+    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Saved Suppliers is only available for Buyer accounts.")
+        return redirect("dashboard")
+
     # Top suppliers or saved items
     suppliers = SearchResult.objects.filter(
         search_job__company=company,
@@ -31,6 +35,10 @@ def saved_leads_view(request):
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
+
+    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Saved Leads is only available for Seller accounts.")
+        return redirect("dashboard")
 
     saved_items = SavedItem.objects.filter(company=company).select_related("search_result", "search_result__external_company")
 
@@ -64,6 +72,10 @@ def price_comparison_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
+    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Price Comparison is only available for Buyer accounts.")
+        return redirect("dashboard")
+
     results = SearchResult.objects.filter(
         search_job__company=company,
         result_type=SearchResult.ResultType.SUPPLIER,
@@ -82,6 +94,10 @@ def leads_list_view(request):
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
+
+    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Sales Leads is only available for Seller accounts.")
+        return redirect("dashboard")
 
     leads = SearchResult.objects.filter(
         search_job__company=company,

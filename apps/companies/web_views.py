@@ -127,46 +127,118 @@ def company_team_web_view(request):
     if request.method == "POST":
         action = request.POST.get("action")
         
-        # 1. Invite / Add new member
+        # 1. Add new user
         if action == "add_member":
-            email = request.POST.get("email", "").strip()
+            email = request.POST.get("email", "").strip().lower()
+            password = request.POST.get("password", "").strip() or "User@12345"
             first_name = request.POST.get("first_name", "").strip()
             last_name = request.POST.get("last_name", "").strip()
+            phone = request.POST.get("phone", "").strip()
             role = request.POST.get("role", CompanyMember.Role.USER)
+            
+            # Checkbox values
+            is_email_verified = ("is_email_verified" in request.POST)
+            is_active = ("is_active" in request.POST)
             
             if not email:
                 messages.error(request, "Email is required.")
+            elif User.objects.filter(email=email).exists():
+                messages.error(request, f"A user with email '{email}' already exists.")
+            elif len(password) < 6:
+                messages.error(request, "Password must be at least 6 characters.")
             else:
-                user, created = User.objects.get_or_create(
+                user = User.objects.create_user(
                     email=email,
-                    defaults={
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "is_active": True,
-                        "is_email_verified": True,
-                    }
+                    password=password,
+                    first_name=first_name,
+                    last_name=last_name,
+                    phone=phone,
+                    is_email_verified=is_email_verified,
+                    is_active=is_active,
                 )
-                if created:
-                    user.set_password("Admin@12345")
-                    user.save()
                 
-                new_member, _ = CompanyMember.objects.update_or_create(
+                new_member = CompanyMember.objects.create(
+                    company=company,
                     user=user,
-                    defaults={
-                        "company": company,
-                        "role": role,
-                        "is_active": True,
-                    }
+                    role=role,
+                    is_active=is_active,
                 )
-                # If Company User, give default READ permission
+                
+                # Assign permissions
+                selected_perms = request.POST.getlist("permissions")
                 if role == CompanyMember.Role.USER:
-                    read_perm, _ = CompanyPermission.objects.get_or_create(module="general", permission="READ")
-                    MemberPermission.objects.get_or_create(member=new_member, permission=read_perm)
+                    if selected_perms:
+                        for code in selected_perms:
+                            perm_obj, _ = CompanyPermission.objects.get_or_create(
+                                module="general",
+                                permission=code.strip().upper(),
+                            )
+                            MemberPermission.objects.get_or_create(member=new_member, permission=perm_obj)
+                    else:
+                        read_perm, _ = CompanyPermission.objects.get_or_create(module="general", permission="READ")
+                        MemberPermission.objects.get_or_create(member=new_member, permission=read_perm)
 
-                messages.success(request, f"Team member {email} added successfully (Default Password: Admin@12345).")
+                messages.success(request, f"Team member '{email}' added successfully.")
                 return redirect("company-team-web")
 
-        # 2. Update member permissions (from the 6 core permissions)
+        # 2. Edit existing user
+        elif action == "edit_member":
+            member_id = request.POST.get("member_id")
+            member = get_object_or_404(CompanyMember, id=member_id, company=company)
+
+            member.user.first_name = request.POST.get("first_name", "").strip()
+            member.user.last_name = request.POST.get("last_name", "").strip()
+            member.user.phone = request.POST.get("phone", "").strip()
+
+            is_active = ("is_active" in request.POST)
+            is_email_verified = ("is_email_verified" in request.POST)
+
+            if not is_active and member.user_id == request.user.id:
+                messages.error(request, "You cannot deactivate your own account.")
+                return redirect("company-team-web")
+
+            member.is_active = is_active
+            member.user.is_active = is_active
+            member.user.is_email_verified = is_email_verified
+
+            new_password = request.POST.get("password", "").strip()
+            if new_password:
+                if len(new_password) < 6:
+                    messages.error(request, "Password must be at least 6 characters.")
+                    return redirect("company-team-web")
+                member.user.set_password(new_password)
+
+            if member.user_id != request.user.id:
+                new_role = request.POST.get("role")
+                if new_role in [CompanyMember.Role.USER, CompanyMember.Role.ADMIN]:
+                    member.role = new_role
+
+            member.user.save()
+            member.save()
+
+            messages.success(request, f"User '{member.user.email}' updated successfully.")
+            return redirect("company-team-web")
+
+        # 3. Toggle Activate / Deactivate status
+        elif action == "toggle_status":
+            member_id = request.POST.get("member_id")
+            member = get_object_or_404(CompanyMember, id=member_id, company=company)
+
+            if member.user_id == request.user.id:
+                messages.error(request, "You cannot deactivate your own account.")
+                return redirect("company-team-web")
+
+            new_status = not (member.is_active and member.user.is_active)
+            member.is_active = new_status
+            member.user.is_active = new_status
+            member.user.save()
+            member.save()
+
+            status_str = "activated" if new_status else "deactivated"
+            messages.success(request, f"User '{member.user.email}' has been {status_str}.")
+            return redirect("company-team-web")
+
+        # 4. Update member permissions (from the 6 core permissions)
         elif action == "update_permissions":
             member_id = request.POST.get("member_id")
             member = get_object_or_404(CompanyMember, id=member_id, company=company)
@@ -192,12 +264,21 @@ def company_team_web_view(request):
             messages.success(request, f"Permissions updated for {member.user.email}: {', '.join(valid_codes) if valid_codes else 'None'}.")
             return redirect("company-team-web")
 
+    total_count = members.count()
+    active_count = sum(1 for m in members if m.is_active and m.user.is_active)
+    inactive_count = total_count - active_count
+    admin_count = sum(1 for m in members if m.role == CompanyMember.Role.ADMIN)
+
     return render(request, "company/team.html", {
         "company": company,
         "members": members,
+        "total_count": total_count,
+        "active_count": active_count,
+        "inactive_count": inactive_count,
+        "admin_count": admin_count,
         "core_permissions": core_permissions,
         "rbac": rbac,
-        "page_title": "Team Members & Permissions",
+        "page_title": "Users & Permissions",
     })
 
 

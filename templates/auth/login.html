@@ -3,88 +3,297 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — AI Procurement & Sales Platform</title>
+  <title>Sign In — AI Procurement & Sales Platform</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #0F172A; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0B1120; }
   </style>
 </head>
-<body class="flex items-center justify-center min-h-screen px-4 py-12">
-  <div class="max-w-md w-full space-y-6">
-    
-    <!-- Brand Header -->
-    <div class="text-center space-y-2">
-      <div class="inline-flex w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 items-center justify-center text-white text-2xl shadow-lg shadow-blue-500/30">
-        <i class="fa-solid fa-hexagon-nodes"></i>
-      </div>
-      <h1 class="text-2xl font-black text-white tracking-tight">AI Procurement & Sales</h1>
-      <p class="text-xs text-slate-400">Sign in to your B2B enterprise workspace</p>
-    </div>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-x-hidden">
 
-    <!-- Login Card -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
-      {% if messages %}
-        <div class="mb-4 space-y-2">
-          {% for message in messages %}
-            <div class="p-3 text-xs rounded-lg {% if message.tags == 'error' %}bg-red-500/20 text-red-300 border border-red-500/30{% else %}bg-blue-500/20 text-blue-300 border border-blue-500/30{% endif %}">
-              {{ message }}
+  <!-- Ambient Glow Backgrounds -->
+  <div class="absolute -top-32 -left-32 w-[32rem] h-[32rem] bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="absolute -bottom-32 -right-32 w-[32rem] h-[32rem] bg-indigo-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+  <!-- Main Container: Dual-Panel Design -->
+  <div class="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl relative z-10">
+
+    <!-- LEFT PANEL: Enterprise Brand & Feature Showcase -->
+    <div class="lg:col-span-5 bg-gradient-to-br from-slate-900 via-blue-950/80 to-slate-900 p-8 sm:p-10 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-800/80">
+      
+      <!-- Logo & Branding -->
+      <div class="space-y-6">
+        <div class="flex items-center space-x-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white text-xl shadow-lg shadow-blue-500/30">
+            <i class="fa-solid fa-hexagon-nodes"></i>
+          </div>
+          <div>
+            <div class="text-lg font-black tracking-tight text-white leading-tight">AI Procurement & Sales</div>
+            <div class="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Enterprise B2B Commerce</div>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug">
+            Intelligent B2B Procurement & Sales 
+          </h2>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Autonomous AI web crawling connecting buyers with verified suppliers, and matching manufacturers with prospective enterprise leads.
+          </p>
+        </div>
+
+        <!-- Capability Highlights -->
+        <div class="space-y-3.5 pt-2">
+          <div class="flex items-start space-x-3">
+            <span class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 text-xs border border-blue-500/20">
+              <i class="fa-solid fa-truck-field"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-slate-200">AI Supplier Discovery</div>
+              <div class="text-[11px] text-slate-400">Find nearby & global exporters with landed price conversions and MOQs.</div>
             </div>
-          {% endfor %}
-        </div>
-      {% endif %}
+          </div>
 
-      <form method="POST" class="space-y-4">
-        {% csrf_token %}
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
-          <input 
-            type="email" 
-            name="email" 
-            required 
-            placeholder="ajay@abctrading.com" 
-            value="ajay@abctrading.com"
-            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-          >
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
-          <input 
-            type="password" 
-            name="password" 
-            required 
-            placeholder="••••••••" 
-            value="Admin@12345"
-            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-          >
-        </div>
-
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-lg shadow-blue-600/30">
-          Sign In
-        </button>
-      </form>
-
-      <!-- Quick 1-Click Role Logins for Testing -->
-      <div class="mt-6 pt-6 border-t border-slate-800 space-y-2">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Quick Role Switch (Demo)</div>
-        <div class="grid grid-cols-2 gap-2 text-xs">
-          <a href="{% url 'demo-login-as' 'admin' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
-            <i class="fa-solid fa-user-tie text-blue-400 mr-1"></i> Company Admin
-          </a>
-          <a href="{% url 'demo-login-as' 'superadmin' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
-            <i class="fa-solid fa-crown text-yellow-400 mr-1"></i> Super Admin
-          </a>
-          <a href="{% url 'demo-login-as' 'buyer' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
-            <i class="fa-solid fa-cart-shopping text-emerald-400 mr-1"></i> Buyer User
-          </a>
-          <a href="{% url 'demo-login-as' 'seller' %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg text-center font-medium border border-slate-700 transition">
-            <i class="fa-solid fa-bullhorn text-purple-400 mr-1"></i> Sales User
-          </a>
+          <div class="flex items-start space-x-3">
+            <span class="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0 text-xs border border-purple-500/20">
+              <i class="fa-solid fa-users-viewfinder"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-slate-200">B2B Sales Leads Generator</div>
+              <div class="text-[11px] text-slate-400">Discover organizations with active demand signals matching your products.</div>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- Trust Badge -->
+      <div class="pt-8 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+        <span class="flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-check text-emerald-400 text-xs"></i>
+          <span>Django + MySQL 8.0</span>
+        </span>
+        <span class="text-slate-500 font-mono">v1.0 Production</span>
+      </div>
+
     </div>
+
+    <!-- RIGHT PANEL: Sign In Form & 1-Click Role Switcher -->
+    <div class="lg:col-span-7 p-8 sm:p-10 flex flex-col justify-between">
+      
+      <div>
+        <!-- Role / Login Mode Switcher Toggle -->
+        <div class="mb-6 p-1 bg-slate-900 border border-slate-800 rounded-2xl grid grid-cols-2 gap-1.5 shadow-inner">
+          <button 
+            type="button" 
+            id="tabCompanyBtn" 
+            onclick="setLoginType('company')"
+            class="py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all duration-200 bg-blue-600 text-white shadow-md shadow-blue-600/30"
+          >
+            <i class="fa-solid fa-building text-xs"></i>
+            <span>Company Login</span>
+          </button>
+          <button 
+            type="button" 
+            id="tabUserBtn" 
+            onclick="setLoginType('user')"
+            class="py-2.5 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 text-slate-400 hover:text-white hover:bg-slate-800/60"
+          >
+            <i class="fa-solid fa-user-gear text-xs"></i>
+            <span>User Login</span>
+          </button>
+        </div>
+
+        <!-- Heading & Context -->
+        <div class="mb-5">
+          <h1 id="headingTitle" class="text-2xl font-black text-white tracking-tight">Company Sign In</h1>
+          <p id="headingSubtitle" class="text-xs text-slate-400 mt-1">Enter your company credentials to access workspace</p>
+        </div>
+
+        <!-- Notice for User Mode (Only visible in User Login) -->
+        <div id="userCallout" class="hidden mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-200 flex items-start gap-2.5">
+          <i class="fa-solid fa-circle-info text-blue-400 text-sm mt-0.5 shrink-0"></i>
+          <div class="leading-relaxed">
+            <span class="font-bold text-white">Company User Login:</span>
+            <span class="text-slate-300">User accounts are created and configured by your <strong>Company Admin</strong>. Enter your assigned email & password. Self-registration is disabled.</span>
+          </div>
+        </div>
+
+        <!-- Flash Messages -->
+        {% if messages %}
+          <div class="mb-5 space-y-2">
+            {% for message in messages %}
+              <div class="p-3 text-xs rounded-xl flex items-center gap-2.5 {% if message.tags == 'error' %}bg-rose-500/15 text-rose-300 border border-rose-500/30{% elif message.tags == 'success' %}bg-emerald-500/15 text-emerald-300 border border-emerald-500/30{% else %}bg-blue-500/15 text-blue-300 border border-blue-500/30{% endif %}">
+                <i class="fa-solid {% if message.tags == 'error' %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %} text-sm shrink-0"></i>
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <!-- Login Form -->
+        <form method="POST" action="{% url 'login' %}" class="space-y-4" id="loginForm">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next|default:'dashboard' }}">
+          <input type="hidden" name="login_type" id="loginTypeInput" value="{{ login_type|default:'company' }}">
+
+          <!-- Email Input -->
+          <div>
+            <label id="emailLabel" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+              Company / Admin Email
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                <i class="fa-solid fa-envelope"></i>
+              </span>
+              <input 
+                type="email" 
+                id="emailInput"
+                name="email" 
+                required 
+                placeholder="name@company.com" 
+                value="{{ email|default:'' }}"
+                class="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              >
+            </div>
+          </div>
+
+          <!-- Password Input -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Password
+              </label>
+              <a href="{% url 'forgot-password' %}" class="text-[11px] text-blue-400 hover:underline">Forgot password?</a>
+            </div>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+                <i class="fa-solid fa-lock"></i>
+              </span>
+              <input 
+                type="password" 
+                id="passwordInput"
+                name="password" 
+                required 
+                placeholder="••••••••" 
+                value=""
+                class="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              >
+              <button 
+                type="button" 
+                onclick="togglePasswordVisibility()" 
+                class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white transition focus:outline-none" 
+                title="Toggle Password"
+              >
+                <i class="fa-solid fa-eye text-xs" id="passwordToggleIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Remember Me -->
+          <div class="flex items-center justify-between text-xs pt-1">
+            <label class="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-200">
+              <input type="checkbox" name="remember_me" checked class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900">
+              <span>Remember this device</span>
+            </label>
+          </div>
+
+          <!-- Submit Button -->
+          <button 
+            type="submit" 
+            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 group mt-2"
+          >
+            <span id="submitBtnText">Sign In to Company</span>
+            <i class="fa-solid fa-arrow-right text-xs transition group-hover:translate-x-1"></i>
+          </button>
+        </form>
+
+        <!-- Bottom: Register Link (Visible for Company only) -->
+        <div id="bottomRegisterSection" class="pt-5 text-center text-xs text-slate-400">
+          Don't have an enterprise account? 
+          <a href="{% url 'register' %}" class="text-blue-400 font-bold hover:underline ml-1">Create Account (Sign Up) &rarr;</a>
+        </div>
+
+        <!-- Bottom: User notice (Visible for User only) -->
+        <div id="bottomUserNotice" class="hidden pt-5 text-center text-xs text-slate-500">
+          <i class="fa-solid fa-shield-halved text-[10px] mr-1 text-slate-400"></i>
+          Need a user account? Please contact your Company Admin to get credentials.
+        </div>
+
+      </div>
+
+    </div>
+
   </div>
+
+  <script>
+    function togglePasswordVisibility() {
+      const pwd = document.getElementById('passwordInput');
+      const icon = document.getElementById('passwordToggleIcon');
+      if (pwd.type === 'password') {
+        pwd.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+      } else {
+        pwd.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+      }
+    }
+
+    function setLoginType(type) {
+      const isCompany = (type === 'company');
+      const compBtn = document.getElementById('tabCompanyBtn');
+      const userBtn = document.getElementById('tabUserBtn');
+      const loginTypeInput = document.getElementById('loginTypeInput');
+      const headingTitle = document.getElementById('headingTitle');
+      const headingSubtitle = document.getElementById('headingSubtitle');
+      const emailLabel = document.getElementById('emailLabel');
+      const emailInput = document.getElementById('emailInput');
+      const submitBtnText = document.getElementById('submitBtnText');
+      const bottomRegisterSection = document.getElementById('bottomRegisterSection');
+      const bottomUserNotice = document.getElementById('bottomUserNotice');
+      const userCallout = document.getElementById('userCallout');
+
+      if (!loginTypeInput) return;
+      loginTypeInput.value = isCompany ? 'company' : 'user';
+
+      if (isCompany) {
+        compBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all duration-200 bg-blue-600 text-white shadow-md shadow-blue-600/30";
+        userBtn.className = "py-2.5 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 text-slate-400 hover:text-white hover:bg-slate-800/60";
+
+        headingTitle.innerText = "Company Sign In";
+        headingSubtitle.innerText = "Enter your company credentials to access workspace";
+        emailLabel.innerText = "Company / Admin Email";
+        emailInput.placeholder = "admin@company.com";
+        submitBtnText.innerText = "Sign In to Company";
+
+        bottomRegisterSection.classList.remove('hidden');
+        bottomUserNotice.classList.add('hidden');
+        userCallout.classList.add('hidden');
+      } else {
+        userBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all duration-200 bg-blue-600 text-white shadow-md shadow-blue-600/30";
+        compBtn.className = "py-2.5 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition-all duration-200 text-slate-400 hover:text-white hover:bg-slate-800/60";
+
+        headingTitle.innerText = "Team Member Sign In";
+        headingSubtitle.innerText = "Sign in with credentials provided by your Company Admin";
+        emailLabel.innerText = "User / Member Email";
+        emailInput.placeholder = "user@company.com";
+        submitBtnText.innerText = "Sign In as Team Member";
+
+        bottomRegisterSection.classList.add('hidden');
+        bottomUserNotice.classList.remove('hidden');
+        userCallout.classList.remove('hidden');
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const initialType = "{{ login_type|default:'company' }}" || urlParams.get('type') || 'company';
+      setLoginType(initialType);
+    });
+  </script>
+
 </body>
 </html>

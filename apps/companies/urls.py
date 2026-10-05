@@ -3,31 +3,46 @@ from .views import (
     CompanyProfileAPIView,
     CreateCompanyUserAPIView,
     CompanyUserListAPIView,
+    CompanyUserDetailUpdateAPIView,
     AssignPermissionsAPIView,
     UserPermissionsAPIView,
+    CompanyModulesAPIView,
 )
+
 urlpatterns = [
     path(
         "<int:company_id>/profile/",
         CompanyProfileAPIView.as_view(),
         name="company-profile",
     ),
-    
     path(
-    "users/create/",
-    CreateCompanyUserAPIView.as_view(),
-    ),
-
-    path(
-    "users/",
-    CompanyUserListAPIView.as_view(),
-   ),
-   path(
-    "users/permissions/",
-    AssignPermissionsAPIView.as_view(),
+        "modules/",
+        CompanyModulesAPIView.as_view(),
+        name="company-modules",
     ),
     path(
-    "users/<int:user_id>/permissions/",
-    UserPermissionsAPIView.as_view(),
+        "users/create/",
+        CreateCompanyUserAPIView.as_view(),
+        name="company-users-create",
+    ),
+    path(
+        "users/",
+        CompanyUserListAPIView.as_view(),
+        name="company-users-list",
+    ),
+    path(
+        "users/<int:user_id>/",
+        CompanyUserDetailUpdateAPIView.as_view(),
+        name="company-user-detail-update",
+    ),
+    path(
+        "users/permissions/",
+        AssignPermissionsAPIView.as_view(),
+        name="company-users-permissions-assign",
+    ),
+    path(
+        "users/<int:user_id>/permissions/",
+        UserPermissionsAPIView.as_view(),
+        name="company-user-permissions-detail",
     ),
 ]
