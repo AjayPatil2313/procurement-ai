@@ -4,6 +4,7 @@ from .models import Requirement
 
 class RequirementSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source="company.name", read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
     created_by_email = serializers.EmailField(source="created_by.email", read_only=True)
 
     class Meta:
@@ -16,6 +17,7 @@ class RequirementSerializer(serializers.ModelSerializer):
             "created_by_email",
             "item_name",
             "category",
+            "category_name",
             "description",
             "specifications",
             "quantity",
@@ -28,6 +30,8 @@ class RequirementSerializer(serializers.ModelSerializer):
             "search_scope",
             "radius_km",
             "status",
+            "is_deleted",
+            "deleted_at",
             "created_at",
             "updated_at",
         ]
@@ -35,6 +39,8 @@ class RequirementSerializer(serializers.ModelSerializer):
             "id",
             "company",
             "created_by",
+            "is_deleted",
+            "deleted_at",
             "created_at",
             "updated_at",
         ]

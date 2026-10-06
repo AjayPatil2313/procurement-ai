@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from apps.companies.models import Company
 from apps.catalog.models import Category
 
@@ -59,6 +60,8 @@ class Requirement(models.Model):
         choices=Status.choices,
         default=Status.DRAFT,
     )
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -66,7 +69,18 @@ class Requirement(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["company", "status"]),
+            models.Index(fields=["company", "is_deleted"]),
         ]
 
     def __str__(self):
         return f"{self.item_name} ({self.company.name})"
+
+    def soft_delete(self):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
+
+    def restore(self):
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save(update_fields=["is_deleted", "deleted_at"])

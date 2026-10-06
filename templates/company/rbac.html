@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}RBAC & Permissions — {{ company.name }} — AI Platform{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">RBAC & Permissions</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <i class="fa-solid fa-shield-halved text-blue-600"></i>
+        <span>Role-Based Access Control (RBAC)</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Configure granular 6-action permissions for company users across 
+        <strong class="text-slate-700">{% if company.company_type == 'BUYER' %}Buyer (Procurement){% elif company.company_type == 'SELLER' %}Seller (Sales & Catalog){% else %}Buyer & Seller (Both){% endif %}</strong> modules.
+      </p>
+    </div>
+
+    <!-- Company Badge -->
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold 
+        {% if company.company_type == 'BUYER' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+        {% elif company.company_type == 'SELLER' %}bg-purple-50 text-purple-700 border border-purple-200
+        {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+        <i class="fa-solid {% if company.company_type == 'BUYER' %}fa-cart-shopping{% elif company.company_type == 'SELLER' %}fa-store{% else %}fa-handshake{% endif %} mr-2"></i>
+        {{ company.get_company_type_display }} Workspace
+      </span>
+      <a href="{% url 'company-team-web' %}" class="text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-xl bg-white border border-slate-200 transition">
+        <i class="fa-solid fa-users mr-1"></i> User Accounts
+      </a>
+    </div>
+  </div>
+
+  <!-- 6 Actions Guide / Legend -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+      <div class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+        <i class="fa-solid fa-list-check text-blue-600"></i>
+        <span>The 6 Core Action Permissions</span>
+      </div>
+      <span class="text-[11px] text-slate-400">Admin assigns checkboxes &rarr; User receives action permissions</span>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {% for perm in core_permissions %}
+      <div class="p-3 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition space-y-1">
+        <div class="flex items-center justify-between">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-black {{ perm.badge_class }}">
+            <i class="fa-solid {{ perm.icon }} mr-1 text-[10px]"></i> {{ perm.code }}
+          </span>
+        </div>
+        <div class="text-[11px] font-bold text-slate-800">{{ perm.name }}</div>
+        <div class="text-[10px] text-slate-500 leading-tight">{{ perm.desc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Permissions Assignment Matrix Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    
+    <!-- Card Toolbar -->
+    <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <span>User Permissions Matrix</span>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">{{ members|length }} Users</span>
+        </h2>
+        <p class="text-[11px] text-slate-500 mt-0.5">
+          Select checkboxes for each action you wish to grant. Unticked checkboxes remain strictly restricted.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-400">Active Company: <strong class="text-slate-700">{{ company.name }}</strong></span>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4 w-60">Company User</th>
+            <th class="py-3 px-3 w-32">Role</th>
+            <th class="py-3 px-3 text-center">READ</th>
+            <th class="py-3 px-3 text-center">EDIT</th>
+            <th class="py-3 px-3 text-center">UPDATE</th>
+            <th class="py-3 px-3 text-center">DELETE</th>
+            <th class="py-3 px-3 text-center">IMPORT</th>
+            <th class="py-3 px-3 text-center">EXPORT</th>
+            <th class="py-3 px-4 text-right w-44">Save Changes</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for m in members %}
+          <tr class="hover:bg-slate-50/80 transition" id="row-member-{{ m.id }}">
+            
+            <!-- User Info -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl {% if m.role == 'ADMIN' %}bg-purple-100 text-purple-700 border-purple-200{% else %}bg-blue-100 text-blue-700 border-blue-200{% endif %} border font-black flex items-center justify-center shrink-0 text-xs">
+                  {{ m.user.first_name|first|default:m.user.email|first|upper }}
+                </div>
+                <div>
+                  <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>{% if m.user.first_name %}{{ m.user.first_name }} {{ m.user.last_name }}{% else %}{{ m.user.email }}{% endif %}</span>
+                    {% if m.user.id == request.user.id %}
+                      <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 text-slate-700">You</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-[11px] text-slate-400">
+                    {{ m.user.email }}
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Role Badge -->
+            <td class="py-3.5 px-3">
+              {% if m.role == "ADMIN" %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                  <i class="fa-solid fa-crown mr-1 text-amber-500"></i> Admin
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <i class="fa-solid fa-user-gear mr-1 text-blue-500"></i> User
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- 6 Actions Checkboxes / Status -->
+            {% if m.role == "ADMIN" %}
+              <!-- Admin automatically has all 6 permissions -->
+              <td colspan="6" class="py-3.5 px-3 text-center">
+                <div class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  <i class="fa-solid fa-shield-check mr-1.5 text-purple-600"></i>
+                  Full Access &bull; All 6 Actions Allowed Automatically
+                </div>
+              </td>
+              <td class="py-3.5 px-4 text-right">
+                <span class="text-slate-300 text-xs cursor-not-allowed" title="Admin permissions cannot be restricted">
+                  <i class="fa-solid fa-lock text-xs mr-1"></i> Locked
+                </span>
+              </td>
+            {% else %}
+              <!-- Interactive Form per Member -->
+              <form method="POST" id="form-member-{{ m.id }}" class="contents">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_permissions">
+                <input type="hidden" name="member_id" value="{{ m.id }}">
+
+                <!-- 1. READ -->
+                <td class="py-3.5 px-3 text-center">
+                  <label class="inline-flex items-center cursor-pointer p-1">
+                    <input 
+                      type="checkbox" 
+                      name="permissions" 
+                      value="READ" 
+                      {% if 'READ' in m.active_permissions %}checked{% endif %}
+                      class="perm-checkbox-{{ m.id }} w-4 h-4 text-blue-600 bg-slate-50 border-slate-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer transition"
+                    >
+                  </label>
+                </td>
+
+                <!-- 2. EDIT -->
+                <td class="py-3.5 px-3 text-center">
+                  <label class="inline-flex items-center cursor-pointer p-1">
+                    <input 
+                      type="checkbox" 
+                      name="permissions" 
+                      value="EDIT" 
+                      {% if 'EDIT' in m.active_permissions %}checked{% endif %}
+                      class="perm-checkbox-{{ m.id }} w-4 h-4 text-emerald-600 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer transition"
+                    >
+                  </label>
+                </td>
+
+                <!-- 3. UPDATE -->
+                <td class="py-3.5 px-3 text-center">
+                  <label class="inline-flex items-center cursor-pointer p-1">
+                    <input 
+                      type="checkbox" 
+                      name="permissions" 
+                      value="UPDATE" 
+                      {% if 'UPDATE' in m.active_permissions %}checked{% endif %}
+                      class="perm-checkbox-{{ m.id }} w-4 h-4 text-amber-600 bg-slate-50 border-slate-300 rounded focus:ring-amber-500 focus:ring-2 cursor-pointer transition"
+                    >
+                  </label>
+                </td>
+
+                <!-- 4. DELETE -->
+                <td class="py-3.5 px-3 text-center">
+                  <label class="inline-flex items-center cursor-pointer p-1">
+                    <input 
+                      type="checkbox" 
+                      name="permissions" 
+                      value="DELETE" 
+                      {% if 'DELETE' in m.active_permissions %}checked{% endif %}
+                      class="perm-checkbox-{{ m.id }} w-4 h-4 text-rose-600 bg-slate-50 border-slate-300 rounded focus:ring-rose-500 focus:ring-2 cursor-pointer transition"
+                    >
+                  </label>
+                </td>
+
+                <!-- 5. IMPORT -->
+                <td class="py-3.5 px-3 text-center">
+                  <label class="inline-flex items-center cursor-pointer p-1">
+                    <input 
+                      type="checkbox" 
+                      name="permissions" 
+                      value="IMPORT" 
+                      {% if 'IMPORT' in m.active_permissions %}checked{% endif %}
+                      class="perm-checkbox-{{ m.id }} w-4 h-4 text-purple-600 bg-slate-50 border-slate-300 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer transition"
+                    >
+                  </label>
+                </td>
+
+                <!-- 6. EXPORT -->
+                <td class="py-3.5 px-3 text-center">
+                  <label class="inline-flex items-center cursor-pointer p-1">
+                    <input 
+                      type="checkbox" 
+                      name="permissions" 
+                      value="EXPORT" 
+                      {% if 'EXPORT' in m.active_permissions %}checked{% endif %}
+                      class="perm-checkbox-{{ m.id }} w-4 h-4 text-indigo-600 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 focus:ring-2 cursor-pointer transition"
+                    >
+                  </label>
+                </td>
+
+                <!-- Save Button & Row Controls -->
+                <td class="py-3.5 px-4 text-right">
+                  <div class="flex items-center justify-end space-x-1.5">
+                    <!-- Quick toggle all button -->
+                    <button 
+                      type="button" 
+                      onclick="toggleAllMemberPerms('{{ m.id }}')" 
+                      class="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg border border-slate-200 transition text-[11px]"
+                      title="Select / Deselect All 6"
+                    >
+                      <i class="fa-solid fa-check-double"></i>
+                    </button>
+
+                    <!-- Save Submit Button -->
+                    <button 
+                      type="submit" 
+                      class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center shadow-sm transition"
+                    >
+                      <i class="fa-solid fa-floppy-disk mr-1"></i> Save
+                    </button>
+                  </div>
+                </td>
+              </form>
+            {% endif %}
+
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="py-10 text-center text-slate-400">
+              No users registered in this company yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer Note -->
+    <div class="p-4 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-500 gap-2">
+      <div class="flex items-center gap-1.5">
+        <i class="fa-solid fa-circle-info text-blue-500"></i>
+        <span>Changes take effect immediately across all Web views and REST API endpoints.</span>
+      </div>
+      <div>
+        Scope: <strong class="text-slate-700">{% if company.company_type == 'BUYER' %}Buyer Modules{% elif company.company_type == 'SELLER' %}Seller Modules{% else %}Buyer & Seller Modules{% endif %}</strong>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  function toggleAllMemberPerms(memberId) {
+    const checkboxes = document.querySelectorAll('.perm-checkbox-' + memberId);
+    let allChecked = true;
+    checkboxes.forEach(cb => {
+      if (!cb.checked) allChecked = false;
+    });
+
+    checkboxes.forEach(cb => {
+      cb.checked = !allChecked;
+    });
+  }
+</script>
+{% endblock %}

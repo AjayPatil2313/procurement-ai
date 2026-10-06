@@ -1,9 +1,10 @@
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from apps.companies.models import Company, CompanyMember, CompanyPermission, MemberPermission
-from apps.companies.rbac import get_user_rbac_context, company_admin_required
+from apps.companies.rbac import get_user_rbac_context, company_admin_required, ensure_default_permissions
 from apps.accounts.models import User
 from apps.billing.models import Subscription, CreditTransaction
 
@@ -278,7 +279,140 @@ def company_team_web_view(request):
         "admin_count": admin_count,
         "core_permissions": core_permissions,
         "rbac": rbac,
-        "page_title": "Users & Permissions",
+        "page_title": "Users",
+    })
+
+
+@login_required
+def company_rbac_web_view(request):
+    """
+    Dedicated RBAC & Permissions Management View:
+    Allows Company Admin to configure granular 6-action permissions
+    (READ, EDIT, UPDATE, DELETE, IMPORT, EXPORT) across Buyer, Seller, or Both modules.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Only Company Administrators can manage RBAC permissions.")
+        return redirect("dashboard")
+
+    if not company:
+        messages.error(request, "No active company found.")
+        return redirect("dashboard")
+
+    ensure_default_permissions()
+
+    members = CompanyMember.objects.filter(company=company).select_related("user").order_by("-joined_at")
+
+    core_permissions = [
+        {
+            "code": "READ",
+            "name": "Read",
+            "icon": "fa-eye",
+            "color": "blue",
+            "badge_class": "bg-blue-100 text-blue-800 border border-blue-200",
+            "desc": "View dashboard, search suppliers/buyers, browse requirements & catalog",
+        },
+        {
+            "code": "EDIT",
+            "name": "Edit / Create",
+            "icon": "fa-pen-to-square",
+            "color": "emerald",
+            "badge_class": "bg-emerald-100 text-emerald-800 border border-emerald-200",
+            "desc": "Create new requirements, add products/services to catalog, post inquiries",
+        },
+        {
+            "code": "UPDATE",
+            "name": "Update",
+            "icon": "fa-rotate",
+            "color": "amber",
+            "badge_class": "bg-amber-100 text-amber-800 border border-amber-200",
+            "desc": "Modify existing requirements, update product specs, prices, and lead statuses",
+        },
+        {
+            "code": "DELETE",
+            "name": "Delete",
+            "icon": "fa-trash-can",
+            "color": "rose",
+            "badge_class": "bg-rose-100 text-rose-800 border border-rose-200",
+            "desc": "Soft delete requirements, products, saved suppliers, and inquiries",
+        },
+        {
+            "code": "IMPORT",
+            "name": "Import",
+            "icon": "fa-file-import",
+            "color": "purple",
+            "badge_class": "bg-purple-100 text-purple-800 border border-purple-200",
+            "desc": "Bulk import requirements, product catalogs, and contact lists from CSV/Excel",
+        },
+        {
+            "code": "EXPORT",
+            "name": "Export",
+            "icon": "fa-file-export",
+            "color": "indigo",
+            "badge_class": "bg-indigo-100 text-indigo-800 border border-indigo-200",
+            "desc": "Download analytics, export reports, price comparison sheets & PDF/Excel",
+        },
+    ]
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "save_permissions":
+            member_id = request.POST.get("member_id")
+            member = get_object_or_404(CompanyMember, id=member_id, company=company)
+
+            if member.role == CompanyMember.Role.ADMIN:
+                messages.warning(request, "Company Admin automatically has all 6 permissions and cannot be restricted.")
+                return redirect("company-rbac-web")
+
+            selected_codes = request.POST.getlist("permissions")
+            valid_codes = [c for c in selected_codes if c in ["READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"]]
+
+            # Modules to assign based on company type (Buyer, Seller, Both)
+            modules_to_assign = ["general"]
+            if company.company_type in [Company.CompanyType.BUYER, Company.CompanyType.BOTH]:
+                modules_to_assign.append("requirements")
+            if company.company_type in [Company.CompanyType.SELLER, Company.CompanyType.BOTH]:
+                modules_to_assign.extend(["products", "catalog", "leads"])
+
+            # Delete old permissions and recreate with checked actions
+            MemberPermission.objects.filter(member=member).delete()
+
+            for code in valid_codes:
+                for mod in modules_to_assign:
+                    perm_obj, _ = CompanyPermission.objects.get_or_create(module=mod, permission=code)
+                    MemberPermission.objects.get_or_create(member=member, permission=perm_obj)
+
+            if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.POST.get("is_ajax"):
+                return JsonResponse({
+                    "success": True,
+                    "member_id": member.id,
+                    "permissions": valid_codes,
+                    "message": f"Permissions updated successfully for {member.user.email}.",
+                })
+
+            messages.success(request, f"Permissions updated successfully for {member.user.email}: {', '.join(valid_codes) if valid_codes else 'All permissions restricted'}.")
+            return redirect("company-rbac-web")
+
+    # Map current active permissions for each member
+    for m in members:
+        if m.role == CompanyMember.Role.ADMIN:
+            m.active_permissions = ["READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"]
+        else:
+            m.active_permissions = list(
+                MemberPermission.objects.filter(member=m)
+                .values_list("permission__permission", flat=True)
+                .distinct()
+            )
+
+    return render(request, "company/rbac.html", {
+        "company": company,
+        "members": members,
+        "core_permissions": core_permissions,
+        "rbac": rbac,
+        "page_title": "Role-Based Access Control (RBAC)",
     })
 
 

@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -16,9 +17,10 @@ from apps.companies.rbac import (
 class RequirementListCreateAPIView(APIView):
     """
     Buyer REST API:
-    - GET: List company's requirements (requires READ permission)
+    - GET: List company's active requirements (requires READ permission)
     - POST: Create new requirement (requires EDIT permission)
     Enforces that the user belongs to a BUYER or BOTH company.
+    Strict multi-tenant data isolation by company.
     """
     permission_classes = [IsAuthenticated, IsBuyerCompany, HasModulePermission]
     required_module = "requirements"
@@ -28,9 +30,23 @@ class RequirementListCreateAPIView(APIView):
         company = rbac.get("company")
 
         if rbac["is_super_admin"] and not company:
-            requirements = Requirement.objects.all().select_related("company", "category")
+            requirements = Requirement.objects.filter(is_deleted=False).select_related("company", "category")
         else:
-            requirements = Requirement.objects.filter(company=company).select_related("category")
+            requirements = Requirement.objects.filter(company=company, is_deleted=False).select_related("category")
+
+        # Optional filters
+        q = request.query_params.get("q", "").strip()
+        if q:
+            requirements = requirements.filter(
+                Q(item_name__icontains=q)
+                | Q(description__icontains=q)
+                | Q(specifications__icontains=q)
+                | Q(delivery_city__icontains=q)
+            )
+
+        category_id = request.query_params.get("category")
+        if category_id:
+            requirements = requirements.filter(category_id=category_id)
 
         serializer = RequirementSerializer(requirements, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -61,7 +77,7 @@ class RequirementDetailAPIView(APIView):
     Buyer REST API for single requirement:
     - GET: Retrieve requirement (READ)
     - PUT/PATCH: Update requirement (UPDATE)
-    - DELETE: Delete requirement (DELETE)
+    - DELETE: Soft-delete requirement (DELETE)
     """
     permission_classes = [IsAuthenticated, IsBuyerCompany, HasModulePermission]
     required_module = "requirements"
@@ -70,8 +86,8 @@ class RequirementDetailAPIView(APIView):
         rbac = get_user_rbac_context(request.user)
         company = rbac.get("company")
         if rbac["is_super_admin"]:
-            return get_object_or_404(Requirement, pk=pk)
-        return get_object_or_404(Requirement, pk=pk, company=company)
+            return get_object_or_404(Requirement, pk=pk, is_deleted=False)
+        return get_object_or_404(Requirement, pk=pk, company=company, is_deleted=False)
 
     def get(self, request, pk):
         req = self.get_object(request, pk)
@@ -93,8 +109,13 @@ class RequirementDetailAPIView(APIView):
 
     def delete(self, request, pk):
         req = self.get_object(request, pk)
-        req.delete()
+        # B2B soft-delete to preserve references and transaction logs
+        req.soft_delete()
         return Response(
-            {"message": "Requirement deleted successfully."},
-            status=status.HTTP_204_NO_CONTENT,
+            {
+                "message": "Requirement soft-deleted successfully.",
+                "id": req.id,
+                "is_deleted": True,
+            },
+            status=status.HTTP_200_OK,
         )

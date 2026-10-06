@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Create Procurement Requirement — AI Procurement{% endblock %}
+{% block title %}Edit {{ requirement.item_name }} — AI Procurement{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto space-y-6">
@@ -13,16 +13,18 @@
         <span>&bull;</span>
         <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Requirements</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">New Requirement</span>
+        <a href="{% url 'requirement-detail' requirement.id %}" class="hover:text-blue-600 transition">{{ requirement.item_name|truncatechars:20 }}</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Edit</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-        <i class="fa-solid fa-cart-plus text-blue-600"></i>
-        <span>Create Procurement Requirement</span>
+        <i class="fa-solid fa-pen-to-square text-blue-600"></i>
+        <span>Edit Requirement</span>
       </h1>
-      <p class="text-xs text-slate-500 mt-1">Specify item parameters and technical specifications for AI supplier discovery</p>
+      <p class="text-xs text-slate-500 mt-1">Update specifications and parameters for {{ requirement.item_name }}</p>
     </div>
-    <a href="{% url 'requirements-list' %}" class="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-xl bg-white border border-slate-200 transition">
-      <i class="fa-solid fa-arrow-left mr-1"></i> Back
+    <a href="{% url 'requirement-detail' requirement.id %}" class="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-xl bg-white border border-slate-200 transition">
+      <i class="fa-solid fa-arrow-left mr-1"></i> Back to Detail
     </a>
   </div>
 
@@ -40,42 +42,56 @@
           type="text" 
           name="item_name" 
           required 
+          value="{{ requirement.item_name }}"
           placeholder="e.g. Industrial Centrifugal Pump 50 HP" 
           class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
         >
       </div>
 
-      <!-- Category & Search Scope -->
+      <!-- Category & Status -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Category</label>
           <select name="category_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
             <option value="">Select Category...</option>
             {% for cat in categories %}
-              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              <option value="{{ cat.id }}" {% if requirement.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
             {% endfor %}
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Search Scope</label>
-          <select name="search_scope" id="scopeSelect" onchange="toggleRadius(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
-            <option value="global" selected>Global (Worldwide Manufacturers & Exporters)</option>
-            <option value="country">Country (Domestic Suppliers & Distributors)</option>
-            <option value="nearby">Nearby (Local Radius in KM)</option>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Requirement Status</label>
+          <select name="status" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+            <option value="draft" {% if requirement.status == 'draft' %}selected{% endif %}>Draft</option>
+            <option value="searching" {% if requirement.status == 'searching' %}selected{% endif %}>Searching (Active)</option>
+            <option value="completed" {% if requirement.status == 'completed' %}selected{% endif %}>Completed</option>
+            <option value="closed" {% if requirement.status == 'closed' %}selected{% endif %}>Closed</option>
           </select>
         </div>
       </div>
 
-      <!-- Nearby Radius (Conditional) -->
-      <div id="radiusDiv" class="hidden">
-        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Nearby Radius (KM)</label>
-        <input 
-          type="number" 
-          name="radius_km" 
-          placeholder="e.g. 50" 
-          class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-        >
+      <!-- Search Scope & Nearby Radius -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Search Scope</label>
+          <select name="search_scope" id="scopeSelect" onchange="toggleRadius(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+            <option value="global" {% if requirement.search_scope == 'global' %}selected{% endif %}>Global (Worldwide Manufacturers & Exporters)</option>
+            <option value="country" {% if requirement.search_scope == 'country' %}selected{% endif %}>Country (Domestic Suppliers & Distributors)</option>
+            <option value="nearby" {% if requirement.search_scope == 'nearby' %}selected{% endif %}>Nearby (Local Radius in KM)</option>
+          </select>
+        </div>
+
+        <div id="radiusDiv" class="{% if requirement.search_scope != 'nearby' %}hidden{% endif %}">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Nearby Radius (KM)</label>
+          <input 
+            type="number" 
+            name="radius_km" 
+            value="{{ requirement.radius_km|default:'' }}"
+            placeholder="e.g. 50" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
       </div>
 
       <!-- Quantity, Unit & Target Price -->
@@ -89,7 +105,7 @@
             step="0.01" 
             name="quantity" 
             required 
-            value="10" 
+            value="{{ requirement.quantity }}" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
           >
         </div>
@@ -99,8 +115,7 @@
           <input 
             type="text" 
             name="unit" 
-            value="pcs" 
-            placeholder="pcs, kg, tons, meters" 
+            value="{{ requirement.unit }}" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
           >
         </div>
@@ -113,6 +128,7 @@
               type="number" 
               step="0.01" 
               name="target_price" 
+              value="{{ requirement.target_price|default:'' }}"
               placeholder="e.g. 45000.00" 
               class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-7 pr-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
             >
@@ -120,15 +136,14 @@
         </div>
       </div>
 
-      <!-- Delivery City, Country, & Currency -->
+      <!-- Delivery City, Country, & Required By -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Delivery City</label>
           <input 
             type="text" 
             name="delivery_city" 
-            value="{{ company.city|default:'Mumbai' }}" 
-            placeholder="e.g. Pune, Bengaluru" 
+            value="{{ requirement.delivery_city }}" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
           >
         </div>
@@ -138,7 +153,7 @@
           <input 
             type="text" 
             name="delivery_country" 
-            value="{{ company.country|default:'India' }}" 
+            value="{{ requirement.delivery_country }}" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
           >
         </div>
@@ -148,6 +163,7 @@
           <input 
             type="date" 
             name="required_by" 
+            value="{{ requirement.required_by|date:'Y-m-d'|default:'' }}" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
           >
         </div>
@@ -161,31 +177,29 @@
         <textarea 
           name="specifications" 
           rows="4" 
-          placeholder="Enter detailed technical requirements, flow rate, pressure ratings, materials (SS304/SS316), dimensions, certifications (ISO, CE), or standard compliance..." 
           class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-        ></textarea>
+        >{{ requirement.specifications }}</textarea>
       </div>
 
       <!-- Description / Additional Notes -->
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-          Procurement Notes / Description (Optional)
+          Procurement Notes / Description
         </label>
         <textarea 
           name="description" 
           rows="2" 
-          placeholder="Payment terms, delivery timeline requirements, packaging standards, warranty expectations..." 
           class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-        ></textarea>
+        >{{ requirement.description }}</textarea>
       </div>
 
       <!-- Action Buttons -->
       <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
-        <a href="{% url 'requirements-list' %}" class="text-xs font-semibold text-slate-500 hover:text-slate-800">
+        <a href="{% url 'requirement-detail' requirement.id %}" class="text-xs font-semibold text-slate-500 hover:text-slate-800">
           Cancel
         </a>
         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-md shadow-blue-500/20 flex items-center">
-          <i class="fa-solid fa-plus mr-2"></i> Save & Post Requirement
+          <i class="fa-solid fa-floppy-disk mr-2"></i> Save Changes
         </button>
       </div>
     </form>

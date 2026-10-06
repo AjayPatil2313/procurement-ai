@@ -77,15 +77,16 @@
         <i class="fa-solid fa-shield-halved"></i>
       </div>
       <div>
-        <div class="font-bold text-slate-900 text-sm">6-Action Role-Based Access Control (RBAC)</div>
+        <div class="font-bold text-slate-900 text-sm">Role-Based Access Control (RBAC)</div>
         <p class="text-slate-600 mt-0.5">
-          <strong>Company Admin</strong> automatically has <strong>All 6 Permissions</strong> (<span class="font-semibold text-blue-700">Read, Edit, Update, Delete, Import, Export</span>). For <strong>Company Users</strong>, admin can configure any specific permissions.
+          User accounts and credentials are managed here. To assign and configure the <strong>6 Core Action Permissions</strong> (<span class="font-semibold text-blue-700">Read, Edit, Update, Delete, Import, Export</span>), open the dedicated RBAC matrix.
         </p>
       </div>
     </div>
     <div class="flex items-center space-x-2 shrink-0">
-      <span class="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-bold text-[11px]">Admin: All 6 Actions</span>
-      <span class="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-bold text-[11px]">User: Custom RBAC</span>
+      <a href="{% url 'company-rbac-web' %}" class="inline-flex items-center px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition">
+        <i class="fa-solid fa-sliders mr-1.5"></i> Open RBAC Matrix &rarr;
+      </a>
     </div>
   </div>
 
@@ -139,7 +140,7 @@
             <th class="py-3 px-4">User</th>
             <th class="py-3 px-4">Role</th>
             <th class="py-3 px-4">Status</th>
-            <th class="py-3 px-4">Assigned Permissions (6 Actions)</th>
+            <th class="py-3 px-4">Assigned Permissions</th>
             <th class="py-3 px-4">Joined Date</th>
             <th class="py-3 px-4 text-right">Actions</th>
           </tr>
@@ -245,6 +246,9 @@
                     <span class="text-slate-400 italic text-[11px]">No permissions assigned</span>
                   {% endif %}
                 </div>
+                <a href="{% url 'company-rbac-web' %}" class="inline-flex items-center text-[10px] text-blue-600 hover:text-blue-800 font-semibold mt-1">
+                  <i class="fa-solid fa-sliders mr-1"></i> Configure in RBAC &rarr;
+                </a>
               {% endif %}
             </td>
 
@@ -266,20 +270,19 @@
                   <i class="fa-solid fa-pen-to-square text-xs"></i>
                 </button>
 
-                <!-- Permissions (if not Admin) -->
+                <!-- Configure in RBAC (if not Admin) -->
                 {% if m.role == 'ADMIN' %}
                   <span class="p-1.5 text-slate-300 cursor-not-allowed" title="Admin permissions cannot be restricted">
                     <i class="fa-solid fa-lock text-xs"></i>
                   </span>
                 {% else %}
-                  <button 
-                    type="button" 
-                    onclick="openPermissionModal('{{ m.id }}', '{{ m.user.email }}', [{% for p in m.active_permissions %}'{{ p }}'{% if not forloop.last %},{% endif %}{% endfor %}])"
-                    class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg border border-blue-200 transition"
-                    title="Manage 6 Permissions"
+                  <a 
+                    href="{% url 'company-rbac-web' %}" 
+                    class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg border border-blue-200 transition inline-flex items-center justify-center"
+                    title="Configure 6 Actions in RBAC"
                   >
-                    <i class="fa-solid fa-sliders text-xs"></i>
-                  </button>
+                    <i class="fa-solid fa-shield-halved text-xs"></i>
+                  </a>
                 {% endif %}
 
                 <!-- Activate / Deactivate Toggle -->
@@ -338,7 +341,7 @@
         <h3 class="font-bold text-slate-900 text-sm flex items-center">
           <i class="fa-solid fa-user-plus text-blue-600 mr-2"></i> Add Company User
         </h3>
-        <p class="text-[11px] text-slate-500 mt-0.5">Create user login credentials and configure permissions</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Create user login credentials and account profile</p>
       </div>
       <button onclick="document.getElementById('addMemberModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
         <i class="fa-solid fa-xmark text-lg"></i>
@@ -448,46 +451,11 @@
       <!-- Company Role -->
       <div>
         <label class="block text-xs font-semibold text-slate-700 mb-1">Company Role <span class="text-rose-500">*</span></label>
-        <select name="role" id="newMemberRole" onchange="toggleRoleNotice(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
-          <option value="USER" selected>Company User (Configurable 6 Permissions)</option>
-          <option value="ADMIN">Company Admin (All 6 Permissions Full Access)</option>
+        <select name="role" id="newMemberRole" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          <option value="USER" selected>Company User</option>
+          <option value="ADMIN">Company Admin</option>
         </select>
-        <p id="adminNotice" class="hidden text-[11px] text-purple-700 bg-purple-50 p-2.5 rounded-xl mt-1.5 border border-purple-200">
-          <i class="fa-solid fa-crown mr-1"></i> Note: Company Admins automatically receive all 6 permissions (Read, Edit, Update, Delete, Import, Export).
-        </p>
-      </div>
-
-      <!-- Initial Permissions Selection -->
-      <div id="initialPermissionsSection">
-        <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-          Assign Initial Permissions (6 Actions)
-        </label>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" name="permissions" value="READ" checked class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-            <span class="font-medium">Read</span>
-          </label>
-          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" name="permissions" value="EDIT" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-            <span class="font-medium">Edit</span>
-          </label>
-          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" name="permissions" value="UPDATE" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-            <span class="font-medium">Update</span>
-          </label>
-          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" name="permissions" value="DELETE" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-            <span class="font-medium">Delete</span>
-          </label>
-          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" name="permissions" value="IMPORT" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-            <span class="font-medium">Import</span>
-          </label>
-          <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" name="permissions" value="EXPORT" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
-            <span class="font-medium">Export</span>
-          </label>
-        </div>
+        <p class="text-[10px] text-slate-400 mt-1">Granular 6-action permissions can be assigned on the RBAC page after user creation.</p>
       </div>
 
       <!-- Verification & Active Status (BOOL) -->
@@ -619,8 +587,8 @@
       <div>
         <label class="block text-xs font-semibold text-slate-700 mb-1">Company Role</label>
         <select name="role" id="editMemberRole" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
-          <option value="USER">Company User (Configurable 6 Permissions)</option>
-          <option value="ADMIN">Company Admin (All 6 Permissions Full Access)</option>
+          <option value="USER">Company User</option>
+          <option value="ADMIN">Company Admin</option>
         </select>
       </div>
 
@@ -659,83 +627,7 @@
   </div>
 </div>
 
-<!-- 3. 6 PERMISSIONS MODAL -->
-<div id="permissionModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
-    
-    <!-- Modal Header -->
-    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-      <div>
-        <h3 class="font-bold text-slate-900 text-sm flex items-center">
-          <i class="fa-solid fa-shield-halved text-blue-600 mr-2"></i> Manage Permissions (6 Actions)
-        </h3>
-        <p id="permModalUserEmail" class="text-xs text-slate-500 font-medium mt-0.5"></p>
-      </div>
-      <button onclick="document.getElementById('permissionModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
-        <i class="fa-solid fa-xmark text-lg"></i>
-      </button>
-    </div>
 
-    <!-- Quick Toggle Buttons -->
-    <div class="flex items-center justify-between py-3 border-b border-slate-100 text-xs">
-      <span class="text-slate-500 font-medium">Select actions allowed for this user:</span>
-      <div class="space-x-2">
-        <button type="button" onclick="toggleAllPerms(true)" class="text-blue-600 hover:text-blue-800 font-bold hover:underline">
-          <i class="fa-solid fa-check-double mr-1"></i> Select All (6)
-        </button>
-        <span class="text-slate-300">|</span>
-        <button type="button" onclick="toggleAllPerms(false)" class="text-slate-500 hover:text-slate-700 font-medium hover:underline">
-          Clear All
-        </button>
-      </div>
-    </div>
-
-    <!-- Form with the 6 permissions -->
-    <form method="POST" class="space-y-4 mt-3 flex-1 overflow-y-auto">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="update_permissions">
-      <input type="hidden" name="member_id" id="permModalMemberId">
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {% for p in core_permissions %}
-        <label class="flex items-start p-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/30 transition cursor-pointer">
-          <input 
-            type="checkbox" 
-            name="permissions" 
-            value="{{ p.code }}" 
-            id="perm_{{ p.code }}"
-            class="rounded text-blue-600 mr-3 mt-0.5 perm-checkbox focus:ring-blue-500 w-4 h-4"
-          >
-          <div class="flex-1">
-            <div class="flex items-center space-x-1.5">
-              <span class="font-bold text-slate-900 text-xs">{{ p.name }}</span>
-              <span class="px-1.5 py-0.2 rounded text-[10px] font-bold {{ p.badge_class }} uppercase">
-                {{ p.code }}
-              </span>
-            </div>
-            <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">{{ p.description }}</p>
-          </div>
-        </label>
-        {% endfor %}
-      </div>
-
-      <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
-        <div class="text-[11px] text-slate-400">
-          <i class="fa-solid fa-circle-info mr-1 text-blue-500"></i> Admins automatically have all 6
-        </div>
-        <div class="flex space-x-2">
-          <button type="button" onclick="document.getElementById('permissionModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
-            Cancel
-          </button>
-          <button type="submit" class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/20 transition">
-            Save Permissions
-          </button>
-        </div>
-      </div>
-    </form>
-
-  </div>
-</div>
 
 <script>
   function toggleNewMemberPasswordVisibility() {
@@ -768,18 +660,6 @@
     }
   }
 
-  function toggleRoleNotice(role) {
-    const notice = document.getElementById('adminNotice');
-    const permSection = document.getElementById('initialPermissionsSection');
-    if (role === 'ADMIN') {
-      if (notice) notice.classList.remove('hidden');
-      if (permSection) permSection.classList.add('hidden');
-    } else {
-      if (notice) notice.classList.add('hidden');
-      if (permSection) permSection.classList.remove('hidden');
-    }
-  }
-
   function openEditUserModal(memberId, email, firstName, lastName, phone, role, isActive, isEmailVerified) {
     document.getElementById('editMemberId').value = memberId;
     document.getElementById('editModalUserEmail').innerText = 'User: ' + email;
@@ -792,28 +672,6 @@
     document.getElementById('editMemberPassword').value = '';
 
     document.getElementById('editMemberModal').classList.remove('hidden');
-  }
-
-  function openPermissionModal(memberId, email, activePerms) {
-    document.getElementById('permModalMemberId').value = memberId;
-    document.getElementById('permModalUserEmail').innerText = 'User: ' + email;
-
-    const checkboxes = document.querySelectorAll('.perm-checkbox');
-    checkboxes.forEach(cb => cb.checked = false);
-
-    if (activePerms && activePerms.length > 0) {
-      activePerms.forEach(code => {
-        const el = document.getElementById('perm_' + code);
-        if (el) el.checked = true;
-      });
-    }
-
-    document.getElementById('permissionModal').classList.remove('hidden');
-  }
-
-  function toggleAllPerms(check) {
-    const checkboxes = document.querySelectorAll('.perm-checkbox');
-    checkboxes.forEach(cb => cb.checked = check);
   }
 
   function filterUsers() {

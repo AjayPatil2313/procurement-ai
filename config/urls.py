@@ -13,11 +13,15 @@ from apps.dashboard.views import global_search_view
 from apps.companies.web_views import (
     company_profile_web_view,
     company_team_web_view,
+    company_rbac_web_view,
     subscription_billing_web_view,
 )
 from apps.requirements.web_views import (
     requirements_list_view,
     requirement_create_view,
+    requirement_detail_view,
+    requirement_edit_view,
+    requirement_delete_view,
     find_suppliers_view,
 )
 from apps.catalog.web_views import (
@@ -64,12 +68,16 @@ urlpatterns = [
     # Company Management (Web)
     path("company/profile/", company_profile_web_view, name="company-profile-web"),
     path("company/team/", company_team_web_view, name="company-team-web"),
+    path("company/rbac/", company_rbac_web_view, name="company-rbac-web"),
     path("company/billing/", subscription_billing_web_view, name="subscription-billing-web"),
 
     # Buyer / Procurement (Web)
     path("procurement/find-suppliers/", find_suppliers_view, name="find-suppliers"),
     path("procurement/requirements/", requirements_list_view, name="requirements-list"),
     path("procurement/requirements/create/", requirement_create_view, name="requirements-create"),
+    path("procurement/requirements/<int:pk>/", requirement_detail_view, name="requirement-detail"),
+    path("procurement/requirements/<int:pk>/edit/", requirement_edit_view, name="requirement-edit"),
+    path("procurement/requirements/<int:pk>/delete/", requirement_delete_view, name="requirement-delete"),
     path("procurement/saved-suppliers/", saved_suppliers_view, name="saved-suppliers"),
     path("procurement/inquiries/", inquiries_list_view, name="inquiries-list"),
     path("procurement/price-comparison/", price_comparison_view, name="price-comparison"),

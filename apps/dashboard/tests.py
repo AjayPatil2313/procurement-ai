@@ -1197,6 +1197,442 @@ class SellerModuleTestCase(TestCase):
         self.assertEqual(api_resp.status_code, 403)
 
 
+class RBACDedicatedPageTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        # 1. Company Admin
+        self.admin_user = User.objects.create_user(
+            email="admin@matrixcorp.com",
+            password="Password@123",
+            first_name="Anita",
+            last_name="Deshmukh",
+        )
+        self.company = Company.objects.create(
+            name="Matrix Corp Pvt. Ltd.",
+            company_type=Company.CompanyType.BOTH,
+            created_by=self.admin_user,
+        )
+        self.admin_member = CompanyMember.objects.create(
+            user=self.admin_user,
+            company=self.company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # 2. Regular Company User
+        self.staff_user = User.objects.create_user(
+            email="staff@matrixcorp.com",
+            password="Password@123",
+            first_name="Vikram",
+            last_name="Singh",
+        )
+        self.staff_member = CompanyMember.objects.create(
+            user=self.staff_user,
+            company=self.company,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+
+        # 3. Super Admin
+        self.superadmin = User.objects.create_superuser(
+            email="super@platform.com",
+            password="Password@123",
+            first_name="Super",
+            last_name="Admin",
+        )
+
+    def test_company_admin_can_access_rbac_page(self):
+        """Company Admin can view dedicated RBAC page with 6 action permissions and matrix"""
+        self.client.login(email="admin@matrixcorp.com", password="Password@123")
+        resp = self.client.get(reverse("company-rbac-web"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Role-Based Access Control (RBAC)")
+        self.assertContains(resp, "READ")
+        self.assertContains(resp, "EDIT")
+        self.assertContains(resp, "UPDATE")
+        self.assertContains(resp, "DELETE")
+        self.assertContains(resp, "IMPORT")
+        self.assertContains(resp, "EXPORT")
+        self.assertContains(resp, "Matrix Corp Pvt. Ltd.")
+        self.assertContains(resp, "Vikram Singh")
+
+    def test_company_user_restricted_from_rbac_page(self):
+        """Regular Company User cannot access RBAC page and is redirected"""
+        self.client.login(email="staff@matrixcorp.com", password="Password@123")
+        resp = self.client.get(reverse("company-rbac-web"))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/dashboard", resp.url)
+
+    def test_admin_can_save_6_permissions_for_user(self):
+        """Company Admin configures checkboxes for actions on RBAC page"""
+        self.client.login(email="admin@matrixcorp.com", password="Password@123")
+
+        # Grant READ, EDIT, and EXPORT
+        resp = self.client.post(reverse("company-rbac-web"), {
+            "action": "save_permissions",
+            "member_id": self.staff_member.id,
+            "permissions": ["READ", "EDIT", "EXPORT"],
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/company/rbac/", resp.url)
+
+        # Verify permissions in database
+        perms = set(MemberPermission.objects.filter(member=self.staff_member).values_list("permission__permission", flat=True))
+        self.assertEqual(perms, {"READ", "EDIT", "EXPORT"})
+
+        # Grant all 6 permissions
+        resp_all = self.client.post(reverse("company-rbac-web"), {
+            "action": "save_permissions",
+            "member_id": self.staff_member.id,
+            "permissions": ["READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"],
+        })
+        self.assertEqual(resp_all.status_code, 302)
+        all_perms = set(MemberPermission.objects.filter(member=self.staff_member).values_list("permission__permission", flat=True))
+        self.assertEqual(all_perms, {"READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"})
+
+    def test_admin_permissions_locked_in_rbac(self):
+        """Admin permissions cannot be modified or restricted via RBAC page"""
+        self.client.login(email="admin@matrixcorp.com", password="Password@123")
+
+        resp = self.client.post(reverse("company-rbac-web"), {
+            "action": "save_permissions",
+            "member_id": self.admin_member.id,
+            "permissions": ["READ"],
+        })
+        self.assertEqual(resp.status_code, 302)
+
+    def test_ajax_permission_save_returns_json(self):
+        """AJAX request to save permissions returns JSON response"""
+        self.client.login(email="admin@matrixcorp.com", password="Password@123")
+
+        resp = self.client.post(
+            reverse("company-rbac-web"),
+            {
+                "action": "save_permissions",
+                "member_id": self.staff_member.id,
+                "permissions": ["READ", "UPDATE"],
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["permissions"], ["READ", "UPDATE"])
+
+    def test_rbac_buyer_and_seller_company_modules_scope(self):
+        """RBAC correctly scopes modules for Buyer-only and Seller-only companies"""
+        # 1. Buyer Company
+        buyer_admin = User.objects.create_user(email="buyeradmin@buyercomp.com", password="Password@123")
+        buyer_comp = Company.objects.create(name="Buyer Comp Ltd", company_type=Company.CompanyType.BUYER, created_by=buyer_admin)
+        CompanyMember.objects.create(user=buyer_admin, company=buyer_comp, role=CompanyMember.Role.ADMIN, is_active=True)
+        buyer_user = User.objects.create_user(email="user@buyercomp.com", password="Password@123")
+        buyer_member = CompanyMember.objects.create(user=buyer_user, company=buyer_comp, role=CompanyMember.Role.USER, is_active=True)
+
+        self.client.login(email="buyeradmin@buyercomp.com", password="Password@123")
+        # Save READ + EDIT
+        self.client.post(reverse("company-rbac-web"), {
+            "action": "save_permissions",
+            "member_id": buyer_member.id,
+            "permissions": ["READ", "EDIT"],
+        })
+        # Check modules assigned: should include requirements and general, NOT products/catalog
+        assigned_modules = set(MemberPermission.objects.filter(member=buyer_member).values_list("permission__module", flat=True))
+        self.assertIn("requirements", assigned_modules)
+        self.assertNotIn("products", assigned_modules)
+
+
+class BuyerModuleTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        # 1. Company Alpha (Buyer)
+        self.alpha_admin = User.objects.create_user(
+            email="admin@alphaprocure.com",
+            password="Password@123",
+            first_name="Alok",
+            last_name="Nath",
+        )
+        self.alpha_company = Company.objects.create(
+            name="Alpha Procurements Pvt. Ltd.",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.alpha_admin,
+            city="Delhi",
+        )
+        CompanyMember.objects.create(
+            user=self.alpha_admin,
+            company=self.alpha_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Alpha Reader (User with only READ permission)
+        self.alpha_reader = User.objects.create_user(
+            email="reader@alphaprocure.com",
+            password="Password@123",
+            first_name="Rohan",
+            last_name="Reader",
+        )
+        self.alpha_reader_member = CompanyMember.objects.create(
+            user=self.alpha_reader,
+            company=self.alpha_company,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+        perm_read, _ = CompanyPermission.objects.get_or_create(module="requirements", permission="READ")
+        MemberPermission.objects.create(member=self.alpha_reader_member, permission=perm_read)
+
+        # 2. Company Beta (Buyer) - For Data Isolation Test
+        self.beta_admin = User.objects.create_user(
+            email="admin@betaprocure.com",
+            password="Password@123",
+            first_name="Bhavesh",
+            last_name="Shah",
+        )
+        self.beta_company = Company.objects.create(
+            name="Beta Procurements Pvt. Ltd.",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.beta_admin,
+            city="Surat",
+        )
+        CompanyMember.objects.create(
+            user=self.beta_admin,
+            company=self.beta_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # 3. Seller-Only Company (Should be blocked from Buyer module)
+        self.seller_admin = User.objects.create_user(
+            email="admin@gammasupply.com",
+            password="Password@123",
+            first_name="Girish",
+            last_name="Patel",
+        )
+        self.seller_company = Company.objects.create(
+            name="Gamma Supply Pvt. Ltd.",
+            company_type=Company.CompanyType.SELLER,
+            created_by=self.seller_admin,
+        )
+        CompanyMember.objects.create(
+            user=self.seller_admin,
+            company=self.seller_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Category
+        self.category = Category.objects.create(name="Heavy Machinery")
+
+        # Sample Alpha Requirement
+        self.req_alpha = Requirement.objects.create(
+            company=self.alpha_company,
+            created_by=self.alpha_admin,
+            item_name="Hydraulic Excavator 20 Ton",
+            category=self.category,
+            quantity=2,
+            unit="units",
+            target_price=3500000.00,
+            currency="INR",
+            delivery_city="Delhi",
+            delivery_country="India",
+            specifications="Operating weight 20,000 kg, bucket capacity 0.9 m3",
+            search_scope=Requirement.SearchScope.GLOBAL,
+            status=Requirement.Status.SEARCHING,
+            is_deleted=False,
+        )
+
+    def test_buyer_requirements_crud_web_view(self):
+        """Complete Requirement Web CRUD: List, Create, Detail, Edit, Soft Delete"""
+        self.client.login(email="admin@alphaprocure.com", password="Password@123")
+
+        # 1. LIST Web View
+        list_resp = self.client.get(reverse("requirements-list"))
+        self.assertEqual(list_resp.status_code, 200)
+        self.assertContains(list_resp, "Buyer Requirements")
+        self.assertContains(list_resp, "Hydraulic Excavator 20 Ton")
+        self.assertContains(list_resp, "Alpha Procurements Pvt. Ltd.")
+
+        # 2. CREATE Web View
+        create_resp = self.client.post(reverse("requirements-create"), {
+            "item_name": "Diesel Generator 250 kVA",
+            "category_id": self.category.id,
+            "quantity": "5",
+            "unit": "pcs",
+            "target_price": "850000.00",
+            "currency": "INR",
+            "delivery_city": "Noida",
+            "delivery_country": "India",
+            "search_scope": "country",
+            "specifications": "Caterpillar or Cummins engine, 3-phase, silent canopy",
+            "status": "searching",
+        })
+        self.assertEqual(create_resp.status_code, 302)
+        new_req = Requirement.objects.get(item_name="Diesel Generator 250 kVA")
+        self.assertEqual(new_req.company, self.alpha_company)
+        self.assertEqual(float(new_req.target_price), 850000.00)
+        self.assertFalse(new_req.is_deleted)
+
+        # 3. DETAIL Web View
+        detail_resp = self.client.get(reverse("requirement-detail", kwargs={"pk": new_req.id}))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertContains(detail_resp, "Diesel Generator 250 kVA")
+        self.assertContains(detail_resp, "Procurement Parameters")
+        self.assertContains(detail_resp, "Technical Specifications")
+
+        # 4. EDIT Web View
+        edit_resp = self.client.post(reverse("requirement-edit", kwargs={"pk": new_req.id}), {
+            "item_name": "Diesel Generator 250 kVA (Silent)",
+            "category_id": self.category.id,
+            "quantity": "6",
+            "unit": "pcs",
+            "target_price": "900000.00",
+            "currency": "INR",
+            "delivery_city": "Gurugram",
+            "delivery_country": "India",
+            "search_scope": "country",
+            "specifications": "Updated specs: CPCB-IV+ emission compliant",
+            "status": "searching",
+        })
+        self.assertEqual(edit_resp.status_code, 302)
+        new_req.refresh_from_db()
+        self.assertEqual(new_req.item_name, "Diesel Generator 250 kVA (Silent)")
+        self.assertEqual(new_req.quantity, 6)
+        self.assertEqual(float(new_req.target_price), 900000.00)
+
+        # 5. SOFT DELETE Web View
+        del_resp = self.client.post(reverse("requirement-delete", kwargs={"pk": new_req.id}))
+        self.assertEqual(del_resp.status_code, 302)
+        new_req.refresh_from_db()
+        self.assertTrue(new_req.is_deleted)
+        self.assertIsNotNone(new_req.deleted_at)
+
+        # Soft-deleted item is no longer in list view
+        list_after = self.client.get(reverse("requirements-list"))
+        self.assertNotIn(new_req, list_after.context["requirements"])
+        self.assertNotContains(list_after, f"/procurement/requirements/{new_req.id}/")
+
+        # Detail view returns 404 for soft-deleted item
+        del_detail = self.client.get(reverse("requirement-detail", kwargs={"pk": new_req.id}))
+        self.assertEqual(del_detail.status_code, 404)
+
+    def test_buyer_requirements_crud_api(self):
+        """Complete Requirement REST API CRUD: List, Create, Detail, Update, Soft-Delete"""
+        self.client.login(email="admin@alphaprocure.com", password="Password@123")
+
+        # 1. LIST API
+        list_resp = self.client.get(reverse("api-requirements-list"))
+        self.assertEqual(list_resp.status_code, 200)
+        self.assertEqual(len(list_resp.json()), 1)
+        self.assertEqual(list_resp.json()[0]["item_name"], "Hydraulic Excavator 20 Ton")
+
+        # 2. CREATE API
+        create_resp = self.client.post(
+            reverse("api-requirements-list"),
+            {
+                "item_name": "Stainless Steel Pipes Grade 316",
+                "quantity": 100,
+                "unit": "meters",
+                "target_price": "1200.00",
+                "delivery_city": "Faridabad",
+                "search_scope": "global",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(create_resp.status_code, 201)
+        new_id = create_resp.json()["id"]
+
+        # 3. DETAIL API
+        detail_resp = self.client.get(reverse("api-requirements-detail", kwargs={"pk": new_id}))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertEqual(detail_resp.json()["item_name"], "Stainless Steel Pipes Grade 316")
+
+        # 4. PATCH API
+        patch_resp = self.client.patch(
+            reverse("api-requirements-detail", kwargs={"pk": new_id}),
+            {"target_price": "1350.00"},
+            content_type="application/json",
+        )
+        self.assertEqual(patch_resp.status_code, 200)
+        self.assertEqual(float(patch_resp.json()["target_price"]), 1350.00)
+
+        # 5. DELETE API (soft-delete)
+        del_resp = self.client.delete(reverse("api-requirements-detail", kwargs={"pk": new_id}))
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertTrue(del_resp.json()["is_deleted"])
+
+        del_req = Requirement.objects.get(id=new_id)
+        self.assertTrue(del_req.is_deleted)
+
+        # Detail returns 404 after soft delete
+        get_after = self.client.get(reverse("api-requirements-detail", kwargs={"pk": new_id}))
+        self.assertEqual(get_after.status_code, 404)
+
+    def test_buyer_rbac_permission_checks(self):
+        """Company User with only READ permission can view but cannot create, edit, or delete"""
+        self.client.login(email="reader@alphaprocure.com", password="Password@123")
+
+        # Can view list and detail
+        self.assertEqual(self.client.get(reverse("requirements-list")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("requirement-detail", kwargs={"pk": self.req_alpha.id})).status_code, 200)
+
+        # Cannot create
+        create_resp = self.client.post(reverse("requirements-create"), {"item_name": "Blocked Item"})
+        self.assertEqual(create_resp.status_code, 302)
+
+        # Cannot edit
+        edit_resp = self.client.post(reverse("requirement-edit", kwargs={"pk": self.req_alpha.id}), {"item_name": "Blocked Edit"})
+        self.assertEqual(edit_resp.status_code, 302)
+
+        # Cannot delete
+        del_resp = self.client.post(reverse("requirement-delete", kwargs={"pk": self.req_alpha.id}))
+        self.assertEqual(del_resp.status_code, 302)
+        self.req_alpha.refresh_from_db()
+        self.assertFalse(self.req_alpha.is_deleted)
+
+    def test_buyer_multi_tenant_data_isolation(self):
+        """Alpha Company cannot see Beta Company requirements and vice versa"""
+        # Beta admin creates Beta requirement
+        req_beta = Requirement.objects.create(
+            company=self.beta_company,
+            created_by=self.beta_admin,
+            item_name="Beta Special Textile Loom",
+            quantity=1,
+            unit="set",
+            is_deleted=False,
+        )
+
+        # Alpha admin visits
+        self.client.login(email="admin@alphaprocure.com", password="Password@123")
+        alpha_list = self.client.get(reverse("requirements-list"))
+        self.assertContains(alpha_list, "Hydraulic Excavator 20 Ton")
+        self.assertNotContains(alpha_list, "Beta Special Textile Loom")
+
+        # Alpha admin cannot view Beta detail
+        alpha_beta_detail = self.client.get(reverse("requirement-detail", kwargs={"pk": req_beta.id}))
+        self.assertEqual(alpha_beta_detail.status_code, 404)
+
+        # Beta admin visits
+        self.client.login(email="admin@betaprocure.com", password="Password@123")
+        beta_list = self.client.get(reverse("requirements-list"))
+        self.assertContains(beta_list, "Beta Special Textile Loom")
+        self.assertNotContains(beta_list, "Hydraulic Excavator 20 Ton")
+
+    def test_seller_only_company_blocked_from_requirements(self):
+        """Seller-only company is blocked from Buyer requirement management"""
+        self.client.login(email="admin@gammasupply.com", password="Password@123")
+
+        # Web view redirects to dashboard
+        web_resp = self.client.get(reverse("requirements-list"))
+        self.assertEqual(web_resp.status_code, 302)
+
+        # REST API returns 403 Forbidden
+        api_resp = self.client.get(reverse("api-requirements-list"))
+        self.assertEqual(api_resp.status_code, 403)
+
+
+
+
 
 
 
