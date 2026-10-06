@@ -3,8 +3,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from apps.ai_search.models import SearchJob, SearchResult
+from apps.ai_search.services.pipeline import run_find_buyers_search
 from apps.catalog.models import Category, Product, ProductImage
 from apps.companies.rbac import get_user_rbac_context
 
@@ -431,8 +433,9 @@ def product_delete_view(request, pk):
 @login_required
 def find_buyers_view(request):
     """
-    Find Buyers (AI Matching):
-    Lists AI-matched buyer leads for this seller's products.
+    Find Buyers (AI Matching & Web Scraping):
+    Allows sellers to initiate live web scraping + AI lead discovery for products,
+    displaying extracted company contacts, locations, and match reasons.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -442,23 +445,47 @@ def find_buyers_view(request):
         messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
+    products = Product.objects.filter(company=company, is_deleted=False).order_by("name")
+
+    # Handle search initiation via POST or GET ?run_search=1
+    if request.method == "POST" and request.POST.get("action") == "run_search":
+        prod_id = request.POST.get("product_id")
+        target_prod = Product.objects.filter(id=prod_id, company=company, is_deleted=False).first()
+        if target_prod:
+            job = run_find_buyers_search(target_prod, request.user, company)
+            messages.success(request, f"Found {job.total_results} buyer leads with contact details for '{target_prod.name}'!")
+            return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
+        else:
+            messages.error(request, "Please select a valid product to search for buyers.")
+            return redirect("find-buyers")
+
     product_id = request.GET.get("product_id")
+    if request.GET.get("run_search") == "1" and product_id:
+        target_prod = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
+        if target_prod:
+            job = run_find_buyers_search(target_prod, request.user, company)
+            messages.success(request, f"Search completed: Discovered {job.total_results} potential buyer leads for '{target_prod.name}'!")
+            return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
+
     leads_qs = SearchResult.objects.filter(
         search_job__company=company,
         result_type=SearchResult.ResultType.LEAD,
-    ).select_related("external_company", "search_job").order_by("-match_score")
+    ).select_related("external_company", "search_job", "search_job__product").order_by("-match_score", "-created_at")
 
-    if product_id:
+    selected_product = None
+    if product_id and product_id.isdigit():
         leads_qs = leads_qs.filter(search_job__product_id=product_id)
+        selected_product = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
 
-    leads = leads_qs[:25]
-    products = Product.objects.filter(company=company, is_deleted=False).order_by("name")
+    leads = leads_qs[:30]
 
     return render(request, "products/find_buyers.html", {
         "leads": leads,
         "products": products,
+        "selected_product": selected_product,
         "selected_product_id": int(product_id) if product_id and product_id.isdigit() else None,
         "company": company,
         "rbac": rbac,
-        "page_title": "Find Buyers (AI)",
+        "page_title": "Find Buyers (AI Lead Engine)",
     })
+

@@ -3,8 +3,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from apps.ai_search.models import SearchJob, SearchResult
+from apps.ai_search.services.pipeline import run_find_suppliers_search
 from apps.catalog.models import Category
 from apps.companies.rbac import get_user_rbac_context
 from apps.requirements.models import Requirement
@@ -442,8 +444,9 @@ def requirement_delete_view(request, pk):
 @login_required
 def find_suppliers_view(request):
     """
-    Find Suppliers View:
-    Displays matched supplier results for buyer requirements.
+    Find Suppliers View (AI Match & Web Scraper):
+    Initiates live web search and deep scraping for suppliers meeting buyer requirements,
+    extracting manufacturer contact info, location, MOQ, and competitive pricing.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -453,15 +456,47 @@ def find_suppliers_view(request):
         messages.error(request, "Access restricted: Buyer module permission required.")
         return redirect("dashboard")
 
-    # Get recent supplier results for this company
-    results = SearchResult.objects.filter(
+    requirements = Requirement.objects.filter(company=company, is_deleted=False).order_by("-created_at")
+
+    # Handle search initiation via POST or GET ?run_search=1
+    if request.method == "POST" and request.POST.get("action") == "run_search":
+        req_id = request.POST.get("requirement_id")
+        target_req = Requirement.objects.filter(id=req_id, company=company, is_deleted=False).first()
+        if target_req:
+            job = run_find_suppliers_search(target_req, request.user, company)
+            messages.success(request, f"Supplier discovery complete! Found {job.total_results} matching suppliers for '{target_req.item_name}'.")
+            return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
+        else:
+            messages.error(request, "Please select an active requirement to find suppliers.")
+            return redirect("find-suppliers")
+
+    requirement_id = request.GET.get("requirement_id")
+    if request.GET.get("run_search") == "1" and requirement_id:
+        target_req = Requirement.objects.filter(id=requirement_id, company=company, is_deleted=False).first()
+        if target_req:
+            job = run_find_suppliers_search(target_req, request.user, company)
+            messages.success(request, f"Search completed: Identified {job.total_results} suppliers for '{target_req.item_name}'.")
+            return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
+
+    results_qs = SearchResult.objects.filter(
         search_job__company=company,
         result_type=SearchResult.ResultType.SUPPLIER,
-    ).select_related("external_company", "search_job").order_by("-match_score")[:20]
+    ).select_related("external_company", "search_job", "search_job__requirement").order_by("-match_score", "-created_at")
+
+    selected_requirement = None
+    if requirement_id and requirement_id.isdigit():
+        results_qs = results_qs.filter(search_job__requirement_id=requirement_id)
+        selected_requirement = Requirement.objects.filter(id=requirement_id, company=company, is_deleted=False).first()
+
+    results = results_qs[:30]
 
     return render(request, "requirements/find_suppliers.html", {
         "results": results,
+        "requirements": requirements,
+        "selected_requirement": selected_requirement,
+        "selected_requirement_id": int(requirement_id) if requirement_id and requirement_id.isdigit() else None,
         "company": company,
         "rbac": rbac,
-        "page_title": "Find Suppliers (AI)",
+        "page_title": "Find Suppliers (AI Sourcing)",
     })
+

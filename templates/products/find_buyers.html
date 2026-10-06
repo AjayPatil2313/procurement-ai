@@ -5,92 +5,203 @@
 {% block content %}
 <div class="space-y-6">
 
+  <!-- Header & Status Bar -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">AI Buyer Leads (Sales Engine)</h1>
-      <p class="text-xs text-slate-500 mt-1">Companies matched by AI that actively purchase or require your products</p>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Products</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">AI Buyer Leads</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-crosshairs"></i>
+        </span>
+        <span>AI Buyer Leads (Sales Engine)</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">Real-time Web Search & Scraper extracting verified buyer contacts, procurement signals, and RFQ intent.</p>
     </div>
-    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-orange-100 text-orange-800">
-      <i class="fa-solid fa-crosshairs mr-1"></i> Intent Signal Radar Active
-    </span>
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
+        <i class="fa-solid fa-signal mr-1.5 text-emerald-600"></i> Live Search & Scraper Active
+      </span>
+    </div>
   </div>
 
+  <!-- Product Search Trigger Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <form method="POST" action="{% url 'find-buyers' %}" class="flex flex-col md:flex-row items-center gap-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="run_search">
+
+      <div class="flex-1 w-full">
+        <label for="product_id" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Select Product to Find Buyers
+        </label>
+        <select id="product_id" name="product_id" class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
+          <option value="">-- Choose Product From Your Catalog --</option>
+          {% for p in products %}
+          <option value="{{ p.id }}" {% if selected_product_id == p.id %}selected{% endif %}>
+            {{ p.name }} ({{ p.category.name|default:"General" }}) — {% if p.price %}{{ p.currency }} {{ p.price }}{% else %}Open Quote{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2 w-full md:w-auto md:mt-5">
+        <button type="submit" class="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>Launch AI Buyer Search</span>
+        </button>
+
+        {% if selected_product_id %}
+        <a href="{% url 'find-buyers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition">
+          Clear Filter
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Active Results Count and Feedback -->
+  <div class="flex items-center justify-between text-xs text-slate-500 px-1">
+    <div>
+      {% if selected_product %}
+        Showing leads for product: <strong class="text-slate-800">{{ selected_product.name }}</strong> ({{ leads|length }} candidates)
+      {% else %}
+        Showing all qualified buyer leads across catalog ({{ leads|length }} discovered)
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Results Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for lead in leads %}
     <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
       <div>
-        <div class="flex items-start justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 font-bold flex items-center justify-center text-sm border border-purple-100">
+        <!-- Top row: Avatar, Name, Location, Fit Badge -->
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 font-bold flex items-center justify-center text-sm border border-orange-100 shrink-0">
               <i class="fa-solid fa-industry"></i>
             </div>
-            <div>
-              <h3 class="font-bold text-slate-900 text-sm leading-tight">Apex Petrochemicals Ltd.</h3>
-              <span class="text-xs text-slate-500">Vadodara, India</span>
+            <div class="min-w-0">
+              <h3 class="font-bold text-slate-900 text-sm leading-tight truncate" title="{{ lead.external_company.name }}">
+                {{ lead.external_company.name }}
+              </h3>
+              <span class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                <i class="fa-solid fa-location-dot text-[11px] text-rose-500"></i>
+                <span class="truncate">{{ lead.external_company.city|default:"Industrial Hub" }}, {{ lead.external_company.country|default:"India" }}</span>
+              </span>
             </div>
           </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800">
-            94% Fit
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold shrink-0 {% if lead.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
+            {{ lead.match_score }}% Fit
           </span>
         </div>
 
-        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
-          <div>
-            <span class="text-slate-400 block text-[11px]">Why they are a fit:</span>
-            <p class="font-medium text-slate-700 mt-0.5">Operating multi-plant refinery with ongoing procurement for high-pressure ANSI control valves.</p>
-          </div>
-          <div class="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px] font-semibold flex items-center">
-            <i class="fa-solid fa-signal mr-1.5 text-blue-600"></i> Need Signal: Active Tender Notice #IND-2025-081
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-        <a href="https://apexpetro.example.com" target="_blank" class="text-xs text-blue-600 hover:underline font-medium">
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Company Web
-        </a>
-        <button class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
-          Save as Lead
-        </button>
-      </div>
-    </div>
-
-    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
-      <div>
-        <div class="flex items-start justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-sm border border-blue-100">
-              <i class="fa-solid fa-water"></i>
-            </div>
-            <div>
-              <h3 class="font-bold text-slate-900 text-sm leading-tight">Metro Water Supply Board</h3>
-              <span class="text-xs text-slate-500">Pune, India</span>
-            </div>
-          </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800">
-            89% Fit
+        <!-- Industry & Product Badge -->
+        <div class="flex flex-wrap items-center gap-1.5 mt-3 text-[11px]">
+          <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">
+            {{ lead.external_company.get_company_role_display|default:"End User" }}
+          </span>
+          <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold border border-blue-100 truncate max-w-[200px]">
+            Target: {{ lead.product_title }}
           </span>
         </div>
 
-        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
+        <!-- Body: Why Fit + Need Signal -->
+        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2.5 text-xs">
           <div>
-            <span class="text-slate-400 block text-[11px]">Why they are a fit:</span>
-            <p class="font-medium text-slate-700 mt-0.5">Upgrading municipal filtration plants; regularly procures industrial grade centrifugal pumps & valves.</p>
+            <span class="text-slate-400 block text-[11px] font-medium">Why they are a fit:</span>
+            <p class="font-medium text-slate-700 mt-0.5 leading-relaxed">
+              {{ lead.match_reason|truncatewords:28 }}
+            </p>
           </div>
-          <div class="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-[11px] font-semibold flex items-center">
-            <i class="fa-solid fa-signal mr-1.5 text-blue-600"></i> Need Signal: Annual vendor empanelement open
+
+          {% if lead.need_signal %}
+          <div class="p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-orange-900 text-[11px] font-semibold flex items-start gap-2">
+            <i class="fa-solid fa-signal text-orange-600 mt-0.5 shrink-0"></i>
+            <span class="leading-snug">{{ lead.need_signal }}</span>
+          </div>
+          {% endif %}
+
+          <!-- Contact Details Block (Extracted via Scraper) -->
+          <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1.5 text-[11px]">
+            <div class="flex items-center justify-between text-slate-600">
+              <span class="text-slate-400"><i class="fa-solid fa-envelope mr-1.5 text-slate-400"></i> Email:</span>
+              {% if lead.external_company.email %}
+              <a href="mailto:{{ lead.external_company.email }}" class="font-semibold text-blue-600 hover:underline truncate max-w-[170px]">
+                {{ lead.external_company.email }}
+              </a>
+              {% else %}
+              <span class="text-slate-400 italic">Not available</span>
+              {% endif %}
+            </div>
+
+            <div class="flex items-center justify-between text-slate-600">
+              <span class="text-slate-400"><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i> Phone:</span>
+              {% if lead.external_company.phone %}
+              <a href="tel:{{ lead.external_company.phone }}" class="font-semibold text-slate-800 hover:text-blue-600">
+                {{ lead.external_company.phone }}
+              </a>
+              {% else %}
+              <span class="text-slate-400 italic">Direct contact</span>
+              {% endif %}
+            </div>
+
+            {% if lead.external_company.address %}
+            <div class="pt-1 border-t border-slate-200 text-slate-500 truncate" title="{{ lead.external_company.address }}">
+              <i class="fa-solid fa-map-pin mr-1 text-slate-400"></i> {{ lead.external_company.address }}
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
 
-      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-        <a href="#" class="text-xs text-blue-600 hover:underline font-medium">
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Company Web
+      <!-- Action Card Footer -->
+      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+        <a href="{{ lead.external_company.website|default:lead.source_url }}" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-600 hover:underline font-semibold flex items-center">
+          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Official Website
         </a>
-        <button class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
-          Save as Lead
-        </button>
+
+        {% if lead.external_company.email %}
+        <a href="mailto:{{ lead.external_company.email }}?subject=B2B%20Supply%20Inquiry:%20{{ lead.product_title|urlencode }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane text-[10px]"></i> Contact Buyer
+        </a>
+        {% else %}
+        <span class="text-xs text-slate-400 font-semibold">Web Verified</span>
+        {% endif %}
       </div>
     </div>
+    {% empty %}
+    <div class="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
+      <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-4 border border-orange-100">
+        <i class="fa-solid fa-crosshairs"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-1">No Buyer Leads Discovered Yet</h3>
+      <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
+        Select a product from the dropdown above and click <strong>"Launch AI Buyer Search"</strong>. Our automated web scraper will query commercial sources, parse company sites, and extract buyer contacts.
+      </p>
+      {% if products.first %}
+      <form method="POST" action="{% url 'find-buyers' %}" class="inline-block">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="run_search">
+        <input type="hidden" name="product_id" value="{{ products.first.id }}">
+        <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition inline-flex items-center gap-2">
+          <i class="fa-solid fa-bolt"></i>
+          <span>Search Buyers for "{{ products.first.name }}"</span>
+        </button>
+      </form>
+      {% else %}
+      <a href="{% url 'product-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition inline-flex items-center gap-2">
+        <i class="fa-solid fa-plus"></i> Add Product First
+      </a>
+      {% endif %}
+    </div>
+    {% endfor %}
   </div>
 
 </div>

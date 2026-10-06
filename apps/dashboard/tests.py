@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.test import TestCase, Client
 from django.urls import reverse
 from apps.accounts.models import User
@@ -6,7 +7,7 @@ from apps.companies.models import Company, CompanyMember, CompanyPermission, Mem
 from apps.billing.models import Subscription
 from apps.requirements.models import Requirement
 from apps.catalog.models import Product, Category, ProductImage
-from apps.ai_search.models import SearchJob
+from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany
 
 
 class RBACTestCase(TestCase):
@@ -1629,6 +1630,243 @@ class BuyerModuleTestCase(TestCase):
         # REST API returns 403 Forbidden
         api_resp = self.client.get(reverse("api-requirements-list"))
         self.assertEqual(api_resp.status_code, 403)
+
+
+class AISearchScrapingEngineTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        # Seller Company
+        self.seller_admin = User.objects.create_user(
+            email="seller@mfgcorp.com",
+            password="Password@123",
+            first_name="Ramesh",
+            last_name="Gupta",
+        )
+        self.seller_company = Company.objects.create(
+            name="Apex Precision Pumps Ltd.",
+            company_type=Company.CompanyType.SELLER,
+            created_by=self.seller_admin,
+            city="Vadodara",
+        )
+        CompanyMember.objects.create(
+            user=self.seller_admin,
+            company=self.seller_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.product = Product.objects.create(
+            company=self.seller_company,
+            created_by=self.seller_admin,
+            name="ANSI Centrifugal Slurry Pump",
+            specifications="Discharge 500 m3/hr, head 60m, high chromium alloy",
+            price=Decimal("185000.00"),
+            currency="INR",
+            minimum_order_quantity=Decimal("2"),
+            unit="units",
+            availability="IN_STOCK",
+            location="Vadodara",
+            is_deleted=False,
+        )
+
+        # Buyer Company
+        self.buyer_admin = User.objects.create_user(
+            email="buyer@refinerycorp.com",
+            password="Password@123",
+            first_name="Sunil",
+            last_name="Verma",
+        )
+        self.buyer_company = Company.objects.create(
+            name="National Refinery & Petrochem Ltd.",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.buyer_admin,
+            city="Mumbai",
+        )
+        CompanyMember.objects.create(
+            user=self.buyer_admin,
+            company=self.buyer_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.requirement = Requirement.objects.create(
+            company=self.buyer_company,
+            created_by=self.buyer_admin,
+            item_name="Heavy Duty Slurry Pump 500 m3/hr",
+            specifications="High wear resistance, mechanical seal, 3-phase motor",
+            quantity=Decimal("4"),
+            unit="units",
+            target_price=Decimal("200000.00"),
+            currency="INR",
+            delivery_city="Mumbai",
+            delivery_country="India",
+            search_scope=Requirement.SearchScope.GLOBAL,
+            status=Requirement.Status.SEARCHING,
+            is_deleted=False,
+        )
+
+    def test_web_search_provider_candidates(self):
+        """WebSearchProvider returns valid candidate results with URL and snippets"""
+        from apps.ai_search.services.search_provider import WebSearchProvider
+        provider = WebSearchProvider()
+        candidates = provider.search("industrial centrifugal pumps", num_results=4)
+        self.assertGreater(len(candidates), 0)
+        first = candidates[0]
+        self.assertIn("title", first)
+        self.assertIn("url", first)
+        self.assertIn("snippet", first)
+        self.assertTrue(first["url"].startswith("http"))
+
+    def test_company_web_scraper_html_parsing(self):
+        """CompanyWebScraper correctly extracts name, emails, phone, address, and role from HTML"""
+        from apps.ai_search.services.web_scraper import CompanyWebScraper
+        scraper = CompanyWebScraper()
+
+        sample_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Kirloskar Brothers — Industrial Fluid Systems</title>
+            <meta name="description" content="Manufacturers of high pressure pumps and valves.">
+        </head>
+        <body>
+            <nav><a href="mailto:procurement@kirloskarpumps.com">Contact Sales</a></nav>
+            <h1>Welcome to Kirloskar Pumps</h1>
+            <p>We are a leading heavy equipment manufacturer based in Pune, Maharashtra.</p>
+            <address>Plot 42, Hinjewadi Industrial Estate, Pune, Maharashtra 411057</address>
+            <footer>
+                <a href="tel:+912028409000">Call Us</a>
+                <span>Email: info@kirloskarpumps.com</span>
+            </footer>
+        </body>
+        </html>
+        """
+
+        extracted = scraper._parse_html(
+            html_text=sample_html,
+            url="https://www.kirloskarpumps.com",
+            domain="kirloskarpumps.com",
+            snippet_title="Kirloskar Brothers",
+        )
+
+        self.assertIn("Kirloskar Brothers", extracted["name"])
+        self.assertIn("@kirloskarpumps.com", extracted["email"])
+        self.assertIn("2028409000", extracted["phone"].replace("+91", "").replace(" ", ""))
+        self.assertEqual(extracted["city"], "Pune")
+        self.assertEqual(extracted["state"], "Maharashtra")
+        self.assertEqual(extracted["company_role"], "manufacturer")
+
+    def test_ai_matcher_evaluation(self):
+        """AIMatcher computes score between 70-98%, need signals, and realistic reason"""
+        from apps.ai_search.services.ai_matcher import AIMatcher
+        scraped = {
+            "name": "Apex Petrochemicals Ltd",
+            "company_role": "end_user",
+            "city": "Vadodara",
+            "country": "India",
+            "industry": "Chemicals & Petrochemicals",
+            "description": "Continuous process refinery requiring centrifugal slurry pumps.",
+        }
+
+        fit = AIMatcher.evaluate_fit(
+            scraped_company=scraped,
+            target_item_name="ANSI Centrifugal Slurry Pump",
+            target_price=Decimal("185000.00"),
+            currency="INR",
+            job_type="find_buyers",
+        )
+
+        self.assertGreaterEqual(fit["match_score"], 70)
+        self.assertLessEqual(fit["match_score"], 98)
+        self.assertTrue(len(fit["need_signal"]) > 10)
+        self.assertIn("Apex Petrochemicals Ltd", fit["match_reason"])
+
+    def test_pipeline_find_buyers_search(self):
+        """End-to-end pipeline creates SearchJob, ExternalCompany, and SearchResult (type LEAD)"""
+        from apps.ai_search.services.pipeline import run_find_buyers_search
+        job = run_find_buyers_search(self.product, self.seller_admin, self.seller_company)
+
+        self.assertEqual(job.status, SearchJob.Status.COMPLETED)
+        self.assertEqual(job.job_type, SearchJob.JobType.FIND_BUYERS)
+        self.assertGreater(job.total_results, 0)
+
+        # Check SearchResults
+        leads = SearchResult.objects.filter(search_job=job, result_type=SearchResult.ResultType.LEAD)
+        self.assertGreater(leads.count(), 0)
+
+        first_lead = leads.first()
+        self.assertIsNotNone(first_lead.external_company)
+        self.assertTrue(len(first_lead.external_company.name) > 0)
+        self.assertTrue(len(first_lead.external_company.email) > 0)
+        self.assertTrue(len(first_lead.external_company.phone) > 0)
+        self.assertGreater(first_lead.match_score, 0)
+        self.assertTrue(len(first_lead.need_signal) > 0)
+
+    def test_pipeline_find_suppliers_search(self):
+        """End-to-end pipeline creates SearchJob, ExternalCompany, and SearchResult (type SUPPLIER)"""
+        from apps.ai_search.services.pipeline import run_find_suppliers_search
+        job = run_find_suppliers_search(self.requirement, self.buyer_admin, self.buyer_company)
+
+        self.assertEqual(job.status, SearchJob.Status.COMPLETED)
+        self.assertEqual(job.job_type, SearchJob.JobType.FIND_SUPPLIERS)
+        self.assertGreater(job.total_results, 0)
+
+        suppliers = SearchResult.objects.filter(search_job=job, result_type=SearchResult.ResultType.SUPPLIER)
+        self.assertGreater(suppliers.count(), 0)
+
+        first_supplier = suppliers.first()
+        self.assertIsNotNone(first_supplier.external_company)
+        self.assertTrue(len(first_supplier.external_company.name) > 0)
+        self.assertTrue(len(first_supplier.external_company.email) > 0)
+        self.assertGreater(first_supplier.match_score, 0)
+
+    def test_find_buyers_web_view_get_and_post(self):
+        """Find Buyers UI supports listing leads and triggering new search via POST"""
+        self.client.login(email="seller@mfgcorp.com", password="Password@123")
+
+        # 1. GET page before search
+        resp_get = self.client.get(reverse("find-buyers"))
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertContains(resp_get, "AI Buyer Leads")
+
+        # 2. POST to trigger search for product
+        resp_post = self.client.post(reverse("find-buyers"), {
+            "action": "run_search",
+            "product_id": self.product.id,
+        })
+        self.assertEqual(resp_post.status_code, 302)
+        self.assertIn(f"product_id={self.product.id}", resp_post.url)
+
+        # 3. Follow redirect to verify leads are rendered
+        follow_resp = self.client.get(resp_post.url)
+        self.assertEqual(follow_resp.status_code, 200)
+        self.assertContains(follow_resp, "ANSI Centrifugal Slurry Pump")
+        self.assertContains(follow_resp, "Fit")
+
+    def test_find_suppliers_web_view_get_and_post(self):
+        """Find Suppliers UI supports listing suppliers and triggering new search via POST"""
+        self.client.login(email="buyer@refinerycorp.com", password="Password@123")
+
+        # 1. GET page before search
+        resp_get = self.client.get(reverse("find-suppliers"))
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertContains(resp_get, "AI Supplier Discovery")
+
+        # 2. POST to trigger search for requirement
+        resp_post = self.client.post(reverse("find-suppliers"), {
+            "action": "run_search",
+            "requirement_id": self.requirement.id,
+        })
+        self.assertEqual(resp_post.status_code, 302)
+        self.assertIn(f"requirement_id={self.requirement.id}", resp_post.url)
+
+        # 3. Follow redirect to verify suppliers are rendered
+        follow_resp = self.client.get(resp_post.url)
+        self.assertEqual(follow_resp.status_code, 200)
+        self.assertContains(follow_resp, "Heavy Duty Slurry Pump")
+        self.assertContains(follow_resp, "Match")
+
 
 
 
