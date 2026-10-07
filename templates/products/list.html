@@ -125,15 +125,15 @@
 
     <!-- Table -->
     <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
+      <table class="w-full text-left text-xs min-w-[800px]">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-3 px-4">Product / Item</th>
-            <th class="py-3 px-4">Category</th>
-            <th class="py-3 px-4">MOQ & Unit</th>
-            <th class="py-3 px-4">Availability</th>
-            <th class="py-3 px-4">Location</th>
-            <th class="py-3 px-4 text-right">Actions</th>
+            <th class="py-3 px-4 min-w-[240px]">Product / Item</th>
+            <th class="py-3 px-4 w-36 whitespace-nowrap">Category</th>
+            <th class="py-3 px-4 w-28 whitespace-nowrap">MOQ & Unit</th>
+            <th class="py-3 px-4 w-36 whitespace-nowrap">Availability</th>
+            <th class="py-3 px-4 w-36 whitespace-nowrap">Location</th>
+            <th class="py-3 px-4 text-right w-36 whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -163,19 +163,19 @@
             </td>
 
             <!-- Category -->
-            <td class="py-3.5 px-4">
+            <td class="py-3.5 px-4 whitespace-nowrap">
               <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-700">
                 {{ p.category.name|default:"General" }}
               </span>
             </td>
 
             <!-- MOQ & Unit -->
-            <td class="py-3.5 px-4 text-slate-700 font-medium">
+            <td class="py-3.5 px-4 text-slate-700 font-medium whitespace-nowrap">
               {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}
             </td>
 
             <!-- Availability -->
-            <td class="py-3.5 px-4">
+            <td class="py-3.5 px-4 whitespace-nowrap">
               {% if p.availability == "IN_STOCK" %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                   <i class="fa-solid fa-circle text-[5px] mr-1 text-emerald-600"></i> In Stock
@@ -196,7 +196,7 @@
             </td>
 
             <!-- Location -->
-            <td class="py-3.5 px-4 text-slate-500">
+            <td class="py-3.5 px-4 text-slate-500 whitespace-nowrap">
               <span class="flex items-center gap-1">
                 <i class="fa-solid fa-location-dot text-[10px] text-slate-400"></i>
                 <span>{{ p.location|default:company.city|default:"India" }}</span>
@@ -204,7 +204,7 @@
             </td>
 
             <!-- Actions -->
-            <td class="py-3.5 px-4 text-right">
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
               <div class="flex items-center justify-end space-x-1.5">
                 <!-- Find Buyers AI -->
                 <a href="{% url 'find-buyers' %}?product_id={{ p.id }}" class="p-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg border border-orange-200 transition" title="Find Buyers (AI Matching)">

@@ -180,13 +180,13 @@
             <i class="fa-solid fa-building text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
-            <!-- Users: visible to Company Admin & Super Admin -->
+            <!-- User Management: visible to Company Admin & Super Admin -->
             {% if rbac.is_company_admin or rbac.is_super_admin %}
             <a href="{% url 'company-team-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/team/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-users w-5 text-center mr-2.5 text-xs"></i> Users
+                <i class="fa-solid fa-users-gear w-5 text-center mr-2.5 text-xs"></i> User Management
               </span>
-              <span class="px-1.5 py-0.2 bg-blue-900/60 text-blue-300 text-[10px] rounded font-semibold">Admin</span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             {% endif %}
 
@@ -374,36 +374,58 @@
               <div class="p-3.5 bg-slate-900/90">
                 <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
                   <span>Organization</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">
-                    {{ current_company.get_company_type_display }}
-                  </span>
+                  <a href="{% url 'company-profile-web' %}" class="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition flex items-center gap-1">
+                    <span>View &amp; Edit Profile</span>
+                    <i class="fa-solid fa-arrow-right text-[8px]"></i>
+                  </a>
                 </div>
-                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-2.5 space-y-2">
-                  <div class="font-bold text-white text-xs flex items-center gap-1.5 truncate">
-                    <i class="fa-solid fa-building text-blue-400 text-xs shrink-0"></i>
-                    <span class="truncate">{{ current_company.name }}</span>
+
+                <!-- Clickable Company Card to View & Edit Profile -->
+                <a 
+                  href="{% url 'company-profile-web' %}" 
+                  class="block bg-slate-800/60 hover:bg-slate-800 border border-slate-700/70 hover:border-blue-500/50 rounded-xl p-3 transition group cursor-pointer shadow-sm"
+                  title="Click to view and edit {{ current_company.name }} profile"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="font-bold text-white text-xs flex items-center gap-2 truncate group-hover:text-blue-400 transition">
+                      <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-[11px] shrink-0">
+                        <i class="fa-solid fa-building"></i>
+                      </span>
+                      <span class="truncate">{{ current_company.name }}</span>
+                    </div>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold shrink-0 ml-1">
+                      {{ current_company.get_company_type_display }}
+                    </span>
                   </div>
-                  <div class="text-[11px] text-slate-400 flex items-center gap-2">
-                    <span>{{ current_company.industry|default:"B2B Commerce" }}</span>
-                    <span>&bull;</span>
-                    <span>{{ current_company.city|default:"India" }}</span>
+
+                  <div class="text-[11px] text-slate-400 flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
+                    <div class="flex items-center gap-2 truncate">
+                      <span>{{ current_company.industry|default:"B2B Commerce" }}</span>
+                      <span>&bull;</span>
+                      <span>{{ current_company.city|default:"India" }}</span>
+                    </div>
+                    <span class="text-[10px] text-blue-400 group-hover:text-blue-300 font-bold flex items-center gap-1 shrink-0 ml-2">
+                      <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                      <span>Edit</span>
+                    </span>
                   </div>
-                  {% if all_user_companies and all_user_companies|length > 1 %}
-                  <div class="pt-2 border-t border-slate-700/60">
-                    <form method="POST" action="{% url 'switch-company' %}" id="profileCompanySwitchForm">
-                      {% csrf_token %}
-                      <label class="block text-[9px] uppercase tracking-wider font-semibold text-slate-400 mb-1">Switch Organization</label>
-                      <select name="company_id" onchange="document.getElementById('profileCompanySwitchForm').submit();" class="w-full bg-slate-900 text-slate-200 text-xs font-medium py-1 px-2 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
-                        {% for comp in all_user_companies %}
-                          <option value="{{ comp.id }}" {% if current_company.id == comp.id %}selected{% endif %}>
-                            {{ comp.name }}
-                          </option>
-                        {% endfor %}
-                      </select>
-                    </form>
-                  </div>
-                  {% endif %}
+                </a>
+
+                {% if all_user_companies and all_user_companies|length > 1 %}
+                <div class="pt-2.5 mt-2 border-t border-slate-800">
+                  <form method="POST" action="{% url 'switch-company' %}" id="profileCompanySwitchForm">
+                    {% csrf_token %}
+                    <label class="block text-[9px] uppercase tracking-wider font-semibold text-slate-400 mb-1">Switch Organization</label>
+                    <select name="company_id" onchange="document.getElementById('profileCompanySwitchForm').submit();" class="w-full bg-slate-900 text-slate-200 text-xs font-medium py-1 px-2 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
+                      {% for comp in all_user_companies %}
+                        <option value="{{ comp.id }}" {% if current_company.id == comp.id %}selected{% endif %}>
+                          {{ comp.name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </form>
                 </div>
+                {% endif %}
               </div>
               {% endif %}
 
@@ -420,7 +442,7 @@
                     </div>
                     <div>
                       <div class="text-xs font-bold text-white leading-tight">Company Profile</div>
-                      <div class="text-[10px] text-slate-400 leading-tight">Manage your organization's business profile and settings</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">View &amp; edit organization details, address, and settings</div>
                     </div>
                   </div>
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition"></i>

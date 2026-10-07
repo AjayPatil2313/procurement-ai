@@ -1,131 +1,406 @@
 {% extends "base.html" %}
 
-{% block title %}Company Profile — {{ company.name }}{% endblock %}
+{% block title %}Company Profile & Settings — {{ company.name }}{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6">
-  
-  <div class="flex items-center justify-between">
+
+  <!-- Breadcrumb & Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Company Profile</h1>
-      <p class="text-xs text-slate-500 mt-1">Manage your organization's business profile and settings</p>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Company Profile</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-building"></i>
+        </span>
+        <span>Company Profile</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        View and update your organization's legal identity, contact channels, and operational settings
+      </p>
     </div>
-    <div>
-      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-        {{ company.get_company_type_display }}
-      </span>
+
+    <div class="flex items-center gap-2">
+      <a href="{% url 'dashboard' %}" class="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition shadow-sm">
+        &larr; Back to Dashboard
+      </a>
+      {% if rbac.is_company_admin or rbac.is_super_admin %}
+      <a href="{% url 'company-team-web' %}" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition">
+        <i class="fa-solid fa-users-gear text-xs"></i>
+        <span>User Management</span>
+      </a>
+      {% endif %}
     </div>
   </div>
 
-  <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+  <!-- Organization Overview Card -->
+  <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div class="flex items-center space-x-4 min-w-0">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xl flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+        {{ company.name|first|upper }}
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 class="text-lg font-black text-slate-900 leading-tight truncate">{{ company.name }}</h2>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+            {{ company.get_company_type_display }}
+          </span>
+          {% if company.is_verified %}
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+            <i class="fa-solid fa-circle-check text-[9px] mr-1 text-emerald-600"></i> Verified Organization
+          </span>
+          {% endif %}
+        </div>
+        <div class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-2">
+          <span><i class="fa-solid fa-industry text-[11px] mr-1 text-slate-400"></i>{{ company.industry|default:"B2B Commerce" }}</span>
+          <span>&bull;</span>
+          <span><i class="fa-solid fa-location-dot text-[11px] mr-1 text-slate-400"></i>{{ company.city|default:"India" }}, {{ company.country|default:"India" }}</span>
+          {% if company.email %}
+          <span>&bull;</span>
+          <span><i class="fa-solid fa-envelope text-[11px] mr-1 text-slate-400"></i>{{ company.email }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      {% if rbac.is_company_admin or rbac.is_super_admin %}
+      <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl flex items-center gap-1.5">
+        <i class="fa-solid fa-user-shield text-xs"></i>
+        <span>Full Admin Access (Can Edit)</span>
+      </span>
+      {% else %}
+      <span class="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1 rounded-xl flex items-center gap-1.5">
+        <i class="fa-solid fa-eye text-xs"></i>
+        <span>Read-Only Access</span>
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Profile Form Card -->
+  <div class="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200 shadow-sm">
     <form method="POST" class="space-y-6">
       {% csrf_token %}
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Company Name</label>
-          <input 
-            type="text" 
-            name="name" 
-            value="{{ company.name }}" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-        </div>
 
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Legal Registered Name</label>
-          <input 
-            type="text" 
-            name="legal_name" 
-            value="{{ company.legal_name }}" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-        </div>
+      <!-- Section 1: Basic Organization Information -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-id-card text-blue-600"></i>
+          <span>Basic Organization Information</span>
+        </h3>
 
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Company Type</label>
-          <select 
-            name="company_type" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}disabled{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="BUYER" {% if company.company_type == 'BUYER' %}selected{% endif %}>Buyer (Procurement Only)</option>
-            <option value="SELLER" {% if company.company_type == 'SELLER' %}selected{% endif %}>Seller (Sales Only)</option>
-            <option value="BOTH" {% if company.company_type == 'BOTH' %}selected{% endif %}>Both (Buyer + Seller)</option>
-          </select>
-        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Company Name -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Company Name <span class="text-rose-500">*</span>
+            </label>
+            <input 
+              type="text" 
+              name="name" 
+              value="{{ company.name }}" 
+              required
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
 
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Industry</label>
-          <input 
-            type="text" 
-            name="industry" 
-            value="{{ company.industry }}" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-        </div>
+          <!-- Legal Registered Name -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Legal Registered Name
+            </label>
+            <input 
+              type="text" 
+              name="legal_name" 
+              value="{{ company.legal_name }}" 
+              placeholder="e.g. Acme Industrial Solutions Pvt. Ltd."
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
 
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Website</label>
-          <input 
-            type="url" 
-            name="website" 
-            value="{{ company.website }}" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-        </div>
+          <!-- Company Business Type -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Platform Business Type
+            </label>
+            <select 
+              name="company_type" 
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}disabled{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+              <option value="BUYER" {% if company.company_type == 'BUYER' %}selected{% endif %}>Buyer (Procurement Only)</option>
+              <option value="SELLER" {% if company.company_type == 'SELLER' %}selected{% endif %}>Seller (Sales Only)</option>
+              <option value="BOTH" {% if company.company_type == 'BOTH' %}selected{% endif %}>Both (Buyer &amp; Seller)</option>
+            </select>
+          </div>
 
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Official Email</label>
-          <input 
-            type="email" 
-            name="email" 
-            value="{{ company.email }}" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-        </div>
+          <!-- Industry -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Primary Industry / Sector
+            </label>
+            <input 
+              type="text" 
+              name="industry" 
+              value="{{ company.industry }}" 
+              placeholder="e.g. Manufacturing, Chemicals, Steel, Textiles"
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
 
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">City</label>
-          <input 
-            type="text" 
-            name="city" 
-            value="{{ company.city }}" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-        </div>
+          <!-- Company Size -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Company Size (Headcount)
+            </label>
+            <select 
+              name="company_size" 
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}disabled{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+              <option value="">Select Size...</option>
+              <option value="1-10" {% if company.company_size == '1-10' %}selected{% endif %}>1-10 Employees (Micro)</option>
+              <option value="11-50" {% if company.company_size == '11-50' %}selected{% endif %}>11-50 Employees (Small)</option>
+              <option value="51-200" {% if company.company_size == '51-200' %}selected{% endif %}>51-200 Employees (Medium)</option>
+              <option value="201-1000" {% if company.company_size == '201-1000' %}selected{% endif %}>201-1000 Employees (Large)</option>
+              <option value="1000+" {% if company.company_size == '1000+' %}selected{% endif %}>1000+ Employees (Enterprise)</option>
+            </select>
+          </div>
 
-        <div>
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Country</label>
-          <input 
-            type="text" 
-            name="country" 
-            value="{{ company.country }}" 
-            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
-            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
+          <!-- GST / Tax Identification -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              GST / VAT / Tax ID
+            </label>
+            <input 
+              type="text" 
+              name="gst_vat_no" 
+              value="{{ company.gst_vat_no }}" 
+              placeholder="e.g. 27AAAAA0000A1Z5"
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
         </div>
       </div>
 
+      <!-- Section 2: Contact Channels & Location -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-location-dot text-blue-600"></i>
+          <span>Contact Channels &amp; Office Location</span>
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Official Email -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Official Email Address
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                <i class="fa-solid fa-envelope"></i>
+              </span>
+              <input 
+                type="email" 
+                name="email" 
+                value="{{ company.email }}" 
+                placeholder="contact@company.com"
+                {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+                class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+              >
+            </div>
+          </div>
+
+          <!-- Phone Number -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Phone Number
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                <i class="fa-solid fa-phone"></i>
+              </span>
+              <input 
+                type="text" 
+                name="phone" 
+                value="{{ company.phone }}" 
+                placeholder="+91 98765 43210"
+                {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+                class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+              >
+            </div>
+          </div>
+
+          <!-- Website -->
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Website URL
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+                <i class="fa-solid fa-globe"></i>
+              </span>
+              <input 
+                type="url" 
+                name="website" 
+                value="{{ company.website }}" 
+                placeholder="https://www.company.com"
+                {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+                class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+              >
+            </div>
+          </div>
+
+          <!-- Address Line 1 -->
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Office / Facility Address
+            </label>
+            <input 
+              type="text" 
+              name="address_line1" 
+              value="{{ company.address_line1 }}" 
+              placeholder="Plot No. 12, Industrial Area, Phase 2"
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
+
+          <!-- City -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              City
+            </label>
+            <input 
+              type="text" 
+              name="city" 
+              value="{{ company.city }}" 
+              placeholder="e.g. Mumbai, Pune, Delhi"
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
+
+          <!-- State -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              State / Province
+            </label>
+            <input 
+              type="text" 
+              name="state" 
+              value="{{ company.state }}" 
+              placeholder="e.g. Maharashtra, Gujarat, Karnataka"
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
+
+          <!-- Postal Code -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Postal / PIN Code
+            </label>
+            <input 
+              type="text" 
+              name="postal_code" 
+              value="{{ company.postal_code }}" 
+              placeholder="e.g. 400001"
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
+
+          <!-- Country -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Country
+            </label>
+            <input 
+              type="text" 
+              name="country" 
+              value="{{ company.country|default:'India' }}" 
+              placeholder="India"
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+          </div>
+
+          <!-- Preferred Currency -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              Preferred Commercial Currency
+            </label>
+            <select 
+              name="preferred_currency" 
+              {% if not rbac.is_company_admin and not rbac.is_super_admin %}disabled{% endif %}
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+            >
+              <option value="INR" {% if company.preferred_currency == 'INR' %}selected{% endif %}>INR (₹ - Indian Rupee)</option>
+              <option value="USD" {% if company.preferred_currency == 'USD' %}selected{% endif %}>USD ($ - US Dollar)</option>
+              <option value="EUR" {% if company.preferred_currency == 'EUR' %}selected{% endif %}>EUR (€ - Euro)</option>
+              <option value="GBP" {% if company.preferred_currency == 'GBP' %}selected{% endif %}>GBP (£ - British Pound)</option>
+              <option value="AED" {% if company.preferred_currency == 'AED' %}selected{% endif %}>AED (UAE Dirham)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Business Description -->
+      <div>
+        <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-align-left text-blue-600"></i>
+          <span>Business Overview / Company Description</span>
+        </h3>
+
+        <div>
+          <textarea 
+            name="description" 
+            rows="3" 
+            placeholder="Brief overview of your company's core operations, products, and commercial capabilities..."
+            {% if not rbac.is_company_admin and not rbac.is_super_admin %}readonly{% endif %}
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+          >{{ company.description }}</textarea>
+        </div>
+      </div>
+
+      <!-- Action Footer -->
       {% if rbac.is_company_admin or rbac.is_super_admin %}
-      <div class="pt-4 border-t border-slate-100 flex justify-end">
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-lg text-sm transition shadow-sm">
-          Save Changes
-        </button>
+      <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
+        <p class="text-[11px] text-slate-400">
+          Changes are reflected immediately across the AI matching engine and lead directory.
+        </p>
+        <div class="flex items-center gap-2">
+          <a href="{% url 'dashboard' %}" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
+            Cancel
+          </a>
+          <button 
+            type="submit" 
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition flex items-center gap-2"
+          >
+            <i class="fa-solid fa-floppy-disk text-xs"></i>
+            <span>Save Changes</span>
+          </button>
+        </div>
       </div>
       {% else %}
-      <div class="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg flex items-center">
-        <i class="fa-solid fa-lock mr-2 text-amber-600"></i>
-        <span>Read-only: You are viewing this company profile as a Company User. Only Company Admins can edit profile details.</span>
+      <div class="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-center gap-2">
+        <i class="fa-solid fa-lock text-amber-600"></i>
+        <span>Read-only: You are viewing this company profile as a standard team member. Only Company Admins can edit organization settings.</span>
       </div>
       {% endif %}
+
     </form>
   </div>
+
 </div>
 {% endblock %}

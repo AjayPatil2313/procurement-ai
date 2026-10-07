@@ -29,24 +29,32 @@
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         {% if is_seller_context %}
-          Audit log, delivery tracker, and quote correspondence for buyer leads and sales proposals organized product-by-product.
+          Audit log, delivery tracker, conversation threads, and commercial quote correspondence for buyer leads organized product-by-product.
         {% else %}
-          Audit log, automated email delivery tracker, and supplier quote capture for commercial procurement requests organized product-by-product.
+          Audit log, delivery tracker, conversation threads, and supplier quotation capture for procurement requests organized product-by-product.
         {% endif %}
       </p>
     </div>
-    <div class="flex items-center gap-2.5">
+    <div class="flex items-center gap-2.5 flex-wrap">
       {% if is_seller_context %}
-      <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+      <a href="{% url 'sales-export-reports' %}{% if selected_product_id %}?product_id={{ selected_product_id }}{% endif %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-chart-pie text-orange-500"></i>
+        <span>Export Reports</span>
+      </a>
+      <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
         <i class="fa-solid fa-funnel-dollar text-orange-500"></i>
         <span>Saved Buyers (CRM)</span>
       </a>
-      <a href="{% url 'find-buyers' %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm shadow-orange-500/20">
+      <a href="{% url 'find-buyers' %}{% if selected_product_id %}?product_id={{ selected_product_id }}{% endif %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm shadow-orange-500/20">
         <i class="fa-solid fa-crosshairs"></i>
         <span>Find New Buyers</span>
       </a>
       {% else %}
-      <a href="{% url 'saved-suppliers' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+      <a href="{% url 'export-reports' %}{% if selected_product_id %}?product_id={{ selected_product_id }}{% endif %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-chart-pie text-blue-500"></i>
+        <span>Export Reports</span>
+      </a>
+      <a href="{% url 'saved-suppliers' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
         <i class="fa-solid fa-bookmark text-blue-600"></i>
         <span>Shortlisted Suppliers</span>
       </a>
@@ -66,7 +74,7 @@
       <div class="flex-1 relative" id="inquiries-product-combobox">
         <label for="inquiry_product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
           <span class="flex items-center gap-1.5">
-            <i class="fa-solid fa-filter text-orange-500"></i>
+            <i class="fa-solid fa-filter {% if is_seller_context %}text-orange-500{% else %}text-blue-500{% endif %}"></i>
             <span>Filter Inquiries by Product</span>
           </span>
           <span class="text-slate-400 font-medium normal-case">
@@ -85,7 +93,7 @@
             autocomplete="off"
             placeholder="Type product name or category to filter inquiries (A-Z)..."
             value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
-            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
+            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 {% if is_seller_context %}focus:ring-orange-500 focus:border-orange-500{% else %}focus:ring-blue-500 focus:border-blue-500{% endif %} transition text-slate-800 placeholder-slate-400"
           >
 
           <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
@@ -132,14 +140,14 @@
             data-category=""
           >
             <div class="flex items-center space-x-2.5 min-w-0">
-              <span class="w-6 h-6 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+              <span class="w-6 h-6 rounded-lg {% if is_seller_context %}bg-orange-100 text-orange-600{% else %}bg-blue-100 text-blue-600{% endif %} flex items-center justify-center text-[10px] shrink-0 font-bold">
                 <i class="fa-solid fa-layer-group"></i>
               </span>
               <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition">
                 All Products (Grouped by Product)
               </span>
             </div>
-            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-orange-100 text-orange-700">
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {% if is_seller_context %}bg-orange-100 text-orange-700{% else %}bg-blue-100 text-blue-700{% endif %}">
               {{ total_inquiries_count }} Inquiries
             </span>
           </a>
@@ -225,7 +233,7 @@
       <!-- All Grouped Tab -->
       <a 
         href="{% if is_seller_context %}{% url 'sales-inquiries-list' %}{% else %}{% url 'inquiries-list' %}{% endif %}" 
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if not selected_product and not is_unassigned_view %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if not selected_product and not is_unassigned_view %}{% if is_seller_context %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-blue-600 text-white shadow-sm shadow-blue-600/20{% endif %}{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
       >
         <i class="fa-solid fa-layer-group text-[10px]"></i>
         <span>All Products (Grouped)</span>
@@ -238,7 +246,7 @@
       {% if p.inquiry_count > 0 %}
       <a 
         href="{% if is_seller_context %}{% url 'sales-inquiries-list' %}{% else %}{% url 'inquiries-list' %}{% endif %}?product_id={{ p.id }}" 
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if selected_product and selected_product.id == p.id %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if selected_product and selected_product.id == p.id %}{% if is_seller_context %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-blue-600 text-white shadow-sm shadow-blue-600/20{% endif %}{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
       >
         <span class="truncate max-w-[150px]">{{ p.name }}</span>
         <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if selected_product and selected_product.id == p.id %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
@@ -251,7 +259,7 @@
       {% if unassigned_count > 0 %}
       <a 
         href="{% if is_seller_context %}{% url 'sales-inquiries-list' %}{% else %}{% url 'inquiries-list' %}{% endif %}?product_id=unassigned" 
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if is_unassigned_view %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if is_unassigned_view %}{% if is_seller_context %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-blue-600 text-white shadow-sm shadow-blue-600/20{% endif %}{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
       >
         <span>Other Inquiries</span>
         <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if is_unassigned_view %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
@@ -262,116 +270,191 @@
     </div>
   </div>
 
-  <!-- Summary Metric Cards -->
-  <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-      <div class="w-10 h-10 rounded-xl {% if is_seller_context %}bg-orange-50 text-orange-600{% else %}bg-blue-50 text-blue-600{% endif %} flex items-center justify-center font-bold text-base shrink-0">
+  <!-- Dynamic Summary Metric Cards (6 Cards) -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl {% if is_seller_context %}bg-orange-50 text-orange-600{% else %}bg-blue-50 text-blue-600{% endif %} flex items-center justify-center font-bold text-sm shrink-0">
         <i class="fa-solid fa-paper-plane"></i>
       </div>
-      <div>
-        <div class="text-xs text-slate-500 font-medium">Total Inquiries</div>
-        <div class="text-xl font-black text-slate-900">{{ total_count|default:"0" }}</div>
+      <div class="min-w-0">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider truncate">Total Inquiries</div>
+        <div class="text-xl font-black text-slate-900 leading-tight">{{ total_count|default:"0" }}</div>
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-base shrink-0">
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-sm shrink-0">
         <i class="fa-solid fa-clock-rotate-left"></i>
       </div>
-      <div>
-        <div class="text-xs text-slate-500 font-medium">Pending Response</div>
-        <div class="text-xl font-black text-amber-600">{{ sent_count|default:"0" }}</div>
+      <div class="min-w-0">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider truncate">Sent / Pending</div>
+        <div class="text-xl font-black text-amber-600 leading-tight">{{ sent_count|default:"0" }}</div>
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base shrink-0">
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
+        <i class="fa-solid fa-comments"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider truncate">In Discussion</div>
+        <div class="text-xl font-black text-blue-600 leading-tight">{{ discussion_count|default:"0" }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-sm shrink-0">
+        <i class="fa-solid fa-calculator"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider truncate">Quotes Logged</div>
+        <div class="text-xl font-black text-purple-600 leading-tight">{{ replied_count|default:"0" }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">
         <i class="fa-solid fa-circle-check"></i>
       </div>
-      <div>
-        <div class="text-xs text-slate-500 font-medium">Quotes Logged</div>
-        <div class="text-xl font-black text-emerald-600">{{ replied_count|default:"0" }}</div>
+      <div class="min-w-0">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider truncate">Won / Accepted</div>
+        <div class="text-xl font-black text-emerald-600 leading-tight">{{ won_count|default:"0" }}</div>
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-      <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-base shrink-0">
-        <i class="fa-solid fa-triangle-exclamation"></i>
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold text-sm shrink-0">
+        <i class="fa-solid fa-chart-line"></i>
       </div>
-      <div>
-        <div class="text-xs text-slate-500 font-medium">Delivery Alert</div>
-        <div class="text-xl font-black text-rose-600">{{ failed_count|default:"0" }}</div>
+      <div class="min-w-0">
+        <div class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider truncate">Engagement Rate</div>
+        <div class="text-xl font-black text-cyan-600 leading-tight">{{ conversion_rate }}%</div>
       </div>
     </div>
   </div>
 
-  <!-- Status Tabs & Text Search Toolbar -->
-  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-    <div class="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto text-xs">
-      <a href="?{% if selected_product_id %}product_id={{ selected_product_id }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
-         class="px-3.5 py-1.5 rounded-xl font-bold transition {% if not current_status %}bg-slate-900 text-white{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
-        All Status
+  <!-- Status Tabs, Date Filter & Search Toolbar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+    
+    <!-- Status Filter Buttons -->
+    <div class="flex items-center gap-1.5 overflow-x-auto text-xs pb-1 lg:pb-0 scrollbar-thin">
+      <a href="?{% if selected_product_id %}product_id={{ selected_product_id }}&{% endif %}{% if current_date_range %}date_range={{ current_date_range }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl font-bold transition shrink-0 {% if not current_status %}bg-slate-900 text-white shadow-xs{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        All Status ({{ total_count|default:"0" }})
       </a>
-      <a href="?status=sent{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-1.5 rounded-xl font-bold transition {% if current_status == 'sent' %}bg-amber-500 text-white{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+      <a href="?status=sent{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_date_range %}&date_range={{ current_date_range }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl font-bold transition shrink-0 {% if current_status == 'sent' %}bg-amber-500 text-white shadow-xs{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
         Pending ({{ sent_count|default:"0" }})
       </a>
-      <a href="?status=replied{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-1.5 rounded-xl font-bold transition {% if current_status == 'replied' %}bg-emerald-600 text-white{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
-        Replied ({{ replied_count|default:"0" }})
+      <a href="?status=in_discussion{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_date_range %}&date_range={{ current_date_range }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl font-bold transition shrink-0 {% if current_status == 'in_discussion' %}bg-blue-600 text-white shadow-xs{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        In Discussion ({{ discussion_count|default:"0" }})
+      </a>
+      <a href="?status=replied{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_date_range %}&date_range={{ current_date_range }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl font-bold transition shrink-0 {% if current_status == 'replied' %}bg-purple-600 text-white shadow-xs{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        Replied / Quoted ({{ replied_count|default:"0" }})
+      </a>
+      <a href="?status=won{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_date_range %}&date_range={{ current_date_range }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl font-bold transition shrink-0 {% if current_status == 'won' %}bg-emerald-600 text-white shadow-xs{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        Won ({{ won_count|default:"0" }})
+      </a>
+      <a href="?status=lost{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_date_range %}&date_range={{ current_date_range }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl font-bold transition shrink-0 {% if current_status == 'lost' %}bg-rose-600 text-white shadow-xs{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        Lost ({{ lost_count|default:"0" }})
       </a>
     </div>
 
-    <!-- Search Box -->
-    <form method="GET" action="" class="w-full md:w-80 flex items-center gap-2">
-      {% if selected_product_id %}
-      <input type="hidden" name="product_id" value="{{ selected_product_id }}">
-      {% endif %}
-      {% if current_status %}
-      <input type="hidden" name="status" value="{{ current_status }}">
-      {% endif %}
-      <div class="relative w-full">
-        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search company, email, or item..."
-               class="w-full pl-8 pr-4 py-2 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 transition">
+    <!-- Date Range & Search Form -->
+    <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+      <!-- Date Range Selector -->
+      <div class="flex items-center bg-slate-100 rounded-xl p-0.5 text-[11px] font-bold shrink-0">
+        <a href="?date_range=all{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="px-2.5 py-1.5 rounded-lg transition {% if not current_date_range or current_date_range == 'all' %}bg-white text-slate-900 shadow-xs{% else %}text-slate-500 hover:text-slate-900{% endif %}">
+          All Time
+        </a>
+        <a href="?date_range=7d{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="px-2.5 py-1.5 rounded-lg transition {% if current_date_range == '7d' %}bg-white text-slate-900 shadow-xs{% else %}text-slate-500 hover:text-slate-900{% endif %}">
+          7 Days
+        </a>
+        <a href="?date_range=30d{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="px-2.5 py-1.5 rounded-lg transition {% if current_date_range == '30d' %}bg-white text-slate-900 shadow-xs{% else %}text-slate-500 hover:text-slate-900{% endif %}">
+          30 Days
+        </a>
+        <a href="?date_range=this_month{% if selected_product_id %}&product_id={{ selected_product_id }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="px-2.5 py-1.5 rounded-lg transition {% if current_date_range == 'this_month' %}bg-white text-slate-900 shadow-xs{% else %}text-slate-500 hover:text-slate-900{% endif %}">
+          This Month
+        </a>
       </div>
-      <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shrink-0">
-        Search
-      </button>
-    </form>
+
+      <!-- Search Box -->
+      <form method="GET" action="" class="w-full sm:w-64 flex items-center gap-1.5">
+        {% if selected_product_id %}
+        <input type="hidden" name="product_id" value="{{ selected_product_id }}">
+        {% endif %}
+        {% if current_status %}
+        <input type="hidden" name="status" value="{{ current_status }}">
+        {% endif %}
+        {% if current_date_range %}
+        <input type="hidden" name="date_range" value="{{ current_date_range }}">
+        {% endif %}
+        <div class="relative w-full">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+          <input type="text" name="q" value="{{ search_query }}" placeholder="Search company, email, or item..."
+                 class="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:ring-2 {% if is_seller_context %}focus:ring-orange-500{% else %}focus:ring-blue-500{% endif %} transition text-slate-800">
+        </div>
+        <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3 py-2 rounded-xl transition shrink-0">
+          Search
+        </button>
+      </form>
+    </div>
+
   </div>
 
   <!-- VIEW 1: SINGLE PRODUCT FILTERED -->
   {% if is_single_product %}
     {% if selected_product %}
-    <div class="bg-gradient-to-r from-orange-50 via-white to-amber-50 rounded-2xl border border-orange-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="bg-gradient-to-r {% if is_seller_context %}from-orange-50 via-white to-amber-50 border-orange-200{% else %}from-blue-50 via-white to-indigo-50 border-blue-200{% endif %} rounded-2xl border p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div class="flex items-center space-x-3.5">
-        <div class="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center text-lg shadow-md shadow-orange-500/20 shrink-0 font-bold">
+        <div class="w-12 h-12 rounded-2xl {% if is_seller_context %}bg-orange-500 shadow-orange-500/20{% else %}bg-blue-600 shadow-blue-600/20{% endif %} text-white flex items-center justify-center text-lg shadow-md shrink-0 font-bold">
           <i class="fa-solid fa-box"></i>
         </div>
         <div>
           <div class="flex items-center gap-2">
             <h2 class="text-base font-extrabold text-slate-900 leading-tight">{{ selected_product.name }}</h2>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {% if is_seller_context %}bg-orange-100 text-orange-800 border-orange-200{% else %}bg-blue-100 text-blue-800 border-blue-200{% endif %} border">
               {{ selected_product.category.name|default:"General" }}
             </span>
           </div>
-          <div class="text-xs text-slate-500 mt-1 flex items-center gap-3">
+          <div class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
             <span>MOQ: <strong>{{ selected_product.minimum_order_quantity|default:selected_product.moq|default:"1" }} {{ selected_product.unit|default:"pcs" }}</strong></span>
             <span>&bull;</span>
             <span class="text-emerald-700 font-semibold">{{ inquiries|length }} Inquiries Tracked</span>
+            <span>&bull;</span>
+            <span class="text-purple-700 font-semibold">{{ replied_count }} Quoted</span>
+            <span>&bull;</span>
+            <span class="text-emerald-700 font-semibold">{{ won_count }} Won</span>
           </div>
         </div>
       </div>
 
       <div class="flex items-center gap-2 shrink-0">
+        {% if is_seller_context %}
         <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
-          <span>Send Inquiries</span>
+          <span>Find More Buyers</span>
         </a>
-        <a href="{% if is_seller_context %}{% url 'sales-inquiries-list' %}{% else %}{% url 'inquiries-list' %}{% endif %}" class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
+        <a href="{% url 'sales-inquiries-list' %}" class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
           View All Products
         </a>
+        {% else %}
+        <a href="{% url 'find-suppliers' %}?product_id={{ selected_product.id }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <span>Find Suppliers</span>
+        </a>
+        <a href="{% url 'inquiries-list' %}" class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
+          View All Products
+        </a>
+        {% endif %}
       </div>
     </div>
     {% endif %}
@@ -379,26 +462,27 @@
     <!-- Filtered Inquiries Table -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
+        <table class="w-full text-left text-xs min-w-[840px]">
           <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
             <tr>
-              <th class="py-3 px-4">Contact / Recipient</th>
-              <th class="py-3 px-4">Subject & Scope</th>
-              <th class="py-3 px-4">Date</th>
-              <th class="py-3 px-4">Status</th>
-              <th class="py-3 px-4 text-right">Actions</th>
+              <th class="py-3 px-4 min-w-[200px] w-60">Contact / Recipient</th>
+              <th class="py-3 px-4 min-w-[200px]">Subject & Scope</th>
+              <th class="py-3 px-4 w-36 whitespace-nowrap">Commercial Terms</th>
+              <th class="py-3 px-4 w-32 whitespace-nowrap">Timeline</th>
+              <th class="py-3 px-4 w-40 whitespace-nowrap">Status & Pipeline</th>
+              <th class="py-3 px-4 text-right w-36 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
             {% for inq in inquiries %}
-            <tr class="hover:bg-slate-50/70 transition">
+            <tr class="hover:bg-slate-50/70 transition" id="inquiry-row-{{ inq.id }}">
               <td class="py-3.5 px-4 font-bold text-slate-900">
                 <div class="flex items-center">
-                  <span class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center mr-3 font-semibold text-xs shrink-0">
+                  <span class="w-8 h-8 rounded-xl {% if is_seller_context %}bg-orange-50 text-orange-600 border-orange-100{% else %}bg-blue-50 text-blue-600 border-blue-100{% endif %} border flex items-center justify-center mr-3 font-semibold text-xs shrink-0">
                     <i class="fa-solid fa-building"></i>
                   </span>
                   <div>
-                    <a href="{% url 'inquiry-detail' inq.id %}" class="font-bold text-slate-900 hover:text-blue-600 truncate block max-w-[200px]">
+                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="font-bold text-slate-900 hover:text-blue-600 truncate block max-w-[200px]">
                       {{ inq.search_result.external_company.name }}
                     </a>
                     <div class="text-[11px] text-slate-400 font-normal truncate max-w-[200px]">
@@ -409,34 +493,62 @@
               </td>
               <td class="py-3.5 px-4">
                 <div class="font-bold text-slate-800 truncate max-w-xs">{{ inq.subject }}</div>
-                <div class="text-[11px] text-slate-500 truncate max-w-xs">Scope: {{ inq.search_result.product_title }}</div>
-              </td>
-              <td class="py-3.5 px-4 text-slate-600 whitespace-nowrap">
-                {{ inq.sent_at|date:"M d, Y" }}
+                <div class="text-[11px] text-slate-500 truncate max-w-xs">
+                  Scope: {{ inq.search_result.product_title }}
+                </div>
               </td>
               <td class="py-3.5 px-4 whitespace-nowrap">
-                {% if inq.status == 'sent' %}
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span> Sent / Pending
-                  </span>
-                {% elif inq.status == 'replied' %}
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <i class="fa-solid fa-circle-check mr-1.5 text-emerald-600"></i> Replied
-                  </span>
+                {% if inq.quoted_price %}
+                <div>
+                  <span class="font-black text-slate-900 text-xs">{{ inq.quoted_currency|default:"INR" }} {{ inq.quoted_price }}</span>
+                  {% if inq.delivery_terms %}
+                  <div class="text-[10px] text-slate-500 font-normal truncate max-w-[150px]" title="{{ inq.delivery_terms }}">{{ inq.delivery_terms }}</div>
+                  {% endif %}
+                </div>
                 {% else %}
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                    {{ inq.get_status_display }}
-                  </span>
+                <span class="text-slate-400 italic text-[11px]">No quote logged</span>
                 {% endif %}
               </td>
+              <td class="py-3.5 px-4 whitespace-nowrap text-slate-600">
+                <div>{{ inq.sent_at|date:"M d, Y" }}</div>
+                <div class="text-[10px] text-slate-400">
+                  <i class="fa-solid fa-comments mr-1"></i>{{ inq.messages.count }} messages
+                </div>
+              </td>
+              <td class="py-3.5 px-4 whitespace-nowrap">
+                <!-- Dynamic Inline Status Select -->
+                <div class="flex items-center gap-1.5">
+                  <select 
+                    class="inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer 
+                    {% if inq.status == 'sent' %}bg-amber-50 text-amber-800 border-amber-300
+                    {% elif inq.status == 'in_discussion' %}bg-blue-50 text-blue-800 border-blue-300
+                    {% elif inq.status == 'replied' %}bg-purple-50 text-purple-800 border-purple-300
+                    {% elif inq.status == 'won' %}bg-emerald-50 text-emerald-800 border-emerald-300
+                    {% elif inq.status == 'lost' %}bg-rose-50 text-rose-800 border-rose-300
+                    {% else %}bg-slate-100 text-slate-700 border-slate-300{% endif %}"
+                    data-id="{{ inq.id }}"
+                    onchange="updateInquiryStatus('{{ inq.id }}', this.value, this)"
+                  >
+                    {% for code, label in status_choices %}
+                    <option value="{{ code }}" {% if inq.status == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <span id="status-spinner-{{ inq.id }}" class="hidden text-slate-400 text-xs animate-spin">
+                    <i class="fa-solid fa-circle-notch"></i>
+                  </span>
+                </div>
+              </td>
               <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5">
-                <a href="{% url 'inquiry-detail' inq.id %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
+                <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
                   Dossier
                 </a>
-                <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
+                <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
                   Quote
                 </button>
-                <form method="POST" action="{% url 'delete-inquiry' inq.id %}" class="inline" onsubmit="return confirm('Delete inquiry?');">
+                <button type="button" onclick="openQuickFollowupModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.subject|escapejs }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg transition" title="Add follow-up message">
+                  <i class="fa-solid fa-reply"></i>
+                </button>
+                <form method="POST" action="{% if is_seller_context %}{% url 'sales-delete-inquiry' inq.id %}{% else %}{% url 'delete-inquiry' inq.id %}{% endif %}" class="inline" onsubmit="return confirm('Delete inquiry?');">
                   {% csrf_token %}
                   <button type="submit" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition">
                     <i class="fa-solid fa-trash-can text-xs"></i>
@@ -446,9 +558,9 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="5" class="py-12 text-center text-slate-400">
-                <p class="font-bold text-slate-700 text-sm">No inquiries recorded for this product yet</p>
-                <p class="text-xs text-slate-400 mt-1">Send quotation requests to prospective buyer companies.</p>
+              <td colspan="6" class="py-12 text-center text-slate-400">
+                <p class="font-bold text-slate-700 text-sm">No inquiries match the active filters</p>
+                <p class="text-xs text-slate-400 mt-1">Adjust your date range or status filters, or dispatch new inquiries.</p>
               </td>
             </tr>
             {% endfor %}
@@ -465,9 +577,9 @@
         {% for group in product_groups %}
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           
-          <div class="bg-gradient-to-r from-slate-50 via-white to-orange-50/40 p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="bg-gradient-to-r {% if is_seller_context %}from-slate-50 via-white to-orange-50/40{% else %}from-slate-50 via-white to-blue-50/40{% endif %} p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="flex items-center space-x-3">
-              <span class="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm shadow-orange-500/20">
+              <span class="w-9 h-9 rounded-xl {% if is_seller_context %}bg-orange-500 shadow-orange-500/20{% else %}bg-blue-600 shadow-blue-600/20{% endif %} text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
                 <i class="fa-solid fa-box"></i>
               </span>
               <div>
@@ -477,11 +589,11 @@
                     {{ group.product.category.name|default:"General" }}
                   </span>
                 </div>
-                <div class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                <div class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
                   <span>MOQ: {{ group.product.minimum_order_quantity|default:group.product.moq|default:"1" }} {{ group.product.unit|default:"pcs" }}</span>
                   <span>&bull;</span>
                   <span class="text-emerald-700 font-bold">{{ group.count }} Inquiries</span>
-                  <span class="text-slate-400">({{ group.replied_count }} Replied, {{ group.sent_count }} Pending)</span>
+                  <span class="text-slate-400">({{ group.replied_count }} Quoted, {{ group.discussion_count }} Discussing, {{ group.won_count }} Won)</span>
                 </div>
               </div>
             </div>
@@ -491,50 +603,85 @@
                 <span>Filter This Product</span>
                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
               </a>
+              {% if is_seller_context %}
               <a href="{% url 'find-buyers' %}?product_id={{ group.product.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition shadow-sm">
                 <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
                 <span>Outreach</span>
               </a>
+              {% else %}
+              <a href="{% url 'find-suppliers' %}?product_id={{ group.product.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-sm">
+                <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+                <span>Find Suppliers</span>
+              </a>
+              {% endif %}
             </div>
           </div>
 
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs min-w-[840px]">
               <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
                 <tr>
-                  <th class="py-2.5 px-4">Recipient Company</th>
-                  <th class="py-2.5 px-4">Subject</th>
-                  <th class="py-2.5 px-4">Date</th>
-                  <th class="py-2.5 px-4">Status</th>
-                  <th class="py-2.5 px-4 text-right">Actions</th>
+                  <th class="py-2.5 px-4 min-w-[200px] w-60">Recipient Company</th>
+                  <th class="py-2.5 px-4 min-w-[200px]">Subject</th>
+                  <th class="py-2.5 px-4 w-36 whitespace-nowrap">Commercial Terms</th>
+                  <th class="py-2.5 px-4 w-32 whitespace-nowrap">Date Sent</th>
+                  <th class="py-2.5 px-4 w-40 whitespace-nowrap">Status</th>
+                  <th class="py-2.5 px-4 text-right w-36 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 {% for inq in group.inquiries %}
-                <tr class="hover:bg-slate-50 transition">
+                <tr class="hover:bg-slate-50 transition" id="inquiry-row-{{ inq.id }}">
                   <td class="py-3 px-4 font-bold text-slate-900">
-                    <div class="truncate max-w-[200px]">{{ inq.search_result.external_company.name }}</div>
+                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="hover:text-blue-600 truncate max-w-[200px] block">
+                      {{ inq.search_result.external_company.name }}
+                    </a>
                     <div class="text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{{ inq.sent_to_email }}</div>
                   </td>
                   <td class="py-3 px-4">
                     <div class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</div>
+                    <div class="text-[10px] text-slate-400">{{ inq.messages.count }} thread messages</div>
+                  </td>
+                  <td class="py-3 px-4 whitespace-nowrap">
+                    {% if inq.quoted_price %}
+                    <span class="font-bold text-slate-800 text-[11px]">{{ inq.quoted_currency|default:"INR" }} {{ inq.quoted_price }}</span>
+                    {% else %}
+                    <span class="text-slate-400 italic text-[10px]">Pending Quote</span>
+                    {% endif %}
                   </td>
                   <td class="py-3 px-4 text-slate-600 whitespace-nowrap">{{ inq.sent_at|date:"M d, Y" }}</td>
                   <td class="py-3 px-4 whitespace-nowrap">
-                    {% if inq.status == 'sent' %}
-                      <span class="text-[11px] font-bold text-amber-700">Pending</span>
-                    {% elif inq.status == 'replied' %}
-                      <span class="text-[11px] font-bold text-emerald-700">Replied</span>
-                    {% else %}
-                      <span class="text-[11px] font-bold text-rose-700">{{ inq.get_status_display }}</span>
-                    {% endif %}
+                    <!-- Inline status dropdown -->
+                    <div class="flex items-center gap-1.5">
+                      <select 
+                        class="inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer 
+                        {% if inq.status == 'sent' %}bg-amber-50 text-amber-800 border-amber-300
+                        {% elif inq.status == 'in_discussion' %}bg-blue-50 text-blue-800 border-blue-300
+                        {% elif inq.status == 'replied' %}bg-purple-50 text-purple-800 border-purple-300
+                        {% elif inq.status == 'won' %}bg-emerald-50 text-emerald-800 border-emerald-300
+                        {% elif inq.status == 'lost' %}bg-rose-50 text-rose-800 border-rose-300
+                        {% else %}bg-slate-100 text-slate-700 border-slate-300{% endif %}"
+                        data-id="{{ inq.id }}"
+                        onchange="updateInquiryStatus('{{ inq.id }}', this.value, this)"
+                      >
+                        {% for code, label in status_choices %}
+                        <option value="{{ code }}" {% if inq.status == code %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                      </select>
+                      <span id="status-spinner-{{ inq.id }}" class="hidden text-slate-400 text-xs animate-spin">
+                        <i class="fa-solid fa-circle-notch"></i>
+                      </span>
+                    </div>
                   </td>
                   <td class="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
-                    <a href="{% url 'inquiry-detail' inq.id %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
+                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
                       Dossier
                     </a>
-                    <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
+                    <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
                       Quote
+                    </button>
+                    <button type="button" onclick="openQuickFollowupModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.subject|escapejs }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg transition" title="Add follow-up">
+                      <i class="fa-solid fa-reply"></i>
                     </button>
                   </td>
                 </tr>
@@ -560,41 +707,59 @@
             <a href="?product_id=unassigned" class="text-xs font-bold text-blue-600 hover:underline">Filter This &rarr;</a>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs min-w-[840px]">
               <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
                 <tr>
-                  <th class="py-2.5 px-4">Recipient Company</th>
-                  <th class="py-2.5 px-4">Subject</th>
-                  <th class="py-2.5 px-4">Date</th>
-                  <th class="py-2.5 px-4">Status</th>
-                  <th class="py-2.5 px-4 text-right">Actions</th>
+                  <th class="py-2.5 px-4 min-w-[200px] w-60">Recipient Company</th>
+                  <th class="py-2.5 px-4 min-w-[200px]">Subject</th>
+                  <th class="py-2.5 px-4 w-36 whitespace-nowrap">Commercial Terms</th>
+                  <th class="py-2.5 px-4 w-32 whitespace-nowrap">Date Sent</th>
+                  <th class="py-2.5 px-4 w-40 whitespace-nowrap">Status</th>
+                  <th class="py-2.5 px-4 text-right w-36 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
                 {% for inq in unassigned_group.inquiries %}
-                <tr class="hover:bg-slate-50 transition">
+                <tr class="hover:bg-slate-50 transition" id="inquiry-row-{{ inq.id }}">
                   <td class="py-3 px-4 font-bold text-slate-900">
-                    <div class="truncate max-w-[200px]">{{ inq.search_result.external_company.name }}</div>
+                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="hover:text-blue-600 truncate max-w-[200px] block">
+                      {{ inq.search_result.external_company.name }}
+                    </a>
                     <div class="text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{{ inq.sent_to_email }}</div>
                   </td>
                   <td class="py-3 px-4">
                     <div class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</div>
                   </td>
-                  <td class="py-3 px-4 text-slate-600 whitespace-nowrap">{{ inq.sent_at|date:"M d, Y" }}</td>
                   <td class="py-3 px-4 whitespace-nowrap">
-                    {% if inq.status == 'sent' %}
-                      <span class="text-[11px] font-bold text-amber-700">Pending</span>
-                    {% elif inq.status == 'replied' %}
-                      <span class="text-[11px] font-bold text-emerald-700">Replied</span>
+                    {% if inq.quoted_price %}
+                    <span class="font-bold text-slate-800 text-[11px]">{{ inq.quoted_currency|default:"INR" }} {{ inq.quoted_price }}</span>
                     {% else %}
-                      <span class="text-[11px] font-bold text-rose-700">{{ inq.get_status_display }}</span>
+                    <span class="text-slate-400 italic text-[10px]">Pending Quote</span>
                     {% endif %}
                   </td>
+                  <td class="py-3 px-4 text-slate-600 whitespace-nowrap">{{ inq.sent_at|date:"M d, Y" }}</td>
+                  <td class="py-3 px-4 whitespace-nowrap">
+                    <select 
+                      class="inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer 
+                      {% if inq.status == 'sent' %}bg-amber-50 text-amber-800 border-amber-300
+                      {% elif inq.status == 'in_discussion' %}bg-blue-50 text-blue-800 border-blue-300
+                      {% elif inq.status == 'replied' %}bg-purple-50 text-purple-800 border-purple-300
+                      {% elif inq.status == 'won' %}bg-emerald-50 text-emerald-800 border-emerald-300
+                      {% elif inq.status == 'lost' %}bg-rose-50 text-rose-800 border-rose-300
+                      {% else %}bg-slate-100 text-slate-700 border-slate-300{% endif %}"
+                      data-id="{{ inq.id }}"
+                      onchange="updateInquiryStatus('{{ inq.id }}', this.value, this)"
+                    >
+                      {% for code, label in status_choices %}
+                      <option value="{{ code }}" {% if inq.status == code %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
                   <td class="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
-                    <a href="{% url 'inquiry-detail' inq.id %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
+                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
                       Dossier
                     </a>
-                    <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
+                    <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
                       Quote
                     </button>
                   </td>
@@ -614,7 +779,7 @@
         </div>
         <h3 class="text-base font-bold text-slate-800 mb-1">No Inquiries Found</h3>
         <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
-          Inquiries are automatically organized by product. Dispatch inquiries or RFQs to see them tracked product-by-product.
+          Inquiries are automatically organized by product. Dispatch commercial inquiries to see them tracked in your pipeline.
         </p>
       </div>
     {% endif %}
@@ -632,7 +797,7 @@
           <i class="fa-solid fa-calculator"></i>
         </div>
         <div>
-          <h3 class="text-sm font-bold text-slate-900">Record Received Quote / Terms</h3>
+          <h3 class="text-sm font-bold text-slate-900">Record Commercial Quote / Terms</h3>
           <p class="text-xs text-slate-500 font-medium" id="quickQuoteSubtitle">From: Contact</p>
         </div>
       </div>
@@ -646,20 +811,26 @@
       <div class="p-5 space-y-4 text-xs">
         <div class="grid grid-cols-3 gap-3">
           <div class="col-span-2">
-            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Quoted Price</label>
-            <input type="number" step="0.01" name="quoted_price" required placeholder="e.g. 85000.00"
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Quoted Price Amount</label>
+            <input type="number" step="0.01" name="quoted_price" id="quickQuotePriceInput" required placeholder="e.g. 85000.00"
                    class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900">
           </div>
           <div>
             <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Currency</label>
-            <input type="text" name="currency" value="INR" maxlength="3"
+            <input type="text" name="currency" id="quickQuoteCurrencyInput" value="INR" maxlength="3"
                    class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 uppercase">
           </div>
         </div>
 
         <div>
-          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Commercial Terms / Notes</label>
-          <textarea name="notes" rows="3" placeholder="Quoted terms, lead time, delivery..."
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Delivery / Lead Time Terms</label>
+          <input type="text" name="delivery_terms" id="quickQuoteDeliveryInput" placeholder="e.g. Ex-Factory, 10 Days delivery"
+                 class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Quotation Notes / Terms</label>
+          <textarea name="notes" id="quickQuoteNotesInput" rows="3" placeholder="Payment terms, validity, packaging details..."
                     class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800"></textarea>
         </div>
       </div>
@@ -670,7 +841,76 @@
         </button>
         <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2 transition text-xs">
           <i class="fa-solid fa-check"></i>
-          <span>Save Terms</span>
+          <span>Save Quote Terms</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Quick Follow-up / Message Modal -->
+<div id="quickFollowupModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-reply"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Add Message / Follow-up</h3>
+          <p class="text-xs text-slate-500 font-medium" id="quickFollowupSubtitle">Company Name</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeQuickFollowupModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="quickFollowupForm" method="POST" action="">
+      {% csrf_token %}
+      <div class="p-5 space-y-4 text-xs">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Message Stream Type</label>
+            <select name="message_type" class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white text-xs font-semibold">
+              <option value="outbound">Outbound Follow-up</option>
+              <option value="inbound">Inbound Counterparty Reply</option>
+              <option value="system">Internal Team Note</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Update Status To</label>
+            <select name="new_status" class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white text-xs font-semibold">
+              <option value="">Keep Current Status</option>
+              {% for code, label in status_choices %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Message Body</label>
+          <textarea name="message_body" rows="4" required placeholder="Type follow-up content, negotiations, or client feedback..."
+                    class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800 text-xs"></textarea>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="send_email_copy" value="1" class="rounded text-blue-600 focus:ring-blue-500">
+            <span class="text-xs text-slate-700 font-semibold">Send email copy to recipient address</span>
+          </label>
+          <span class="text-[10px] text-slate-400 font-medium">Auto-logged in thread</span>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeQuickFollowupModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/20 flex items-center gap-2 transition text-xs">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Save to Conversation</span>
         </button>
       </div>
     </form>
@@ -680,11 +920,80 @@
 
 {% block extra_scripts %}
 <script>
-function openQuickQuoteModal(inquiryId, supplierName) {
+const IS_SELLER_CONTEXT = {% if is_seller_context %}true{% else %}false{% endif %};
+
+function getCsrfToken() {
+  const tokenInput = document.querySelector('[name=csrfmiddlewaretoken]');
+  return tokenInput ? tokenInput.value : '';
+}
+
+// Inline AJAX Status Update
+async function updateInquiryStatus(inquiryId, newStatus, selectElement) {
+  const spinner = document.getElementById(`status-spinner-${inquiryId}`);
+  if (spinner) spinner.classList.remove('hidden');
+
+  const endpoint = IS_SELLER_CONTEXT 
+    ? `/sales/inquiries/${inquiryId}/status/` 
+    : `/procurement/inquiries/${inquiryId}/status/`;
+
+  try {
+    const formData = new FormData();
+    formData.append('status', newStatus);
+    formData.append('csrfmiddlewaretoken', getCsrfToken());
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      // Update select element badge colors
+      selectElement.className = 'inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer ';
+      if (newStatus === 'sent') {
+        selectElement.className += 'bg-amber-50 text-amber-800 border-amber-300';
+      } else if (newStatus === 'in_discussion') {
+        selectElement.className += 'bg-blue-50 text-blue-800 border-blue-300';
+      } else if (newStatus === 'replied') {
+        selectElement.className += 'bg-purple-50 text-purple-800 border-purple-300';
+      } else if (newStatus === 'won') {
+        selectElement.className += 'bg-emerald-50 text-emerald-800 border-emerald-300';
+      } else if (newStatus === 'lost') {
+        selectElement.className += 'bg-rose-50 text-rose-800 border-rose-300';
+      } else {
+        selectElement.className += 'bg-slate-100 text-slate-700 border-slate-300';
+      }
+    } else {
+      alert('Could not update status: ' + (data.error || 'Server error'));
+    }
+  } catch (err) {
+    console.error('Status update failed:', err);
+    alert('Network error while updating status.');
+  } finally {
+    if (spinner) spinner.classList.add('hidden');
+  }
+}
+
+// Quick Record Quote Modal
+function openQuickQuoteModal(inquiryId, companyName, currentPrice, currentCurrency, currentTerms) {
   const form = document.getElementById('quickQuoteForm');
   const subtitle = document.getElementById('quickQuoteSubtitle');
-  form.action = `/procurement/inquiries/${inquiryId}/quote/`;
-  subtitle.textContent = `From: ${supplierName}`;
+  const priceInput = document.getElementById('quickQuotePriceInput');
+  const currencyInput = document.getElementById('quickQuoteCurrencyInput');
+  const deliveryInput = document.getElementById('quickQuoteDeliveryInput');
+
+  form.action = IS_SELLER_CONTEXT 
+    ? `/sales/inquiries/${inquiryId}/quote/` 
+    : `/procurement/inquiries/${inquiryId}/quote/`;
+
+  subtitle.textContent = `Company: ${companyName}`;
+  if (priceInput) priceInput.value = currentPrice || '';
+  if (currencyInput && currentCurrency) currencyInput.value = currentCurrency;
+  if (deliveryInput) deliveryInput.value = currentTerms || '';
+
   document.getElementById('quickQuoteModal').classList.remove('hidden');
 }
 
@@ -692,8 +1001,29 @@ function closeQuickQuoteModal() {
   document.getElementById('quickQuoteModal').classList.add('hidden');
 }
 
+// Quick Follow-up Modal
+function openQuickFollowupModal(inquiryId, companyName, subject) {
+  const form = document.getElementById('quickFollowupForm');
+  const subtitle = document.getElementById('quickFollowupSubtitle');
+
+  form.action = IS_SELLER_CONTEXT 
+    ? `/sales/inquiries/${inquiryId}/message/` 
+    : `/procurement/inquiries/${inquiryId}/message/`;
+
+  subtitle.textContent = `${companyName} (${subject})`;
+  document.getElementById('quickFollowupModal').classList.remove('hidden');
+}
+
+function closeQuickFollowupModal() {
+  document.getElementById('quickFollowupModal').classList.add('hidden');
+}
+
 document.getElementById('quickQuoteModal')?.addEventListener('click', function(e) {
   if (e.target === this) closeQuickQuoteModal();
+});
+
+document.getElementById('quickFollowupModal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeQuickFollowupModal();
 });
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -708,12 +1038,12 @@ document.addEventListener('DOMContentLoaded', function() {
   const comboboxWrapper = document.getElementById('inquiries-product-combobox');
 
   function openDropdown() {
-    dropdownMenu.classList.remove('hidden');
+    if (dropdownMenu) dropdownMenu.classList.remove('hidden');
     if (chevron) chevron.classList.add('rotate-180');
   }
 
   function closeDropdown() {
-    dropdownMenu.classList.add('hidden');
+    if (dropdownMenu) dropdownMenu.classList.add('hidden');
     if (chevron) chevron.classList.remove('rotate-180');
   }
 
@@ -733,10 +1063,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (visibleCount === 0 && q) {
-      noMatch.classList.remove('hidden');
-      noMatchQuery.textContent = query;
+      if (noMatch) noMatch.classList.remove('hidden');
+      if (noMatchQuery) noMatchQuery.textContent = query;
     } else {
-      noMatch.classList.add('hidden');
+      if (noMatch) noMatch.classList.add('hidden');
     }
   }
 
@@ -744,7 +1074,7 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       if (dropdownMenu.classList.contains('hidden')) {
-        filterOptions(filterInput.value);
+        filterOptions(filterInput ? filterInput.value : '');
         openDropdown();
       } else {
         closeDropdown();

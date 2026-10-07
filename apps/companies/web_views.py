@@ -181,7 +181,11 @@ def company_profile_web_view(request):
         company.phone = request.POST.get("phone", company.phone).strip()
         company.address_line1 = request.POST.get("address_line1", company.address_line1).strip()
         company.city = request.POST.get("city", company.city).strip()
+        company.state = request.POST.get("state", company.state).strip()
+        company.postal_code = request.POST.get("postal_code", company.postal_code).strip()
         company.country = request.POST.get("country", company.country).strip()
+        company.gst_vat_no = request.POST.get("gst_vat_no", company.gst_vat_no).strip()
+        company.description = request.POST.get("description", company.description).strip()
         company.preferred_currency = request.POST.get("preferred_currency", company.preferred_currency)
         company.save()
 
@@ -415,7 +419,25 @@ def company_team_web_view(request):
             messages.success(request, f"User '{member.user.email}' has been {status_str}.")
             return redirect("company-team-web")
 
-        # 4. Update member permissions (from the 6 core permissions)
+        # 4. Delete user from team
+        elif action == "delete_member":
+            member_id = request.POST.get("member_id")
+            member = get_object_or_404(CompanyMember, id=member_id, company=company)
+
+            if member.user_id == request.user.id:
+                messages.error(request, "You cannot delete your own account.")
+                return redirect("company-team-web")
+
+            user_email = member.user.email
+            user_to_delete = member.user
+            member.delete()
+            if not CompanyMember.objects.filter(user=user_to_delete).exists() and not user_to_delete.is_superuser:
+                user_to_delete.delete()
+
+            messages.success(request, f"User '{user_email}' deleted successfully from company team.")
+            return redirect("company-team-web")
+
+        # 5. Update member permissions (from the 6 core permissions)
         elif action == "update_permissions":
             member_id = request.POST.get("member_id")
             member = get_object_or_404(CompanyMember, id=member_id, company=company)

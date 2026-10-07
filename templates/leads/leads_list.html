@@ -301,15 +301,15 @@
     <!-- Filtered Leads Table -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
+        <table class="w-full text-left text-xs min-w-[860px]">
           <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
             <tr>
-              <th class="py-3 px-4">Company Name</th>
-              <th class="py-3 px-4">Location</th>
-              <th class="py-3 px-4">Match Score</th>
-              <th class="py-3 px-4">Need Signal & Fit Reason</th>
-              <th class="py-3 px-4">Verified Contact</th>
-              <th class="py-3 px-4 text-right">Actions</th>
+              <th class="py-3 px-4 min-w-[200px] w-64">Company Name</th>
+              <th class="py-3 px-4 w-36 whitespace-nowrap">Location</th>
+              <th class="py-3 px-4 w-28 whitespace-nowrap">Match Score</th>
+              <th class="py-3 px-4 min-w-[220px]">Need Signal & Fit Reason</th>
+              <th class="py-3 px-4 w-44 whitespace-nowrap">Verified Contact</th>
+              <th class="py-3 px-4 text-right w-44 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -385,11 +385,10 @@
                 </a>
                 {% endif %}
 
-                {% if lead.external_company.email %}
-                <a href="mailto:{{ lead.external_company.email }}?subject=B2B%20Supply%20Inquiry:%20{{ lead.product_title|urlencode }}" class="inline-flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
-                  Contact
-                </a>
-                {% endif %}
+                <button type="button" onclick="openSendProposalModal('{{ lead.id }}', '{{ lead.external_company.name|escapejs }}', '{{ lead.external_company.email|default:''|escapejs }}', '{{ lead.product_title|escapejs }}')" class="inline-flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
+                  <i class="fa-solid fa-paper-plane text-[10px] mr-1.5"></i>
+                  <span>Contact</span>
+                </button>
               </td>
             </tr>
             {% empty %}
@@ -465,15 +464,15 @@
 
           <!-- Product Leads Table -->
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs min-w-[860px]">
               <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
                 <tr>
-                  <th class="py-2.5 px-4">Buyer Company</th>
-                  <th class="py-2.5 px-4">Location</th>
-                  <th class="py-2.5 px-4">Fit Score</th>
-                  <th class="py-2.5 px-4">Need Signal & Fit Reason</th>
-                  <th class="py-2.5 px-4">Contact</th>
-                  <th class="py-2.5 px-4 text-right">Actions</th>
+                  <th class="py-2.5 px-4 min-w-[200px] w-64">Buyer Company</th>
+                  <th class="py-2.5 px-4 w-36 whitespace-nowrap">Location</th>
+                  <th class="py-2.5 px-4 w-28 whitespace-nowrap">Fit Score</th>
+                  <th class="py-2.5 px-4 min-w-[220px]">Need Signal & Fit Reason</th>
+                  <th class="py-2.5 px-4 w-44 whitespace-nowrap">Contact</th>
+                  <th class="py-2.5 px-4 text-right w-44 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
@@ -547,11 +546,10 @@
                     </a>
                     {% endif %}
 
-                    {% if lead.external_company.email %}
-                    <a href="mailto:{{ lead.external_company.email }}?subject=B2B%20Supply%20Inquiry:%20{{ lead.product_title|urlencode }}" class="inline-flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition shadow-sm">
-                      Contact
-                    </a>
-                    {% endif %}
+                    <button type="button" onclick="openSendProposalModal('{{ lead.id }}', '{{ lead.external_company.name|escapejs }}', '{{ lead.external_company.email|default:''|escapejs }}', '{{ lead.product_title|escapejs }}')" class="inline-flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition shadow-sm">
+                      <i class="fa-solid fa-paper-plane text-[10px] mr-1"></i>
+                      <span>Contact</span>
+                    </button>
                   </td>
                 </tr>
                 {% endfor %}
@@ -631,10 +629,105 @@
   {% endif %}
 
 </div>
+
+<!-- Send Commercial Proposal Modal -->
+<div id="sendProposalModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Send Commercial Proposal</h3>
+          <p class="text-xs text-slate-500 font-medium" id="proposalModalSubtitle">To: Company</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeSendProposalModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="sendProposalForm" method="POST" action="">
+      {% csrf_token %}
+      <div class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Recipient Contact Email</label>
+          <input type="email" name="sent_to_email" id="proposalRecipientEmail" required
+                 class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 font-semibold text-slate-900 text-xs">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Proposal Subject</label>
+          <input type="text" name="subject" id="proposalSubject" required
+                 class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 font-bold text-slate-900 text-xs">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Proposed Unit Price</label>
+            <input type="number" step="0.01" name="target_price" placeholder="Optional price quote"
+                   class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 font-semibold text-slate-900 text-xs">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Delivery / Terms</label>
+            <input type="text" name="delivery_terms" placeholder="e.g. Ex-Factory, 7 Days"
+                   class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 font-semibold text-slate-900 text-xs">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Proposal Message</label>
+          <textarea name="message" id="proposalMessage" rows="4" required
+                    class="w-full rounded-xl border border-slate-300 p-3 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 text-slate-800 text-xs leading-relaxed"></textarea>
+        </div>
+
+        <div class="p-3 bg-orange-50/60 rounded-xl border border-orange-100 flex items-center gap-2 text-orange-900">
+          <i class="fa-solid fa-circle-info text-orange-600"></i>
+          <span class="text-[11px] leading-snug">Dispatches email to buyer and automatically initializes an active discussion thread in <strong>Buyer Inquiries</strong>.</span>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeSendProposalModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 transition text-xs">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Send Commercial Proposal</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+function openSendProposalModal(resultId, companyName, companyEmail, productTitle) {
+  const form = document.getElementById('sendProposalForm');
+  const subtitle = document.getElementById('proposalModalSubtitle');
+  const emailInput = document.getElementById('proposalRecipientEmail');
+  const subjectInput = document.getElementById('proposalSubject');
+  const messageInput = document.getElementById('proposalMessage');
+
+  form.action = `/sales/inquiries/send/${resultId}/`;
+  subtitle.textContent = `To: ${companyName}`;
+  emailInput.value = companyEmail || '';
+  subjectInput.value = `Commercial Proposal & Supply Quotation: ${productTitle}`;
+  messageInput.value = `Dear Purchasing Team at ${companyName},\n\nWe noticed your demand for ${productTitle}. We manufacture and supply high-quality ${productTitle} with competitive wholesale pricing and reliable delivery.\n\nPlease let us know your required volume and delivery location so we can provide our formal commercial quotation.\n\nBest regards,\nSales Team`;
+
+  document.getElementById('sendProposalModal').classList.remove('hidden');
+}
+
+function closeSendProposalModal() {
+  document.getElementById('sendProposalModal').classList.add('hidden');
+}
+
+document.getElementById('sendProposalModal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeSendProposalModal();
+});
+
 document.addEventListener('DOMContentLoaded', function() {
   const filterInput = document.getElementById('product_filter_input');
   const dropdownMenu = document.getElementById('leads_dropdown_menu');

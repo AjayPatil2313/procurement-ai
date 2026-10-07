@@ -272,21 +272,29 @@ class CompanyRole(models.Model):
         summary = []
         for mp in self.module_permissions.all().order_by("module"):
             actions = []
+            codes = []
             if mp.can_admin:
                 actions.append("Admin")
-            if mp.can_read:
-                actions.append("Read")
-            if mp.can_write:
-                actions.append("Write")
-            if mp.can_edit:
-                actions.append("Edit")
-            if mp.can_delete:
-                actions.append("Delete")
+                codes.append("Admin")
+            else:
+                if mp.can_read:
+                    actions.append("Read")
+                    codes.append("R")
+                if mp.can_write:
+                    actions.append("Write")
+                    codes.append("W")
+                if mp.can_edit:
+                    actions.append("Edit")
+                    codes.append("E")
+                if mp.can_delete:
+                    actions.append("Delete")
+                    codes.append("D")
             if actions:
                 summary.append({
                     "module": mp.module,
                     "module_name": mp.get_module_title(),
                     "actions": ", ".join(actions),
+                    "action_codes": ", ".join(codes),
                     "action_list": actions,
                     "is_full": mp.can_admin or len(actions) == 5,
                 })

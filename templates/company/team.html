@@ -70,50 +70,42 @@
     </div>
   </div>
 
-  <!-- RBAC Rules Callout -->
-  <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-    <div class="flex items-start space-x-3">
-      <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 text-sm shadow">
-        <i class="fa-solid fa-shield-halved"></i>
-      </div>
-      <div>
-        <div class="font-bold text-slate-900 text-sm">Role-Based Access Control (RBAC)</div>
-        <p class="text-slate-600 mt-0.5">
-          User accounts and credentials are managed here. To assign and configure the <strong>6 Core Action Permissions</strong> (<span class="font-semibold text-blue-700">Read, Edit, Update, Delete, Import, Export</span>), open the dedicated RBAC matrix.
-        </p>
-      </div>
-    </div>
-    <div class="flex items-center space-x-2 shrink-0">
-      <a href="{% url 'company-rbac-web' %}" class="inline-flex items-center px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition">
-        <i class="fa-solid fa-sliders mr-1.5"></i> Open RBAC Matrix &rarr;
-      </a>
-    </div>
-  </div>
-
   <!-- Users Section Card -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     
     <!-- Table Header Toolbar -->
     <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
       <div class="flex items-center space-x-3">
-        <h2 class="text-sm font-bold text-slate-900">User List ({{ members|length }})</h2>
+        <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <span>User List</span>
+          <span id="userCountBadge" class="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">{{ members|length }}</span>
+        </h2>
         <span class="text-xs text-slate-400">Company: <strong class="text-slate-700">{{ company.name }}</strong></span>
       </div>
 
       <!-- Search & Filters -->
       <div class="flex flex-wrap items-center gap-2">
         <!-- Search Input -->
-        <div class="relative w-full sm:w-60">
+        <div class="relative w-full sm:w-64">
           <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
             <i class="fa-solid fa-magnifying-glass"></i>
           </span>
           <input 
             type="text" 
             id="userSearchInput" 
-            onkeyup="filterUsers()" 
-            placeholder="Search by name, email..." 
-            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+            oninput="filterUsers()" 
+            placeholder="Search name, email, phone, role..." 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-8 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
           >
+          <button 
+            type="button" 
+            id="clearUserSearchBtn" 
+            onclick="clearUserSearch()" 
+            class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 transition"
+            title="Clear search"
+          >
+            <i class="fa-solid fa-circle-xmark text-xs"></i>
+          </button>
         </div>
 
         <!-- Role Filter -->
@@ -135,15 +127,14 @@
 
     <!-- Table -->
     <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs" id="usersTable">
+      <table class="w-full text-left text-xs min-w-[760px]" id="usersTable">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-3 px-4">User</th>
-            <th class="py-3 px-4">Role</th>
-            <th class="py-3 px-4">Status</th>
-            <th class="py-3 px-4">Assigned Permissions</th>
-            <th class="py-3 px-4">Joined Date</th>
-            <th class="py-3 px-4 text-right">Actions</th>
+            <th class="py-3 px-4 min-w-[240px]">User</th>
+            <th class="py-3 px-4 w-60 min-w-[180px]">Assigned Role</th>
+            <th class="py-3 px-4 w-28 whitespace-nowrap">Status</th>
+            <th class="py-3 px-4 w-36 whitespace-nowrap">Joined Date</th>
+            <th class="py-3 px-4 w-36 text-right whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -151,6 +142,7 @@
           <tr class="user-row hover:bg-slate-50/80 transition" 
               data-email="{{ m.user.email|lower }}" 
               data-name="{{ m.user.first_name|lower }} {{ m.user.last_name|lower }}"
+              data-phone="{{ m.user.phone|default:''|lower }}"
               data-role="{% if m.custom_role %}{{ m.custom_role.name|lower }}{% else %}{{ m.role|lower }}{% endif %}"
               data-status="{% if m.user.is_active and m.is_active %}ACTIVE{% else %}INACTIVE{% endif %}">
             
@@ -180,31 +172,36 @@
               </div>
             </td>
 
-            <!-- Role -->
+            <!-- Assigned Role -->
             <td class="py-3.5 px-4">
               {% if m.custom_role %}
-                {% if m.custom_role.is_system or m.role == 'ADMIN' %}
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                    <i class="fa-solid fa-user-shield mr-1.5 text-purple-600"></i> {{ m.custom_role.name }}
-                  </span>
-                {% else %}
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    <i class="fa-solid fa-user-gear mr-1.5 text-blue-500"></i> {{ m.custom_role.name }}
-                  </span>
+                <div>
+                  {% if m.custom_role.is_system or m.role == 'ADMIN' %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                      <i class="fa-solid fa-crown mr-1.5 text-amber-500"></i> {{ m.custom_role.name }}
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      <i class="fa-solid fa-user-shield mr-1.5 text-blue-600"></i> {{ m.custom_role.name }}
+                    </span>
+                  {% endif %}
+                </div>
+                {% if m.custom_role.description %}
+                  <div class="text-[10px] text-slate-400 mt-1 truncate max-w-xs">{{ m.custom_role.description }}</div>
                 {% endif %}
               {% elif m.role == 'ADMIN' %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                  <i class="fa-solid fa-user-shield mr-1.5 text-purple-600"></i> Company Admin
+                  <i class="fa-solid fa-crown mr-1.5 text-amber-500"></i> Company Admin
                 </span>
               {% else %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  <i class="fa-solid fa-user-gear mr-1.5 text-blue-500"></i> Company User
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                  <i class="fa-solid fa-user mr-1.5 text-slate-500"></i> Team Member
                 </span>
               {% endif %}
             </td>
 
             <!-- Status -->
-            <td class="py-3.5 px-4">
+            <td class="py-3.5 px-4 whitespace-nowrap">
               {% if m.user.is_active and m.is_active %}
                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                   <i class="fa-solid fa-circle text-[6px] mr-1.5 text-emerald-600"></i> Active
@@ -216,92 +213,23 @@
               {% endif %}
             </td>
 
-            <!-- Module Permissions Summary -->
-            <td class="py-3.5 px-4">
-              {% if m.role == 'ADMIN' or m.custom_role.is_system %}
-                <div class="space-y-1">
-                  <div class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                    <i class="fa-solid fa-crown mr-1 text-amber-500"></i> Full Access (All Modules)
-                  </div>
-                  <div class="text-[10px] text-slate-500">
-                    Full Administrative Access
-                  </div>
-                </div>
-              {% elif m.custom_role %}
-                <div class="space-y-1">
-                  <div class="flex flex-wrap gap-1 text-[9px]">
-                    {% for p in m.custom_role.module_permissions.all %}
-                      {% if p.can_read or p.can_write or p.can_edit or p.can_delete or p.can_admin %}
-                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-medium" title="{{ p.get_module_title }}">
-                          {{ p.module|slice:":6" }}:
-                          {% if p.can_admin %}<strong class="text-purple-600">ADM</strong>{% else %}{% if p.can_read %}R{% endif %}{% if p.can_write %}W{% endif %}{% if p.can_edit %}E{% endif %}{% if p.can_delete %}D{% endif %}{% endif %}
-                        </span>
-                      {% endif %}
-                    {% empty %}
-                      <span class="text-slate-400 italic text-[11px]">No module rights</span>
-                    {% endfor %}
-                  </div>
-                  <a href="{% url 'seller-roles-web' %}" class="inline-flex items-center text-[10px] text-blue-600 hover:text-blue-800 font-semibold">
-                    <i class="fa-solid fa-user-shield mr-1"></i> Edit in Roles &amp; Responsibilities &rarr;
-                  </a>
-                </div>
-              {% else %}
-                <div class="flex flex-wrap gap-1 text-[10px]">
-                  {% if 'READ' in m.active_permissions %}
-                    <span class="px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-800">Read</span>
-                  {% endif %}
-                  {% if 'EDIT' in m.active_permissions %}
-                    <span class="px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800">Edit</span>
-                  {% endif %}
-                  {% if 'UPDATE' in m.active_permissions %}
-                    <span class="px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800">Update</span>
-                  {% endif %}
-                  {% if 'DELETE' in m.active_permissions %}
-                    <span class="px-2 py-0.5 rounded font-bold bg-red-100 text-red-800">Delete</span>
-                  {% endif %}
-                  {% if 'IMPORT' in m.active_permissions %}
-                    <span class="px-2 py-0.5 rounded font-bold bg-purple-100 text-purple-800">Import</span>
-                  {% endif %}
-                  {% if 'EXPORT' in m.active_permissions %}
-                    <span class="px-2 py-0.5 rounded font-bold bg-indigo-100 text-indigo-800">Export</span>
-                  {% endif %}
-
-                  {% if not m.active_permissions %}
-                    <span class="text-slate-400 italic text-[11px]">No permissions assigned</span>
-                  {% endif %}
-                </div>
-                <a href="{% url 'seller-roles-web' %}" class="inline-flex items-center text-[10px] text-blue-600 hover:text-blue-800 font-semibold mt-1">
-                  <i class="fa-solid fa-user-shield mr-1"></i> Manage in Roles &rarr;
-                </a>
-              {% endif %}
-            </td>
-
             <!-- Joined Date -->
-            <td class="py-3.5 px-4 text-slate-500 font-medium">
+            <td class="py-3.5 px-4 text-slate-500 font-medium whitespace-nowrap">
               {{ m.joined_at|date:"M d, Y" }}
             </td>
 
             <!-- Action Buttons -->
-            <td class="py-3.5 px-4 text-right">
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
               <div class="flex items-center justify-end space-x-1.5">
-                <!-- Edit User -->
+                <!-- Edit User Details & Role -->
                 <button 
                   type="button" 
-                  onclick="openEditUserModal('{{ m.id }}', '{{ m.user.email }}', '{{ m.user.first_name }}', '{{ m.user.last_name }}', '{{ m.user.phone }}', '{{ m.custom_role.id|default:'' }}', {% if m.user.is_active and m.is_active %}true{% else %}false{% endif %}, {% if m.user.is_email_verified %}true{% else %}false{% endif %})"
-                  class="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-slate-200 transition"
-                  title="Edit User Details"
+                  onclick="openEditUserModal('{{ m.id }}', '{{ m.user.email|escapejs }}', '{{ m.user.first_name|escapejs }}', '{{ m.user.last_name|escapejs }}', '{{ m.user.phone|escapejs }}', '{{ m.custom_role.id|default:'' }}', '{{ m.custom_role.name|default:''|escapejs }}', '{{ m.custom_role.description|default:''|escapejs }}', {% if m.user.is_active and m.is_active %}true{% else %}false{% endif %}, {% if m.user.is_email_verified %}true{% else %}false{% endif %})"
+                  class="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-slate-200 transition cursor-pointer"
+                  title="Edit User & Reassign Role"
                 >
                   <i class="fa-solid fa-pen-to-square text-xs"></i>
                 </button>
-
-                <!-- Roles & Responsibilities link -->
-                <a 
-                  href="{% url 'seller-roles-web' %}" 
-                  class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg border border-blue-200 transition inline-flex items-center justify-center"
-                  title="Manage in Roles & Responsibilities"
-                >
-                  <i class="fa-solid fa-user-shield text-xs"></i>
-                </a>
 
                 <!-- Activate / Deactivate Toggle -->
                 {% if m.user.id == request.user.id %}
@@ -317,7 +245,7 @@
                       <button 
                         type="submit" 
                         title="Deactivate User Account"
-                        class="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg border border-amber-200 transition"
+                        class="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg border border-amber-200 transition cursor-pointer"
                       >
                         <i class="fa-solid fa-user-slash text-xs"></i>
                       </button>
@@ -325,13 +253,42 @@
                       <button 
                         type="submit" 
                         title="Activate User Account"
-                        class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition"
+                        class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition cursor-pointer"
                       >
                         <i class="fa-solid fa-user-check text-xs"></i>
                       </button>
                     {% endif %}
                   </form>
                 {% endif %}
+
+                <!-- Delete User (Protected against self-delete) -->
+                {% if m.user.id == request.user.id %}
+                  <span class="p-1.5 text-slate-300 cursor-not-allowed" title="You cannot delete your own account">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                  </span>
+                {% else %}
+                  <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete user {{ m.user.email|escapejs }} from this company team? This action cannot be undone.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_member">
+                    <input type="hidden" name="member_id" value="{{ m.id }}">
+                    <button 
+                      type="submit" 
+                      title="Delete User from Team"
+                      class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 hover:border-rose-200 transition cursor-pointer"
+                    >
+                      <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                  </form>
+                {% endif %}
+
+                <!-- Roles & Responsibilities Quick Link -->
+                <a 
+                  href="{% url 'seller-roles-web' %}" 
+                  class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-slate-200 hover:border-blue-200 transition inline-flex items-center justify-center"
+                  title="Configure Roles & Responsibilities"
+                >
+                  <i class="fa-solid fa-shield-halved text-xs"></i>
+                </a>
               </div>
             </td>
 
@@ -370,11 +327,10 @@
       {% csrf_token %}
       <input type="hidden" name="action" value="add_member">
       
-      <!-- Email Address (VARCHAR 254 UNIQUE) -->
+      <!-- Email Address -->
       <div>
         <label class="block text-xs font-semibold text-slate-700 mb-1">
           Email Address <span class="text-rose-500">*</span>
-          <span class="text-[10px] font-normal text-slate-400">(Login identifier)</span>
         </label>
         <div class="relative">
           <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
@@ -391,11 +347,10 @@
         </div>
       </div>
 
-      <!-- Password (VARCHAR 128) -->
+      <!-- Password -->
       <div>
         <label class="block text-xs font-semibold text-slate-700 mb-1">
           Initial Password <span class="text-rose-500">*</span>
-          <span class="text-[10px] font-normal text-slate-400">(Hashed on save)</span>
         </label>
         <div class="relative">
           <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
@@ -466,42 +421,115 @@
         </div>
       </div>
 
-      <!-- Company Role -->
-      <div>
-        <label class="block text-xs font-semibold text-slate-700 mb-1">Company Role <span class="text-rose-500">*</span></label>
-        <select name="role_id" id="newMemberRole" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
-          {% for r in company_roles %}
-            <option value="{{ r.id }}" {% if not r.is_system and forloop.counter == 2 %}selected{% elif forloop.first %}selected{% endif %}>
-              {{ r.name }}{% if r.is_system %} (System Admin){% endif %}
-            </option>
-          {% empty %}
-            <option value="">No roles configured</option>
-          {% endfor %}
-        </select>
-        <p class="text-[10px] text-slate-400 mt-1">Select from roles created under Seller &rarr; Roles &amp; Responsibilities.</p>
-      </div>
-
-      <!-- Verification & Active Status (BOOL) -->
-      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
-          <input 
-            type="checkbox" 
-            name="is_email_verified" 
-            checked 
-            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
-          >
-          <span>Mark Email as Verified (<code class="text-[10px] text-slate-500">is_email_verified = True</code>)</span>
+      <!-- Searchable Role Field -->
+      <div class="relative" id="addRoleComboboxContainer">
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Company Role <span class="text-rose-500">*</span>
+          <span class="text-[10px] font-normal text-slate-400 lowercase">(from Roles & Responsibilities)</span>
         </label>
 
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+        <!-- Hidden input storing chosen role ID -->
+        <input type="hidden" name="role_id" id="addMemberRoleId" required value="{% if company_roles %}{{ company_roles.0.id }}{% endif %}">
+
+        <!-- Selected Role Display Card -->
+        <div id="addSelectedRoleCard" class="flex items-center justify-between p-2.5 rounded-xl border border-blue-200 bg-blue-50/70 mb-2">
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
+              <i class="fa-solid fa-user-shield"></i>
+            </span>
+            <div class="min-w-0">
+              <div class="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 truncate">
+                <span id="addSelectedRoleName">{% if company_roles %}{{ company_roles.0.name }}{% else %}No Role Configured{% endif %}</span>
+                <span id="addSelectedRoleBadge" class="text-[9px] px-1.5 py-0.2 rounded font-bold {% if company_roles.0.is_system %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                  {% if company_roles.0.is_system %}System Admin{% else %}Custom Role{% endif %}
+                </span>
+              </div>
+              <div class="text-[10px] text-slate-500 truncate" id="addSelectedRoleDesc">
+                {% if company_roles %}{{ company_roles.0.description|default:"Organizational role permissions" }}{% endif %}
+              </div>
+            </div>
+          </div>
+          <button type="button" onclick="focusAddRoleSearch()" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 shrink-0 ml-2 hover:underline">
+            Change
+          </button>
+        </div>
+
+        <!-- Role Search Input Field -->
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </span>
+          <input 
+            type="text" 
+            id="addRoleSearchInput" 
+            onfocus="showAddRoleDropdown()" 
+            onkeyup="filterAddRoles(this.value)" 
+            placeholder="Type to search roles (e.g. Sales, Admin, Visitors)..." 
+            autocomplete="off"
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-8 py-2 text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white transition text-slate-800"
+          >
+          <button 
+            type="button" 
+            onclick="toggleAddRoleDropdown()" 
+            class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+          >
+            <i class="fa-solid fa-chevron-down text-xs transition duration-200" id="addRoleChevron"></i>
+          </button>
+        </div>
+
+        <!-- Role Dropdown List -->
+        <div id="addRoleDropdownList" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100 custom-scrollbar">
+          {% for r in company_roles %}
+          <div 
+            onclick="selectAddRole('{{ r.id }}', '{{ r.name|escapejs }}', '{{ r.description|default:''|escapejs }}', {% if r.is_system %}true{% else %}false{% endif %})"
+            class="add-role-option p-2.5 hover:bg-blue-50 cursor-pointer transition flex items-center justify-between"
+            data-role-name="{{ r.name|lower }}"
+            data-role-desc="{{ r.description|default:''|lower }}"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg {% if r.is_system %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %} flex items-center justify-center text-[10px] font-bold shrink-0">
+                <i class="fa-solid {% if r.is_system %}fa-crown{% else %}fa-user-shield{% endif %}"></i>
+              </span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
+                  <span>{{ r.name }}</span>
+                  {% if r.is_system %}
+                    <span class="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-purple-100 text-purple-700">System Admin</span>
+                  {% else %}
+                    <span class="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-blue-100 text-blue-700">Custom</span>
+                  {% endif %}
+                </div>
+                {% if r.description %}
+                  <div class="text-[10px] text-slate-400 truncate">{{ r.description }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <span class="text-[10px] text-blue-600 font-bold ml-2 shrink-0">Select &rarr;</span>
+          </div>
+          {% empty %}
+          <div class="p-4 text-center text-slate-400 text-xs">
+            No roles configured. Create roles under <a href="{% url 'seller-roles-web' %}" class="text-blue-600 font-bold underline">Roles & Responsibilities</a>.
+          </div>
+          {% endfor %}
+          <div id="addRoleNoMatch" class="hidden p-4 text-center text-slate-400 text-xs">
+            No roles match your search.
+          </div>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1">Search & select from roles created under Roles &amp; Responsibilities.</p>
+      </div>
+
+      <!-- Account Status -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <label class="flex items-center gap-2.5 cursor-pointer text-xs text-slate-700 font-medium select-none">
           <input 
             type="checkbox" 
             name="is_active" 
             checked 
             class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
           >
-          <span>Active Account (<code class="text-[10px] text-slate-500">is_active = True</code>)</span>
+          <span>Account Status: <strong class="text-emerald-700">Active</strong> (User can log in immediately)</span>
         </label>
+        <input type="hidden" name="is_email_verified" value="1">
       </div>
 
       <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
@@ -606,38 +634,111 @@
         </div>
       </div>
 
-      <!-- Company Role -->
-      <div>
-        <label class="block text-xs font-semibold text-slate-700 mb-1">Company Role</label>
-        <select name="role_id" id="editMemberRole" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+      <!-- Searchable Role Field (Edit) -->
+      <div class="relative" id="editRoleComboboxContainer">
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Company Role <span class="text-rose-500">*</span>
+          <span class="text-[10px] font-normal text-slate-400 lowercase">(from Roles & Responsibilities)</span>
+        </label>
+
+        <!-- Hidden input storing chosen role ID -->
+        <input type="hidden" name="role_id" id="editMemberRoleId" required>
+
+        <!-- Selected Role Display Card -->
+        <div id="editSelectedRoleCard" class="flex items-center justify-between p-2.5 rounded-xl border border-blue-200 bg-blue-50/70 mb-2">
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-xs">
+              <i class="fa-solid fa-user-shield"></i>
+            </span>
+            <div class="min-w-0">
+              <div class="text-xs font-extrabold text-slate-900 flex items-center gap-1.5 truncate">
+                <span id="editSelectedRoleName">Loading...</span>
+                <span id="editSelectedRoleBadge" class="text-[9px] px-1.5 py-0.2 rounded font-bold bg-blue-100 text-blue-700">Custom Role</span>
+              </div>
+              <div class="text-[10px] text-slate-500 truncate" id="editSelectedRoleDesc"></div>
+            </div>
+          </div>
+          <button type="button" onclick="focusEditRoleSearch()" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 shrink-0 ml-2 hover:underline">
+            Change
+          </button>
+        </div>
+
+        <!-- Role Search Input Field -->
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </span>
+          <input 
+            type="text" 
+            id="editRoleSearchInput" 
+            onfocus="showEditRoleDropdown()" 
+            onkeyup="filterEditRoles(this.value)" 
+            placeholder="Type to search & change assigned role..." 
+            autocomplete="off"
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-8 py-2 text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white transition text-slate-800"
+          >
+          <button 
+            type="button" 
+            onclick="toggleEditRoleDropdown()" 
+            class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+          >
+            <i class="fa-solid fa-chevron-down text-xs transition duration-200" id="editRoleChevron"></i>
+          </button>
+        </div>
+
+        <!-- Role Dropdown List -->
+        <div id="editRoleDropdownList" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100 custom-scrollbar">
           {% for r in company_roles %}
-            <option value="{{ r.id }}">{{ r.name }}{% if r.is_system %} (System Admin){% endif %}</option>
+          <div 
+            onclick="selectEditRole('{{ r.id }}', '{{ r.name|escapejs }}', '{{ r.description|default:''|escapejs }}', {% if r.is_system %}true{% else %}false{% endif %})"
+            class="edit-role-option p-2.5 hover:bg-blue-50 cursor-pointer transition flex items-center justify-between"
+            data-role-name="{{ r.name|lower }}"
+            data-role-desc="{{ r.description|default:''|lower }}"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg {% if r.is_system %}bg-purple-100 text-purple-700{% else %}bg-blue-100 text-blue-700{% endif %} flex items-center justify-center text-[10px] font-bold shrink-0">
+                <i class="fa-solid {% if r.is_system %}fa-crown{% else %}fa-user-shield{% endif %}"></i>
+              </span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
+                  <span>{{ r.name }}</span>
+                  {% if r.is_system %}
+                    <span class="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-purple-100 text-purple-700">System Admin</span>
+                  {% else %}
+                    <span class="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-blue-100 text-blue-700">Custom</span>
+                  {% endif %}
+                </div>
+                {% if r.description %}
+                  <div class="text-[10px] text-slate-400 truncate">{{ r.description }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <span class="text-[10px] text-blue-600 font-bold ml-2 shrink-0">Select &rarr;</span>
+          </div>
+          {% empty %}
+          <div class="p-4 text-center text-slate-400 text-xs">
+            No roles configured.
+          </div>
           {% endfor %}
-        </select>
-        <p class="text-[10px] text-slate-400 mt-1">Role rights are managed under Seller &rarr; Roles &amp; Responsibilities.</p>
+          <div id="editRoleNoMatch" class="hidden p-4 text-center text-slate-400 text-xs">
+            No roles match your search.
+          </div>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-1">Assign any role created under Roles &amp; Responsibilities.</p>
       </div>
 
-      <!-- Active & Verified Status -->
-      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
+      <!-- Account Status -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <label class="flex items-center gap-2.5 cursor-pointer text-xs text-slate-700 font-medium select-none">
           <input 
             type="checkbox" 
             name="is_active" 
             id="editIsActive"
             class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
           >
-          <span>Account Active (<code class="text-[10px] text-slate-500">is_active</code>)</span>
+          <span>Account Status: <strong class="text-slate-800">Active</strong> (Allows system sign-in and module access)</span>
         </label>
-
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-700 font-medium">
-          <input 
-            type="checkbox" 
-            name="is_email_verified" 
-            id="editIsEmailVerified"
-            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
-          >
-          <span>Email Verified (<code class="text-[10px] text-slate-500">is_email_verified</code>)</span>
-        </label>
+        <input type="hidden" name="is_email_verified" id="editIsEmailVerified" value="1">
       </div>
 
       <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
@@ -655,6 +756,7 @@
 
 
 <script>
+  // Password Visibility Toggles
   function toggleNewMemberPasswordVisibility() {
     const input = document.getElementById('newMemberPassword');
     const icon = document.getElementById('newMemberPasswordIcon');
@@ -685,15 +787,147 @@
     }
   }
 
-  function openEditUserModal(memberId, email, firstName, lastName, phone, roleId, isActive, isEmailVerified) {
+  // Add Role Combobox Handlers
+  function showAddRoleDropdown() {
+    document.getElementById('addRoleDropdownList')?.classList.remove('hidden');
+    document.getElementById('addRoleChevron')?.classList.add('rotate-180');
+  }
+  function hideAddRoleDropdown() {
+    document.getElementById('addRoleDropdownList')?.classList.add('hidden');
+    document.getElementById('addRoleChevron')?.classList.remove('rotate-180');
+  }
+  function toggleAddRoleDropdown() {
+    const dd = document.getElementById('addRoleDropdownList');
+    if (!dd) return;
+    if (dd.classList.contains('hidden')) {
+      showAddRoleDropdown();
+      document.getElementById('addRoleSearchInput')?.focus();
+    } else {
+      hideAddRoleDropdown();
+    }
+  }
+  function filterAddRoles(query) {
+    showAddRoleDropdown();
+    const q = (query || '').toLowerCase().trim();
+    const options = document.querySelectorAll('#addRoleDropdownList .add-role-option');
+    let matchCount = 0;
+    options.forEach(opt => {
+      const name = opt.getAttribute('data-role-name') || '';
+      const desc = opt.getAttribute('data-role-desc') || '';
+      if (!q || name.includes(q) || desc.includes(q)) {
+        opt.style.display = '';
+        matchCount++;
+      } else {
+        opt.style.display = 'none';
+      }
+    });
+    const noMatch = document.getElementById('addRoleNoMatch');
+    if (noMatch) {
+      noMatch.classList.toggle('hidden', matchCount > 0);
+    }
+  }
+  function selectAddRole(roleId, roleName, roleDesc, isSystem) {
+    const roleIdInput = document.getElementById('addMemberRoleId');
+    if (roleIdInput) roleIdInput.value = roleId;
+    const nameEl = document.getElementById('addSelectedRoleName');
+    if (nameEl) nameEl.textContent = roleName;
+    const descEl = document.getElementById('addSelectedRoleDesc');
+    if (descEl) descEl.textContent = roleDesc || (isSystem ? 'Full administrative access' : 'Custom organizational role');
+    const badgeEl = document.getElementById('addSelectedRoleBadge');
+    if (badgeEl) {
+      badgeEl.textContent = isSystem ? 'System Admin' : 'Custom Role';
+      badgeEl.className = `text-[9px] px-1.5 py-0.2 rounded font-bold ${isSystem ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`;
+    }
+    const searchInput = document.getElementById('addRoleSearchInput');
+    if (searchInput) searchInput.value = '';
+    filterAddRoles('');
+    hideAddRoleDropdown();
+  }
+  function focusAddRoleSearch() {
+    showAddRoleDropdown();
+    document.getElementById('addRoleSearchInput')?.focus();
+  }
+
+  // Edit Role Combobox Handlers
+  function showEditRoleDropdown() {
+    document.getElementById('editRoleDropdownList')?.classList.remove('hidden');
+    document.getElementById('editRoleChevron')?.classList.add('rotate-180');
+  }
+  function hideEditRoleDropdown() {
+    document.getElementById('editRoleDropdownList')?.classList.add('hidden');
+    document.getElementById('editRoleChevron')?.classList.remove('rotate-180');
+  }
+  function toggleEditRoleDropdown() {
+    const dd = document.getElementById('editRoleDropdownList');
+    if (!dd) return;
+    if (dd.classList.contains('hidden')) {
+      showEditRoleDropdown();
+      document.getElementById('editRoleSearchInput')?.focus();
+    } else {
+      hideEditRoleDropdown();
+    }
+  }
+  function filterEditRoles(query) {
+    showEditRoleDropdown();
+    const q = (query || '').toLowerCase().trim();
+    const options = document.querySelectorAll('#editRoleDropdownList .edit-role-option');
+    let matchCount = 0;
+    options.forEach(opt => {
+      const name = opt.getAttribute('data-role-name') || '';
+      const desc = opt.getAttribute('data-role-desc') || '';
+      if (!q || name.includes(q) || desc.includes(q)) {
+        opt.style.display = '';
+        matchCount++;
+      } else {
+        opt.style.display = 'none';
+      }
+    });
+    const noMatch = document.getElementById('editRoleNoMatch');
+    if (noMatch) {
+      noMatch.classList.toggle('hidden', matchCount > 0);
+    }
+  }
+  function selectEditRole(roleId, roleName, roleDesc, isSystem) {
+    const roleIdInput = document.getElementById('editMemberRoleId');
+    if (roleIdInput) roleIdInput.value = roleId;
+    const nameEl = document.getElementById('editSelectedRoleName');
+    if (nameEl) nameEl.textContent = roleName;
+    const descEl = document.getElementById('editSelectedRoleDesc');
+    if (descEl) descEl.textContent = roleDesc || (isSystem ? 'Full administrative access' : 'Custom organizational role');
+    const badgeEl = document.getElementById('editSelectedRoleBadge');
+    if (badgeEl) {
+      badgeEl.textContent = isSystem ? 'System Admin' : 'Custom Role';
+      badgeEl.className = `text-[9px] px-1.5 py-0.2 rounded font-bold ${isSystem ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`;
+    }
+    const searchInput = document.getElementById('editRoleSearchInput');
+    if (searchInput) searchInput.value = '';
+    filterEditRoles('');
+    hideEditRoleDropdown();
+  }
+  function focusEditRoleSearch() {
+    showEditRoleDropdown();
+    document.getElementById('editRoleSearchInput')?.focus();
+  }
+
+  // Open Edit User Modal with details
+  function openEditUserModal(memberId, email, firstName, lastName, phone, roleId, roleName, roleDesc, isActive, isEmailVerified) {
     document.getElementById('editMemberId').value = memberId;
     document.getElementById('editModalUserEmail').innerText = 'User: ' + email;
     document.getElementById('editFirstName').value = firstName || '';
     document.getElementById('editLastName').value = lastName || '';
     document.getElementById('editPhone').value = phone || '';
-    if (roleId) {
-      document.getElementById('editMemberRole').value = roleId;
+
+    // Set role in combobox
+    document.getElementById('editMemberRoleId').value = roleId || '';
+    document.getElementById('editSelectedRoleName').textContent = roleName || 'No Role Assigned';
+    document.getElementById('editSelectedRoleDesc').textContent = roleDesc || 'Roles created under Roles & Responsibilities';
+    const isSystemRole = (roleName || '').toLowerCase().includes('admin');
+    const badgeEl = document.getElementById('editSelectedRoleBadge');
+    if (badgeEl) {
+      badgeEl.textContent = isSystemRole ? 'System Admin' : 'Custom Role';
+      badgeEl.className = `text-[9px] px-1.5 py-0.2 rounded font-bold ${isSystemRole ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`;
     }
+
     document.getElementById('editIsActive').checked = Boolean(isActive);
     document.getElementById('editIsEmailVerified').checked = Boolean(isEmailVerified);
     document.getElementById('editMemberPassword').value = '';
@@ -701,10 +935,27 @@
     document.getElementById('editMemberModal').classList.remove('hidden');
   }
 
+  // Clear search input
+  function clearUserSearch() {
+    const input = document.getElementById('userSearchInput');
+    if (input) {
+      input.value = '';
+      filterUsers();
+      input.focus();
+    }
+  }
+
+  // Filter Users Table
   function filterUsers() {
-    const searchVal = document.getElementById('userSearchInput').value.toLowerCase().trim();
-    const roleVal = (document.getElementById('roleFilter').value || 'ALL').toLowerCase();
-    const statusVal = document.getElementById('statusFilter').value;
+    const searchInput = document.getElementById('userSearchInput');
+    const searchVal = (searchInput?.value || '').toLowerCase().trim();
+    const roleVal = (document.getElementById('roleFilter')?.value || 'ALL').toLowerCase();
+    const statusVal = document.getElementById('statusFilter')?.value || 'ALL';
+
+    const clearBtn = document.getElementById('clearUserSearchBtn');
+    if (clearBtn) {
+      clearBtn.classList.toggle('hidden', !searchVal);
+    }
 
     const rows = document.querySelectorAll('.user-row');
     let visibleCount = 0;
@@ -712,10 +963,15 @@
     rows.forEach(row => {
       const email = (row.getAttribute('data-email') || '').toLowerCase();
       const name = (row.getAttribute('data-name') || '').toLowerCase();
+      const phone = (row.getAttribute('data-phone') || '').toLowerCase();
       const role = (row.getAttribute('data-role') || '').toLowerCase();
       const status = row.getAttribute('data-status') || '';
 
-      const matchesSearch = !searchVal || email.includes(searchVal) || name.includes(searchVal);
+      const matchesSearch = !searchVal || 
+                            email.includes(searchVal) || 
+                            name.includes(searchVal) || 
+                            phone.includes(searchVal) || 
+                            role.includes(searchVal);
       const matchesRole = (roleVal === 'all') || (role === roleVal);
       const matchesStatus = (statusVal === 'ALL') || (status === statusVal);
 
@@ -727,14 +983,34 @@
       }
     });
 
+    const badge = document.getElementById('userCountBadge');
+    if (badge) {
+      badge.textContent = visibleCount;
+    }
+
     const noMatch = document.getElementById('noMatchMessage');
     if (noMatch) {
-      if (visibleCount === 0) {
-        noMatch.classList.remove('hidden');
-      } else {
-        noMatch.classList.add('hidden');
-      }
+      noMatch.classList.toggle('hidden', visibleCount > 0);
     }
   }
+
+  // Dismiss dropdowns on outside click or Escape
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('addRoleComboboxContainer')?.contains(e.target)) {
+      hideAddRoleDropdown();
+    }
+    if (!document.getElementById('editRoleComboboxContainer')?.contains(e.target)) {
+      hideEditRoleDropdown();
+    }
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      hideAddRoleDropdown();
+      hideEditRoleDropdown();
+      document.getElementById('addMemberModal')?.classList.add('hidden');
+      document.getElementById('editMemberModal')?.classList.add('hidden');
+    }
+  });
 </script>
 {% endblock %}

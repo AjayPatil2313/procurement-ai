@@ -88,39 +88,59 @@
     <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
       <div class="flex items-center gap-2">
         <span class="text-xs font-bold text-slate-700">All Defined Roles</span>
-        <span class="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600">{{ roles|length }}</span>
+        <span id="roleCountBadge" class="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700">{{ roles|length }}</span>
       </div>
 
-      <div class="w-full sm:w-72 relative">
+      <div class="w-full sm:w-80 relative">
         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
           <i class="fa-solid fa-magnifying-glass"></i>
         </span>
         <input 
           type="text" 
           id="roleTableSearch" 
-          placeholder="Search role name or permissions..." 
-          class="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          oninput="filterRolesTable(this.value)"
+          placeholder="Search roles, modules, or codes (e.g. Products, R, E)..." 
+          class="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
         >
+        <button 
+          type="button" 
+          id="clearRoleSearchBtn" 
+          onclick="clearRoleSearch()" 
+          class="hidden absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 transition"
+          title="Clear search"
+        >
+          <i class="fa-solid fa-circle-xmark text-xs"></i>
+        </button>
       </div>
     </div>
 
     <!-- Table -->
     <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs" id="rolesTable">
+      <table class="w-full text-left text-xs min-w-[760px]" id="rolesTable">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-3 px-4 w-16 text-center">SR NO</th>
-            <th class="py-3 px-4 min-w-[160px]">ROLE NAME</th>
-            <th class="py-3 px-4">MODULE PERMISSIONS</th>
-            <th class="py-3 px-4 min-w-[150px] whitespace-nowrap">CREATE DATE</th>
-            <th class="py-3 px-4 text-right w-28">ACTIONS</th>
+            <th class="py-3 px-4 w-14 text-center whitespace-nowrap">SR NO</th>
+            <th class="py-3 px-4 w-60 min-w-[200px] whitespace-nowrap">ROLE NAME</th>
+            <th class="py-3 px-4 min-w-[340px]">MODULE PERMISSIONS</th>
+            <th class="py-3 px-4 w-44 min-w-[140px] whitespace-nowrap">CREATE DATE</th>
+            <th class="py-3 px-4 text-right w-28 whitespace-nowrap">ACTIONS</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for r in roles_data %}
-          <tr class="role-row hover:bg-slate-50/70 transition" data-name="{{ r.role.name|lower }}">
+          <tr class="role-row hover:bg-slate-50/70 transition" 
+              id="role-row-{{ r.role.id }}" 
+              data-name="{{ r.role.name|lower }}"
+              data-role-id="{{ r.role.id }}"
+              data-role-name="{{ r.role.name|escape }}"
+              data-role-desc="{{ r.role.description|default:''|escape }}"
+              data-is-system="{% if r.role.is_system %}1{% else %}0{% endif %}"
+              data-search="{{ r.role.name|lower }} {{ r.role.description|default:''|lower }} {% for perm in r.summary %}{{ perm.module_name|lower }} {{ perm.action_codes|lower }} {{ perm.actions|lower }} {% endfor %}">
+            
+            <script type="application/json" id="role-perms-{{ r.role.id }}">{{ r.perms_json|safe }}</script>
+
             <!-- SR NO -->
-            <td class="py-3.5 px-4 text-center font-bold text-slate-400">
+            <td class="py-3.5 px-4 text-center font-bold text-slate-400 whitespace-nowrap">
               {{ forloop.counter }}
             </td>
 
@@ -131,7 +151,7 @@
                   {{ r.role.name }}
                 </span>
                 {% if r.role.is_system %}
-                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-700 border border-blue-200 shrink-0">
                     System
                   </span>
                 {% endif %}
@@ -153,7 +173,7 @@
                   {% for perm in r.summary %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold {% cycle 'bg-rose-50 text-rose-700 border border-rose-200' 'bg-blue-50 text-blue-700 border border-blue-200' 'bg-purple-50 text-purple-700 border border-purple-200' 'bg-amber-50 text-amber-700 border border-amber-200' 'bg-emerald-50 text-emerald-700 border border-emerald-200' 'bg-indigo-50 text-indigo-700 border border-indigo-200' %}">
                       <span class="font-bold">{{ perm.module_name }}</span>
-                      <span class="font-normal opacity-80 ml-1">({{ perm.actions }})</span>
+                      <span class="font-bold text-[10px] opacity-90 ml-1">({{ perm.action_codes|default:perm.actions }})</span>
                     </span>
                   {% empty %}
                     <span class="text-slate-400 italic text-[11px]">No module permissions configured</span>
@@ -171,8 +191,8 @@
             <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1">
               <button 
                 type="button" 
-                onclick="openEditRoleModal('{{ r.role.id }}', '{{ r.role.name|escapejs }}', '{{ r.role.description|escapejs }}', {{ r.perms_json|safe }})"
-                class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                onclick="openEditRoleModal('{{ r.role.id }}')"
+                class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                 title="Edit Role & Permissions"
               >
                 <i class="fa-solid fa-pen-to-square text-xs"></i>
@@ -207,13 +227,24 @@
             </td>
           </tr>
           {% endfor %}
+
+          <!-- No Match Empty State Row -->
+          <tr id="noRolesMatchRow" class="hidden">
+            <td colspan="5" class="py-10 text-center text-slate-400">
+              <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-base mx-auto mb-2">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </div>
+              <p class="font-bold text-slate-700 text-xs">No matching roles found</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">Try searching with a different role name or permission code.</p>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
 
     <!-- Table Footer -->
     <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 bg-slate-50/50">
-      <div>Showing 1 to {{ roles|length }} of {{ roles|length }} entries</div>
+      <div id="roleFooterCount">Showing 1 to {{ roles|length }} of {{ roles|length }} entries</div>
       <div class="text-[11px] text-slate-400 font-medium">
         Changes apply immediately across all assigned user sessions.
       </div>
@@ -529,17 +560,60 @@
 {% block extra_scripts %}
 <script>
 // Search Filter on Roles Table
-document.getElementById('roleTableSearch')?.addEventListener('input', function() {
-  const query = (this.value || '').trim().toLowerCase();
+function filterRolesTable(val) {
+  const query = (val || '').trim().toLowerCase();
   const rows = document.querySelectorAll('#rolesTable .role-row');
+  const totalCount = rows.length;
+  let matchCount = 0;
+
   rows.forEach(row => {
-    const text = row.textContent.toLowerCase();
-    row.style.display = (!query || text.includes(query)) ? '' : 'none';
+    const searchData = (row.getAttribute('data-search') || row.textContent).toLowerCase();
+    const isMatch = !query || searchData.includes(query);
+    row.style.display = isMatch ? '' : 'none';
+    if (isMatch) matchCount++;
   });
+
+  const clearBtn = document.getElementById('clearRoleSearchBtn');
+  if (clearBtn) {
+    clearBtn.classList.toggle('hidden', !query);
+  }
+
+  const noMatchRow = document.getElementById('noRolesMatchRow');
+  if (noMatchRow) {
+    noMatchRow.classList.toggle('hidden', matchCount > 0);
+  }
+
+  const badge = document.getElementById('roleCountBadge');
+  if (badge) {
+    badge.textContent = query ? `${matchCount} of ${totalCount}` : totalCount;
+  }
+
+  const footerCount = document.getElementById('roleFooterCount');
+  if (footerCount) {
+    footerCount.textContent = query 
+      ? `Showing ${matchCount} of ${totalCount} entries (filtered)` 
+      : `Showing 1 to ${totalCount} of ${totalCount} entries`;
+  }
+}
+
+function clearRoleSearch() {
+  const input = document.getElementById('roleTableSearch');
+  if (input) {
+    input.value = '';
+    filterRolesTable('');
+    input.focus();
+  }
+}
+
+document.getElementById('roleTableSearch')?.addEventListener('input', function() {
+  filterRolesTable(this.value);
 });
 
 // Add Role Modal Handlers
 function openAddRoleModal() {
+  const form = document.querySelector('#addRoleModal form');
+  if (form) form.reset();
+  toggleAllMatrix('add', false);
   document.getElementById('addRoleModal').classList.remove('hidden');
 }
 function closeAddRoleModal() {
@@ -547,15 +621,39 @@ function closeAddRoleModal() {
 }
 
 // Edit Role Modal Handlers
-function openEditRoleModal(roleId, roleName, roleDesc, permsMap) {
+function openEditRoleModal(roleId) {
+  const row = document.getElementById(`role-row-${roleId}`);
+  const roleName = row ? (row.getAttribute('data-role-name') || '') : '';
+  const roleDesc = row ? (row.getAttribute('data-role-desc') || '') : '';
+  const isSystem = row ? (row.getAttribute('data-is-system') === '1') : false;
+
   const form = document.getElementById('editRoleForm');
   form.action = `/sales/roles/${roleId}/edit/`;
-  document.getElementById('editRoleName').value = roleName;
-  document.getElementById('editRoleDescription').value = roleDesc || '';
+
+  const nameInput = document.getElementById('editRoleName');
+  nameInput.value = roleName;
+  nameInput.readOnly = isSystem;
+  if (isSystem) {
+    nameInput.classList.add('bg-slate-100', 'cursor-not-allowed');
+  } else {
+    nameInput.classList.remove('bg-slate-100', 'cursor-not-allowed');
+  }
+
+  document.getElementById('editRoleDescription').value = roleDesc;
   document.getElementById('editModalTitle').textContent = `Edit Role: ${roleName}`;
 
   // Reset all edit checkboxes
   document.querySelectorAll('.edit-cb').forEach(cb => cb.checked = false);
+
+  const dataScript = document.getElementById(`role-perms-${roleId}`);
+  let permsMap = {};
+  if (dataScript) {
+    try {
+      permsMap = JSON.parse(dataScript.textContent);
+    } catch (e) {
+      console.error("Error parsing role permissions:", e);
+    }
+  }
 
   // Populate from permsMap
   if (permsMap && typeof permsMap === 'object') {

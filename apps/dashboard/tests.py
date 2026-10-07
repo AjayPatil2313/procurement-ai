@@ -2255,7 +2255,7 @@ class LeadCRMandRFQWorkflowTestCase(TestCase):
         # 3. View detail again and verify price history table appears
         resp_detail2 = self.client.get(reverse("inquiry-detail", args=[inquiry.id]))
         self.assertContains(resp_detail2, "4150000.00")
-        self.assertContains(resp_detail2, "REPLIED")
+        self.assertContains(resp_detail2, "Replied")
 
     def test_resend_and_delete_inquiry(self):
         """Buyer can resend follow-up RFQ and delete inquiry"""
@@ -2418,6 +2418,133 @@ class SellerRolesAndTeamManagementTestCase(TestCase):
         resp = self.client.post(reverse("seller-role-delete", args=[admin_role.id]))
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(CompanyRole.objects.filter(id=admin_role.id).exists())
+
+    def test_edit_custom_role_and_delete_custom_role(self):
+        """Admin can edit custom role permissions and delete custom role"""
+        from apps.companies.models import CompanyRole, RolePermission
+        self.client.login(email="admin@apexdynamics.com", password="Password@123")
+        
+        # Create a custom role
+        custom_role = CompanyRole.objects.create(
+            company=self.company,
+            name="Junior Salesman",
+            description="Junior rep duties",
+            is_system=False,
+        )
+        RolePermission.objects.create(
+            role=custom_role,
+            module="products",
+            can_read=True,
+            can_write=False,
+        )
+
+        # 1. Edit the role
+        edit_data = {
+            "name": "Senior Salesman",
+            "description": "Senior rep duties and catalogs",
+            "perm_products_read": "1",
+            "perm_products_write": "1",
+            "perm_products_edit": "1",
+        }
+        resp = self.client.post(reverse("seller-role-edit", args=[custom_role.id]), data=edit_data)
+        self.assertEqual(resp.status_code, 302)
+
+        custom_role.refresh_from_db()
+        self.assertEqual(custom_role.name, "Senior Salesman")
+        self.assertEqual(custom_role.description, "Senior rep duties and catalogs")
+        prod_perm = RolePermission.objects.get(role=custom_role, module="products")
+        self.assertTrue(prod_perm.can_read)
+        self.assertTrue(prod_perm.can_write)
+        self.assertTrue(prod_perm.can_edit)
+
+        # Verify page renders the row with role-perms script tag safely
+        resp_web = self.client.get(reverse("seller-roles-web"))
+        self.assertEqual(resp_web.status_code, 200)
+        self.assertContains(resp_web, f'id="role-perms-{custom_role.id}"')
+        self.assertContains(resp_web, f"openEditRoleModal('{custom_role.id}')")
+
+        # 2. Delete the custom role
+        resp_del = self.client.post(reverse("seller-role-delete", args=[custom_role.id]))
+        self.assertEqual(resp_del.status_code, 302)
+        self.assertFalse(CompanyRole.objects.filter(id=custom_role.id).exists())
+
+    def test_team_page_clean_layout_and_user_deletion(self):
+        """Team page has clean layout without old RBAC banner, searchable role combobox, and delete action"""
+        from apps.companies.models import CompanyRole
+        self.client.login(email="admin@apexdynamics.com", password="Password@123")
+        self.client.get(reverse("seller-roles-web")) # seed roles
+
+        # 1. Verify team page clean layout
+        resp = self.client.get(reverse("company-team-web"))
+        self.assertEqual(resp.status_code, 200)
+        # Old RBAC banner should NOT be present
+        self.assertNotContains(resp, "Role-Based Access Control (RBAC)")
+        # Old Assigned Permissions column header should NOT be present
+        self.assertNotContains(resp, '<th class="py-3 px-4">Assigned Permissions</th>')
+        # Searchable role combobox components should be present
+        self.assertContains(resp, 'id="addRoleComboboxContainer"')
+        self.assertContains(resp, 'id="addRoleSearchInput"')
+        self.assertContains(resp, 'id="editRoleComboboxContainer"')
+        self.assertContains(resp, 'id="editRoleSearchInput"')
+
+        # 2. Create user with custom role
+        visitor_role = CompanyRole.objects.create(
+            company=self.company,
+            name="Visitors",
+            description="Guest account view only",
+            is_system=False,
+        )
+        add_data = {
+            "action": "add_member",
+            "email": "visitor@apexdynamics.com",
+            "password": "Password@123",
+            "first_name": "Test",
+            "last_name": "Visitor",
+            "phone": "+91 9123456789",
+            "role_id": visitor_role.id,
+            "is_active": "on",
+            "is_email_verified": "on",
+        }
+        resp_add = self.client.post(reverse("company-team-web"), data=add_data)
+        self.assertEqual(resp_add.status_code, 302)
+        
+        member = CompanyMember.objects.get(company=self.company, user__email="visitor@apexdynamics.com")
+        self.assertEqual(member.custom_role, visitor_role)
+
+        # 3. Edit user to assign different role
+        admin_role = CompanyRole.objects.get(company=self.company, is_system=True)
+        edit_data = {
+            "action": "edit_member",
+            "member_id": member.id,
+            "first_name": "Test",
+            "last_name": "Upgraded",
+            "phone": "+91 9123456789",
+            "role_id": admin_role.id,
+            "is_active": "on",
+            "is_email_verified": "on",
+        }
+        resp_edit = self.client.post(reverse("company-team-web"), data=edit_data)
+        self.assertEqual(resp_edit.status_code, 302)
+        member.refresh_from_db()
+        self.assertEqual(member.custom_role, admin_role)
+        self.assertEqual(member.role, CompanyMember.Role.ADMIN)
+
+        # 4. Self deletion protection
+        self_del_resp = self.client.post(reverse("company-team-web"), data={
+            "action": "delete_member",
+            "member_id": self.admin_member.id,
+        })
+        self.assertEqual(self_del_resp.status_code, 302)
+        self.assertTrue(CompanyMember.objects.filter(id=self.admin_member.id).exists())
+
+        # 5. Delete member
+        del_resp = self.client.post(reverse("company-team-web"), data={
+            "action": "delete_member",
+            "member_id": member.id,
+        })
+        self.assertEqual(del_resp.status_code, 302)
+        self.assertFalse(CompanyMember.objects.filter(id=member.id).exists())
+
 
 
 
