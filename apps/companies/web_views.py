@@ -1,12 +1,159 @@
+import json
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from apps.companies.models import Company, CompanyMember, CompanyPermission, MemberPermission
+from apps.companies.models import (
+    Company,
+    CompanyMember,
+    CompanyPermission,
+    MemberPermission,
+    CompanyRole,
+    RolePermission,
+)
 from apps.companies.rbac import get_user_rbac_context, company_admin_required, ensure_default_permissions
 from apps.accounts.models import User
 from apps.billing.models import Subscription, CreditTransaction
+
+
+def ensure_company_default_roles(company):
+    """
+    Ensures standard organizational roles exist for the company:
+    1. Admin (System) - Full administrative access
+    2. Sales Manager - Full CRUD on seller & CRM modules
+    3. Sales Executive - Operational read/write on discovery & proposals
+    """
+    if not company:
+        return
+    admin_role, created = CompanyRole.objects.get_or_create(
+        company=company,
+        name="Admin",
+        defaults={
+            "description": "Full administrative access across all platform modules and settings.",
+            "is_system": True,
+        },
+    )
+    if created or not admin_role.module_permissions.exists():
+        admin_role.is_system = True
+        admin_role.save(update_fields=["is_system"])
+        for mod in RolePermission.MODULE_TITLES.keys():
+            RolePermission.objects.update_or_create(
+                role=admin_role,
+                module=mod,
+                defaults={
+                    "can_read": True,
+                    "can_write": True,
+                    "can_edit": True,
+                    "can_delete": True,
+                    "can_admin": True,
+                },
+            )
+
+    mgr_role, m_created = CompanyRole.objects.get_or_create(
+        company=company,
+        name="Sales Manager",
+        defaults={
+            "description": "Supervises sales catalog, lead generation, customer proposals, and CRM pipeline.",
+            "is_system": False,
+        },
+    )
+    if m_created or not mgr_role.module_permissions.exists():
+        seller_mods = [
+            "products",
+            "find_buyers",
+            "leads",
+            "saved_buyers",
+            "inquiries",
+            "export_reports",
+            "team",
+            "company_profile",
+        ]
+        for mod in RolePermission.MODULE_TITLES.keys():
+            is_active = mod in seller_mods
+            RolePermission.objects.update_or_create(
+                role=mgr_role,
+                module=mod,
+                defaults={
+                    "can_read": is_active,
+                    "can_write": is_active,
+                    "can_edit": is_active,
+                    "can_delete": is_active and mod in ["products", "leads", "saved_buyers", "inquiries"],
+                    "can_admin": False,
+                },
+            )
+
+    exec_role, e_created = CompanyRole.objects.get_or_create(
+        company=company,
+        name="Sales Executive",
+        defaults={
+            "description": "Executes lead discovery, pipeline outreach, and buyer quoting workflows.",
+            "is_system": False,
+        },
+    )
+    if e_created or not exec_role.module_permissions.exists():
+        exec_mods = ["products", "find_buyers", "leads", "saved_buyers", "inquiries", "export_reports"]
+        for mod in RolePermission.MODULE_TITLES.keys():
+            is_active = mod in exec_mods
+            RolePermission.objects.update_or_create(
+                role=exec_role,
+                module=mod,
+                defaults={
+                    "can_read": is_active,
+                    "can_write": is_active and mod in ["find_buyers", "saved_buyers", "inquiries"],
+                    "can_edit": is_active and mod in ["saved_buyers", "inquiries"],
+                    "can_delete": False,
+                    "can_admin": False,
+                },
+            )
+
+    # Backfill any existing members who lack a custom_role
+    for m in CompanyMember.objects.filter(company=company, custom_role__isnull=True):
+        if m.role == CompanyMember.Role.ADMIN:
+            m.custom_role = admin_role
+        else:
+            m.custom_role = exec_role
+        m.save(update_fields=["custom_role"])
+
+
+def sync_member_permissions_from_role(member, custom_role):
+    """
+    Synchronizes granular MemberPermission rows whenever a member's custom role is assigned or updated.
+    """
+    if not member or not custom_role:
+        return
+
+    MemberPermission.objects.filter(member=member).delete()
+
+    if custom_role.is_system or custom_role.name.lower() == "admin":
+        member.role = CompanyMember.Role.ADMIN
+        member.save(update_fields=["role", "custom_role"])
+        return
+
+    member.role = CompanyMember.Role.USER
+    member.save(update_fields=["role", "custom_role"])
+
+    for mp in custom_role.module_permissions.all():
+        actions = []
+        if mp.can_admin:
+            actions = ["READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"]
+        else:
+            if mp.can_read:
+                actions.append("READ")
+            if mp.can_write:
+                actions.append("EDIT")
+            if mp.can_edit:
+                actions.append("EDIT")
+            if mp.can_delete:
+                actions.append("DELETE")
+
+        for act in set(actions):
+            perm_obj, _ = CompanyPermission.objects.get_or_create(module=mp.module, permission=act)
+            MemberPermission.objects.get_or_create(member=member, permission=perm_obj)
+            if act == "READ":
+                gen_p, _ = CompanyPermission.objects.get_or_create(module="general", permission="READ")
+                MemberPermission.objects.get_or_create(member=member, permission=gen_p)
+
 
 
 @login_required
@@ -58,7 +205,10 @@ def company_team_web_view(request):
         messages.error(request, "Access restricted: Only Company Admin or Super Admin can manage team members.")
         return redirect("dashboard")
 
-    members = CompanyMember.objects.filter(company=company).select_related("user").order_by("-joined_at")
+    ensure_company_default_roles(company)
+
+    members = CompanyMember.objects.filter(company=company).select_related("user", "custom_role").prefetch_related("custom_role__module_permissions").order_by("-joined_at")
+    company_roles = list(CompanyRole.objects.filter(company=company).order_by("-is_system", "name"))
 
     # The 6 core permissions
     core_permissions = [
@@ -135,7 +285,20 @@ def company_team_web_view(request):
             first_name = request.POST.get("first_name", "").strip()
             last_name = request.POST.get("last_name", "").strip()
             phone = request.POST.get("phone", "").strip()
+            
+            # Roles from Roles & Responsibilities
+            role_id = request.POST.get("role_id")
             role = request.POST.get("role", CompanyMember.Role.USER)
+            chosen_role = None
+
+            if role_id:
+                chosen_role = CompanyRole.objects.filter(id=role_id, company=company).first()
+                if chosen_role:
+                    role = CompanyMember.Role.ADMIN if (chosen_role.is_system or chosen_role.name.lower() == "admin") else CompanyMember.Role.USER
+            elif role == CompanyMember.Role.ADMIN:
+                chosen_role = CompanyRole.objects.filter(company=company, is_system=True).first()
+            else:
+                chosen_role = CompanyRole.objects.filter(company=company, is_system=False).first()
             
             # Checkbox values
             is_email_verified = ("is_email_verified" in request.POST)
@@ -162,22 +325,26 @@ def company_team_web_view(request):
                     company=company,
                     user=user,
                     role=role,
+                    custom_role=chosen_role,
                     is_active=is_active,
                 )
                 
-                # Assign permissions
-                selected_perms = request.POST.getlist("permissions")
-                if role == CompanyMember.Role.USER:
-                    if selected_perms:
-                        for code in selected_perms:
-                            perm_obj, _ = CompanyPermission.objects.get_or_create(
-                                module="general",
-                                permission=code.strip().upper(),
-                            )
-                            MemberPermission.objects.get_or_create(member=new_member, permission=perm_obj)
-                    else:
-                        read_perm, _ = CompanyPermission.objects.get_or_create(module="general", permission="READ")
-                        MemberPermission.objects.get_or_create(member=new_member, permission=read_perm)
+                # Assign permissions based on role
+                if chosen_role:
+                    sync_member_permissions_from_role(new_member, chosen_role)
+                else:
+                    selected_perms = request.POST.getlist("permissions")
+                    if role == CompanyMember.Role.USER:
+                        if selected_perms:
+                            for code in selected_perms:
+                                perm_obj, _ = CompanyPermission.objects.get_or_create(
+                                    module="general",
+                                    permission=code.strip().upper(),
+                                )
+                                MemberPermission.objects.get_or_create(member=new_member, permission=perm_obj)
+                        else:
+                            read_perm, _ = CompanyPermission.objects.get_or_create(module="general", permission="READ")
+                            MemberPermission.objects.get_or_create(member=new_member, permission=read_perm)
 
                 messages.success(request, f"Team member '{email}' added successfully.")
                 return redirect("company-team-web")
@@ -210,9 +377,18 @@ def company_team_web_view(request):
                 member.user.set_password(new_password)
 
             if member.user_id != request.user.id:
-                new_role = request.POST.get("role")
-                if new_role in [CompanyMember.Role.USER, CompanyMember.Role.ADMIN]:
-                    member.role = new_role
+                role_id = request.POST.get("role_id")
+                if role_id:
+                    chosen_role = CompanyRole.objects.filter(id=role_id, company=company).first()
+                    if chosen_role:
+                        member.custom_role = chosen_role
+                        member.role = CompanyMember.Role.ADMIN if (chosen_role.is_system or chosen_role.name.lower() == "admin") else CompanyMember.Role.USER
+                        member.save(update_fields=["role", "custom_role"])
+                        sync_member_permissions_from_role(member, chosen_role)
+                else:
+                    new_role = request.POST.get("role")
+                    if new_role in [CompanyMember.Role.USER, CompanyMember.Role.ADMIN]:
+                        member.role = new_role
 
             member.user.save()
             member.save()
@@ -273,6 +449,7 @@ def company_team_web_view(request):
     return render(request, "company/team.html", {
         "company": company,
         "members": members,
+        "company_roles": company_roles,
         "total_count": total_count,
         "active_count": active_count,
         "inactive_count": inactive_count,
@@ -454,3 +631,234 @@ def subscription_billing_web_view(request):
         "rbac": rbac,
         "page_title": "Subscription & Credits",
     })
+
+
+# ============================================================
+# SELLER / SALES: ROLES & RESPONSIBILITIES (ROLE MANAGEMENT)
+# ============================================================
+
+@login_required
+def seller_roles_web_view(request):
+    """
+    Role Management (Roles & Responsibilities):
+    Renders configured organizational roles with module permissions matrix pills.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not company:
+        messages.error(request, "No active company found.")
+        return redirect("dashboard")
+
+    if not (rbac["is_company_admin"] or rbac["is_super_admin"] or rbac["can_view_seller"]):
+        messages.error(request, "Access restricted: Company administrator or seller permissions required.")
+        return redirect("dashboard")
+
+    ensure_company_default_roles(company)
+
+    roles = list(CompanyRole.objects.filter(company=company).prefetch_related("module_permissions").order_by("-is_system", "name"))
+
+    roles_data = []
+    for r in roles:
+        summary = r.get_permission_summary()
+        perms_map = {}
+        for mp in r.module_permissions.all():
+            perms_map[mp.module] = {
+                "can_read": mp.can_read,
+                "can_write": mp.can_write,
+                "can_edit": mp.can_edit,
+                "can_delete": mp.can_delete,
+                "can_admin": mp.can_admin,
+            }
+        is_full_admin = r.is_system or any(mp.can_admin for mp in r.module_permissions.all()) or len(summary) >= 10
+        roles_data.append({
+            "role": r,
+            "summary": summary,
+            "perms_json": json.dumps(perms_map),
+            "is_full_admin": is_full_admin,
+            "member_count": r.members.count(),
+        })
+
+    modules = [
+        {"key": "products", "name": "Products", "icon": "fa-box-open", "desc": "Product catalog, items, specifications & MOQ"},
+        {"key": "find_buyers", "name": "Find Buyers", "icon": "fa-crosshairs", "desc": "AI buyer discovery & targeted web scraping"},
+        {"key": "leads", "name": "Buyer Leads", "icon": "fa-users-viewfinder", "desc": "Discovered enterprise leads & fit scoring"},
+        {"key": "saved_buyers", "name": "Saved Buyers", "icon": "fa-bookmark", "desc": "CRM deal pipeline, notes, and sales rep assignments"},
+        {"key": "inquiries", "name": "Buyer Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
+        {"key": "export_reports", "name": "Export Reports", "icon": "fa-download", "desc": "CSV downloads & catalog matrix exports"},
+        {"key": "team", "name": "Team & Users", "icon": "fa-users", "desc": "Employee management & user assignments"},
+        {"key": "company_profile", "name": "Company Profile", "icon": "fa-building", "desc": "Organization details, GST, and address"},
+        {"key": "billing", "name": "Subscription & Credits", "icon": "fa-coins", "desc": "Plan status and AI credits allocation"},
+        {"key": "requirements", "name": "Requirements", "icon": "fa-clipboard-list", "desc": "Procurement requisitions & requests"},
+        {"key": "find_suppliers", "name": "Find Suppliers", "icon": "fa-magnifying-glass-chart", "desc": "Supplier discovery & search"},
+        {"key": "saved_suppliers", "name": "Saved Suppliers", "icon": "fa-bookmark", "desc": "Shortlisted supplier vendors"},
+    ]
+
+    return render(request, "company/roles.html", {
+        "company": company,
+        "roles": roles,
+        "roles_data": roles_data,
+        "modules": modules,
+        "system_role_count": sum(1 for r in roles if r.is_system),
+        "custom_role_count": sum(1 for r in roles if not r.is_system),
+        "assigned_users_count": CompanyMember.objects.filter(company=company, custom_role__isnull=False).count(),
+        "rbac": rbac,
+        "page_title": "Role Management & Responsibilities",
+    })
+
+
+@login_required
+def seller_role_create_view(request):
+    """
+    Creates a new custom role with matrix permissions.
+    """
+    if request.method != "POST":
+        return redirect("seller-roles-web")
+
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Company administrator privileges required.")
+        return redirect("seller-roles-web")
+
+    name = request.POST.get("name", "").strip()
+    description = request.POST.get("description", "").strip()
+
+    if not name:
+        messages.error(request, "Role name is required.")
+        return redirect("seller-roles-web")
+
+    if CompanyRole.objects.filter(company=company, name__iexact=name).exists():
+        messages.error(request, f"A role named '{name}' already exists in your company.")
+        return redirect("seller-roles-web")
+
+    role = CompanyRole.objects.create(
+        company=company,
+        name=name,
+        description=description,
+        is_system=False,
+    )
+
+    module_keys = list(RolePermission.MODULE_TITLES.keys())
+    for mod in module_keys:
+        can_read = request.POST.get(f"perm_{mod}_read") == "1"
+        can_write = request.POST.get(f"perm_{mod}_write") == "1"
+        can_edit = request.POST.get(f"perm_{mod}_edit") == "1"
+        can_delete = request.POST.get(f"perm_{mod}_delete") == "1"
+        can_admin = request.POST.get(f"perm_{mod}_admin") == "1"
+        if can_admin:
+            can_read = can_write = can_edit = can_delete = True
+
+        RolePermission.objects.create(
+            role=role,
+            module=mod,
+            can_read=can_read,
+            can_write=can_write,
+            can_edit=can_edit,
+            can_delete=can_delete,
+            can_admin=can_admin,
+        )
+
+    messages.success(request, f"Role '{name}' successfully created!")
+    return redirect("seller-roles-web")
+
+
+@login_required
+def seller_role_edit_view(request, role_id):
+    """
+    Updates role name, description, and module permissions.
+    """
+    if request.method != "POST":
+        return redirect("seller-roles-web")
+
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Company administrator privileges required.")
+        return redirect("seller-roles-web")
+
+    role = get_object_or_404(CompanyRole, id=role_id, company=company)
+
+    new_name = request.POST.get("name", "").strip()
+    description = request.POST.get("description", "").strip()
+
+    if new_name and not role.is_system:
+        # Check duplicate name
+        if CompanyRole.objects.filter(company=company, name__iexact=new_name).exclude(id=role.id).exists():
+            messages.error(request, f"Another role named '{new_name}' already exists.")
+            return redirect("seller-roles-web")
+        role.name = new_name
+
+    role.description = description
+    role.save()
+
+    module_keys = list(RolePermission.MODULE_TITLES.keys())
+    for mod in module_keys:
+        can_read = request.POST.get(f"perm_{mod}_read") == "1"
+        can_write = request.POST.get(f"perm_{mod}_write") == "1"
+        can_edit = request.POST.get(f"perm_{mod}_edit") == "1"
+        can_delete = request.POST.get(f"perm_{mod}_delete") == "1"
+        can_admin = request.POST.get(f"perm_{mod}_admin") == "1"
+        if can_admin:
+            can_read = can_write = can_edit = can_delete = True
+
+        RolePermission.objects.update_or_create(
+            role=role,
+            module=mod,
+            defaults={
+                "can_read": can_read,
+                "can_write": can_write,
+                "can_edit": can_edit,
+                "can_delete": can_delete,
+                "can_admin": can_admin,
+            },
+        )
+
+    # Sync permissions for all members assigned to this role
+    for m in role.members.all():
+        sync_member_permissions_from_role(m, role)
+
+    messages.success(request, f"Role '{role.name}' updated successfully!")
+    return redirect("seller-roles-web")
+
+
+@login_required
+def seller_role_delete_view(request, role_id):
+    """
+    Deletes a custom role.
+    """
+    if request.method != "POST":
+        return redirect("seller-roles-web")
+
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Company administrator privileges required.")
+        return redirect("seller-roles-web")
+
+    role = get_object_or_404(CompanyRole, id=role_id, company=company)
+
+    if role.is_system:
+        messages.error(request, "System default roles cannot be deleted.")
+        return redirect("seller-roles-web")
+
+    role_name = role.name
+    # Fallback any assigned members to default admin or user
+    default_role = CompanyRole.objects.filter(company=company, is_system=True).first()
+    for m in role.members.all():
+        m.custom_role = default_role
+        m.save(update_fields=["custom_role"])
+        if default_role:
+            sync_member_permissions_from_role(m, default_role)
+
+    role.delete()
+    messages.success(request, f"Role '{role_name}' deleted successfully.")
+    return redirect("seller-roles-web")
+

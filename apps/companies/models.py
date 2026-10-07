@@ -159,6 +159,14 @@ class CompanyMember(models.Model):
         default=Role.USER,
     )
 
+    custom_role = models.ForeignKey(
+        "CompanyRole",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="members",
+    )
+
     is_active = models.BooleanField(default=True)
 
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -226,3 +234,109 @@ class MemberPermission(models.Model):
             f"{self.permission.module} - "
             f"{self.permission.permission}"
         )
+
+
+class CompanyRole(models.Model):
+    """
+    Roles & Responsibilities Model:
+    Defines configurable organizational roles (e.g., Visitors, Sales Manager, Accountant, etc.)
+    with custom module-by-module permission matrix (Read, Write, Edit, Delete, Admin).
+    """
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="custom_roles",
+    )
+
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    is_system = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_system", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "name"],
+                name="unique_company_role_name",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.company.name})"
+
+    def get_permission_summary(self):
+        """Returns structured module permissions for rendering badge pills like in Role Management UI."""
+        summary = []
+        for mp in self.module_permissions.all().order_by("module"):
+            actions = []
+            if mp.can_admin:
+                actions.append("Admin")
+            if mp.can_read:
+                actions.append("Read")
+            if mp.can_write:
+                actions.append("Write")
+            if mp.can_edit:
+                actions.append("Edit")
+            if mp.can_delete:
+                actions.append("Delete")
+            if actions:
+                summary.append({
+                    "module": mp.module,
+                    "module_name": mp.get_module_title(),
+                    "actions": ", ".join(actions),
+                    "action_list": actions,
+                    "is_full": mp.can_admin or len(actions) == 5,
+                })
+        return summary
+
+
+class RolePermission(models.Model):
+    """
+    Permission matrix row for a specific module under a CompanyRole.
+    Corresponds to columns: READ, WRITE, EDIT, DELETE, ADMIN.
+    """
+    MODULE_TITLES = {
+        "products": "Products",
+        "find_buyers": "Find Buyers",
+        "leads": "Buyer Leads",
+        "saved_buyers": "Saved Buyers",
+        "inquiries": "Inquiries",
+        "export_reports": "Export Reports",
+        "team": "Team & Users",
+        "company_profile": "Company Profile",
+        "billing": "Subscription & Credits",
+        "requirements": "Requirements",
+        "find_suppliers": "Find Suppliers",
+        "saved_suppliers": "Saved Suppliers",
+    }
+
+    role = models.ForeignKey(
+        CompanyRole,
+        on_delete=models.CASCADE,
+        related_name="module_permissions",
+    )
+
+    module = models.CharField(max_length=50)
+
+    can_read = models.BooleanField(default=False)
+    can_write = models.BooleanField(default=False)
+    can_edit = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+    can_admin = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["role", "module"],
+                name="unique_role_module_permission",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.role.name} - {self.module}"
+
+    def get_module_title(self):
+        return self.MODULE_TITLES.get(self.module, self.module.replace("_", " ").title())

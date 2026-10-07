@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Sales Leads — AI Sales{% endblock %}
+{% block title %}Sales Leads — AI Sales Leads by Product{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -8,94 +8,718 @@
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Sales Leads</h1>
-      <p class="text-xs text-slate-500 mt-1">AI-discovered companies and buyers matching your products and services</p>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Products</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Sales Leads</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-users-viewfinder"></i>
+        </span>
+        <span>Sales Leads</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        AI-discovered buyer companies and sales opportunities organized product-by-product.
+      </p>
     </div>
     <div class="flex items-center gap-2.5">
-      <a href="{% url 'find-buyers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
-        <i class="fa-solid fa-magnifying-glass"></i>
+      <a href="{% url 'find-buyers' %}{% if selected_product %}?product_id={{ selected_product.id }}{% endif %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
         <span>Find New Buyers</span>
       </a>
-      <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
-        <i class="fa-regular fa-bookmark text-blue-600"></i>
+      <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-regular fa-bookmark text-orange-500"></i>
         <span>Saved Leads</span>
       </a>
     </div>
   </div>
 
-  <!-- Leads Table -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-3 px-4">Company Name</th>
-            <th class="py-3 px-4">Location</th>
-            <th class="py-3 px-4">Target Need / Product</th>
-            <th class="py-3 px-4">Match Score</th>
-            <th class="py-3 px-4">Need Signal / Rationale</th>
-            <th class="py-3 px-4 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for lead in leads %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3.5 px-4 font-bold text-slate-900">
-              <div class="flex items-center">
-                <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-3 font-semibold text-xs">
-                  <i class="fa-solid fa-building"></i>
-                </span>
-                <div>
-                  <div class="font-bold text-slate-900">{{ lead.external_company.name }}</div>
-                  {% if lead.external_company.industry %}
-                    <div class="text-[11px] text-slate-400 font-normal">{{ lead.external_company.industry }}</div>
-                  {% endif %}
+  <!-- Product Filter & Selector Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3.5">
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      
+      <!-- Searchable Combobox Dropdown -->
+      <div class="flex-1 relative" id="leads-product-combobox">
+        <label for="product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-filter text-orange-500"></i>
+            <span>Filter Leads by Product</span>
+          </span>
+          <span class="text-slate-400 font-medium normal-case">
+            {{ products|length }} Products &bull; A-Z
+          </span>
+        </label>
+
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          </div>
+
+          <input 
+            type="text" 
+            id="product_filter_input" 
+            autocomplete="off"
+            placeholder="Type product name or category to filter leads (A-Z)..."
+            value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
+            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
+          >
+
+          <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+            {% if selected_product or is_unassigned_view %}
+            <a 
+              href="{% url 'leads-list' %}" 
+              id="clear_leads_filter_btn" 
+              class="text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+              title="Clear product filter"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </a>
+            {% else %}
+            <button 
+              type="button" 
+              id="clear_leads_filter_btn" 
+              class="hidden text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+              title="Clear product filter"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+            {% endif %}
+            <button 
+              type="button" 
+              id="toggle_leads_dropdown_btn" 
+              class="text-slate-400 hover:text-orange-600 p-1 rounded-md transition"
+              title="Toggle product list"
+            >
+              <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="leads_chevron"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Dropdown Menu -->
+        <div 
+          id="leads_dropdown_menu" 
+          class="hidden absolute z-30 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
+        >
+          <!-- All Products Option -->
+          <a 
+            href="{% url 'leads-list' %}" 
+            class="leads-product-option px-3.5 py-2.5 hover:bg-orange-50/70 flex items-center justify-between transition group {% if not selected_product and not is_unassigned_view %}bg-orange-50 text-orange-950 font-bold{% endif %}"
+            data-name="all products grouped"
+            data-category=""
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                <i class="fa-solid fa-layer-group"></i>
+              </span>
+              <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition">
+                All Products (Grouped by Product)
+              </span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-orange-100 text-orange-700">
+              {{ total_leads_count }} Leads
+            </span>
+          </a>
+
+          {% for p in products %}
+          <a 
+            href="{% url 'leads-list' %}?product_id={{ p.id }}" 
+            class="leads-product-option px-3.5 py-2.5 hover:bg-orange-50/70 flex items-center justify-between transition group {% if selected_product and selected_product.id == p.id %}bg-orange-50 text-orange-950 font-bold{% endif %}"
+            data-id="{{ p.id }}"
+            data-name="{{ p.name }}"
+            data-category="{{ p.category.name|default:'' }}"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-orange-100 text-slate-500 group-hover:text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                {{ forloop.counter }}
+              </span>
+              <div class="truncate">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">
+                  {{ p.name }}
+                </div>
+                <div class="text-[10px] text-slate-400 font-normal">
+                  {{ p.category.name|default:"General" }} &bull; MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}
                 </div>
               </div>
-            </td>
-            <td class="py-3.5 px-4 text-slate-600 font-medium">
-              {% if lead.external_company.city %}{{ lead.external_company.city }}, {% endif %}{{ lead.external_company.country|default:"Global" }}
-            </td>
-            <td class="py-3.5 px-4 font-semibold text-slate-800">
-              {{ lead.product_title }}
-            </td>
-            <td class="py-3.5 px-4">
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if lead.match_score >= 85 %}bg-emerald-100 text-emerald-800{% elif lead.match_score >= 70 %}bg-blue-100 text-blue-800{% else %}bg-slate-100 text-slate-800{% endif %}">
-                {{ lead.match_score }}% Match
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-slate-100 text-slate-600 group-hover:bg-orange-100 group-hover:text-orange-700">
+                {{ p.category.name|default:"General" }}
               </span>
-            </td>
-            <td class="py-3.5 px-4 text-slate-600 max-w-xs truncate">
-              {{ lead.need_signal|default:lead.match_reason|default:"High synergy requirement identified" }}
-            </td>
-            <td class="py-3.5 px-4 text-right space-x-2">
-              {% if lead.external_company.website %}
-              <a href="{{ lead.external_company.website }}" target="_blank" class="text-slate-400 hover:text-blue-600 transition p-1.5" title="Visit Website">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i>
-              </a>
+              {% if p.lead_count > 0 %}
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                {{ p.lead_count }} Leads
+              </span>
+              {% else %}
+              <span class="text-[10px] px-1.5 py-0.5 rounded text-slate-400 bg-slate-50">
+                0 Leads
+              </span>
               {% endif %}
-              {% if lead.external_company.email %}
-              <a href="mailto:{{ lead.external_company.email }}" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
-                Contact
-              </a>
-              {% endif %}
-            </td>
-          </tr>
+            </div>
+          </a>
           {% empty %}
-          <tr>
-            <td colspan="6" class="py-12 text-center text-slate-400">
-              <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
-                <i class="fa-solid fa-users-viewfinder text-lg"></i>
-              </div>
-              <p class="font-medium text-slate-600">No sales leads found yet</p>
-              <p class="text-xs text-slate-400 mt-1">Use the "Find New Buyers" tool to start an AI search for prospective customers.</p>
-              <a href="{% url 'find-buyers' %}" class="inline-block mt-4 text-xs font-bold text-blue-600 hover:underline">Launch Buyer Search &rarr;</a>
-            </td>
-          </tr>
+          <div class="px-4 py-4 text-xs text-center text-slate-400">
+            No products found in catalog.
+          </div>
           {% endfor %}
-        </tbody>
-      </table>
+
+          {% if unassigned_count > 0 %}
+          <a 
+            href="{% url 'leads-list' %}?product_id=unassigned" 
+            class="leads-product-option px-3.5 py-2.5 hover:bg-orange-50/70 flex items-center justify-between transition group {% if is_unassigned_view %}bg-orange-50 text-orange-950 font-bold{% endif %}"
+            data-name="other search leads"
+            data-category="general"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </span>
+              <span class="text-xs font-semibold text-slate-700">
+                Other / Custom Search Leads
+              </span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">
+              {{ unassigned_count }} Leads
+            </span>
+          </a>
+          {% endif %}
+
+          <div id="leads_no_match" class="hidden px-4 py-4 text-xs text-center text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-sm mb-1 block text-slate-300"></i>
+            No products match "<span id="leads_no_match_query" class="font-semibold text-slate-600"></span>"
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Quick Filter Pills Bar (Products that have Leads) -->
+    <div class="pt-2 border-t border-slate-100 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+      <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+        Quick Tabs:
+      </span>
+
+      <!-- All Grouped Tab -->
+      <a 
+        href="{% url 'leads-list' %}" 
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if not selected_product and not is_unassigned_view %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+      >
+        <i class="fa-solid fa-layer-group text-[10px]"></i>
+        <span>All Products (Grouped)</span>
+        <span class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full {% if not selected_product and not is_unassigned_view %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
+          {{ total_leads_count }}
+        </span>
+      </a>
+
+      {% for p in products %}
+      {% if p.lead_count > 0 %}
+      <a 
+        href="{% url 'leads-list' %}?product_id={{ p.id }}" 
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if selected_product and selected_product.id == p.id %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+      >
+        <span class="truncate max-w-[150px]">{{ p.name }}</span>
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if selected_product and selected_product.id == p.id %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
+          {{ p.lead_count }}
+        </span>
+      </a>
+      {% endif %}
+      {% endfor %}
+
+      {% if unassigned_count > 0 %}
+      <a 
+        href="{% url 'leads-list' %}?product_id=unassigned" 
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if is_unassigned_view %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+      >
+        <span>Other Leads</span>
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if is_unassigned_view %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
+          {{ unassigned_count }}
+        </span>
+      </a>
+      {% endif %}
     </div>
   </div>
 
+  <!-- VIEW 1: SINGLE PRODUCT FILTERED -->
+  {% if is_single_product %}
+    {% if selected_product %}
+    <!-- Active Product Highlight Banner -->
+    <div class="bg-gradient-to-r from-orange-50 via-white to-amber-50 rounded-2xl border border-orange-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center space-x-3.5">
+        <div class="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center text-lg shadow-md shadow-orange-500/20 shrink-0 font-bold">
+          <i class="fa-solid fa-box"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-extrabold text-slate-900 leading-tight">
+              {{ selected_product.name }}
+            </h2>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
+              {{ selected_product.category.name|default:"General" }}
+            </span>
+          </div>
+          <div class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
+            <span>MOQ: <strong>{{ selected_product.minimum_order_quantity|default:selected_product.moq|default:"1" }} {{ selected_product.unit|default:"pcs" }}</strong></span>
+            <span>&bull;</span>
+            <span class="text-emerald-700 font-semibold">
+              <i class="fa-solid fa-circle-check text-[10px] mr-1"></i>
+              {{ leads|length }} Qualified Buyer Leads Found
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <a 
+          href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" 
+          class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+        >
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>Find More Buyers</span>
+        </a>
+        <a 
+          href="{% url 'leads-list' %}" 
+          class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1"
+        >
+          <span>View All Products</span>
+        </a>
+      </div>
+    </div>
+    {% elif is_unassigned_view %}
+    <div class="bg-slate-50 rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center justify-between gap-4">
+      <div>
+        <h2 class="text-base font-bold text-slate-900">Other / Custom Search Leads</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Leads discovered from custom or unlinked search queries ({{ leads|length }} candidates)</p>
+      </div>
+      <a href="{% url 'leads-list' %}" class="text-xs font-bold text-blue-600 hover:underline">
+        &larr; View All Products
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- Filtered Leads Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Company Name</th>
+              <th class="py-3 px-4">Location</th>
+              <th class="py-3 px-4">Match Score</th>
+              <th class="py-3 px-4">Need Signal & Fit Reason</th>
+              <th class="py-3 px-4">Verified Contact</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for lead in leads %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3.5 px-4 font-bold text-slate-900">
+                <div class="flex items-center">
+                  <span class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center mr-3 font-semibold text-xs shrink-0">
+                    <i class="fa-solid fa-industry"></i>
+                  </span>
+                  <div>
+                    <div class="font-bold text-slate-900 text-xs">{{ lead.external_company.name }}</div>
+                    {% if lead.external_company.industry %}
+                      <div class="text-[11px] text-slate-400 font-normal">{{ lead.external_company.industry }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              <td class="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+                {% if lead.external_company.city %}{{ lead.external_company.city }}, {% endif %}{{ lead.external_company.country|default:"India" }}
+              </td>
+              <td class="py-3.5 px-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if lead.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% elif lead.match_score >= 70 %}bg-blue-100 text-blue-800 border border-blue-200{% else %}bg-slate-100 text-slate-800{% endif %}">
+                  {{ lead.match_score }}% Fit
+                </span>
+              </td>
+              <td class="py-3.5 px-4 text-slate-700 max-w-sm">
+                <div class="font-medium text-xs">{{ lead.match_reason|truncatewords:24 }}</div>
+                {% if lead.need_signal %}
+                <div class="text-[11px] text-orange-800 bg-orange-50 px-2 py-0.5 rounded-md mt-1 inline-block font-semibold border border-orange-100">
+                  <i class="fa-solid fa-signal mr-1 text-orange-600"></i>{{ lead.need_signal|truncatewords:15 }}
+                </div>
+                {% endif %}
+              </td>
+              <td class="py-3.5 px-4 text-[11px] whitespace-nowrap space-y-1">
+                {% if lead.external_company.email %}
+                <div class="flex items-center gap-1.5 text-blue-600 font-medium">
+                  <i class="fa-solid fa-envelope text-slate-400"></i>
+                  <a href="mailto:{{ lead.external_company.email }}" class="hover:underline truncate max-w-[150px]" title="{{ lead.external_company.email }}">
+                    {{ lead.external_company.email }}
+                  </a>
+                </div>
+                {% endif %}
+                {% if lead.external_company.phone %}
+                <div class="flex items-center gap-1.5 text-slate-700 font-medium">
+                  <i class="fa-solid fa-phone text-slate-400"></i>
+                  <a href="tel:{{ lead.external_company.phone }}" class="hover:text-blue-600">
+                    {{ lead.external_company.phone }}
+                  </a>
+                </div>
+                {% endif %}
+                {% if not lead.external_company.email and not lead.external_company.phone %}
+                <span class="text-slate-400 italic">Direct via website</span>
+                {% endif %}
+              </td>
+              <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                {% if lead.id in saved_result_ids %}
+                <a href="{% url 'saved-leads' %}" class="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg" title="Already in Pipeline">
+                  <i class="fa-solid fa-check text-[10px] mr-1"></i> Saved
+                </a>
+                {% else %}
+                <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
+                  {% csrf_token %}
+                  <button type="submit" class="inline-flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 transition" title="Save Lead to Pipeline">
+                    <i class="fa-regular fa-bookmark text-[10px] mr-1"></i> Save
+                  </button>
+                </form>
+                {% endif %}
+
+                {% if lead.external_company.website %}
+                <a href="{{ lead.external_company.website }}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-blue-600 transition p-1.5 inline-block" title="Visit Website">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>
+                {% endif %}
+
+                {% if lead.external_company.email %}
+                <a href="mailto:{{ lead.external_company.email }}?subject=B2B%20Supply%20Inquiry:%20{{ lead.product_title|urlencode }}" class="inline-flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition shadow-sm">
+                  Contact
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="py-12 text-center text-slate-400">
+                <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mx-auto mb-3">
+                  <i class="fa-solid fa-users-viewfinder text-lg"></i>
+                </div>
+                <p class="font-bold text-slate-700 text-sm">No buyer leads discovered yet for this product</p>
+                <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  Run an AI Buyer Search to scrape and identify verified enterprise buyers for this product.
+                </p>
+                {% if selected_product %}
+                <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="inline-flex items-center gap-1.5 mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  <span>Search Buyers for "{{ selected_product.name }}"</span>
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  <!-- VIEW 2: ALL PRODUCTS GROUPED (PRODUCT-BY-PRODUCT SECTIONS) -->
+  {% else %}
+
+    {% if product_groups or unassigned_group %}
+      <div class="space-y-6">
+        {% for group in product_groups %}
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          
+          <!-- Product Group Section Header -->
+          <div class="bg-gradient-to-r from-slate-50 via-white to-orange-50/40 p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+              <span class="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm shadow-orange-500/20">
+                <i class="fa-solid fa-box"></i>
+              </span>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-extrabold text-slate-900">{{ group.product.name }}</h2>
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                    {{ group.product.category.name|default:"General" }}
+                  </span>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                  <span>MOQ: {{ group.product.minimum_order_quantity|default:group.product.moq|default:"1" }} {{ group.product.unit|default:"pcs" }}</span>
+                  <span>&bull;</span>
+                  <span class="text-emerald-700 font-bold">{{ group.count }} Qualified Leads</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <a 
+                href="{% url 'leads-list' %}?product_id={{ group.product.id }}" 
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-orange-600 transition shadow-sm"
+              >
+                <span>Filter This Product</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </a>
+              <a 
+                href="{% url 'find-buyers' %}?product_id={{ group.product.id }}" 
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition shadow-sm"
+              >
+                <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                <span>Find More</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Product Leads Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-4">Buyer Company</th>
+                  <th class="py-2.5 px-4">Location</th>
+                  <th class="py-2.5 px-4">Fit Score</th>
+                  <th class="py-2.5 px-4">Need Signal & Fit Reason</th>
+                  <th class="py-2.5 px-4">Contact</th>
+                  <th class="py-2.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for lead in group.leads %}
+                <tr class="hover:bg-slate-50 transition">
+                  <td class="py-3 px-4 font-bold text-slate-900">
+                    <div class="flex items-center">
+                      <span class="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center mr-2.5 font-semibold text-xs shrink-0">
+                        <i class="fa-solid fa-industry text-[11px]"></i>
+                      </span>
+                      <div>
+                        <div class="font-bold text-slate-900 text-xs">{{ lead.external_company.name }}</div>
+                        {% if lead.external_company.industry %}
+                          <div class="text-[10px] text-slate-400 font-normal">{{ lead.external_company.industry }}</div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-3 px-4 text-slate-600 whitespace-nowrap text-xs">
+                    {% if lead.external_company.city %}{{ lead.external_company.city }}, {% endif %}{{ lead.external_company.country|default:"India" }}
+                  </td>
+                  <td class="py-3 px-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if lead.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% elif lead.match_score >= 70 %}bg-blue-100 text-blue-800 border border-blue-200{% else %}bg-slate-100 text-slate-800{% endif %}">
+                      {{ lead.match_score }}% Fit
+                    </span>
+                  </td>
+                  <td class="py-3 px-4 text-slate-700 max-w-sm">
+                    <div class="font-medium text-xs leading-snug">{{ lead.match_reason|truncatewords:20 }}</div>
+                    {% if lead.need_signal %}
+                    <div class="text-[10px] text-orange-800 bg-orange-50 px-2 py-0.5 rounded mt-1 inline-block font-semibold">
+                      <i class="fa-solid fa-signal mr-1 text-orange-600 text-[9px]"></i>{{ lead.need_signal|truncatewords:12 }}
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td class="py-3 px-4 text-[11px] whitespace-nowrap space-y-0.5">
+                    {% if lead.external_company.email %}
+                    <div class="text-blue-600 font-medium truncate max-w-[150px]">
+                      <a href="mailto:{{ lead.external_company.email }}" class="hover:underline">
+                        <i class="fa-solid fa-envelope text-slate-400 mr-1 text-[10px]"></i>{{ lead.external_company.email }}
+                      </a>
+                    </div>
+                    {% endif %}
+                    {% if lead.external_company.phone %}
+                    <div class="text-slate-700 font-medium">
+                      <a href="tel:{{ lead.external_company.phone }}" class="hover:text-blue-600">
+                        <i class="fa-solid fa-phone text-slate-400 mr-1 text-[10px]"></i>{{ lead.external_company.phone }}
+                      </a>
+                    </div>
+                    {% endif %}
+                    {% if not lead.external_company.email and not lead.external_company.phone %}
+                    <span class="text-slate-400 italic">Direct via website</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                    {% if lead.id in saved_result_ids %}
+                    <a href="{% url 'saved-leads' %}" class="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg" title="In Pipeline CRM">
+                      <i class="fa-solid fa-check text-[10px] mr-1"></i> Saved
+                    </a>
+                    {% else %}
+                    <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
+                      {% csrf_token %}
+                      <button type="submit" class="inline-flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 transition" title="Save to Pipeline">
+                        <i class="fa-regular fa-bookmark text-[10px] mr-1"></i> Save
+                      </button>
+                    </form>
+                    {% endif %}
+
+                    {% if lead.external_company.website %}
+                    <a href="{{ lead.external_company.website }}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-blue-600 transition p-1.5 inline-block" title="Website">
+                      <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                    </a>
+                    {% endif %}
+
+                    {% if lead.external_company.email %}
+                    <a href="mailto:{{ lead.external_company.email }}?subject=B2B%20Supply%20Inquiry:%20{{ lead.product_title|urlencode }}" class="inline-flex items-center bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition shadow-sm">
+                      Contact
+                    </a>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endfor %}
+
+        <!-- Unassigned Group (if any) -->
+        {% if unassigned_group %}
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="bg-slate-50 p-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold text-slate-800">{{ unassigned_group.title }}</h2>
+              <span class="text-xs text-slate-500">{{ unassigned_group.count }} Leads</span>
+            </div>
+            <a href="{% url 'leads-list' %}?product_id=unassigned" class="text-xs font-bold text-blue-600 hover:underline">
+              Filter This &rarr;
+            </a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-2.5 px-4">Company</th>
+                  <th class="py-2.5 px-4">Location</th>
+                  <th class="py-2.5 px-4">Fit Score</th>
+                  <th class="py-2.5 px-4">Signal</th>
+                  <th class="py-2.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for lead in unassigned_group.leads %}
+                <tr class="hover:bg-slate-50 transition">
+                  <td class="py-3 px-4 font-bold text-slate-900">{{ lead.external_company.name }}</td>
+                  <td class="py-3 px-4 text-slate-600">{{ lead.external_company.city|default:"India" }}</td>
+                  <td class="py-3 px-4"><span class="font-bold text-emerald-700">{{ lead.match_score }}%</span></td>
+                  <td class="py-3 px-4 text-slate-600">{{ lead.match_reason|truncatewords:15 }}</td>
+                  <td class="py-3 px-4 text-right">
+                    <a href="{{ lead.external_company.website }}" target="_blank" class="text-blue-600 hover:underline text-xs font-semibold">Website</a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+    <!-- Empty State when catalog has 0 leads -->
+    {% else %}
+      <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 shadow-sm">
+        <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-4 border border-orange-100">
+          <i class="fa-solid fa-users-viewfinder"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-800 mb-1">No Sales Leads Discovered Yet</h3>
+        <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
+          Leads are automatically grouped by each product in your catalog. Choose a product and launch AI Buyer Discovery to populate buyer leads.
+        </p>
+        <div class="flex flex-wrap justify-center gap-2">
+          {% for p in products|slice:":4" %}
+          <a href="{% url 'find-buyers' %}?product_id={{ p.id }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition">
+            <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+            <span>Find Buyers for "{{ p.name }}"</span>
+          </a>
+          {% empty %}
+          <a href="{% url 'products-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition inline-flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Add Product First
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+  {% endif %}
+
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const filterInput = document.getElementById('product_filter_input');
+  const dropdownMenu = document.getElementById('leads_dropdown_menu');
+  const toggleBtn = document.getElementById('toggle_leads_dropdown_btn');
+  const chevron = document.getElementById('leads_chevron');
+  const clearBtn = document.getElementById('clear_leads_filter_btn');
+  const options = Array.from(document.querySelectorAll('.leads-product-option'));
+  const noMatch = document.getElementById('leads_no_match');
+  const noMatchQuery = document.getElementById('leads_no_match_query');
+  const comboboxWrapper = document.getElementById('leads-product-combobox');
+
+  function openDropdown() {
+    dropdownMenu.classList.remove('hidden');
+    if (chevron) chevron.classList.add('rotate-180');
+  }
+
+  function closeDropdown() {
+    dropdownMenu.classList.add('hidden');
+    if (chevron) chevron.classList.remove('rotate-180');
+  }
+
+  function filterOptions(query) {
+    const q = (query || '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    options.forEach(opt => {
+      const name = (opt.getAttribute('data-name') || '').toLowerCase();
+      const cat = (opt.getAttribute('data-category') || '').toLowerCase();
+      if (!q || name.includes(q) || cat.includes(q)) {
+        opt.classList.remove('hidden');
+        visibleCount++;
+      } else {
+        opt.classList.add('hidden');
+      }
+    });
+
+    if (visibleCount === 0 && q) {
+      noMatch.classList.remove('hidden');
+      noMatchQuery.textContent = query;
+    } else {
+      noMatch.classList.add('hidden');
+    }
+  }
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (dropdownMenu.classList.contains('hidden')) {
+        filterOptions(filterInput.value);
+        openDropdown();
+      } else {
+        closeDropdown();
+      }
+    });
+  }
+
+  if (filterInput) {
+    filterInput.addEventListener('focus', function() {
+      filterOptions(filterInput.value);
+      openDropdown();
+    });
+
+    filterInput.addEventListener('input', function() {
+      const q = this.value;
+      if (clearBtn) {
+        if (q) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+      }
+      filterOptions(q);
+      openDropdown();
+    });
+
+    filterInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeDropdown();
+      }
+    });
+  }
+
+  // Close when clicking outside
+  document.addEventListener('click', function(e) {
+    if (comboboxWrapper && !comboboxWrapper.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+});
+</script>
 {% endblock %}

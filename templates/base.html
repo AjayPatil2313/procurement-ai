@@ -151,7 +151,7 @@
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
-            <a href="{% url 'inquiries-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+            <a href="{% url 'sales-inquiries-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-regular fa-paper-plane w-5 text-center mr-2.5 text-xs"></i> {% if rbac.is_both %}Buyer Inquiries{% else %}Inquiries{% endif %}
               </span>
@@ -160,6 +160,12 @@
             <a href="{% url 'sales-export-reports' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/export-reports/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-download w-5 text-center mr-2.5 text-xs"></i> Export Reports
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
+            <a href="{% url 'seller-roles-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/roles/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-user-shield w-5 text-center mr-2.5 text-xs"></i> Roles & Responsibilities
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -179,14 +185,6 @@
             <a href="{% url 'company-team-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/team/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-users w-5 text-center mr-2.5 text-xs"></i> Users
-              </span>
-              <span class="px-1.5 py-0.2 bg-blue-900/60 text-blue-300 text-[10px] rounded font-semibold">Admin</span>
-            </a>
-
-            <!-- RBAC: visible to Company Admin & Super Admin -->
-            <a href="{% url 'company-rbac-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/rbac/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-shield-halved w-5 text-center mr-2.5 text-xs"></i> RBAC
               </span>
               <span class="px-1.5 py-0.2 bg-blue-900/60 text-blue-300 text-[10px] rounded font-semibold">Admin</span>
             </a>
@@ -446,21 +444,21 @@
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition"></i>
                 </a>
 
-                <!-- RBAC (Admin only) -->
+                <!-- Roles & Responsibilities (Admin only) -->
                 <a 
-                  href="{% url 'company-rbac-web' %}" 
-                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/company/rbac/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
+                  href="{% url 'seller-roles-web' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/sales/roles/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
                 >
                   <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-emerald-500 group-hover:text-white transition">
-                      <i class="fa-solid fa-shield-halved"></i>
+                    <div class="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-orange-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-user-shield"></i>
                     </div>
                     <div>
-                      <div class="text-xs font-bold text-white leading-tight">RBAC & Permissions</div>
-                      <div class="text-[10px] text-slate-400 leading-tight">Manage 6-action granular access control</div>
+                      <div class="text-xs font-bold text-white leading-tight">Roles & Responsibilities</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Manage organizational roles & module matrix</div>
                     </div>
                   </div>
-                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition"></i>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-orange-400 group-hover:translate-x-0.5 transition"></i>
                 </a>
                 {% endif %}
 

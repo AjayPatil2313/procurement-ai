@@ -1,0 +1,643 @@
+{% extends "base.html" %}
+
+{% block title %}Role Management & Responsibilities — AI Sales{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Breadcrumbs & Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Sales</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Roles & Responsibilities</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-user-shield"></i>
+        </span>
+        <span>Role Management</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Configure organizational sales roles and assign module-by-module permission matrix (Read, Write, Edit, Delete, Admin).
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+      <button 
+        type="button" 
+        onclick="openAddRoleModal()" 
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20"
+      >
+        <i class="fa-solid fa-plus"></i>
+        <span>Add New Role</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Total Roles</div>
+        <div class="text-xl font-black text-slate-900">{{ roles|length }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-crown text-amber-500"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">System Roles</div>
+        <div class="text-xl font-black text-slate-900">{{ system_role_count|default:"1" }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-sliders"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Custom Roles</div>
+        <div class="text-xl font-black text-slate-900">{{ custom_role_count|default:"0" }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-users"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Assigned Users</div>
+        <div class="text-xl font-black text-slate-900">{{ assigned_users_count|default:"0" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Role Management Table Container -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    
+    <!-- Table Toolbar -->
+    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-slate-700">All Defined Roles</span>
+        <span class="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-600">{{ roles|length }}</span>
+      </div>
+
+      <div class="w-full sm:w-72 relative">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+        <input 
+          type="text" 
+          id="roleTableSearch" 
+          placeholder="Search role name or permissions..." 
+          class="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        >
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs" id="rolesTable">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4 w-16 text-center">SR NO</th>
+            <th class="py-3 px-4 min-w-[160px]">ROLE NAME</th>
+            <th class="py-3 px-4">MODULE PERMISSIONS</th>
+            <th class="py-3 px-4 min-w-[150px] whitespace-nowrap">CREATE DATE</th>
+            <th class="py-3 px-4 text-right w-28">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for r in roles_data %}
+          <tr class="role-row hover:bg-slate-50/70 transition" data-name="{{ r.role.name|lower }}">
+            <!-- SR NO -->
+            <td class="py-3.5 px-4 text-center font-bold text-slate-400">
+              {{ forloop.counter }}
+            </td>
+
+            <!-- ROLE NAME -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-center space-x-2">
+                <span class="font-extrabold text-slate-900 text-xs tracking-wide uppercase">
+                  {{ r.role.name }}
+                </span>
+                {% if r.role.is_system %}
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                    System
+                  </span>
+                {% endif %}
+              </div>
+              {% if r.role.description %}
+                <div class="text-[11px] text-slate-400 mt-0.5 truncate max-w-xs">{{ r.role.description }}</div>
+              {% endif %}
+            </td>
+
+            <!-- MODULE PERMISSIONS -->
+            <td class="py-3.5 px-4">
+              {% if r.role.is_system or r.is_full_admin %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                  <span>Full Administrative Access</span>
+                </span>
+              {% else %}
+                <div class="flex flex-wrap gap-1.5 max-w-2xl">
+                  {% for perm in r.summary %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold {% cycle 'bg-rose-50 text-rose-700 border border-rose-200' 'bg-blue-50 text-blue-700 border border-blue-200' 'bg-purple-50 text-purple-700 border border-purple-200' 'bg-amber-50 text-amber-700 border border-amber-200' 'bg-emerald-50 text-emerald-700 border border-emerald-200' 'bg-indigo-50 text-indigo-700 border border-indigo-200' %}">
+                      <span class="font-bold">{{ perm.module_name }}</span>
+                      <span class="font-normal opacity-80 ml-1">({{ perm.actions }})</span>
+                    </span>
+                  {% empty %}
+                    <span class="text-slate-400 italic text-[11px]">No module permissions configured</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </td>
+
+            <!-- CREATE DATE -->
+            <td class="py-3.5 px-4 text-slate-600 whitespace-nowrap font-medium">
+              {{ r.role.created_at|date:"d M Y, H:i" }}
+            </td>
+
+            <!-- ACTIONS -->
+            <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1">
+              <button 
+                type="button" 
+                onclick="openEditRoleModal('{{ r.role.id }}', '{{ r.role.name|escapejs }}', '{{ r.role.description|escapejs }}', {{ r.perms_json|safe }})"
+                class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                title="Edit Role & Permissions"
+              >
+                <i class="fa-solid fa-pen-to-square text-xs"></i>
+              </button>
+
+              {% if not r.role.is_system %}
+              <form method="POST" action="{% url 'seller-role-delete' r.role.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete role {{ r.role.name|escapejs }}?');">
+                {% csrf_token %}
+                <button 
+                  type="submit" 
+                  class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                  title="Delete Role"
+                >
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </form>
+              {% else %}
+              <span class="p-1.5 text-slate-300 cursor-not-allowed" title="System roles cannot be deleted">
+                <i class="fa-solid fa-lock text-xs"></i>
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="py-12 text-center text-slate-400">
+              <div class="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl mx-auto mb-3">
+                <i class="fa-solid fa-user-shield"></i>
+              </div>
+              <p class="font-bold text-slate-700 text-sm">No roles found</p>
+              <p class="text-xs text-slate-400 mt-1">Click "Add New Role" to create your first custom sales role.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Table Footer -->
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 bg-slate-50/50">
+      <div>Showing 1 to {{ roles|length }} of {{ roles|length }} entries</div>
+      <div class="text-[11px] text-slate-400 font-medium">
+        Changes apply immediately across all assigned user sessions.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ============================================================ -->
+<!-- MODAL: ADD NEW ROLE (Refer Image 2) -->
+<!-- ============================================================ -->
+<div id="addRoleModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    
+    <!-- Modal Header -->
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-900">Add New Role</h3>
+          <p class="text-[11px] text-slate-500 font-medium">Create a new organizational role with customizable module permissions.</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeAddRoleModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Modal Form -->
+    <form method="POST" action="{% url 'seller-role-create' %}" class="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
+      {% csrf_token %}
+
+      <!-- Role Name Input -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Role Name <span class="text-rose-500">*</span>
+        </label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-id-badge"></i>
+          </span>
+          <input 
+            type="text" 
+            name="name" 
+            required 
+            placeholder="e.g. VISITORS, SALES EXECUTIVE, BD REP..." 
+            class="w-full pl-9 pr-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition text-slate-800"
+          >
+        </div>
+      </div>
+
+      <!-- Description Input -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Description <span class="text-slate-400 font-normal lowercase">(optional)</span>
+        </label>
+        <input 
+          type="text" 
+          name="description" 
+          placeholder="Brief description of this role's scope and duties..." 
+          class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition text-slate-800"
+        >
+      </div>
+
+      <!-- Permissions Matrix (Refer Image 2) -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Module Permissions Matrix
+          </label>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="toggleAllMatrix('add', true)" class="text-[10px] font-bold text-blue-600 hover:underline">Select All</button>
+            <span class="text-slate-300">&bull;</span>
+            <button type="button" onclick="toggleAllMatrix('add', false)" class="text-[10px] font-bold text-slate-500 hover:underline">Clear All</button>
+          </div>
+        </div>
+
+        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <table class="w-full text-left text-xs" id="addMatrixTable">
+            <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
+              <tr>
+                <th class="py-2.5 px-4">MODULE NAME</th>
+                <th class="py-2.5 px-3 text-center">
+                  <label class="cursor-pointer inline-flex items-center gap-1">
+                    <span>READ</span>
+                    <input type="checkbox" onchange="toggleColumn('add', 'read', this.checked)" class="w-3 h-3 text-blue-600 rounded">
+                  </label>
+                </th>
+                <th class="py-2.5 px-3 text-center">
+                  <label class="cursor-pointer inline-flex items-center gap-1">
+                    <span>WRITE</span>
+                    <input type="checkbox" onchange="toggleColumn('add', 'write', this.checked)" class="w-3 h-3 text-blue-600 rounded">
+                  </label>
+                </th>
+                <th class="py-2.5 px-3 text-center">
+                  <label class="cursor-pointer inline-flex items-center gap-1">
+                    <span>EDIT</span>
+                    <input type="checkbox" onchange="toggleColumn('add', 'edit', this.checked)" class="w-3 h-3 text-blue-600 rounded">
+                  </label>
+                </th>
+                <th class="py-2.5 px-3 text-center">
+                  <label class="cursor-pointer inline-flex items-center gap-1">
+                    <span>DELETE</span>
+                    <input type="checkbox" onchange="toggleColumn('add', 'delete', this.checked)" class="w-3 h-3 text-blue-600 rounded">
+                  </label>
+                </th>
+                <th class="py-2.5 px-3 text-center">
+                  <label class="cursor-pointer inline-flex items-center gap-1">
+                    <span>ADMIN</span>
+                    <input type="checkbox" onchange="toggleColumn('add', 'admin', this.checked)" class="w-3 h-3 text-blue-600 rounded">
+                  </label>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-medium">
+              {% for mod in modules %}
+              <tr class="hover:bg-slate-50/80 transition" id="add_row_{{ mod.key }}">
+                <td class="py-3 px-4">
+                  <div class="flex items-center space-x-2.5">
+                    <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                      <i class="fa-solid {{ mod.icon }}"></i>
+                    </span>
+                    <div>
+                      <div class="font-bold text-slate-800 text-xs">{{ mod.name }}</div>
+                      <div class="text-[10px] text-slate-400 font-normal">{{ mod.desc }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" name="perm_{{ mod.key }}_read" value="1" class="add-cb add-read w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" name="perm_{{ mod.key }}_write" value="1" class="add-cb add-write w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" name="perm_{{ mod.key }}_edit" value="1" class="add-cb add-edit w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" name="perm_{{ mod.key }}_delete" value="1" class="add-cb add-delete w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" name="perm_{{ mod.key }}_admin" value="1" onchange="handleAdminRowToggle('add', '{{ mod.key }}', this.checked)" class="add-cb add-admin w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500">
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 sticky bottom-0 bg-white">
+        <button 
+          type="button" 
+          onclick="closeAddRoleModal()" 
+          class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs"
+        >
+          Cancel
+        </button>
+        <button 
+          type="submit" 
+          class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2 transition text-xs"
+        >
+          <i class="fa-solid fa-check"></i>
+          <span>Save Role</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- MODAL: EDIT ROLE & PERMISSIONS -->
+<!-- ============================================================ -->
+<div id="editRoleModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    
+    <!-- Modal Header -->
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-900" id="editModalTitle">Edit Role</h3>
+          <p class="text-[11px] text-slate-500 font-medium">Update role details and module permission matrix.</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeEditRoleModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Modal Form -->
+    <form id="editRoleForm" method="POST" action="" class="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
+      {% csrf_token %}
+
+      <!-- Role Name Input -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Role Name <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          id="editRoleName" 
+          name="name" 
+          required 
+          class="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 transition text-slate-800"
+        >
+      </div>
+
+      <!-- Description Input -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Description
+        </label>
+        <input 
+          type="text" 
+          id="editRoleDescription" 
+          name="description" 
+          class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 transition text-slate-800"
+        >
+      </div>
+
+      <!-- Permissions Matrix -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Module Permissions Matrix
+          </label>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="toggleAllMatrix('edit', true)" class="text-[10px] font-bold text-orange-600 hover:underline">Select All</button>
+            <span class="text-slate-300">&bull;</span>
+            <button type="button" onclick="toggleAllMatrix('edit', false)" class="text-[10px] font-bold text-slate-500 hover:underline">Clear All</button>
+          </div>
+        </div>
+
+        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <table class="w-full text-left text-xs" id="editMatrixTable">
+            <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
+              <tr>
+                <th class="py-2.5 px-4">MODULE NAME</th>
+                <th class="py-2.5 px-3 text-center">READ</th>
+                <th class="py-2.5 px-3 text-center">WRITE</th>
+                <th class="py-2.5 px-3 text-center">EDIT</th>
+                <th class="py-2.5 px-3 text-center">DELETE</th>
+                <th class="py-2.5 px-3 text-center">ADMIN</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-medium">
+              {% for mod in modules %}
+              <tr class="hover:bg-slate-50/80 transition" id="edit_row_{{ mod.key }}">
+                <td class="py-3 px-4">
+                  <div class="flex items-center space-x-2.5">
+                    <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                      <i class="fa-solid {{ mod.icon }}"></i>
+                    </span>
+                    <div>
+                      <div class="font-bold text-slate-800 text-xs">{{ mod.name }}</div>
+                      <div class="text-[10px] text-slate-400 font-normal">{{ mod.desc }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_read" name="perm_{{ mod.key }}_read" value="1" class="edit-cb edit-read w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_write" name="perm_{{ mod.key }}_write" value="1" class="edit-cb edit-write w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_edit" name="perm_{{ mod.key }}_edit" value="1" class="edit-cb edit-edit w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_delete" name="perm_{{ mod.key }}_delete" value="1" class="edit-cb edit-delete w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                </td>
+                <td class="py-3 px-3 text-center">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_admin" name="perm_{{ mod.key }}_admin" value="1" onchange="handleAdminRowToggle('edit', '{{ mod.key }}', this.checked)" class="edit-cb edit-admin w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500">
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 sticky bottom-0 bg-white">
+        <button 
+          type="button" 
+          onclick="closeEditRoleModal()" 
+          class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs"
+        >
+          Cancel
+        </button>
+        <button 
+          type="submit" 
+          class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 transition text-xs"
+        >
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>Save Changes</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Search Filter on Roles Table
+document.getElementById('roleTableSearch')?.addEventListener('input', function() {
+  const query = (this.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#rolesTable .role-row');
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = (!query || text.includes(query)) ? '' : 'none';
+  });
+});
+
+// Add Role Modal Handlers
+function openAddRoleModal() {
+  document.getElementById('addRoleModal').classList.remove('hidden');
+}
+function closeAddRoleModal() {
+  document.getElementById('addRoleModal').classList.add('hidden');
+}
+
+// Edit Role Modal Handlers
+function openEditRoleModal(roleId, roleName, roleDesc, permsMap) {
+  const form = document.getElementById('editRoleForm');
+  form.action = `/sales/roles/${roleId}/edit/`;
+  document.getElementById('editRoleName').value = roleName;
+  document.getElementById('editRoleDescription').value = roleDesc || '';
+  document.getElementById('editModalTitle').textContent = `Edit Role: ${roleName}`;
+
+  // Reset all edit checkboxes
+  document.querySelectorAll('.edit-cb').forEach(cb => cb.checked = false);
+
+  // Populate from permsMap
+  if (permsMap && typeof permsMap === 'object') {
+    Object.keys(permsMap).forEach(mod => {
+      const p = permsMap[mod];
+      const readCb = document.getElementById(`edit_cb_${mod}_read`);
+      const writeCb = document.getElementById(`edit_cb_${mod}_write`);
+      const editCb = document.getElementById(`edit_cb_${mod}_edit`);
+      const delCb = document.getElementById(`edit_cb_${mod}_delete`);
+      const adminCb = document.getElementById(`edit_cb_${mod}_admin`);
+
+      if (readCb) readCb.checked = !!p.can_read;
+      if (writeCb) writeCb.checked = !!p.can_write;
+      if (editCb) editCb.checked = !!p.can_edit;
+      if (delCb) delCb.checked = !!p.can_delete;
+      if (adminCb) adminCb.checked = !!p.can_admin;
+    });
+  }
+
+  document.getElementById('editRoleModal').classList.remove('hidden');
+}
+
+function closeEditRoleModal() {
+  document.getElementById('editRoleModal').classList.add('hidden');
+}
+
+// Admin Checkbox Row Auto-Toggle
+function handleAdminRowToggle(prefix, modKey, isChecked) {
+  const readCb = document.querySelector(`input[name="perm_${modKey}_read"]`);
+  const writeCb = document.querySelector(`input[name="perm_${modKey}_write"]`);
+  const editCb = document.querySelector(`input[name="perm_${modKey}_edit"]`);
+  const delCb = document.querySelector(`input[name="perm_${modKey}_delete"]`);
+  
+  if (isChecked) {
+    if (prefix === 'add') {
+      const row = document.getElementById(`add_row_${modKey}`);
+      if (row) {
+        row.querySelector('.add-read').checked = true;
+        row.querySelector('.add-write').checked = true;
+        row.querySelector('.add-edit').checked = true;
+        row.querySelector('.add-delete').checked = true;
+      }
+    } else {
+      const read = document.getElementById(`edit_cb_${modKey}_read`);
+      const write = document.getElementById(`edit_cb_${modKey}_write`);
+      const edit = document.getElementById(`edit_cb_${modKey}_edit`);
+      const del = document.getElementById(`edit_cb_${modKey}_delete`);
+      if (read) read.checked = true;
+      if (write) write.checked = true;
+      if (edit) edit.checked = true;
+      if (del) del.checked = true;
+    }
+  }
+}
+
+// Column Header Select All Toggle
+function toggleColumn(prefix, action, isChecked) {
+  const cbs = document.querySelectorAll(`.${prefix}-${action}`);
+  cbs.forEach(cb => cb.checked = isChecked);
+}
+
+// Toggle Entire Matrix
+function toggleAllMatrix(prefix, isChecked) {
+  const cbs = document.querySelectorAll(`.${prefix}-cb`);
+  cbs.forEach(cb => cb.checked = isChecked);
+}
+
+// Close modals on background click or Esc
+['addRoleModal', 'editRoleModal'].forEach(id => {
+  const modal = document.getElementById(id);
+  modal?.addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.classList.add('hidden');
+    }
+  });
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeAddRoleModal();
+    closeEditRoleModal();
+  }
+});
+</script>
+{% endblock %}

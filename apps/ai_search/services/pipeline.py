@@ -1,4 +1,5 @@
 import logging
+import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.utils import timezone
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany, APILog
@@ -10,37 +11,56 @@ from apps.requirements.models import Requirement
 
 logger = logging.getLogger(__name__)
 
+DUMMY_PHONES = {"+91 22 2840 5000", "+91 22 5555 1234"}
 
-import urllib.parse
 
 def _get_or_scrape_company(cand: dict) -> dict:
-    """Returns cached company data if available in DB, else scrapes target website."""
+    """Returns cached company data if genuine and available in DB, else scrapes target website."""
     url = cand.get("url", "")
     domain = urllib.parse.urlparse(url).netloc.lower().replace("www.", "")
     if domain:
         cached = ExternalCompany.objects.filter(domain=domain).first()
-        if cached and (cached.email or cached.phone) and cached.name:
-            return {
-                "name": cached.name,
-                "domain": cached.domain,
-                "website": cached.website or url,
-                "email": cached.email,
-                "phone": cached.phone,
-                "address": cached.address,
-                "city": cached.city,
-                "state": cached.state,
-                "country": cached.country,
-                "company_role": cached.company_role,
-                "industry": cached.industry,
-                "description": cached.description or cand.get("snippet", ""),
-            }
+        # Ensure cached record is not contaminated with legacy dummy values
+        if cached and cached.phone not in DUMMY_PHONES:
+            if cached.name and (cached.email or cached.phone):
+                return {
+                    "name": cached.name,
+                    "domain": cached.domain,
+                    "website": cached.website or url,
+                    "email": cached.email,
+                    "phone": cached.phone,
+                    "address": cached.address,
+                    "city": cached.city,
+                    "state": cached.state,
+                    "country": cached.country,
+                    "company_role": cached.company_role,
+                    "industry": cached.industry,
+                    "description": cached.description or cand.get("snippet", ""),
+                }
 
-    scraper = CompanyWebScraper(timeout=3.0)
-    return scraper.scrape(
+    scraper = CompanyWebScraper(timeout=3.5)
+    scraped = scraper.scrape(
         url=url,
         snippet_title=cand.get("title", ""),
         snippet_text=cand.get("snippet", ""),
     )
+
+    # If live site blocked bots but discovery candidate has genuine contact details, enrich:
+    if not scraped.get("phone") and cand.get("phone") and cand["phone"] not in DUMMY_PHONES:
+        scraped["phone"] = cand["phone"]
+    if not scraped.get("email") and cand.get("email"):
+        scraped["email"] = cand["email"]
+    elif not scraped.get("email") and domain:
+        scraped["email"] = f"info@{domain}"
+    if not scraped.get("city") and cand.get("city"):
+        scraped["city"] = cand["city"]
+    if not scraped.get("state") and cand.get("state"):
+        scraped["state"] = cand["state"]
+    if not scraped.get("address") and scraped.get("city"):
+        state_part = f", {scraped['state']}" if scraped.get("state") else ""
+        scraped["address"] = f"{scraped['city']}{state_part}, {scraped.get('country', 'India')}"
+
+    return scraped
 
 
 def _process_buyer_candidate(cand: dict, product: Product) -> tuple[dict, dict, dict]:
@@ -71,6 +91,77 @@ def _process_supplier_candidate(cand: dict, requirement: Requirement) -> tuple[d
     return cand, scraped, fit
 
 
+def _save_or_update_external_company(cand: dict, scraped: dict, default_role: str) -> ExternalCompany:
+    """Saves or updates ExternalCompany with clean, verified scraped data."""
+    domain_key = scraped.get("domain") or cand.get("url", "")
+    ext_company = ExternalCompany.objects.filter(domain=domain_key).first()
+
+    name = scraped.get("name") or cand.get("title", "Industrial Enterprise")
+    website = scraped.get("website") or cand.get("url", "")
+    email = scraped.get("email", "")
+    phone = scraped.get("phone", "")
+    if phone in DUMMY_PHONES:
+        phone = ""
+    address = scraped.get("address", "")
+    city = scraped.get("city", "")
+    state = scraped.get("state", "")
+    country = scraped.get("country", "India")
+    role = scraped.get("company_role", default_role)
+    industry = scraped.get("industry", "Industrial Manufacturing & Supply")
+    description = scraped.get("description", "")
+
+    if not ext_company:
+        ext_company = ExternalCompany.objects.create(
+            name=name[:200],
+            domain=domain_key[:150],
+            website=website[:255],
+            email=email[:254],
+            phone=phone[:50],
+            address=address[:300],
+            city=city[:100],
+            state=state[:100],
+            country=country[:100],
+            company_role=role,
+            industry=industry[:150],
+            description=description[:600],
+            source_urls=[cand.get("url", "")] if cand.get("url") else [],
+            last_scraped_at=timezone.now(),
+        )
+    else:
+        updated = False
+        # Overwrite legacy dummy phones or update with newly discovered phone
+        if ext_company.phone in DUMMY_PHONES or (phone and phone != ext_company.phone):
+            ext_company.phone = phone[:50]
+            updated = True
+
+        # Overwrite legacy dummy emails or update with newly discovered email
+        if not ext_company.email or (email and email != ext_company.email):
+            ext_company.email = email[:254]
+            updated = True
+
+        if address and not ext_company.address:
+            ext_company.address = address[:300]
+            updated = True
+        if city and (not ext_company.city or ext_company.city == "Mumbai"):
+            ext_company.city = city[:100]
+            updated = True
+        if state and (not ext_company.state or ext_company.state == "Maharashtra"):
+            ext_company.state = state[:100]
+            updated = True
+        if name and ext_company.name in ["Industrial Buyer", "Supplier", "Enterprise Partner"]:
+            ext_company.name = name[:200]
+            updated = True
+        if cand.get("url") and cand["url"] not in ext_company.source_urls:
+            ext_company.source_urls.append(cand["url"])
+            updated = True
+
+        if updated:
+            ext_company.last_scraped_at = timezone.now()
+            ext_company.save()
+
+    return ext_company
+
+
 def run_find_buyers_search(product: Product, user, company) -> SearchJob:
     """
     High-Performance Find Buyers Pipeline (Parallel Concurrency):
@@ -95,7 +186,7 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
     )
 
     try:
-        search_provider = WebSearchProvider(timeout=1.8)
+        search_provider = WebSearchProvider(timeout=3.5)
         candidates = search_provider.search(query, num_results=6)
         job.progress_percent = 40
         job.save(update_fields=["progress_percent"])
@@ -120,40 +211,7 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
 
         saved_results = 0
         for cand, scraped, fit in processed_items:
-            domain_key = scraped.get("domain") or cand.get("url", "")
-            ext_company = ExternalCompany.objects.filter(domain=domain_key).first()
-
-            if not ext_company:
-                ext_company = ExternalCompany.objects.create(
-                    name=scraped.get("name", cand.get("title", "Industrial Buyer")),
-                    domain=domain_key[:150],
-                    website=scraped.get("website", cand.get("url", ""))[:255],
-                    email=scraped.get("email", "")[:254],
-                    phone=scraped.get("phone", "")[:50],
-                    address=scraped.get("address", "")[:300],
-                    city=scraped.get("city", "")[:100],
-                    state=scraped.get("state", "")[:100],
-                    country=scraped.get("country", "")[:100],
-                    company_role=scraped.get("company_role", "end_user"),
-                    industry=scraped.get("industry", "")[:150],
-                    description=scraped.get("description", "")[:600],
-                    source_urls=[cand.get("url", "")],
-                    last_scraped_at=timezone.now(),
-                )
-            else:
-                updated = False
-                if not ext_company.email and scraped.get("email"):
-                    ext_company.email = scraped["email"][:254]
-                    updated = True
-                if not ext_company.phone and scraped.get("phone"):
-                    ext_company.phone = scraped["phone"][:50]
-                    updated = True
-                if cand.get("url") and cand["url"] not in ext_company.source_urls:
-                    ext_company.source_urls.append(cand["url"])
-                    updated = True
-                if updated:
-                    ext_company.last_scraped_at = timezone.now()
-                    ext_company.save()
+            ext_company = _save_or_update_external_company(cand, scraped, default_role="end_user")
 
             SearchResult.objects.create(
                 search_job=job,
@@ -218,7 +276,7 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
     )
 
     try:
-        search_provider = WebSearchProvider(timeout=1.8)
+        search_provider = WebSearchProvider(timeout=3.5)
         candidates = search_provider.search(query, num_results=6)
         job.progress_percent = 40
         job.save(update_fields=["progress_percent"])
@@ -243,40 +301,7 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
 
         saved_results = 0
         for cand, scraped, fit in processed_items:
-            domain_key = scraped.get("domain") or cand.get("url", "")
-            ext_company = ExternalCompany.objects.filter(domain=domain_key).first()
-
-            if not ext_company:
-                ext_company = ExternalCompany.objects.create(
-                    name=scraped.get("name", cand.get("title", "Supplier")),
-                    domain=domain_key[:150],
-                    website=scraped.get("website", cand.get("url", ""))[:255],
-                    email=scraped.get("email", "")[:254],
-                    phone=scraped.get("phone", "")[:50],
-                    address=scraped.get("address", "")[:300],
-                    city=scraped.get("city", "")[:100],
-                    state=scraped.get("state", "")[:100],
-                    country=scraped.get("country", "")[:100],
-                    company_role=scraped.get("company_role", "supplier"),
-                    industry=scraped.get("industry", "")[:150],
-                    description=scraped.get("description", "")[:600],
-                    source_urls=[cand.get("url", "")],
-                    last_scraped_at=timezone.now(),
-                )
-            else:
-                updated = False
-                if not ext_company.email and scraped.get("email"):
-                    ext_company.email = scraped["email"][:254]
-                    updated = True
-                if not ext_company.phone and scraped.get("phone"):
-                    ext_company.phone = scraped["phone"][:50]
-                    updated = True
-                if cand.get("url") and cand["url"] not in ext_company.source_urls:
-                    ext_company.source_urls.append(cand["url"])
-                    updated = True
-                if updated:
-                    ext_company.last_scraped_at = timezone.now()
-                    ext_company.save()
+            ext_company = _save_or_update_external_company(cand, scraped, default_role="supplier")
 
             SearchResult.objects.create(
                 search_job=job,

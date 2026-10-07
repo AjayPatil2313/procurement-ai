@@ -24,40 +24,119 @@
       <p class="text-xs text-slate-500 mt-1">Real-time Web Search & Scraper extracting verified buyer contacts, procurement signals, and RFQ intent.</p>
     </div>
     <div class="flex items-center gap-2">
-      <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
-        <i class="fa-solid fa-signal mr-1.5 text-emerald-600"></i> Live Search & Scraper Active
+      <a href="{% url 'saved-leads' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
+        <i class="fa-solid fa-funnel-dollar mr-1.5 text-orange-500"></i> Sales CRM Pipeline
+      </a>
+      <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
+        <i class="fa-solid fa-signal mr-1.5 text-emerald-600"></i> Live Scraper Active
       </span>
     </div>
   </div>
 
   <!-- Product Search Trigger Card -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-    <form method="POST" action="{% url 'find-buyers' %}" class="flex flex-col md:flex-row items-center gap-4">
+    <form method="POST" action="{% url 'find-buyers' %}" id="find-buyers-form" class="flex flex-col md:flex-row items-center gap-4">
       {% csrf_token %}
       <input type="hidden" name="action" value="run_search">
+      <input type="hidden" name="product_id" id="selected_product_id" value="{% if selected_product %}{{ selected_product.id }}{% elif selected_product_id %}{{ selected_product_id }}{% endif %}">
 
-      <div class="flex-1 w-full">
-        <label for="product_id" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Select Product to Find Buyers
+      <div class="flex-1 w-full relative" id="searchable-combobox-wrapper">
+        <label for="product_search_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-boxes-stacked text-orange-500"></i>
+            <span>Select Product to Find Buyers</span>
+          </span>
+          <span class="text-[11px] text-slate-400 font-medium normal-case">
+            {{ products|length }} Products &bull; Alphabetical A-Z
+          </span>
         </label>
-        <select id="product_id" name="product_id" class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
-          <option value="">-- Choose Product From Your Catalog --</option>
-          {% for p in products %}
-          <option value="{{ p.id }}" {% if selected_product_id == p.id %}selected{% endif %}>
-            {{ p.name }} ({{ p.category.name|default:"General" }}) — {% if p.price %}{{ p.currency }} {{ p.price }}{% else %}Open Quote{% endif %}
-          </option>
-          {% endfor %}
-        </select>
+        
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          </div>
+
+          <input 
+            type="text" 
+            id="product_search_input" 
+            autocomplete="off"
+            placeholder="Type to search products (e.g. Steel, Valve, Chemical)..." 
+            value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
+            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
+          >
+
+          <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+            <button 
+              type="button" 
+              id="clear_product_btn" 
+              class="{% if not selected_product %}hidden{% endif %} text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+              title="Clear selection"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+            <button 
+              type="button" 
+              id="toggle_dropdown_btn" 
+              class="text-slate-400 hover:text-orange-600 p-1 rounded-md transition"
+              title="Toggle product list"
+            >
+              <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="dropdown_chevron"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Dropdown Panel -->
+        <div 
+          id="product_dropdown_menu" 
+          class="hidden absolute z-30 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
+        >
+          <div id="product_options_container">
+            {% for p in products %}
+            <div 
+              class="product-option px-3.5 py-2.5 hover:bg-orange-50/70 cursor-pointer flex items-center justify-between transition group {% if selected_product and selected_product.id == p.id %}bg-orange-50 text-orange-950 font-bold{% endif %}"
+              data-id="{{ p.id }}"
+              data-name="{{ p.name }}"
+              data-category="{{ p.category.name|default:'' }}"
+            >
+              <div class="flex items-center space-x-2.5 min-w-0">
+                <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-orange-100 text-slate-500 group-hover:text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                  {{ forloop.counter }}
+                </span>
+                <div class="truncate">
+                  <div class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">
+                    {{ p.name }}
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-normal">
+                    {{ p.category.name|default:"General Category" }} &bull; MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}
+                  </div>
+                </div>
+              </div>
+              <span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-slate-100 text-slate-600 shrink-0 group-hover:bg-orange-100 group-hover:text-orange-700">
+                {{ p.category.name|default:"General" }}
+              </span>
+            </div>
+            {% empty %}
+            <div class="px-4 py-5 text-xs text-center text-slate-400">
+              <i class="fa-solid fa-box-open text-base mb-1 block text-slate-300"></i>
+              No products found in catalog. Add products first.
+            </div>
+            {% endfor %}
+          </div>
+          <div id="no_match_item" class="hidden px-4 py-5 text-xs text-center text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-base mb-1 block text-slate-300"></i>
+            No products match "<span id="no_match_query" class="font-semibold text-slate-600"></span>"
+          </div>
+        </div>
       </div>
 
-      <div class="flex items-center gap-2 w-full md:w-auto md:mt-5">
-        <button type="submit" class="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition">
+      <div class="flex items-center gap-2 w-full md:w-auto md:mt-5 shrink-0">
+        <button type="submit" id="launch_search_btn" class="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
           <span>Launch AI Buyer Search</span>
         </button>
 
         {% if selected_product_id %}
-        <a href="{% url 'find-buyers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition">
+        <a href="{% url 'find-buyers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition shrink-0">
           Clear Filter
         </a>
         {% endif %}
@@ -93,7 +172,17 @@
               </h3>
               <span class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                 <i class="fa-solid fa-location-dot text-[11px] text-rose-500"></i>
-                <span class="truncate">{{ lead.external_company.city|default:"Industrial Hub" }}, {{ lead.external_company.country|default:"India" }}</span>
+                <span class="truncate">
+                  {% if lead.external_company.city and lead.external_company.state %}
+                    {{ lead.external_company.city }}, {{ lead.external_company.state }}
+                  {% elif lead.external_company.city %}
+                    {{ lead.external_company.city }}, {{ lead.external_company.country|default:"India" }}
+                  {% elif lead.external_company.state %}
+                    {{ lead.external_company.state }}, {{ lead.external_company.country|default:"India" }}
+                  {% else %}
+                    Industrial Hub, {{ lead.external_company.country|default:"India" }}
+                  {% endif %}
+                </span>
               </span>
             </div>
           </div>
@@ -133,11 +222,11 @@
             <div class="flex items-center justify-between text-slate-600">
               <span class="text-slate-400"><i class="fa-solid fa-envelope mr-1.5 text-slate-400"></i> Email:</span>
               {% if lead.external_company.email %}
-              <a href="mailto:{{ lead.external_company.email }}" class="font-semibold text-blue-600 hover:underline truncate max-w-[170px]">
+              <a href="mailto:{{ lead.external_company.email }}" class="font-semibold text-blue-600 hover:underline truncate max-w-[170px]" title="{{ lead.external_company.email }}">
                 {{ lead.external_company.email }}
               </a>
               {% else %}
-              <span class="text-slate-400 italic">Not available</span>
+              <span class="text-slate-400 italic">Available on site</span>
               {% endif %}
             </div>
 
@@ -148,7 +237,7 @@
                 {{ lead.external_company.phone }}
               </a>
               {% else %}
-              <span class="text-slate-400 italic">Direct contact</span>
+              <span class="text-slate-400 italic">Direct via website</span>
               {% endif %}
             </div>
 
@@ -164,16 +253,32 @@
       <!-- Action Card Footer -->
       <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
         <a href="{{ lead.external_company.website|default:lead.source_url }}" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-600 hover:underline font-semibold flex items-center">
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Official Website
+          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Website
         </a>
 
-        {% if lead.external_company.email %}
-        <a href="mailto:{{ lead.external_company.email }}?subject=B2B%20Supply%20Inquiry:%20{{ lead.product_title|urlencode }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
-          <i class="fa-solid fa-paper-plane text-[10px]"></i> Contact Buyer
-        </a>
-        {% else %}
-        <span class="text-xs text-slate-400 font-semibold">Web Verified</span>
-        {% endif %}
+        <div class="flex items-center gap-2">
+          {% if lead.id in saved_result_ids %}
+          <a href="{% url 'saved-leads' %}" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-emerald-100 transition" title="Already in your Sales Pipeline">
+            <i class="fa-solid fa-check text-[10px]"></i>
+            <span>In Pipeline</span>
+          </a>
+          {% else %}
+          <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-300 flex items-center gap-1.5 transition">
+              <i class="fa-regular fa-bookmark text-[10px]"></i>
+              <span>Save Lead</span>
+            </button>
+          </form>
+          {% endif %}
+
+          {% if lead.external_company.email %}
+          <a href="mailto:{{ lead.external_company.email }}?subject=B2B%20Supply%20Inquiry:%20{{ lead.product_title|urlencode }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane text-[10px]"></i>
+            <span>Contact</span>
+          </a>
+          {% endif %}
+        </div>
       </div>
     </div>
     {% empty %}
@@ -196,7 +301,7 @@
         </button>
       </form>
       {% else %}
-      <a href="{% url 'product-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition inline-flex items-center gap-2">
+      <a href="{% url 'products-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition inline-flex items-center gap-2">
         <i class="fa-solid fa-plus"></i> Add Product First
       </a>
       {% endif %}
@@ -205,4 +310,216 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('find-buyers-form');
+  const searchInput = document.getElementById('product_search_input');
+  const hiddenInput = document.getElementById('selected_product_id');
+  const dropdownMenu = document.getElementById('product_dropdown_menu');
+  const clearBtn = document.getElementById('clear_product_btn');
+  const toggleBtn = document.getElementById('toggle_dropdown_btn');
+  const chevron = document.getElementById('dropdown_chevron');
+  const options = Array.from(document.querySelectorAll('.product-option'));
+  const noMatchItem = document.getElementById('no_match_item');
+  const noMatchQuery = document.getElementById('no_match_query');
+  const comboboxWrapper = document.getElementById('searchable-combobox-wrapper');
+  
+  let currentFocusIndex = -1;
+
+  function openDropdown() {
+    dropdownMenu.classList.remove('hidden');
+    if (chevron) chevron.classList.add('rotate-180');
+  }
+
+  function closeDropdown() {
+    dropdownMenu.classList.add('hidden');
+    if (chevron) chevron.classList.remove('rotate-180');
+    currentFocusIndex = -1;
+    removeActiveDescendant();
+  }
+
+  function filterOptions(query) {
+    const q = (query || '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    options.forEach(opt => {
+      const name = (opt.getAttribute('data-name') || '').toLowerCase();
+      const cat = (opt.getAttribute('data-category') || '').toLowerCase();
+      if (!q || name.includes(q) || cat.includes(q)) {
+        opt.classList.remove('hidden');
+        visibleCount++;
+      } else {
+        opt.classList.add('hidden');
+      }
+    });
+
+    if (visibleCount === 0 && q) {
+      noMatchItem.classList.remove('hidden');
+      noMatchQuery.textContent = query;
+    } else {
+      noMatchItem.classList.add('hidden');
+    }
+  }
+
+  function selectOption(opt) {
+    const id = opt.getAttribute('data-id');
+    const name = opt.getAttribute('data-name');
+    hiddenInput.value = id;
+    searchInput.value = name;
+    clearBtn.classList.remove('hidden');
+
+    options.forEach(o => {
+      o.classList.remove('bg-orange-50', 'text-orange-950', 'font-bold');
+    });
+    opt.classList.add('bg-orange-50', 'text-orange-950', 'font-bold');
+
+    closeDropdown();
+  }
+
+  function removeActiveDescendant() {
+    options.forEach(o => o.classList.remove('bg-orange-100/80', 'ring-1', 'ring-orange-400'));
+  }
+
+  function highlightOption(index, visibleOpts) {
+    removeActiveDescendant();
+    if (index >= 0 && index < visibleOpts.length) {
+      const activeOpt = visibleOpts[index];
+      activeOpt.classList.add('bg-orange-100/80', 'ring-1', 'ring-orange-400');
+      activeOpt.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  // Toggle on chevron click
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (dropdownMenu.classList.contains('hidden')) {
+        filterOptions(searchInput.value);
+        openDropdown();
+      } else {
+        closeDropdown();
+      }
+    });
+  }
+
+  // Input events
+  if (searchInput) {
+    searchInput.addEventListener('focus', function() {
+      filterOptions(searchInput.value);
+      openDropdown();
+    });
+
+    searchInput.addEventListener('input', function() {
+      const query = this.value;
+      if (query) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+        hiddenInput.value = '';
+      }
+
+      filterOptions(query);
+      openDropdown();
+
+      // Check if current text matches a product exactly
+      const exactMatch = options.find(o => (o.getAttribute('data-name') || '').toLowerCase() === query.trim().toLowerCase());
+      if (exactMatch) {
+        hiddenInput.value = exactMatch.getAttribute('data-id');
+      } else {
+        hiddenInput.value = '';
+      }
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+      const visibleOpts = options.filter(o => !o.classList.contains('hidden'));
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (dropdownMenu.classList.contains('hidden')) {
+          openDropdown();
+        }
+        if (visibleOpts.length > 0) {
+          currentFocusIndex = (currentFocusIndex + 1) % visibleOpts.length;
+          highlightOption(currentFocusIndex, visibleOpts);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (dropdownMenu.classList.contains('hidden')) {
+          openDropdown();
+        }
+        if (visibleOpts.length > 0) {
+          currentFocusIndex = (currentFocusIndex - 1 + visibleOpts.length) % visibleOpts.length;
+          highlightOption(currentFocusIndex, visibleOpts);
+        }
+      } else if (e.key === 'Enter') {
+        if (!dropdownMenu.classList.contains('hidden')) {
+          if (currentFocusIndex >= 0 && currentFocusIndex < visibleOpts.length) {
+            e.preventDefault();
+            selectOption(visibleOpts[currentFocusIndex]);
+          } else if (visibleOpts.length === 1) {
+            e.preventDefault();
+            selectOption(visibleOpts[0]);
+          }
+        }
+      } else if (e.key === 'Escape') {
+        closeDropdown();
+      }
+    });
+  }
+
+  // Option click
+  options.forEach(opt => {
+    opt.addEventListener('click', function(e) {
+      e.stopPropagation();
+      selectOption(this);
+    });
+  });
+
+  // Clear button
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      searchInput.value = '';
+      hiddenInput.value = '';
+      clearBtn.classList.add('hidden');
+      options.forEach(o => {
+        o.classList.remove('hidden', 'bg-orange-50', 'text-orange-950', 'font-bold');
+      });
+      noMatchItem.classList.add('hidden');
+      searchInput.focus();
+      openDropdown();
+    });
+  }
+
+  // Close when clicking outside
+  document.addEventListener('click', function(e) {
+    if (comboboxWrapper && !comboboxWrapper.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+
+  // Form submit validation
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      if (!hiddenInput.value) {
+        const visibleOpts = options.filter(o => !o.classList.contains('hidden'));
+        if (visibleOpts.length === 1) {
+          selectOption(visibleOpts[0]);
+        } else {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.classList.add('ring-2', 'ring-rose-500', 'border-rose-500');
+          setTimeout(() => {
+            searchInput.classList.remove('ring-2', 'ring-rose-500', 'border-rose-500');
+          }, 2000);
+          openDropdown();
+        }
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

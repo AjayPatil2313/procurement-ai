@@ -8,6 +8,7 @@ from apps.billing.models import Subscription
 from apps.requirements.models import Requirement
 from apps.catalog.models import Product, Category, ProductImage
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany
+from apps.leads.models import SavedItem, Inquiry
 
 
 class RBACTestCase(TestCase):
@@ -1017,7 +1018,6 @@ class SellerModuleTestCase(TestCase):
         detail_resp = self.client.get(reverse("product-detail", kwargs={"pk": self.prod_a.id}))
         self.assertEqual(detail_resp.status_code, 200)
         self.assertContains(detail_resp, "Product A - ANSI Pump")
-        self.assertContains(detail_resp, "15000.00")
         self.assertContains(detail_resp, "In Stock")
 
     def test_seller_product_create_web(self):
@@ -1196,6 +1196,83 @@ class SellerModuleTestCase(TestCase):
         # REST API returns 403 Forbidden
         api_resp = self.client.get(reverse("api-products-list"))
         self.assertEqual(api_resp.status_code, 403)
+
+    def test_seller_leads_list_product_wise(self):
+        """Buyer Leads list organizes leads product-by-product instead of all-in-one mix"""
+        self.client.login(email="admin@abctraders.com", password="Password@123")
+
+        # Create SearchJob & leads for prod_a
+        job_a = SearchJob.objects.create(
+            company=self.abc_company,
+            user=self.abc_admin,
+            job_type=SearchJob.JobType.FIND_BUYERS,
+            product=self.prod_a,
+            status=SearchJob.Status.COMPLETED,
+        )
+        ext_comp_1 = ExternalCompany.objects.create(
+            name="Apex Refinery Ltd",
+            city="Vadodara",
+            country="India",
+            email="procurement@apexrefinery.com",
+            phone="+91 265 222 3344",
+        )
+        SearchResult.objects.create(
+            search_job=job_a,
+            external_company=ext_comp_1,
+            result_type=SearchResult.ResultType.LEAD,
+            product_title=self.prod_a.name,
+            match_score=92,
+            match_reason="Requires heavy duty ANSI pumps for plant expansion",
+        )
+
+        # Create SearchJob & leads for prod_b
+        job_b = SearchJob.objects.create(
+            company=self.abc_company,
+            user=self.abc_admin,
+            job_type=SearchJob.JobType.FIND_BUYERS,
+            product=self.prod_b,
+            status=SearchJob.Status.COMPLETED,
+        )
+        ext_comp_2 = ExternalCompany.objects.create(
+            name="Zenith Power Station",
+            city="Surat",
+            country="India",
+            email="purchase@zenithpower.com",
+            phone="+91 261 444 5566",
+        )
+        SearchResult.objects.create(
+            search_job=job_b,
+            external_company=ext_comp_2,
+            result_type=SearchResult.ResultType.LEAD,
+            product_title=self.prod_b.name,
+            match_score=88,
+            match_reason="Procuring control valves for steam boiler circuits",
+        )
+
+        # 1. GET /sales/leads/ without filter -> Groups by product
+        resp = self.client.get(reverse("leads-list"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Sales Leads")
+        self.assertContains(resp, "product_filter_input")
+        self.assertContains(resp, "Product A - ANSI Pump")
+        self.assertContains(resp, "Product B - Control Valve")
+        self.assertContains(resp, "Apex Refinery Ltd")
+        self.assertContains(resp, "Zenith Power Station")
+
+        # Verify context has product groups
+        product_groups = resp.context["product_groups"]
+        self.assertEqual(len(product_groups), 2)
+        group_products = [g["product"].name for g in product_groups]
+        self.assertIn(self.prod_a.name, group_products)
+        self.assertIn(self.prod_b.name, group_products)
+
+        # 2. GET /sales/leads/?product_id=prod_a.id -> Filters strictly to prod_a
+        resp_filtered = self.client.get(reverse("leads-list"), {"product_id": self.prod_a.id})
+        self.assertEqual(resp_filtered.status_code, 200)
+        self.assertTrue(resp_filtered.context["is_single_product"])
+        self.assertEqual(resp_filtered.context["selected_product"], self.prod_a)
+        self.assertContains(resp_filtered, "Apex Refinery Ltd")
+        self.assertNotContains(resp_filtered, "Zenith Power Station")
 
 
 class RBACDedicatedPageTestCase(TestCase):
@@ -1829,6 +1906,12 @@ class AISearchScrapingEngineTestCase(TestCase):
         resp_get = self.client.get(reverse("find-buyers"))
         self.assertEqual(resp_get.status_code, 200)
         self.assertContains(resp_get, "AI Buyer Leads")
+        self.assertContains(resp_get, "product_search_input")
+        self.assertContains(resp_get, "product_dropdown_menu")
+        # Verify alphabetical ordering A-Z
+        products_in_ctx = list(resp_get.context["products"])
+        prod_names = [p.name.lower() for p in products_in_ctx]
+        self.assertEqual(prod_names, sorted(prod_names))
 
         # 2. POST to trigger search for product
         resp_post = self.client.post(reverse("find-buyers"), {
@@ -1866,6 +1949,477 @@ class AISearchScrapingEngineTestCase(TestCase):
         self.assertEqual(follow_resp.status_code, 200)
         self.assertContains(follow_resp, "Heavy Duty Slurry Pump")
         self.assertContains(follow_resp, "Match")
+
+
+class LeadCRMandRFQWorkflowTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        # Seller Company & Users
+        self.seller_admin = User.objects.create_user(
+            email="selleradmin@steelcorp.com",
+            password="Password@123",
+            first_name="Rohan",
+            last_name="Verma",
+        )
+        self.seller_company = Company.objects.create(
+            name="SteelCorp Ltd",
+            company_type=Company.CompanyType.SELLER,
+            created_by=self.seller_admin,
+        )
+        CompanyMember.objects.create(
+            user=self.seller_admin,
+            company=self.seller_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.sales_rep = User.objects.create_user(
+            email="rep@steelcorp.com",
+            password="Password@123",
+            first_name="Amit",
+            last_name="Singh",
+        )
+        CompanyMember.objects.create(
+            user=self.sales_rep,
+            company=self.seller_company,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+
+        self.product = Product.objects.create(
+            company=self.seller_company,
+            name="TMT Steel Bars Fe 550D",
+            price=Decimal("65000.00"),
+            currency="INR",
+            created_by=self.seller_admin,
+        )
+
+        # External Buyer Company & Lead SearchResult
+        self.buyer_ext_company = ExternalCompany.objects.create(
+            name="Metro Infra Projects Ltd",
+            domain="metroinfra.in",
+            email="procurement@metroinfra.in",
+            phone="+912234567890",
+            city="Mumbai",
+            country="India",
+            company_role=ExternalCompany.CompanyRole.END_USER,
+        )
+        self.seller_search_job = SearchJob.objects.create(
+            company=self.seller_company,
+            user=self.seller_admin,
+            product=self.product,
+            job_type=SearchJob.JobType.FIND_BUYERS,
+            search_query="TMT Steel Bars buyers",
+            status=SearchJob.Status.COMPLETED,
+            total_results=1,
+        )
+        self.lead_result = SearchResult.objects.create(
+            search_job=self.seller_search_job,
+            external_company=self.buyer_ext_company,
+            result_type=SearchResult.ResultType.LEAD,
+            product_title="TMT Steel Bars Fe 550D",
+            match_score=92,
+            match_reason="Active commercial contractor with upcoming residential projects.",
+            need_signal="Tender published for 500 tons TMT rebar",
+        )
+
+        # Buyer Company & Users
+        self.buyer_admin = User.objects.create_user(
+            email="buyeradmin@buildtech.com",
+            password="Password@123",
+            first_name="Vikram",
+            last_name="Malhotra",
+        )
+        self.buyer_company = Company.objects.create(
+            name="BuildTech Solutions",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.buyer_admin,
+        )
+        CompanyMember.objects.create(
+            user=self.buyer_admin,
+            company=self.buyer_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.requirement = Requirement.objects.create(
+            company=self.buyer_company,
+            created_by=self.buyer_admin,
+            item_name="Hydraulic Excavator 20 Ton",
+            quantity=2,
+            target_price=Decimal("4500000.00"),
+            currency="INR",
+        )
+
+        # External Supplier Company & Supplier SearchResult
+        self.supplier_ext_company = ExternalCompany.objects.create(
+            name="Heavy Machinery Works",
+            domain="heavymachinery.co.in",
+            email="sales@heavymachinery.co.in",
+            phone="+912067890123",
+            city="Pune",
+            country="India",
+            company_role=ExternalCompany.CompanyRole.MANUFACTURER,
+        )
+        self.buyer_search_job = SearchJob.objects.create(
+            company=self.buyer_company,
+            user=self.buyer_admin,
+            requirement=self.requirement,
+            job_type=SearchJob.JobType.FIND_SUPPLIERS,
+            search_query="Hydraulic Excavator manufacturer",
+            status=SearchJob.Status.COMPLETED,
+            total_results=1,
+        )
+        self.supplier_result = SearchResult.objects.create(
+            search_job=self.buyer_search_job,
+            external_company=self.supplier_ext_company,
+            result_type=SearchResult.ResultType.SUPPLIER,
+            product_title="Hydraulic Excavator 20 Ton",
+            match_score=88,
+            price=Decimal("4200000.00"),
+            price_currency="INR",
+            moq=1,
+            match_reason="Authorized heavy earthmoving equipment manufacturer with full OEM warranty.",
+        )
+
+    def test_save_lead_toggle_view(self):
+        """Seller can save lead to pipeline (idempotent, supports normal and AJAX POST)"""
+        self.client.login(email="selleradmin@steelcorp.com", password="Password@123")
+
+        # 1. Normal POST
+        resp = self.client.post(reverse("save-lead-toggle", args=[self.lead_result.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(SavedItem.objects.filter(company=self.seller_company, search_result=self.lead_result).exists())
+
+        # 2. Duplicate POST should not recreate duplicate
+        resp2 = self.client.post(reverse("save-lead-toggle", args=[self.lead_result.id]))
+        self.assertEqual(resp2.status_code, 302)
+        self.assertEqual(SavedItem.objects.filter(company=self.seller_company, search_result=self.lead_result).count(), 1)
+
+        # 3. AJAX request returns JSON
+        ajax_resp = self.client.post(
+            reverse("save-lead-toggle", args=[self.lead_result.id]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(ajax_resp.status_code, 200)
+        self.assertTrue(ajax_resp.json()["success"])
+
+    def test_saved_leads_view_renders_crm(self):
+        """Saved leads view renders CRM pipeline, stages, and assigned members"""
+        SavedItem.objects.create(
+            company=self.seller_company,
+            search_result=self.lead_result,
+            status=SavedItem.Status.NEW,
+            notes="Follow up after client board meeting",
+        )
+        self.client.login(email="selleradmin@steelcorp.com", password="Password@123")
+        resp = self.client.get(reverse("saved-leads"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Metro Infra Projects Ltd")
+        self.assertContains(resp, "Follow up after client board meeting")
+        self.assertContains(resp, "Contacted")
+        self.assertContains(resp, "Negotiating")
+
+    def test_update_saved_lead_view(self):
+        """Seller can update stage, private notes, and assigned team rep"""
+        item = SavedItem.objects.create(
+            company=self.seller_company,
+            search_result=self.lead_result,
+            status=SavedItem.Status.NEW,
+        )
+        self.client.login(email="selleradmin@steelcorp.com", password="Password@123")
+
+        # POST update
+        resp = self.client.post(reverse("update-saved-lead", args=[item.id]), {
+            "status": "negotiating",
+            "notes": "Offered 5% discount on 100+ ton order",
+            "assigned_to_id": self.sales_rep.id,
+        })
+        self.assertEqual(resp.status_code, 302)
+        item.refresh_from_db()
+        self.assertEqual(item.status, "negotiating")
+        self.assertEqual(item.notes, "Offered 5% discount on 100+ ton order")
+        self.assertEqual(item.assigned_to, self.sales_rep)
+
+        # AJAX update
+        ajax_resp = self.client.post(
+            reverse("update-saved-lead", args=[item.id]),
+            {"status": "won", "notes": "Contract signed!"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(ajax_resp.status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.status, "won")
+        self.assertEqual(item.notes, "Contract signed!")
+
+    def test_delete_saved_lead_view(self):
+        """Seller can remove lead from pipeline"""
+        item = SavedItem.objects.create(
+            company=self.seller_company,
+            search_result=self.lead_result,
+            status=SavedItem.Status.NEW,
+        )
+        self.client.login(email="selleradmin@steelcorp.com", password="Password@123")
+
+        resp = self.client.post(reverse("delete-saved-lead", args=[item.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(SavedItem.objects.filter(id=item.id).exists())
+
+    def test_save_supplier_toggle_and_delete(self):
+        """Buyer can shortlist supplier and remove from shortlist"""
+        self.client.login(email="buyeradmin@buildtech.com", password="Password@123")
+
+        # 1. Shortlist supplier
+        resp = self.client.post(reverse("save-supplier-toggle", args=[self.supplier_result.id]))
+        self.assertEqual(resp.status_code, 302)
+        item = SavedItem.objects.filter(company=self.buyer_company, search_result=self.supplier_result).first()
+        self.assertIsNotNone(item)
+
+        # 2. View shortlisted suppliers
+        resp_list = self.client.get(reverse("saved-suppliers"))
+        self.assertEqual(resp_list.status_code, 200)
+        self.assertContains(resp_list, "Heavy Machinery Works")
+        self.assertContains(resp_list, "Hydraulic Excavator 20 Ton")
+
+        # 3. Delete shortlisted supplier
+        resp_del = self.client.post(reverse("delete-saved-supplier", args=[item.id]))
+        self.assertEqual(resp_del.status_code, 302)
+        self.assertFalse(SavedItem.objects.filter(id=item.id).exists())
+
+    def test_send_rfq_and_inquiries_tracking(self):
+        """Buyer can dispatch RFQ inquiry and track delivery status in inquiries list"""
+        self.client.login(email="buyeradmin@buildtech.com", password="Password@123")
+
+        # 1. Send RFQ
+        resp = self.client.post(reverse("send-rfq", args=[self.supplier_result.id]), {
+            "subject": "Commercial RFQ - 2 Units Hydraulic Excavator",
+            "message": "Please provide your formal quotation with FOB delivery terms and warranty details.",
+            "sent_to_email": "sales@heavymachinery.co.in",
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse("inquiries-list"))
+
+        # Verify DB entry
+        inquiry = Inquiry.objects.filter(company=self.buyer_company, search_result=self.supplier_result).first()
+        self.assertIsNotNone(inquiry)
+        self.assertEqual(inquiry.subject, "Commercial RFQ - 2 Units Hydraulic Excavator")
+        self.assertEqual(inquiry.sent_to_email, "sales@heavymachinery.co.in")
+        self.assertEqual(inquiry.status, Inquiry.Status.SENT)
+
+        # 2. View Inquiries list page
+        resp_list = self.client.get(reverse("inquiries-list"))
+        self.assertEqual(resp_list.status_code, 200)
+        self.assertContains(resp_list, "Commercial RFQ - 2 Units Hydraulic Excavator")
+        self.assertContains(resp_list, "sales@heavymachinery.co.in")
+        self.assertContains(resp_list, "Heavy Machinery Works")
+
+    def test_inquiry_detail_and_record_quote_workflow(self):
+        """Buyer can view RFQ dossier, log received supplier quote, creating PriceHistory"""
+        inquiry = Inquiry.objects.create(
+            company=self.buyer_company,
+            search_result=self.supplier_result,
+            subject="RFQ - Excavator Unit Price",
+            message="Please provide price for 2 units.",
+            sent_to_email="sales@heavymachinery.co.in",
+            status=Inquiry.Status.SENT,
+        )
+        self.client.login(email="buyeradmin@buildtech.com", password="Password@123")
+
+        # 1. View Detail Dossier
+        resp_detail = self.client.get(reverse("inquiry-detail", args=[inquiry.id]))
+        self.assertEqual(resp_detail.status_code, 200)
+        self.assertContains(resp_detail, "Heavy Machinery Works")
+        self.assertContains(resp_detail, "RFQ - Excavator Unit Price")
+
+        # 2. Record Received Quote
+        resp_quote = self.client.post(reverse("record-inquiry-quote", args=[inquiry.id]), {
+            "quoted_price": "4150000.00",
+            "currency": "INR",
+            "notes": "Includes 2 years comprehensive warranty and site commissioning.",
+        })
+        self.assertEqual(resp_quote.status_code, 302)
+
+        inquiry.refresh_from_db()
+        self.assertEqual(inquiry.status, Inquiry.Status.REPLIED)
+        self.assertIn("4150000.00", inquiry.message)
+
+        # Verify PriceHistory created
+        from apps.leads.models import PriceHistory
+        ph = PriceHistory.objects.filter(
+            external_company=self.supplier_ext_company,
+            price=Decimal("4150000.00")
+        ).first()
+        self.assertIsNotNone(ph)
+
+        # 3. View detail again and verify price history table appears
+        resp_detail2 = self.client.get(reverse("inquiry-detail", args=[inquiry.id]))
+        self.assertContains(resp_detail2, "4150000.00")
+        self.assertContains(resp_detail2, "REPLIED")
+
+    def test_resend_and_delete_inquiry(self):
+        """Buyer can resend follow-up RFQ and delete inquiry"""
+        inquiry = Inquiry.objects.create(
+            company=self.buyer_company,
+            search_result=self.supplier_result,
+            subject="RFQ Follow-up Test",
+            message="Original RFQ",
+            sent_to_email="sales@heavymachinery.co.in",
+            status=Inquiry.Status.SENT,
+        )
+        self.client.login(email="buyeradmin@buildtech.com", password="Password@123")
+
+        # Resend
+        resp_resend = self.client.post(reverse("resend-inquiry", args=[inquiry.id]), {
+            "followup_note": "Friendly reminder regarding our pending quote request.",
+        })
+        self.assertEqual(resp_resend.status_code, 302)
+        inquiry.refresh_from_db()
+        self.assertIn("Friendly reminder", inquiry.message)
+
+        # Delete
+        resp_del = self.client.post(reverse("delete-inquiry", args=[inquiry.id]))
+        self.assertEqual(resp_del.status_code, 302)
+        self.assertFalse(Inquiry.objects.filter(id=inquiry.id).exists())
+
+    def test_seller_can_access_inquiries_without_buyer_permission_restriction(self):
+        """Seller accounts can view and manage inquiries from sales module without restriction"""
+        inquiry = Inquiry.objects.create(
+            company=self.seller_company,
+            search_result=self.lead_result,
+            subject="Commercial Proposal - TMT Steel Bars",
+            message="We can supply 500 tons per month at competitive pricing.",
+            sent_to_email="procurement@metroinfra.in",
+            status=Inquiry.Status.SENT,
+        )
+        self.client.login(email="selleradmin@steelcorp.com", password="Password@123")
+
+        # 1. Access via sales inquiries URL
+        resp_sales = self.client.get(reverse("sales-inquiries-list"))
+        self.assertEqual(resp_sales.status_code, 200)
+        self.assertContains(resp_sales, "Buyer Inquiries & Commercial Outreach")
+        self.assertContains(resp_sales, "Commercial Proposal - TMT Steel Bars")
+        self.assertContains(resp_sales, "Find New Buyers")
+
+        # 2. Access inquiry detail dossier
+        resp_detail = self.client.get(reverse("inquiry-detail", args=[inquiry.id]))
+        self.assertEqual(resp_detail.status_code, 200)
+        self.assertContains(resp_detail, "Commercial Proposal - TMT Steel Bars")
+
+        # 3. Delete inquiry as seller
+        resp_del = self.client.post(reverse("delete-inquiry", args=[inquiry.id]))
+        self.assertEqual(resp_del.status_code, 302)
+        self.assertFalse(Inquiry.objects.filter(id=inquiry.id).exists())
+
+
+class SellerRolesAndTeamManagementTestCase(TestCase):
+    """Test suite for Roles & Responsibilities under Seller and dynamic Role assignment in Team"""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            email="admin@apexdynamics.com",
+            password="Password@123",
+            first_name="Admin",
+            last_name="Boss",
+            is_active=True,
+            is_email_verified=True,
+        )
+        self.company = Company.objects.create(
+            name="Apex Dynamics Pvt Ltd",
+            company_type=Company.CompanyType.BOTH,
+            created_by=self.admin_user,
+            is_active=True,
+        )
+        self.admin_member = CompanyMember.objects.create(
+            company=self.company,
+            user=self.admin_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+    def test_roles_management_page_loads_and_seeds_defaults(self):
+        """Admin can access /sales/roles/ and default system/custom roles are auto-seeded"""
+        self.client.login(email="admin@apexdynamics.com", password="Password@123")
+        resp = self.client.get(reverse("seller-roles-web"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Role Management")
+        self.assertContains(resp, "Add New Role")
+        self.assertContains(resp, "Admin")
+        self.assertContains(resp, "Full Administrative Access")
+
+    def test_create_custom_role_with_matrix_permissions(self):
+        """Admin creates custom role with specific module permission checkboxes"""
+        self.client.login(email="admin@apexdynamics.com", password="Password@123")
+        create_data = {
+            "name": "BD Executive",
+            "description": "Responsible for leads and buyer inquiries",
+            "perm_products_read": "1",
+            "perm_leads_read": "1",
+            "perm_leads_write": "1",
+            "perm_leads_edit": "1",
+            "perm_inquiries_read": "1",
+            "perm_inquiries_write": "1",
+        }
+        resp = self.client.post(reverse("seller-role-create"), data=create_data)
+        self.assertEqual(resp.status_code, 302)
+        self.assertRedirects(resp, reverse("seller-roles-web"))
+
+        from apps.companies.models import CompanyRole, RolePermission
+        role = CompanyRole.objects.get(company=self.company, name="BD Executive")
+        self.assertFalse(role.is_system)
+
+        leads_perm = RolePermission.objects.get(role=role, module="leads")
+        self.assertTrue(leads_perm.can_read)
+        self.assertTrue(leads_perm.can_write)
+        self.assertTrue(leads_perm.can_edit)
+        self.assertFalse(leads_perm.can_delete)
+
+    def test_team_user_creation_with_custom_role(self):
+        """Company Admin creates user selecting a custom role; permissions sync properly"""
+        from apps.companies.models import CompanyRole
+        self.client.login(email="admin@apexdynamics.com", password="Password@123")
+        
+        # Access roles first to ensure defaults exist
+        self.client.get(reverse("seller-roles-web"))
+        sales_rep_role = CompanyRole.objects.filter(company=self.company, name="Sales Executive").first()
+        self.assertIsNotNone(sales_rep_role)
+
+        add_user_data = {
+            "action": "add_member",
+            "email": "executive@apexdynamics.com",
+            "password": "Password@123",
+            "first_name": "Rohan",
+            "last_name": "Verma",
+            "phone": "+91 9988776655",
+            "role_id": sales_rep_role.id,
+            "is_active": "on",
+            "is_email_verified": "on",
+        }
+        resp = self.client.post(reverse("company-team-web"), data=add_user_data)
+        self.assertEqual(resp.status_code, 302)
+
+        member = CompanyMember.objects.get(company=self.company, user__email="executive@apexdynamics.com")
+        self.assertEqual(member.custom_role, sales_rep_role)
+        self.assertEqual(member.role, CompanyMember.Role.USER)
+
+        # Verify team page displays the custom role
+        resp_team = self.client.get(reverse("company-team-web"))
+        self.assertEqual(resp_team.status_code, 200)
+        self.assertContains(resp_team, "Sales Executive")
+
+    def test_cannot_delete_system_role(self):
+        """System default roles cannot be deleted"""
+        from apps.companies.models import CompanyRole
+        self.client.login(email="admin@apexdynamics.com", password="Password@123")
+        self.client.get(reverse("seller-roles-web"))
+
+        admin_role = CompanyRole.objects.get(company=self.company, is_system=True)
+        resp = self.client.post(reverse("seller-role-delete", args=[admin_role.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(CompanyRole.objects.filter(id=admin_role.id).exists())
+
+
 
 
 

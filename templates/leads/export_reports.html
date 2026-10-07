@@ -1,38 +1,445 @@
 {% extends "base.html" %}
 
-{% block title %}Export Reports — AI Procurement & Sales{% endblock %}
+{% block title %}Export Reports — AI Platform{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto space-y-6">
+<div class="space-y-6">
 
-  <div>
-    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Export Reports</h1>
-    <p class="text-xs text-slate-500 mt-1">Export search jobs, supplier price comparisons, and sales lead reports in Excel or PDF</p>
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% if is_seller_context %}{% url 'products-list' %}{% else %}{% url 'requirements-list' %}{% endif %}" class="hover:text-blue-600 transition">
+          {% if is_seller_context %}Sales{% else %}Procurement{% endif %}
+        </a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Export Reports</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-download"></i>
+        </span>
+        <span>Export Reports (Product-Wise)</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Generate and download structured CSV and Excel reports product-by-product or consolidated across your entire catalog.
+      </p>
+    </div>
+    <div class="flex items-center gap-2.5">
+      {% if is_seller_context %}
+      <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-funnel-dollar text-orange-500"></i>
+        <span>Saved Buyers</span>
+      </a>
+      <a href="{% url 'leads-list' %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm shadow-orange-500/20">
+        <i class="fa-solid fa-users-viewfinder"></i>
+        <span>Buyer Leads</span>
+      </a>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-      <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
-        <i class="fa-solid fa-file-excel"></i>
+  <!-- Product Selector & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3.5">
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      
+      <!-- Searchable Combobox Dropdown -->
+      <div class="flex-1 relative" id="export-product-combobox">
+        <label for="export_product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-filter text-orange-500"></i>
+            <span>Select Product to Export</span>
+          </span>
+          <span class="text-slate-400 font-medium normal-case">
+            {{ products|length }} Products &bull; A-Z
+          </span>
+        </label>
+
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          </div>
+
+          <input 
+            type="text" 
+            id="export_product_filter_input" 
+            autocomplete="off"
+            placeholder="Search product to export reports (A-Z)..."
+            value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
+            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
+          >
+
+          <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+            {% if selected_product %}
+            <a 
+              href="{% if is_seller_context %}{% url 'sales-export-reports' %}{% else %}{% url 'export-reports' %}{% endif %}" 
+              id="clear_export_filter_btn" 
+              class="text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+              title="Export all products"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </a>
+            {% else %}
+            <button 
+              type="button" 
+              id="clear_export_filter_btn" 
+              class="hidden text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+              title="Clear selection"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+            {% endif %}
+            <button 
+              type="button" 
+              id="toggle_export_dropdown_btn" 
+              class="text-slate-400 hover:text-orange-600 p-1 rounded-md transition"
+              title="Toggle product list"
+            >
+              <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="export_chevron"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Dropdown Menu -->
+        <div 
+          id="export_dropdown_menu" 
+          class="hidden absolute z-30 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
+        >
+          <!-- All Products Option -->
+          <a 
+            href="{% if is_seller_context %}{% url 'sales-export-reports' %}{% else %}{% url 'export-reports' %}{% endif %}" 
+            class="export-product-option px-3.5 py-2.5 hover:bg-orange-50/70 flex items-center justify-between transition group {% if not selected_product %}bg-orange-50 text-orange-950 font-bold{% endif %}"
+            data-name="all products consolidated"
+            data-category=""
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                <i class="fa-solid fa-layer-group"></i>
+              </span>
+              <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition">
+                All Products (Consolidated Report)
+              </span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-orange-100 text-orange-700">
+              {{ total_leads_count }} Leads
+            </span>
+          </a>
+
+          {% for p in products %}
+          <a 
+            href="{% if is_seller_context %}{% url 'sales-export-reports' %}{% else %}{% url 'export-reports' %}{% endif %}?product_id={{ p.id }}" 
+            class="export-product-option px-3.5 py-2.5 hover:bg-orange-50/70 flex items-center justify-between transition group {% if selected_product and selected_product.id == p.id %}bg-orange-50 text-orange-950 font-bold{% endif %}"
+            data-id="{{ p.id }}"
+            data-name="{{ p.name }}"
+            data-category="{{ p.category.name|default:'' }}"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-orange-100 text-slate-500 group-hover:text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                {{ forloop.counter }}
+              </span>
+              <div class="truncate">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">
+                  {{ p.name }}
+                </div>
+                <div class="text-[10px] text-slate-400 font-normal">
+                  {{ p.category.name|default:"General" }} &bull; MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-slate-100 text-slate-600 group-hover:bg-orange-100 group-hover:text-orange-700">
+                {{ p.category.name|default:"General" }}
+              </span>
+              {% if p.lead_count > 0 %}
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                {{ p.lead_count }} Leads
+              </span>
+              {% endif %}
+            </div>
+          </a>
+          {% empty %}
+          <div class="px-4 py-4 text-xs text-center text-slate-400">
+            No products found in catalog.
+          </div>
+          {% endfor %}
+
+          <div id="export_no_match" class="hidden px-4 py-4 text-xs text-center text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-sm mb-1 block text-slate-300"></i>
+            No products match "<span id="export_no_match_query" class="font-semibold text-slate-600"></span>"
+          </div>
+        </div>
       </div>
-      <h3 class="font-bold text-slate-900 text-sm">Excel Format (.xlsx)</h3>
-      <p class="text-xs text-slate-500">Includes complete tables: supplier contact details, MOQ, price breakdown, match score, and verified URLs.</p>
-      <button class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs transition">
-        Download Excel
-      </button>
+
     </div>
 
-    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-      <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl">
-        <i class="fa-solid fa-file-pdf"></i>
-      </div>
-      <h3 class="font-bold text-slate-900 text-sm">Executive Summary PDF</h3>
-      <p class="text-xs text-slate-500">Formatted procurement memo with landed cost charts, cheaper exporter options, and company credentials.</p>
-      <button class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs transition">
-        Download PDF
-      </button>
+    <!-- Quick Filter Tabs -->
+    <div class="pt-2 border-t border-slate-100 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+      <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+        Quick Tabs:
+      </span>
+
+      <a 
+        href="{% if is_seller_context %}{% url 'sales-export-reports' %}{% else %}{% url 'export-reports' %}{% endif %}" 
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if not selected_product %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+      >
+        <i class="fa-solid fa-layer-group text-[10px]"></i>
+        <span>All Products (Consolidated)</span>
+      </a>
+
+      {% for p in products %}
+      <a 
+        href="{% if is_seller_context %}{% url 'sales-export-reports' %}{% else %}{% url 'export-reports' %}{% endif %}?product_id={{ p.id }}" 
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if selected_product and selected_product.id == p.id %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
+      >
+        <span class="truncate max-w-[150px]">{{ p.name }}</span>
+        {% if p.lead_count > 0 %}
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if selected_product and selected_product.id == p.id %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
+          {{ p.lead_count }}
+        </span>
+        {% endif %}
+      </a>
+      {% endfor %}
     </div>
+  </div>
+
+  <!-- Active Scope Highlight Banner -->
+  <div class="bg-gradient-to-r from-orange-50 via-white to-amber-50 rounded-2xl border border-orange-200 p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex items-center space-x-3.5">
+      <div class="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center text-lg shadow-md shadow-orange-500/20 shrink-0 font-bold">
+        {% if selected_product %}<i class="fa-solid fa-box"></i>{% else %}<i class="fa-solid fa-file-invoice"></i>{% endif %}
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="text-base font-extrabold text-slate-900 leading-tight">
+            {% if selected_product %}
+              {{ selected_product.name }}
+            {% else %}
+              Consolidated Catalog Report (All Products)
+            {% endif %}
+          </h2>
+          {% if selected_product %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
+            {{ selected_product.category.name|default:"General" }}
+          </span>
+          {% endif %}
+        </div>
+        <div class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-3">
+          {% if selected_product %}
+          <span>MOQ: <strong>{{ selected_product.minimum_order_quantity|default:selected_product.moq|default:"1" }} {{ selected_product.unit|default:"pcs" }}</strong></span>
+          <span>&bull;</span>
+          <span class="text-emerald-700 font-semibold">{{ selected_product.lead_count }} Discovered Leads</span>
+          <span>&bull;</span>
+          <span class="text-blue-700 font-semibold">{{ selected_product.saved_count }} in CRM</span>
+          <span>&bull;</span>
+          <span class="text-amber-700 font-semibold">{{ selected_product.inquiry_count }} Inquiries</span>
+          {% else %}
+          <span>Catalog Total: <strong>{{ products|length }} Products</strong></span>
+          <span>&bull;</span>
+          <span class="text-emerald-700 font-semibold">{{ total_leads_count }} Total Discovered Leads</span>
+          <span>&bull;</span>
+          <span class="text-blue-700 font-semibold">{{ total_saved_count }} in CRM</span>
+          <span>&bull;</span>
+          <span class="text-amber-700 font-semibold">{{ total_inquiry_count }} Inquiries</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if selected_product %}
+    <a href="{% if is_seller_context %}{% url 'sales-export-reports' %}{% else %}{% url 'export-reports' %}{% endif %}" class="text-xs font-bold text-slate-600 hover:text-slate-900 border border-slate-300 px-3.5 py-2 rounded-xl hover:bg-slate-50 transition shrink-0">
+      Reset to Consolidated View
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Download Report Cards Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    
+    <!-- 1. Buyer Leads Report Card -->
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl mb-3">
+          <i class="fa-solid fa-users-viewfinder"></i>
+        </div>
+        <h3 class="font-bold text-slate-900 text-sm">Buyer Leads Report (CSV / Excel)</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          {% if selected_product %}
+            Exports verified company names, contact emails, phone numbers, fit match percentage, and purchase intent signals discovered specifically for <strong>{{ selected_product.name }}</strong>.
+          {% else %}
+            Exports verified buyer directory, contact emails, phone numbers, fit match percentage, and procurement intent signals across all catalog products.
+          {% endif %}
+        </p>
+      </div>
+      <a 
+        href="?download=1&type=leads{% if selected_product %}&product_id={{ selected_product.id }}{% endif %}" 
+        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md shadow-orange-500/20 text-center flex items-center justify-center gap-2"
+      >
+        <i class="fa-solid fa-file-csv text-sm"></i>
+        <span>Download Buyer Leads CSV</span>
+      </a>
+    </div>
+
+    <!-- 2. Saved CRM Pipeline Report Card -->
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl mb-3">
+          <i class="fa-solid fa-funnel-dollar"></i>
+        </div>
+        <h3 class="font-bold text-slate-900 text-sm">Sales CRM Pipeline Report (CSV)</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          {% if selected_product %}
+            Exports shortlisted deals, assigned team members, negotiation stage status (New, Contacted, Won, Lost), and internal deal notes for <strong>{{ selected_product.name }}</strong>.
+          {% else %}
+            Exports all active CRM pipeline leads, assigned sales reps, stage status, and internal notes across all products.
+          {% endif %}
+        </p>
+      </div>
+      <a 
+        href="?download=1&type=saved{% if selected_product %}&product_id={{ selected_product.id }}{% endif %}" 
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md shadow-blue-600/20 text-center flex items-center justify-center gap-2"
+      >
+        <i class="fa-solid fa-file-arrow-down text-sm"></i>
+        <span>Download CRM Pipeline CSV</span>
+      </a>
+    </div>
+
+    <!-- 3. Inquiries & Outreach Audit Card -->
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl mb-3">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <h3 class="font-bold text-slate-900 text-sm">Inquiries & Outreach Audit (CSV)</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          {% if selected_product %}
+            Exports sent commercial inquiries, recipient contacts, dispatch timestamps, and response feedback for <strong>{{ selected_product.name }}</strong>.
+          {% else %}
+            Exports complete audit trail of sent quotation inquiries, delivery states, and supplier quotes across all products.
+          {% endif %}
+        </p>
+      </div>
+      <a 
+        href="?download=1&type=inquiries{% if selected_product %}&product_id={{ selected_product.id }}{% endif %}" 
+        class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md text-center flex items-center justify-center gap-2"
+      >
+        <i class="fa-solid fa-envelope-open-text text-sm"></i>
+        <span>Download Inquiries Audit CSV</span>
+      </a>
+    </div>
+
+    <!-- 4. Consolidated Product Summary Card -->
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl mb-3">
+          <i class="fa-solid fa-file-excel"></i>
+        </div>
+        <h3 class="font-bold text-slate-900 text-sm">Consolidated Product Catalog Matrix</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Comprehensive table mapping every product to its category, MOQ, verified buyer lead volume, active pipeline deals, and dispatched inquiries.
+        </p>
+      </div>
+      <a 
+        href="?download=1&type=consolidated" 
+        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-md shadow-emerald-600/20 text-center flex items-center justify-center gap-2"
+      >
+        <i class="fa-solid fa-table text-sm"></i>
+        <span>Download Consolidated Matrix CSV</span>
+      </a>
+    </div>
+
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const filterInput = document.getElementById('export_product_filter_input');
+  const dropdownMenu = document.getElementById('export_dropdown_menu');
+  const toggleBtn = document.getElementById('toggle_export_dropdown_btn');
+  const chevron = document.getElementById('export_chevron');
+  const clearBtn = document.getElementById('clear_export_filter_btn');
+  const options = Array.from(document.querySelectorAll('.export-product-option'));
+  const noMatch = document.getElementById('export_no_match');
+  const noMatchQuery = document.getElementById('export_no_match_query');
+  const comboboxWrapper = document.getElementById('export-product-combobox');
+
+  function openDropdown() {
+    dropdownMenu.classList.remove('hidden');
+    if (chevron) chevron.classList.add('rotate-180');
+  }
+
+  function closeDropdown() {
+    dropdownMenu.classList.add('hidden');
+    if (chevron) chevron.classList.remove('rotate-180');
+  }
+
+  function filterOptions(query) {
+    const q = (query || '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    options.forEach(opt => {
+      const name = (opt.getAttribute('data-name') || '').toLowerCase();
+      const cat = (opt.getAttribute('data-category') || '').toLowerCase();
+      if (!q || name.includes(q) || cat.includes(q)) {
+        opt.classList.remove('hidden');
+        visibleCount++;
+      } else {
+        opt.classList.add('hidden');
+      }
+    });
+
+    if (visibleCount === 0 && q) {
+      noMatch.classList.remove('hidden');
+      noMatchQuery.textContent = query;
+    } else {
+      noMatch.classList.add('hidden');
+    }
+  }
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (dropdownMenu.classList.contains('hidden')) {
+        filterOptions(filterInput.value);
+        openDropdown();
+      } else {
+        closeDropdown();
+      }
+    });
+  }
+
+  if (filterInput) {
+    filterInput.addEventListener('focus', function() {
+      filterOptions(filterInput.value);
+      openDropdown();
+    });
+
+    filterInput.addEventListener('input', function() {
+      const q = this.value;
+      if (clearBtn) {
+        if (q) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+      }
+      filterOptions(q);
+      openDropdown();
+    });
+
+    filterInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeDropdown();
+      }
+    });
+  }
+
+  document.addEventListener('click', function(e) {
+    if (comboboxWrapper && !comboboxWrapper.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+});
+</script>
 {% endblock %}

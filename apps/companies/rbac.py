@@ -195,7 +195,7 @@ def get_user_rbac_context(user, company_id=None):
         if is_super_admin:
             company = Company.objects.filter(id=company_id, is_active=True).first()
         else:
-            membership = CompanyMember.objects.select_related("company").filter(
+            membership = CompanyMember.objects.select_related("company", "custom_role").filter(
                 user=user,
                 company_id=company_id,
                 is_active=True,
@@ -206,7 +206,7 @@ def get_user_rbac_context(user, company_id=None):
 
     if not company:
         # Default to first company membership
-        membership = CompanyMember.objects.select_related("company").filter(
+        membership = CompanyMember.objects.select_related("company", "custom_role").filter(
             user=user,
             is_active=True,
             company__is_active=True,
@@ -228,9 +228,13 @@ def get_user_rbac_context(user, company_id=None):
         is_company_admin = True
         permissions_set = {"READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"}
     elif membership:
-        if membership.role == CompanyMember.Role.ADMIN:
+        is_admin_flag = (
+            membership.role == CompanyMember.Role.ADMIN
+            or (membership.custom_role and (membership.custom_role.is_system or membership.custom_role.name.lower() == "admin"))
+        )
+        if is_admin_flag:
             role = "COMPANY_ADMIN"
-            role_label = "Company Admin"
+            role_label = membership.custom_role.name if membership.custom_role else "Company Admin"
             is_company_admin = True
             # Company Admin gets all 6 permissions automatically
             permissions_set = {"READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"}
@@ -244,19 +248,22 @@ def get_user_rbac_context(user, company_id=None):
                 permissions_set.add(f"{p.permission.module}:{p.permission.permission}")
                 permissions_set.add(f"{p.permission.module}:*")
 
-            # Determine specific role label (Buyer, Seller, or Company User)
-            has_buyer_perm = any(p.startswith("requirements:") for p in permissions_set)
-            has_seller_perm = any(p.startswith("products:") or p.startswith("leads:") for p in permissions_set)
-            if has_buyer_perm and not has_seller_perm:
-                role_label = "Buyer"
-            elif has_seller_perm and not has_buyer_perm:
-                role_label = "Seller"
-            elif company and company.company_type == Company.CompanyType.BUYER:
-                role_label = "Buyer"
-            elif company and company.company_type == Company.CompanyType.SELLER:
-                role_label = "Seller"
+            if membership.custom_role:
+                role_label = membership.custom_role.name
             else:
-                role_label = "Company User"
+                # Determine specific role label (Buyer, Seller, or Company User)
+                has_buyer_perm = any(p.startswith("requirements:") for p in permissions_set)
+                has_seller_perm = any(p.startswith("products:") or p.startswith("leads:") for p in permissions_set)
+                if has_buyer_perm and not has_seller_perm:
+                    role_label = "Buyer"
+                elif has_seller_perm and not has_buyer_perm:
+                    role_label = "Seller"
+                elif company and company.company_type == Company.CompanyType.BUYER:
+                    role_label = "Buyer"
+                elif company and company.company_type == Company.CompanyType.SELLER:
+                    role_label = "Seller"
+                else:
+                    role_label = "Company User"
 
     # Scope module visibility strictly by company type and permissions
     company_type = company.company_type if company else "BOTH"
@@ -317,18 +324,30 @@ def get_user_rbac_context(user, company_id=None):
             ],
         }
     elif is_seller_only:
+        seller_mods = [
+            {"name": "Seller Dashboard", "url": "/dashboard/", "icon": "fa-house"},
+            {"name": "My Products", "url": "/sales/products/", "icon": "fa-box-open"},
+            {"name": "Find Buyers", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
+            {"name": "Buyer Leads", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
+            {"name": "Saved Buyers", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
+            {"name": "Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane"},
+        ]
+        if is_company_admin or is_super_admin:
+            seller_mods.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield"})
         navigation = {
             "title": "Seller Dashboard",
-            "modules": [
-                {"name": "Seller Dashboard", "url": "/dashboard/", "icon": "fa-house"},
-                {"name": "My Products", "url": "/sales/products/", "icon": "fa-box-open"},
-                {"name": "Find Buyers", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
-                {"name": "Buyer Leads", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
-                {"name": "Saved Buyers", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
-                {"name": "Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane"},
-            ],
+            "modules": seller_mods,
         }
     else:  # BOTH or Super Admin
+        seller_mods = [
+            {"name": "My Products", "url": "/sales/products/", "icon": "fa-box-open"},
+            {"name": "Find Buyers", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
+            {"name": "Buyer Leads", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
+            {"name": "Saved Buyers", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
+            {"name": "Buyer Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane"},
+        ]
+        if is_company_admin or is_super_admin:
+            seller_mods.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield"})
         navigation = {
             "title": "Overview",
             "sections": [
@@ -343,13 +362,7 @@ def get_user_rbac_context(user, company_id=None):
                 },
                 {
                     "title": "SELLER",
-                    "modules": [
-                        {"name": "My Products", "url": "/sales/products/", "icon": "fa-box-open"},
-                        {"name": "Find Buyers", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
-                        {"name": "Buyer Leads", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
-                        {"name": "Saved Buyers", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
-                        {"name": "Buyer Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane"},
-                    ],
+                    "modules": seller_mods,
                 },
             ],
         }

@@ -9,6 +9,7 @@ from apps.ai_search.models import SearchJob, SearchResult
 from apps.ai_search.services.pipeline import run_find_suppliers_search
 from apps.catalog.models import Category
 from apps.companies.rbac import get_user_rbac_context
+from apps.leads.models import SavedItem
 from apps.requirements.models import Requirement
 
 
@@ -489,9 +490,11 @@ def find_suppliers_view(request):
         selected_requirement = Requirement.objects.filter(id=requirement_id, company=company, is_deleted=False).first()
 
     results = results_qs[:30]
+    saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
     return render(request, "requirements/find_suppliers.html", {
         "results": results,
+        "saved_result_ids": saved_result_ids,
         "requirements": requirements,
         "selected_requirement": selected_requirement,
         "selected_requirement_id": int(requirement_id) if requirement_id and requirement_id.isdigit() else None,

@@ -3,46 +3,56 @@ import re
 import urllib.parse
 from datetime import datetime
 import requests
+import urllib3
 from bs4 import BeautifulSoup
+
+# Suppress SSL insecure request warnings during scraping of diverse B2B sites
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
-# Common Indian & Global Industrial Metros / Clusters for extraction
+# Common Industrial Metros / Clusters for extraction
 COMMON_CITIES = [
-    "Mumbai", "Delhi", "Bengaluru", "Bangalore", "Hyderabad", "Ahmedabad", "Chennai",
-    "Kolkata", "Surat", "Pune", "Jaipur", "Lucknow", "Kanpur", "Nagpur", "Indore",
-    "Thane", "Bhopal", "Visakhapatnam", "Vadodara", "Firozabad", "Ludhiana", "Rajkot",
-    "Agra", "Nashik", "Faridabad", "Meerut", "Ghaziabad", "Coimbatore", "Vapi",
-    "Ankleshwar", "Panipat", "Jalandhar", "Moradabad", "Tirupur", "Noida", "Gurugram",
-    "Gurgaon", "Dubai", "Singapore", "Shanghai", "Shenzhen", "Hamburg", "Frankfurt",
-    "Houston", "Chicago", "London", "Tokyo", "Seoul",
+    "Mumbai", "Navi Mumbai", "Thane", "Pune", "Nashik", "Nagpur", "Aurangabad", "Kolhapur",
+    "Ahmedabad", "Vadodara", "Surat", "Rajkot", "Vapi", "Ankleshwar", "Gandhinagar", "Morbi",
+    "Delhi", "New Delhi", "Noida", "Greater Noida", "Gurugram", "Gurgaon", "Faridabad", "Ghaziabad",
+    "Bengaluru", "Bangalore", "Mysuru", "Belagavi",
+    "Chennai", "Coimbatore", "Tirupur", "Salem", "Madurai", "Trichy",
+    "Hyderabad", "Secunderabad", "Visakhapatnam", "Vijayawada",
+    "Kolkata", "Howrah", "Durgapur",
+    "Jaipur", "Jodhpur", "Udaipur", "Bhilwara",
+    "Ludhiana", "Jalandhar", "Amritsar", "Panipat", "Chandigarh", "Baddi",
+    "Kanpur", "Lucknow", "Agra", "Meerut", "Varanasi",
+    "Indore", "Bhopal", "Jabalpur", "Gwalior",
+    "Dubai", "Singapore", "Shanghai", "Shenzhen", "Hamburg", "Frankfurt", "Houston", "Chicago",
 ]
 
 COMMON_STATES_INDIA = [
     "Maharashtra", "Gujarat", "Tamil Nadu", "Karnataka", "Uttar Pradesh",
     "Haryana", "Punjab", "West Bengal", "Rajasthan", "Telangana", "Andhra Pradesh",
-    "Kerala", "Madhya Pradesh", "Delhi",
+    "Kerala", "Madhya Pradesh", "Delhi", "Himachal Pradesh", "Uttarakhand", "Odisha", "Chhattisgarh",
 ]
 
 EXCLUDED_EMAIL_EXTENSIONS = (
-    ".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp", ".css", ".js", ".woff", ".woff2"
+    ".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp", ".css", ".js", ".woff", ".woff2", ".ico"
 )
+
+EXCLUDED_EMAIL_DOMAINS = [
+    "example.com", "yourdomain.com", "sentry.io", "wixpress.com", "schema.org",
+    "domain.com", "email.com", "sample.com", "cloudflare.com", "wordpress.org"
+]
 
 
 class CompanyWebScraper:
     """
     Intelligent Web Scraper for B2B Company websites.
-    Extracts:
-      - Company Name
-      - Domain & Website
-      - Official Emails (mailto & regex text)
-      - Contact Numbers / Phones (tel & regex text)
-      - Physical Address / City / State / Country
-      - Business About / Description
-      - Company Role (Manufacturer, Supplier, Exporter, Distributor, End User)
-      - Industry
-    Includes resilient fallback parsing from search snippets and domain when
-    websites timeout or block bot scrapers.
+    Performs multi-page deep crawling:
+      1. Homepage crawling for primary meta, phones, emails, and address.
+      2. Automated discovery of /contact, /contact-us, /about-us subpages.
+      3. Contact subpage crawling to extract real phone numbers, verified emails,
+         and physical facility addresses.
+      4. Fallback search snippet extraction.
+    NEVER returns fake or hardcoded dummy contact information.
     """
 
     def __init__(self, timeout: float = 3.5):
@@ -53,14 +63,14 @@ class CompanyWebScraper:
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
         }
 
     def scrape(self, url: str, snippet_title: str = "", snippet_text: str = "") -> dict:
         """
-        Scrapes the given URL or falls back to snippet data.
-        Returns a dictionary with extracted company attributes.
+        Scrapes the given company URL with multi-page contact page crawling.
+        Extracts genuine contact details, emails, phones, and addresses.
         """
         parsed_url = urllib.parse.urlparse(url)
         netloc = parsed_url.netloc.lower()
@@ -68,29 +78,36 @@ class CompanyWebScraper:
         if not domain and url:
             domain = url.split("/")[0].replace("www.", "")
 
-        # Default fallback values
         clean_name = self._derive_name(snippet_title, domain)
+
+        # Baseline structure - Notice NO hardcoded dummy phone or fake email!
         extracted = {
             "name": clean_name,
             "domain": domain,
             "website": f"{parsed_url.scheme or 'https'}://{netloc or domain}",
-            "email": f"contact@{domain}" if domain else "",
-            "phone": "+91 22 2840 5000",
+            "email": "",
+            "phone": "",
             "address": "",
-            "city": "Mumbai",
-            "state": "Maharashtra",
+            "city": "",
+            "state": "",
             "country": "India",
-            "description": snippet_text or f"{clean_name} is an established B2B industrial enterprise.",
+            "description": snippet_text or f"{clean_name} is an active commercial B2B enterprise.",
             "company_role": "supplier",
-            "industry": "Industrial Goods & Equipment",
+            "industry": "Industrial Manufacturing & Supply",
         }
 
-        # Deduce role and city from snippet text first
-        if snippet_text:
-            role = self._detect_company_role(snippet_title + " " + snippet_text)
+        # 1. Parse hints from snippet text & title (location, role, any snippet phone/email)
+        combined_snippet = f"{snippet_title} {snippet_text}".strip()
+        if combined_snippet:
+            role = self._detect_company_role(combined_snippet)
             if role:
                 extracted["company_role"] = role
-            loc = self._extract_location_from_text(snippet_title + " " + snippet_text)
+            
+            industry = self._detect_industry(combined_snippet)
+            if industry:
+                extracted["industry"] = industry
+
+            loc = self._extract_location_from_text(combined_snippet)
             if loc.get("city"):
                 extracted["city"] = loc["city"]
             if loc.get("state"):
@@ -98,138 +115,184 @@ class CompanyWebScraper:
             if loc.get("country"):
                 extracted["country"] = loc["country"]
 
-        # Attempt live HTTP crawl with connection pooling and fast 200KB chunk reading
+            # Check if snippet contains phone number or email directly
+            snippet_phones = self._extract_phones_from_text(combined_snippet)
+            if snippet_phones:
+                extracted["phone"] = snippet_phones[0]
+
+            snippet_emails = self._extract_emails_from_text(combined_snippet)
+            if snippet_emails:
+                extracted["email"] = snippet_emails[0]
+
+        # 2. Live HTTP Crawl (Homepage + Subpage Contact Crawl)
         if url and url.startswith("http"):
             try:
-                resp = requests.get(
-                    url,
-                    headers=self.headers,
-                    timeout=self.timeout,
-                    verify=False,
-                    allow_redirects=True,
-                    stream=True,
-                )
-                if resp.status_code == 200:
-                    raw_chunk = resp.raw.read(200000).decode("utf-8", errors="ignore")
-                    live_data = self._parse_html(raw_chunk, url, domain, snippet_title)
-                    # Merge live data into extracted dict
-                    for k, v in live_data.items():
+                session = requests.Session()
+                session.headers.update(self.headers)
+                session.verify = False
+
+                homepage_resp = session.get(url, timeout=self.timeout, allow_redirects=True)
+                if homepage_resp.status_code == 200:
+                    html_text = homepage_resp.text
+                    homepage_data = self._parse_html(html_text=html_text, url=url, domain=domain, snippet_title=snippet_title)
+                    contact_links = homepage_data.pop("_contact_links", [])
+
+                    # Merge homepage findings
+                    for k, v in homepage_data.items():
                         if v:
                             extracted[k] = v
+
+                    # 3. If phone or email or physical address is still missing, deep crawl contact subpage!
+                    if (not extracted.get("phone") or not extracted.get("email") or not extracted.get("address")) and contact_links:
+                        contact_subpage_url = contact_links[0]
+                        try:
+                            sub_resp = session.get(contact_subpage_url, timeout=2.8, allow_redirects=True)
+                            if sub_resp.status_code == 200:
+                                sub_data = self._parse_html(html_text=sub_resp.text, url=contact_subpage_url, domain=domain, snippet_title=snippet_title)
+                                sub_data.pop("_contact_links", None)
+                                # Fill missing fields from contact page
+                                if not extracted.get("phone") and sub_data.get("phone"):
+                                    extracted["phone"] = sub_data["phone"]
+                                if not extracted.get("email") and sub_data.get("email"):
+                                    extracted["email"] = sub_data["email"]
+                                if not extracted.get("address") and sub_data.get("address"):
+                                    extracted["address"] = sub_data["address"]
+                                if not extracted.get("city") and sub_data.get("city"):
+                                    extracted["city"] = sub_data["city"]
+                                if not extracted.get("state") and sub_data.get("state"):
+                                    extracted["state"] = sub_data["state"]
+                        except Exception as sub_err:
+                            logger.debug(f"Contact subpage crawl error for {contact_subpage_url}: {sub_err}")
+
             except Exception as e:
-                logger.debug(f"Live scraping error for {url}: {e} (using snippet fallback)")
+                logger.debug(f"Live scraping error for {url}: {e} (using snippet data)")
+
+        # Format address cleanly if city/state known but full street address absent
+        if not extracted.get("address") and extracted.get("city"):
+            state_part = f", {extracted['state']}" if extracted.get("state") else ""
+            extracted["address"] = f"{extracted['city']}{state_part}, {extracted.get('country', 'India')}"
 
         return extracted
 
-    def _parse_html(self, html_text: str, url: str, domain: str, snippet_title: str) -> dict:
-        """Parses HTML document to extract company details, contacts, and addresses."""
+    def _parse_html(self, html_text: str, url: str = "", domain: str = "", snippet_title: str = "") -> dict:
+        """Parses HTML document to extract company details, contacts, addresses, and contact links."""
         soup = BeautifulSoup(html_text, "html.parser")
 
         # 1. Company Name
         name = ""
-        og_site_name = soup.find("meta", property="og:site_name")
-        if og_site_name and og_site_name.get("content"):
-            name = og_site_name["content"].strip()
+        # If snippet title is provided and clean, prioritize it
+        if snippet_title and len(snippet_title.strip()) > 2 and not any(kw in snippet_title.lower() for kw in ["http", "search", "result"]):
+            name = self._derive_name(snippet_title, domain)
+
+        if not name:
+            og_site_name = soup.find("meta", property="og:site_name")
+            if og_site_name and og_site_name.get("content"):
+                name = og_site_name["content"].strip()
 
         if not name:
             title_tag = soup.find("title")
             if title_tag and title_tag.get_text():
                 name = self._derive_name(title_tag.get_text().strip(), domain)
 
-        if not name and snippet_title:
-            name = self._derive_name(snippet_title, domain)
-
         # 2. Description
         description = ""
         meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", property="og:description")
         if meta_desc and meta_desc.get("content"):
             description = meta_desc["content"].strip()
-        
+
         if not description:
-            # Look for about paragraph
-            about_div = soup.find(id=re.compile(r"about|overview|intro", re.I)) or soup.find(class_=re.compile(r"about|overview|intro", re.I))
-            if about_div:
-                p = about_div.find("p")
+            about_elem = soup.find(id=re.compile(r"about|overview|intro", re.I)) or soup.find(class_=re.compile(r"about|overview|intro", re.I))
+            if about_elem:
+                p = about_elem.find("p")
                 if p:
                     description = p.get_text().strip()
 
-        # 3. Emails
+        # 3. Emails (mailto links + regex in page text)
         emails = []
         for a in soup.find_all("a", href=True):
             href = a["href"].strip()
             if href.lower().startswith("mailto:"):
                 raw_mail = href.split("mailto:")[1].split("?")[0].strip()
-                if raw_mail and "@" in raw_mail and not raw_mail.lower().endswith(EXCLUDED_EMAIL_EXTENSIONS):
+                if self._is_valid_email(raw_mail):
                     emails.append(raw_mail)
 
-        # Regex search for emails in page text
         text_content = soup.get_text(separator=" ")
-        regex_emails = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text_content)
-        for em in regex_emails:
-            em_clean = em.strip().rstrip(".,;")
-            if not em_clean.lower().endswith(EXCLUDED_EMAIL_EXTENSIONS) and "@" in em_clean:
-                if len(em_clean) <= 60 and not any(dummy in em_clean for dummy in ["example.com", "yourdomain"]):
-                    emails.append(em_clean)
+        regex_emails = self._extract_emails_from_text(text_content)
+        emails.extend(regex_emails)
 
-        # Pick primary email
+        # Remove duplicates while preserving order
+        unique_emails = list(dict.fromkeys(emails))
         primary_email = ""
-        if emails:
-            # Prioritize emails matching domain or info/sales/contact/rfq
+        if unique_emails:
+            # Prioritize sales / info / contact / procurement emails
             prioritized = [
-                e for e in emails if any(k in e.lower() for k in ["info@", "sales@", "contact@", "rfq@", "purchase@", "procure@"])
+                e for e in unique_emails if any(k in e.lower() for k in ["sales@", "info@", "contact@", "inquiry@", "enquiry@", "rfq@", "purchase@", "order@"])
             ]
-            primary_email = prioritized[0] if prioritized else emails[0]
-        elif domain:
-            primary_email = f"contact@{domain}"
+            primary_email = prioritized[0] if prioritized else unique_emails[0]
 
-        # 4. Phone Numbers
+        # 4. Phone Numbers (tel links + regex in page text)
         phones = []
         for a in soup.find_all("a", href=True):
             href = a["href"].strip()
             if href.lower().startswith("tel:"):
-                raw_phone = href.split("tel:")[1].strip()
-                if len(raw_phone) >= 7:
-                    phones.append(raw_phone)
+                raw_phone = href.split("tel:")[1].split("?")[0].strip()
+                clean_phone = self._clean_phone(raw_phone)
+                if clean_phone:
+                    phones.append(clean_phone)
 
-        # Regex phone lookup
-        phone_matches = re.findall(r"(?:\+91[\-\s]?)?[6789]\d{9}", text_content)
-        if phone_matches:
-            phones.extend(phone_matches[:3])
-        else:
-            intl_matches = re.findall(r"\+?\d{1,3}[\s\-\.]?\(?\d{2,4}\)?[\s\-\.]?\d{3,4}[\s\-\.]?\d{3,4}", text_content)
-            phones.extend([p.strip() for p in intl_matches if len(p.strip()) >= 10][:2])
+        regex_phones = self._extract_phones_from_text(text_content)
+        phones.extend(regex_phones)
 
-        primary_phone = phones[0] if phones else "+91 22 2840 5000"
+        unique_phones = list(dict.fromkeys(phones))
+        primary_phone = unique_phones[0] if unique_phones else ""
 
-        # 5. Location / Address
+        # 5. Address / Location
         address_text = ""
         address_tag = soup.find("address")
         if address_tag:
-            address_text = address_tag.get_text().strip()
-        
-        if not address_text:
-            footer = soup.find("footer")
-            if footer:
-                f_text = footer.get_text()
-                # Find lines mentioning address/office
-                for line in f_text.splitlines():
-                    if any(kw in line.lower() for kw in ["office", "plot no", "works", "plant", "registered office"]):
-                        address_text = line.strip()[:200]
-                        break
+            address_text = " ".join(address_tag.get_text().split()).strip()
 
-        loc = self._extract_location_from_text(text_content)
-        city = loc.get("city", "Mumbai")
-        state = loc.get("state", "Maharashtra")
+        if not address_text:
+            # Search footer or contact sections for physical address
+            for container in soup.find_all(["footer", "div", "section"], class_=re.compile(r"contact|footer|address|location|reach", re.I)):
+                c_text = container.get_text(separator="\n")
+                for line in c_text.splitlines():
+                    clean_line = " ".join(line.split()).strip()
+                    # Check if line contains postal code or address keywords
+                    if len(clean_line) >= 15 and len(clean_line) <= 220:
+                        has_pincode = bool(re.search(r"\b[1-9]\d{5}\b", clean_line))
+                        has_addr_kw = any(kw in clean_line.lower() for kw in [
+                            "plot no", "midc", "gidc", "industrial area", "phase", "road", "street", "estate",
+                            "works:", "factory:", "registered office", "head office", "plant:", "sector "
+                        ])
+                        if has_pincode or has_addr_kw:
+                            address_text = clean_line
+                            break
+                if address_text:
+                    break
+
+        loc = self._extract_location_from_text(address_text or text_content)
+        city = loc.get("city", "")
+        state = loc.get("state", "")
         country = loc.get("country", "India")
 
-        if not address_text and city:
-            address_text = f"Industrial Area, {city}, {state}, {country}"
+        # 6. Discover Contact Subpage Links for deep crawling
+        contact_links = []
+        parsed_base = urllib.parse.urlparse(url)
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            href_lower = href.lower()
+            if any(k in href_lower for k in ["/contact", "contact-us", "contact_us", "contactus", "reach-us", "get-in-touch", "/about-us"]):
+                full_url = urllib.parse.urljoin(url, href)
+                parsed_target = urllib.parse.urlparse(full_url)
+                # Keep within same domain and avoid anchors or mailto
+                if parsed_target.netloc == parsed_base.netloc and full_url not in contact_links and not full_url.startswith("mailto:"):
+                    contact_links.append(full_url)
 
-        # 6. Company Role & Industry
         role = self._detect_company_role(name + " " + description + " " + text_content[:1500])
         industry = self._detect_industry(name + " " + description)
 
-        return {
+        parsed_data = {
             "name": name,
             "description": description[:600],
             "email": primary_email[:250],
@@ -240,21 +303,109 @@ class CompanyWebScraper:
             "country": country[:100],
             "company_role": role,
             "industry": industry[:150],
+            "_contact_links": contact_links,
         }
+
+        return parsed_data
+
+    def _extract_emails_from_text(self, text: str) -> list[str]:
+        """Extracts valid business emails via regular expression."""
+        raw_matches = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text)
+        valid = []
+        for em in raw_matches:
+            em_clean = em.strip().rstrip(".,;:/)")
+            if self._is_valid_email(em_clean) and em_clean not in valid:
+                valid.append(em_clean)
+        return valid
+
+    def _is_valid_email(self, email: str) -> bool:
+        """Validates that an email is legitimate and not an asset/dummy."""
+        if not email or "@" not in email:
+            return False
+        em_lower = email.lower()
+        if em_lower.endswith(EXCLUDED_EMAIL_EXTENSIONS):
+            return False
+        if any(d in em_lower for d in EXCLUDED_EMAIL_DOMAINS):
+            return False
+        parts = em_lower.split("@")
+        if len(parts) != 2 or "." not in parts[1]:
+            return False
+        if len(email) < 6 or len(email) > 80:
+            return False
+        return True
+
+    def _extract_phones_from_text(self, text: str) -> list[str]:
+        """Extracts real telephone numbers from text."""
+        phones = []
+        # Pattern 1: Indian Mobile or Landline with country code: +91-XXXXX or +91 XXXXX
+        for m in re.finditer(r"(?:\+91[\s\-]?)?(?:0\d{2,4}[\s\-]?)?[6-9]\d{9}", text):
+            cleaned = self._clean_phone(m.group(0))
+            if cleaned and cleaned not in phones:
+                phones.append(cleaned)
+
+        # Pattern 2: Indian Landlines with STD codes (e.g., 020 2710 1000, 022 2840 5000, 011 2345 6789)
+        for m in re.finditer(r"\b0\d{2,4}[\s\-]\d{6,8}\b", text):
+            cleaned = self._clean_phone(m.group(0))
+            if cleaned and cleaned not in phones:
+                phones.append(cleaned)
+
+        # Pattern 3: Toll-free numbers (1800 XXX XXXX)
+        for m in re.finditer(r"\b1800[\s\-]?\d{3}[\s\-]?\d{3,4}\b", text):
+            cleaned = self._clean_phone(m.group(0))
+            if cleaned and cleaned not in phones:
+                phones.append(cleaned)
+
+        # Pattern 4: International format (+1-XXX..., +44-XXX...)
+        for m in re.finditer(r"\+\d{1,3}[\s\-]\(?\d{2,4}\)?[\s\-]\d{3,4}[\s\-]\d{3,4}", text):
+            cleaned = self._clean_phone(m.group(0))
+            if cleaned and cleaned not in phones:
+                phones.append(cleaned)
+
+        return phones
+
+    def _clean_phone(self, raw: str) -> str:
+        """Cleans and validates phone number string."""
+        if not raw:
+            return ""
+        # Strip extraneous trailing chars
+        cleaned = re.sub(r"[^\d\+\-\s\(\)]", "", raw).strip().strip("-.,")
+        digits_only = re.sub(r"\D", "", cleaned)
+        # Phone numbers should have between 8 and 14 digits
+        if len(digits_only) < 8 or len(digits_only) > 14:
+            return ""
+        # Filter out 6-digit pin codes or year numbers like 2024, 2025, 2026
+        if len(digits_only) == 6 or digits_only in ["2023", "2024", "2025", "2026", "2027"]:
+            return ""
+        return cleaned
 
     def _derive_name(self, title: str, domain: str) -> str:
         """Derives clean company name from website title or domain."""
         if title:
-            # Common title splits: "UT Pumps — Screw Pumps", "Kirloskar | Home", "Apex Petrochemicals Ltd - Contact"
+            # Check for common title splits
+            parts = [title]
             for sep in [" — ", " - ", " | ", " :: ", " : ", " • "]:
                 if sep in title:
-                    title = title.split(sep)[0].strip()
-            # Clean up trailing words
-            clean = re.sub(r"\b(home|welcome to|official website|products|services)\b", "", title, flags=re.I).strip()
+                    parts = [p.strip() for p in title.split(sep) if p.strip()]
+                    break
+
+            # Find the best part that looks like a company name
+            best_part = parts[0]
+            domain_base = domain.split(".")[0].lower() if domain else ""
+            for p in parts:
+                p_lower = p.lower()
+                # If segment mentions the domain or corporate keywords
+                if domain_base and domain_base in p_lower:
+                    best_part = p
+                    break
+                if any(kw in p_lower for kw in ["ltd", "limited", "pvt", "corp", "industries", "pumps", "engineering", "group"]):
+                    best_part = p
+                    break
+
+            clean = re.sub(r"\b(home|welcome to|official website|products|services|contact us|about us|manufacturer|supplier)\b", "", best_part, flags=re.I).strip()
+            clean = clean.strip(" -|:•—")
             if len(clean) > 2 and len(clean) < 60:
                 return clean
 
-        # From domain: e.g. "apexpetro.com" -> "Apex Petro"
         if domain:
             base = domain.split(".")[0]
             words = re.sub(r"[-_]", " ", base).title()
@@ -265,9 +416,9 @@ class CompanyWebScraper:
     def _detect_company_role(self, text: str) -> str:
         """Classifies role into manufacturer, supplier, trader, exporter, distributor, or end_user."""
         t = text.lower()
-        if any(w in t for w in ["procurement", "tenders", "rfq", "plant operations", "refinery", "infrastructure board", "contractor"]):
+        if any(w in t for w in ["procurement", "tender", "rfq", "refinery", "plant operations", "contractor", "buyer", "infrastructure board"]):
             return "end_user"
-        if any(w in t for w in ["manufacturer", "manufacturing", "factory", "oem", "production unit"]):
+        if any(w in t for w in ["manufacturer", "manufacturing", "factory", "oem", "production plant", "fabricator"]):
             return "manufacturer"
         if any(w in t for w in ["exporter", "exporting", "global export"]):
             return "exporter"
@@ -280,36 +431,53 @@ class CompanyWebScraper:
     def _detect_industry(self, text: str) -> str:
         """Detects broad industrial domain."""
         t = text.lower()
-        if any(w in t for w in ["pump", "valve", "flow", "fluid"]):
-            return "Fluid Management & Pumps"
-        if any(w in t for w in ["steel", "iron", "metal", "alloy", "pipe"]):
+        if any(w in t for w in ["pump", "valve", "flow", "fluid", "compressor", "hydraulic"]):
+            return "Fluid Management & Industrial Pumps"
+        if any(w in t for w in ["steel", "iron", "metal", "alloy", "pipe", "tube", "fabrication"]):
             return "Metals, Pipes & Heavy Fabrication"
-        if any(w in t for w in ["textile", "fabric", "cotton", "yarn", "garment"]):
-            return "Textiles & Apparel"
-        if any(w in t for w in ["chemical", "petrochemical", "polymer", "resin"]):
+        if any(w in t for w in ["textile", "fabric", "cotton", "yarn", "garment", "weaving"]):
+            return "Textiles & Industrial Fabrics"
+        if any(w in t for w in ["chemical", "petrochemical", "polymer", "resin", "solvent"]):
             return "Chemicals & Petrochemicals"
-        if any(w in t for w in ["electric", "motor", "power", "generator", "solar"]):
+        if any(w in t for w in ["electric", "motor", "power", "generator", "solar", "transformer"]):
             return "Electrical & Energy Equipment"
-        if any(w in t for w in ["auto", "automotive", "bearing", "gear"]):
+        if any(w in t for w in ["auto", "automotive", "bearing", "gear", "engine", "transmission"]):
             return "Automotive & Mechanical Parts"
         return "Industrial Manufacturing & Supply"
 
     def _extract_location_from_text(self, text: str) -> dict:
-        """Searches for city, state, country clues in text."""
-        result = {"city": "Mumbai", "state": "Maharashtra", "country": "India"}
+        """Searches for city, state, country clues in text. Defaults to empty strings if not found."""
+        result = {"city": "", "state": "", "country": "India"}
+        if not text:
+            return result
+
         for city in COMMON_CITIES:
             if re.search(r"\b" + re.escape(city) + r"\b", text, re.I):
                 result["city"] = city
-                if city in ["Vadodara", "Ahmedabad", "Surat", "Rajkot", "Vapi", "Ankleshwar"]:
+                if city in ["Vadodara", "Ahmedabad", "Surat", "Rajkot", "Vapi", "Ankleshwar", "Gandhinagar", "Morbi"]:
                     result["state"] = "Gujarat"
-                elif city in ["Mumbai", "Pune", "Nagpur", "Nashik", "Thane"]:
+                elif city in ["Mumbai", "Navi Mumbai", "Pune", "Nagpur", "Nashik", "Thane", "Aurangabad", "Kolhapur"]:
                     result["state"] = "Maharashtra"
-                elif city in ["Bengaluru", "Bangalore"]:
+                elif city in ["Bengaluru", "Bangalore", "Mysuru", "Belagavi"]:
                     result["state"] = "Karnataka"
-                elif city in ["Chennai", "Coimbatore", "Tirupur"]:
+                elif city in ["Chennai", "Coimbatore", "Tirupur", "Salem", "Madurai", "Trichy"]:
                     result["state"] = "Tamil Nadu"
-                elif city in ["Delhi", "Noida", "Gurugram", "Gurgaon", "Faridabad"]:
+                elif city in ["Delhi", "New Delhi", "Noida", "Greater Noida", "Gurugram", "Gurgaon", "Faridabad", "Ghaziabad"]:
                     result["state"] = "Delhi NCR"
+                elif city in ["Kolkata", "Howrah", "Durgapur"]:
+                    result["state"] = "West Bengal"
+                elif city in ["Jaipur", "Jodhpur", "Udaipur", "Bhilwara"]:
+                    result["state"] = "Rajasthan"
+                elif city in ["Hyderabad", "Secunderabad"]:
+                    result["state"] = "Telangana"
+                elif city in ["Visakhapatnam", "Vijayawada"]:
+                    result["state"] = "Andhra Pradesh"
+                elif city in ["Ludhiana", "Jalandhar", "Amritsar"]:
+                    result["state"] = "Punjab"
+                elif city in ["Kanpur", "Lucknow", "Agra", "Meerut", "Varanasi"]:
+                    result["state"] = "Uttar Pradesh"
+                elif city in ["Indore", "Bhopal", "Jabalpur", "Gwalior"]:
+                    result["state"] = "Madhya Pradesh"
                 elif city in ["Dubai"]:
                     result["state"] = "Dubai"
                     result["country"] = "UAE"
@@ -320,14 +488,15 @@ class CompanyWebScraper:
                     result["state"] = "Hesse"
                     result["country"] = "Germany"
                 elif city in ["Houston", "Chicago"]:
-                    result["state"] = "USA"
+                    result["state"] = "Texas/Illinois"
                     result["country"] = "USA"
                 break
 
-        for state in COMMON_STATES_INDIA:
-            if re.search(r"\b" + re.escape(state) + r"\b", text, re.I):
-                result["state"] = state
-                result["country"] = "India"
-                break
+        if not result["state"]:
+            for state in COMMON_STATES_INDIA:
+                if re.search(r"\b" + re.escape(state) + r"\b", text, re.I):
+                    result["state"] = state
+                    result["country"] = "India"
+                    break
 
         return result

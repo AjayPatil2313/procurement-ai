@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -9,6 +10,7 @@ from apps.ai_search.models import SearchJob, SearchResult
 from apps.ai_search.services.pipeline import run_find_buyers_search
 from apps.catalog.models import Category, Product, ProductImage
 from apps.companies.rbac import get_user_rbac_context
+from apps.leads.models import SavedItem
 
 
 @login_required
@@ -445,7 +447,7 @@ def find_buyers_view(request):
         messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
-    products = Product.objects.filter(company=company, is_deleted=False).order_by("name")
+    products = Product.objects.filter(company=company, is_deleted=False).order_by(Lower("name"))
 
     # Handle search initiation via POST or GET ?run_search=1
     if request.method == "POST" and request.POST.get("action") == "run_search":
@@ -478,9 +480,11 @@ def find_buyers_view(request):
         selected_product = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
 
     leads = leads_qs[:30]
+    saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
     return render(request, "products/find_buyers.html", {
         "leads": leads,
+        "saved_result_ids": saved_result_ids,
         "products": products,
         "selected_product": selected_product,
         "selected_product_id": int(product_id) if product_id and product_id.isdigit() else None,

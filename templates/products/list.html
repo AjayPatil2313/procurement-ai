@@ -130,7 +130,6 @@
           <tr>
             <th class="py-3 px-4">Product / Item</th>
             <th class="py-3 px-4">Category</th>
-            <th class="py-3 px-4">Price</th>
             <th class="py-3 px-4">MOQ & Unit</th>
             <th class="py-3 px-4">Availability</th>
             <th class="py-3 px-4">Location</th>
@@ -168,17 +167,6 @@
               <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-700">
                 {{ p.category.name|default:"General" }}
               </span>
-            </td>
-
-            <!-- Price -->
-            <td class="py-3.5 px-4 font-bold text-slate-900">
-              {% if p.price %}
-                {{ p.currency }} {{ p.price|floatformat:2 }}
-              {% elif p.price_min %}
-                {{ p.currency }} {{ p.price_min|floatformat:2 }}{% if p.price_max %} - {{ p.price_max|floatformat:2 }}{% endif %}
-              {% else %}
-                <span class="text-slate-400 font-normal">Contact for Price</span>
-              {% endif %}
             </td>
 
             <!-- MOQ & Unit -->
@@ -249,7 +237,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="py-12 text-center text-slate-400">
+            <td colspan="6" class="py-12 text-center text-slate-400">
               <div class="max-w-xs mx-auto space-y-3">
                 <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">
                   <i class="fa-solid fa-box-open"></i>

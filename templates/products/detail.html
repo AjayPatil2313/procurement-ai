@@ -82,20 +82,6 @@
           Commercial Terms
         </h3>
 
-        <!-- Price -->
-        <div class="flex items-center justify-between">
-          <span class="text-slate-500 font-medium">Price</span>
-          <span class="font-extrabold text-slate-900 text-sm">
-            {% if product.price %}
-              {{ product.currency }} {{ product.price|floatformat:2 }}
-            {% elif product.price_min %}
-              {{ product.currency }} {{ product.price_min|floatformat:2 }}{% if product.price_max %} - {{ product.price_max|floatformat:2 }}{% endif %}
-            {% else %}
-              <span class="text-slate-400 font-normal">On Request</span>
-            {% endif %}
-          </span>
-        </div>
-
         <!-- MOQ -->
         <div class="flex items-center justify-between">
           <span class="text-slate-500 font-medium">Min Order Qty</span>

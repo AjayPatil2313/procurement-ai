@@ -1,52 +1,192 @@
 {% extends "base.html" %}
 
-{% block title %}Saved Suppliers — AI Procurement Platform{% endblock %}
+{% block title %}Shortlisted Suppliers — AI Procurement{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
-  <div class="flex items-center justify-between">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Saved Suppliers</h1>
-      <p class="text-xs text-slate-500 mt-1">Shortlisted suppliers for procurement requirements</p>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'find-suppliers' %}" class="hover:text-blue-600 transition">Supplier Sourcing</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Shortlist</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-bookmark"></i>
+        </span>
+        <span>Shortlisted Suppliers</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">Vetted manufacturers and vendors bookmarked for official RFQ dispatch and price evaluation.</p>
+    </div>
+    <div class="flex items-center gap-2.5">
+      <a href="{% url 'inquiries-list' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-paper-plane text-emerald-600"></i>
+        <span>Sent Inquiries (RFQs)</span>
+      </a>
+      <a href="{% url 'find-suppliers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>Find More Suppliers</span>
+      </a>
     </div>
   </div>
 
+  <!-- Summary Stats -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-industry"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Shortlisted Vendors</div>
+        <div class="text-xl font-black text-slate-900">{{ saved_suppliers|length }}</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Verified Commercial Contacts</div>
+        <div class="text-xl font-black text-slate-900">
+          {% with count=0 %}
+            {% for item in saved_suppliers %}
+              {% if item.search_result.external_company.email %}
+                {{ forloop.counter }}
+              {% endif %}
+            {% empty %}
+              0
+            {% endfor %}
+          {% endwith %}
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-scale-balanced"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Price Comparison Ready</div>
+        <div class="text-xl font-black text-slate-900">
+          <a href="{% url 'price-comparison' %}" class="text-xs font-bold text-blue-600 hover:underline">Compare Quotes &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suppliers Table -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-3 px-4">Supplier Name</th>
+            <th class="py-3 px-4">Supplier & Facility</th>
             <th class="py-3 px-4">Location</th>
-            <th class="py-3 px-4">Matched Product</th>
-            <th class="py-3 px-4">Price</th>
-            <th class="py-3 px-4">Match Score</th>
+            <th class="py-3 px-4">Sourced Item</th>
+            <th class="py-3 px-4">Estimated Quote</th>
+            <th class="py-3 px-4">MOQ</th>
+            <th class="py-3 px-4">AI Score</th>
             <th class="py-3 px-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          {% for s in suppliers %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center">
-              <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-2.5">
-                <i class="fa-solid fa-building text-xs"></i>
-              </span>
-              <span>{{ s.external_company.name }}</span>
+          {% for item in saved_suppliers %}
+          <tr class="hover:bg-slate-50/70 transition">
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center">
+                <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mr-3 font-semibold text-xs border border-blue-100 shrink-0">
+                  <i class="fa-solid fa-building"></i>
+                </span>
+                <div class="min-w-0">
+                  <div class="font-bold text-slate-900 truncate max-w-[220px]" title="{{ item.search_result.external_company.name }}">
+                    {{ item.search_result.external_company.name }}
+                  </div>
+                  {% if item.search_result.external_company.email %}
+                    <div class="text-[11px] text-slate-500 font-normal truncate max-w-[220px]">
+                      {{ item.search_result.external_company.email }}
+                    </div>
+                  {% elif item.search_result.external_company.domain %}
+                    <div class="text-[11px] text-slate-400 font-normal truncate max-w-[220px]">
+                      {{ item.search_result.external_company.domain }}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
             </td>
-            <td class="py-3.5 px-4 text-slate-600 font-medium">{{ s.external_company.city }}, {{ s.external_company.country }}</td>
-            <td class="py-3.5 px-4 font-semibold text-slate-800">{{ s.product_title }}</td>
+
+            <td class="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
+              <i class="fa-solid fa-location-dot text-rose-500 text-[11px] mr-1"></i>
+              {% if item.search_result.external_company.city %}{{ item.search_result.external_company.city }}, {% endif %}{{ item.search_result.external_company.country|default:"Global" }}
+            </td>
+
             <td class="py-3.5 px-4 font-semibold text-slate-800">
-              {% if s.price %}₹{{ s.price }} / {{ s.price_unit|default:"pcs" }}{% else %}Contact for Quote{% endif %}
-            </td>
-            <td class="py-3.5 px-4">
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                {{ s.match_score }}%
+              <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium truncate max-w-[200px] inline-block" title="{{ item.search_result.product_title }}">
+                {{ item.search_result.product_title }}
               </span>
             </td>
-            <td class="py-3.5 px-4 text-right">
-              <a href="mailto:{{ s.external_company.email }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
-                Send RFQ
+
+            <td class="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+              {% if item.search_result.price %}
+                {{ item.search_result.price_currency }} {{ item.search_result.price }} / {{ item.search_result.price_unit|default:"pcs" }}
+              {% else %}
+                <span class="text-slate-400 font-medium text-[11px]">Quote upon RFQ</span>
+              {% endif %}
+            </td>
+
+            <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+              {{ item.search_result.moq|default:"Flexible" }}
+            </td>
+
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if item.search_result.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
+                {{ item.search_result.match_score }}% Match
+              </span>
+            </td>
+
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <div class="inline-flex items-center gap-1.5">
+                <button type="button"
+                        onclick="openRfqModal('{{ item.search_result.id }}', '{{ item.search_result.external_company.name|escapejs }}', '{{ item.search_result.product_title|escapejs }}', '{{ item.search_result.external_company.email|default:''|escapejs }}')"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                  <span>Send RFQ</span>
+                </button>
+
+                {% if item.search_result.external_company.website %}
+                <a href="{{ item.search_result.external_company.website }}" target="_blank" rel="noopener noreferrer"
+                   class="w-7 h-7 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition" title="Visit Website">
+                  <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
+                </a>
+                {% endif %}
+
+                <form method="POST" action="{% url 'delete-saved-supplier' item.id %}" class="inline" onsubmit="return confirm('Remove this supplier from your shortlist?');">
+                  {% csrf_token %}
+                  <button type="submit" class="w-7 h-7 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center transition" title="Remove from shortlist">
+                    <i class="fa-solid fa-trash-can text-[11px]"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-14 text-center text-slate-400">
+              <div class="w-14 h-14 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-2xl mx-auto mb-3 border border-blue-100">
+                <i class="fa-regular fa-bookmark"></i>
+              </div>
+              <h3 class="font-bold text-slate-800 text-sm mb-1">No Shortlisted Suppliers Yet</h3>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4 leading-relaxed">
+                Browse AI-recommended suppliers from your procurement requirements and click <strong>"Shortlist"</strong> to bookmark them here.
+              </p>
+              <a href="{% url 'find-suppliers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Discover Qualified Suppliers</span>
               </a>
             </td>
           </tr>
@@ -57,4 +197,92 @@
   </div>
 
 </div>
+
+<!-- Interactive RFQ Modal -->
+<div id="rfqModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Send Request for Quotation (RFQ)</h3>
+          <p id="rfqModalSubtitle" class="text-xs text-slate-500 font-medium">To: Supplier Name</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeRfqModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="rfqForm" method="POST" action="">
+      {% csrf_token %}
+      <div class="p-5 space-y-4 text-xs">
+        <div>
+          <label for="rfq_sent_to_email" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Supplier Recipient Email
+          </label>
+          <input type="email" id="rfq_sent_to_email" name="sent_to_email" required
+                 class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800">
+        </div>
+
+        <div>
+          <label for="rfq_subject" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Inquiry Subject Line
+          </label>
+          <input type="text" id="rfq_subject" name="subject" required
+                 class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800">
+        </div>
+
+        <div>
+          <label for="rfq_message" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            RFQ Commercial Details & Specification
+          </label>
+          <textarea id="rfq_message" name="message" rows="5" required
+                    class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800 leading-relaxed"></textarea>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeRfqModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition text-xs">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Dispatch Official RFQ</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openRfqModal(resultId, supplierName, productTitle, targetEmail) {
+  const modal = document.getElementById('rfqModal');
+  const form = document.getElementById('rfqForm');
+  const subtitle = document.getElementById('rfqModalSubtitle');
+  const emailInput = document.getElementById('rfq_sent_to_email');
+  const subjectInput = document.getElementById('rfq_subject');
+  const messageInput = document.getElementById('rfq_message');
+
+  form.action = `/procurement/inquiries/send/${resultId}/`;
+  subtitle.textContent = `To: ${supplierName}`;
+  emailInput.value = targetEmail || `sales@${supplierName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+  subjectInput.value = `Request for Quotation (RFQ) - ${productTitle}`;
+  messageInput.value = `Dear ${supplierName} Sales Team,\n\nWe are preparing a purchase order for ${productTitle} and request your best commercial quotation including:\n1. Unit price for bulk order\n2. Minimum Order Quantity (MOQ)\n3. Expected lead time & delivery window\n4. Payment milestones and compliance certificates\n\nPlease let us know if additional technical specifications are needed.\n\nBest regards,\nProcurement Team`;
+
+  modal.classList.remove('hidden');
+}
+
+function closeRfqModal() {
+  document.getElementById('rfqModal').classList.add('hidden');
+}
+
+document.getElementById('rfqModal')?.addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeRfqModal();
+  }
+});
+</script>
 {% endblock %}
