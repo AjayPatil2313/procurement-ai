@@ -2,7 +2,7 @@ import logging
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.utils import timezone
-from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany, APILog
+from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany, APILog, MatchingParameter, ensure_default_parameters_for_company
 from apps.ai_search.services.search_provider import WebSearchProvider
 from apps.ai_search.services.web_scraper import CompanyWebScraper
 from apps.ai_search.services.ai_matcher import AIMatcher
@@ -63,7 +63,7 @@ def _get_or_scrape_company(cand: dict) -> dict:
     return scraped
 
 
-def _process_buyer_candidate(cand: dict, product: Product) -> tuple[dict, dict, dict]:
+def _process_buyer_candidate(cand: dict, product: Product, matching_parameters: list | None = None) -> tuple[dict, dict, dict]:
     """Scrapes company (with cache check) and runs AI fit evaluation in parallel worker thread."""
     scraped = _get_or_scrape_company(cand)
     fit = AIMatcher.evaluate_fit(
@@ -73,6 +73,7 @@ def _process_buyer_candidate(cand: dict, product: Product) -> tuple[dict, dict, 
         target_price=product.price,
         currency=product.currency or "INR",
         job_type="find_buyers",
+        matching_parameters=matching_parameters,
     )
     return cand, scraped, fit
 
@@ -167,7 +168,8 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
     High-Performance Find Buyers Pipeline (Parallel Concurrency):
     1. Formulates search query based on product name, category, and target location.
     2. Runs WebSearchProvider to retrieve candidate B2B companies / procurement notices.
-    3. Crawls company websites AND evaluates Gemini AI matches concurrently via ThreadPoolExecutor.
+    3. Crawls company websites AND evaluates Gemini AI matches concurrently via ThreadPoolExecutor
+       applying the company's active dynamic Matching Parameters.
     4. Saves/updates ExternalCompany and SearchResult (type LEAD) in MySQL.
     """
     category_name = product.category.name if product.category else ""
@@ -186,17 +188,21 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
     )
 
     try:
+        # Load active matching criteria for this company
+        matching_params = ensure_default_parameters_for_company(company)
+        active_params = [p for p in matching_params if p.is_active]
+
         search_provider = WebSearchProvider(timeout=3.5)
         candidates = search_provider.search(query, num_results=6)
         job.progress_percent = 40
         job.save(update_fields=["progress_percent"])
 
-        # Concurrent parallel processing for scraping & Gemini evaluations
+        # Concurrent parallel processing for scraping & evaluations
         processed_items = []
         max_workers = min(len(candidates), 6) if candidates else 1
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_cand = {
-                executor.submit(_process_buyer_candidate, cand, product): cand
+                executor.submit(_process_buyer_candidate, cand, product, active_params): cand
                 for cand in candidates
             }
             for future in as_completed(future_to_cand):
@@ -213,6 +219,11 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
         for cand, scraped, fit in processed_items:
             ext_company = _save_or_update_external_company(cand, scraped, default_role="end_user")
 
+            combined_raw = {
+                **scraped,
+                "matched_parameters": fit.get("matched_parameters", []),
+            }
+
             SearchResult.objects.create(
                 search_job=job,
                 external_company=ext_company,
@@ -225,7 +236,7 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
                 match_reason=fit.get("match_reason", ""),
                 need_signal=fit.get("need_signal", ""),
                 source_url=cand.get("url", "")[:500],
-                raw_data=scraped,
+                raw_data=combined_raw,
             )
             saved_results += 1
 

@@ -217,3 +217,151 @@ class APILog(models.Model):
 
     def __str__(self):
         return f"{self.provider} - {self.endpoint} ({self.status_code})"
+
+
+class MatchingParameter(models.Model):
+    """
+    Dynamic Company Matching Criteria & Score Parameters:
+    Configured per company to define how candidate buyers/suppliers are evaluated
+    during AI search (Find Buyers / Find Suppliers). Allows dynamic weights,
+    mandatory rules, bonus boosts, and full CRUD.
+    """
+    class RuleType(models.TextChoices):
+        WEIGHTED = "weighted", "Weighted (Percentage Contribution)"
+        MANDATORY = "mandatory", "Mandatory (Must Satisfy)"
+        BONUS = "bonus", "Bonus (Boost Points)"
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="matching_parameters",
+    )
+    name = models.CharField(max_length=150)
+    parameter_key = models.CharField(max_length=80, blank=True)
+    description = models.TextField(blank=True)
+    criteria_value = models.CharField(max_length=255, blank=True)
+    rule_type = models.CharField(
+        max_length=20,
+        choices=RuleType.choices,
+        default=RuleType.WEIGHTED,
+    )
+    weight_percentage = models.PositiveSmallIntegerField(default=10)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_active", "-weight_percentage", "id"]
+        verbose_name = "Matching Parameter"
+        verbose_name_plural = "Matching Parameters"
+
+    def __str__(self):
+        return f"{self.name} ({self.weight_percentage}%) - {self.company.name}"
+
+
+DEFAULT_MATCHING_PARAMETERS = [
+    {
+        "name": "Legal Entity Structure (Pvt Ltd / Ltd)",
+        "parameter_key": "entity_type",
+        "criteria_value": "Private Limited (Pvt Ltd), Public Limited, Corporate Entity",
+        "description": "Target buyer must be an officially incorporated Private Limited (Pvt Ltd) or Public Ltd commercial entity with corporate standing.",
+        "rule_type": "mandatory",
+        "weight_percentage": 10,
+    },
+    {
+        "name": "Verified Contact & Registration",
+        "parameter_key": "verified_status",
+        "criteria_value": "Verified Phone, Direct Corporate Email & Official Web Domain",
+        "description": "Company must possess reachable communication channels, confirmed phone lines, and verified operational presence.",
+        "rule_type": "weighted",
+        "weight_percentage": 10,
+    },
+    {
+        "name": "Geographic Location & Delivery Proximity",
+        "parameter_key": "location",
+        "criteria_value": "Regional Hub, Industrial Corridor, Domestic Proximity",
+        "description": "Proximity between buyer plant or project location and target logistics dispatch corridor.",
+        "rule_type": "weighted",
+        "weight_percentage": 10,
+    },
+    {
+        "name": "Product Technical Matching",
+        "parameter_key": "product_matching",
+        "criteria_value": "Direct Technical Compatibility & SKU Relevance",
+        "description": "Direct operational alignment between the offered product specifications and the buyer's procurement scope.",
+        "rule_type": "weighted",
+        "weight_percentage": 15,
+    },
+    {
+        "name": "Product Category Alignment",
+        "parameter_key": "categories_match",
+        "criteria_value": "Target Industrial Category & Sector Classification",
+        "description": "Buyer's business domain must actively utilize and procure within the seller's specific product category.",
+        "rule_type": "weighted",
+        "weight_percentage": 10,
+    },
+    {
+        "name": "Buyer Requirement & Demand Intent",
+        "parameter_key": "buyer_req_match",
+        "criteria_value": "Active Tender, Expansion Capex, Recurring Maintenance Demand",
+        "description": "Buyer demonstrates an active buying signal, vendor empanelement window, ongoing RFQ, or replenishment cycle.",
+        "rule_type": "weighted",
+        "weight_percentage": 15,
+    },
+    {
+        "name": "Industry Vertical Match",
+        "parameter_key": "industry_match",
+        "criteria_value": "Manufacturing, Infrastructure, EPC, Chemical, Heavy Engineering",
+        "description": "Buyer operates in an industrial vertical that routinely consumes raw materials, equipment, or components.",
+        "rule_type": "weighted",
+        "weight_percentage": 10,
+    },
+    {
+        "name": "Company Specifications (Size, Grade, Capacity)",
+        "parameter_key": "specifications",
+        "criteria_value": "Enterprise Scale, Quality Grade (ISO/MTC), Plant Capacity",
+        "description": "Buyer's operational scale, unit capacity, and quality grade standards match supplier production volume.",
+        "rule_type": "weighted",
+        "weight_percentage": 10,
+    },
+    {
+        "name": "Company Profile & Operational Relevance",
+        "parameter_key": "profile_relevance",
+        "criteria_value": "Operational Plant, Facility Infrastructure, Historical Track Record",
+        "description": "Buyer's plant infrastructure and published commercial activities align with our technical portfolio.",
+        "rule_type": "weighted",
+        "weight_percentage": 5,
+    },
+    {
+        "name": "B2B Commercial Operating Model",
+        "parameter_key": "b2b_model",
+        "criteria_value": "Commercial B2B Wholesale / Institutional Bulk Consumer",
+        "description": "Buyer must operate on a B2B model (wholesale, institutional project, OEM, or distributor) and not retail/consumer.",
+        "rule_type": "weighted",
+        "weight_percentage": 5,
+    },
+]
+
+
+def ensure_default_parameters_for_company(company):
+    """Initializes standard matching parameters for a company if none exist."""
+    if not company:
+        return []
+    existing = list(MatchingParameter.objects.filter(company=company))
+    if existing:
+        return existing
+
+    created_params = []
+    for data in DEFAULT_MATCHING_PARAMETERS:
+        p = MatchingParameter.objects.create(
+            company=company,
+            name=data["name"],
+            parameter_key=data["parameter_key"],
+            criteria_value=data["criteria_value"],
+            description=data["description"],
+            rule_type=data["rule_type"],
+            weight_percentage=data["weight_percentage"],
+            is_active=True,
+        )
+        created_params.append(p)
+    return created_params

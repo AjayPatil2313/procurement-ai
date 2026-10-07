@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Saved Buyers & CRM Pipeline — AI Sales{% endblock %}
+{% block title %}Saved Buyers — AI Sales{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -13,13 +13,13 @@
         <span>&bull;</span>
         <a href="{% url 'find-buyers' %}" class="hover:text-blue-600 transition">Buyer Discovery</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">Saved Buyers & CRM</span>
+        <span class="text-slate-600 font-semibold">Saved Buyers</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
-          <i class="fa-solid fa-funnel-dollar"></i>
+          <i class="fa-solid fa-bookmark"></i>
         </span>
-        <span>Saved Leads & Sales CRM Pipeline</span>
+        <span>Saved Buyers</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         Track shortlisted buyer deals, assign team reps, update pipeline stages, and manage notes product-by-product.
@@ -426,8 +426,8 @@
                 <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mx-auto mb-3">
                   <i class="fa-regular fa-bookmark text-lg"></i>
                 </div>
-                <p class="font-bold text-slate-700 text-sm">No saved leads in pipeline for this product</p>
-                <p class="text-xs text-slate-400 mt-1">Discover buyers and click "Save Lead" to add them to your CRM.</p>
+                <p class="font-bold text-slate-700 text-sm">No saved buyers for this product</p>
+                <p class="text-xs text-slate-400 mt-1">Discover buyers and click "Save Lead" to add them to your saved buyers.</p>
                 {% if selected_product %}
                 <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="inline-flex items-center gap-1.5 mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
                   <i class="fa-solid fa-wand-magic-sparkles"></i>

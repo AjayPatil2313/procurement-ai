@@ -9,6 +9,7 @@ from apps.requirements.models import Requirement
 from apps.catalog.models import Product, Category, ProductImage
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany
 from apps.leads.models import SavedItem, Inquiry
+from apps.dashboard.models import SupportTicket
 
 
 class RBACTestCase(TestCase):
@@ -2297,7 +2298,8 @@ class LeadCRMandRFQWorkflowTestCase(TestCase):
         # 1. Access via sales inquiries URL
         resp_sales = self.client.get(reverse("sales-inquiries-list"))
         self.assertEqual(resp_sales.status_code, 200)
-        self.assertContains(resp_sales, "Buyer Inquiries & Commercial Outreach")
+        self.assertContains(resp_sales, "Buyer Inquiries")
+        self.assertNotContains(resp_sales, "Commercial Outreach")
         self.assertContains(resp_sales, "Commercial Proposal - TMT Steel Bars")
         self.assertContains(resp_sales, "Find New Buyers")
 
@@ -2380,10 +2382,18 @@ class SellerRolesAndTeamManagementTestCase(TestCase):
         from apps.companies.models import CompanyRole
         self.client.login(email="admin@apexdynamics.com", password="Password@123")
         
-        # Access roles first to ensure defaults exist
+        # Access roles page - only Admin should exist, no static roles auto-created
         self.client.get(reverse("seller-roles-web"))
-        sales_rep_role = CompanyRole.objects.filter(company=self.company, name="Sales Executive").first()
-        self.assertIsNotNone(sales_rep_role)
+        self.assertFalse(CompanyRole.objects.filter(company=self.company, name="Sales Executive").exists())
+        self.assertFalse(CompanyRole.objects.filter(company=self.company, name="Sales Manager").exists())
+
+        # Create custom role dynamically
+        sales_rep_role = CompanyRole.objects.create(
+            company=self.company,
+            name="Sales Executive",
+            description="Dynamic sales role",
+            is_system=False,
+        )
 
         add_user_data = {
             "action": "add_member",
@@ -2544,6 +2554,78 @@ class SellerRolesAndTeamManagementTestCase(TestCase):
         })
         self.assertEqual(del_resp.status_code, 302)
         self.assertFalse(CompanyMember.objects.filter(id=member.id).exists())
+
+
+class HelpSupportTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="supportuser@apex.com",
+            password="securepass123",
+            first_name="Anita",
+            last_name="Roy",
+        )
+        self.company = Company.objects.create(
+            name="Apex Engineering Solutions",
+            company_type=Company.CompanyType.SELLER,
+            industry="Machinery",
+            created_by=self.user,
+        )
+        self.member = CompanyMember.objects.create(
+            user=self.user,
+            company=self.company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        self.client = Client()
+        self.client.login(email="supportuser@apex.com", password="securepass123")
+        session = self.client.session
+        session["active_company_id"] = self.company.id
+        session.save()
+
+    def test_help_support_page_renders(self):
+        response = self.client.get(reverse("help-support"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Help & Support Center")
+        self.assertContains(response, "Frequently Asked Questions")
+        self.assertContains(response, "support@procureai.in")
+        self.assertNotContains(response, "My Support Tickets")
+
+    def test_create_support_ticket(self):
+        response = self.client.post(
+            reverse("help-ticket-create"),
+            {
+                "subject": "Inquiry about custom matching parameters",
+                "description": "How do I configure mandatory parameters for ISO certification?",
+                "category": "matching_rules",
+                "priority": "high",
+                "contact_email": "supportuser@apex.com",
+                "contact_phone": "+91 99887 76655",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        ticket = SupportTicket.objects.filter(company=self.company).first()
+        self.assertIsNotNone(ticket)
+        self.assertTrue(ticket.ticket_number.startswith("TKT-"))
+        self.assertEqual(ticket.priority, SupportTicket.Priority.HIGH)
+        self.assertEqual(ticket.category, "matching_rules")
+
+    def test_support_ticket_detail_ajax(self):
+        ticket = SupportTicket.objects.create(
+            company=self.company,
+            user=self.user,
+            subject="Test Scraper Issue",
+            description="Scraper took longer than 15s to respond.",
+            category="ai_search",
+            priority="medium",
+            contact_email="supportuser@apex.com",
+        )
+        response = self.client.get(reverse("help-ticket-detail", args=[ticket.id]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["ticket_number"], ticket.ticket_number)
+        self.assertEqual(data["subject"], "Test Scraper Issue")
+
 
 
 

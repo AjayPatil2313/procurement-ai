@@ -14,9 +14,10 @@ from apps.accounts.models import User
 from apps.ai_search.models import ExternalCompany, SearchJob, SearchResult
 from apps.billing.models import Subscription
 from apps.catalog.models import Product
+from django.contrib import messages
 from apps.companies.models import Company, CompanyMember
 from apps.companies.rbac import get_user_rbac_context, HasModulePermission
-from apps.dashboard.models import ActivityLog
+from apps.dashboard.models import ActivityLog, SupportTicket
 from apps.leads.models import SavedItem
 from apps.requirements.models import Requirement
 
@@ -487,4 +488,213 @@ def global_search_view(request):
             "page_title": f"Search: {q}" if q else "Global Search",
         },
     )
+
+
+@login_required
+def help_support_view(request):
+    """
+    Enterprise Help & Support Desk:
+    Provides an interactive knowledge base with searchable guides, categorized FAQs,
+    system operational health, contact channels, and a complete dynamic support ticket
+    management system for the company.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    tickets = []
+    if company:
+        tickets = list(SupportTicket.objects.filter(company=company).order_by("-created_at"))
+    elif rbac["is_super_admin"]:
+        tickets = list(SupportTicket.objects.all().order_by("-created_at"))
+
+    open_tickets_count = sum(1 for t in tickets if t.status in [SupportTicket.Status.OPEN, SupportTicket.Status.IN_PROGRESS])
+    resolved_tickets_count = sum(1 for t in tickets if t.status in [SupportTicket.Status.RESOLVED, SupportTicket.Status.CLOSED])
+
+    faqs = [
+        {
+            "category": "Getting Started & Accounts",
+            "icon": "fa-rocket",
+            "color": "blue",
+            "items": [
+                {
+                    "q": "How do I switch between Buyer and Seller workspaces?",
+                    "a": "You can switch roles or companies using the top navigation switcher. If your company is configured with both Buyer and Seller capabilities, your sidebar dynamically shows both 'Procurement' (Find Suppliers, Requirements) and 'Sales' (Find Buyers, My Products, Leads) menus.",
+                },
+                {
+                    "q": "How do I invite team members and assign custom roles?",
+                    "a": "Navigate to 'User Management' under Company to invite team members. To configure fine-grained permissions (Read, Write, Edit, Delete) across specific modules like Find Buyers or Inquiries, visit 'Roles & Responsibilities' in the Seller section.",
+                },
+                {
+                    "q": "Where can I view or update my company profile?",
+                    "a": "Click on your profile avatar at the top right of the screen. Inside the dropdown, click 'View & Edit Profile' or click the company organization card to update company details, contact information, industry, and address.",
+                },
+            ],
+        },
+        {
+            "category": "AI Discovery & Search Engine",
+            "icon": "fa-wand-magic-sparkles",
+            "color": "purple",
+            "items": [
+                {
+                    "q": "How does the AI Buyer and Supplier discovery work?",
+                    "a": "Our automated web scraper and AI search pipeline queries commercial B2B directories, public trade databases, and corporate portals in real time. It extracts corporate contacts, verified phone numbers, emails, and active purchase signals.",
+                },
+                {
+                    "q": "How is the Company Match Score calculated?",
+                    "a": "The score is dynamically computed based on your active 'Matching Parameters' (e.g., Pvt Ltd legal entity status, verified contacts, geographical proximity, product specifications, category match, capacity, and B2B wholesale model). Entities matching all active rules score between 80% and 98%.",
+                },
+                {
+                    "q": "How can I customize or add new matching parameters?",
+                    "a": "Go to 'Matching Parameters' in the Seller sidebar. You can toggle rules on/off, adjust percentage weights, or click '+ Add Parameter' to define custom keyword criteria (e.g. ISO 9001, Export Turnover > $1M, OEM Grade).",
+                },
+            ],
+        },
+        {
+            "category": "Sales CRM & Buyer Leads",
+            "icon": "fa-users-viewfinder",
+            "color": "orange",
+            "items": [
+                {
+                    "q": "How are buyer leads organized product-by-product?",
+                    "a": "In the 'Buyer Leads' section, leads are grouped under each product from your catalog. You can filter by any specific product from the dropdown or clear the filter to view all products at once.",
+                },
+                {
+                    "q": "What happens when I save a lead to the pipeline?",
+                    "a": "Clicking 'Save Lead' moves the discovered company into your 'Saved Buyers' CRM pipeline, where you can track deal stages (Discovered, Contacted, In Negotiation, Proposal Sent, Won, Lost) and add internal follow-up notes.",
+                },
+                {
+                    "q": "How do I send commercial proposals or RFQ inquiries?",
+                    "a": "Click 'Contact & Inquire' on any discovered buyer card or lead row. Fill in the proposal subject, target unit price, and requirement details to dispatch an inquiry directly to the buyer's contact channel.",
+                },
+            ],
+        },
+        {
+            "category": "Subscriptions, Billing & AI Credits",
+            "icon": "fa-coins",
+            "color": "emerald",
+            "items": [
+                {
+                    "q": "How are AI Search credits deducted?",
+                    "a": "Each AI search run (Find Buyers or Find Suppliers) consumes 1 search credit. Normal browsing, CRM pipeline updates, and exporting reports do not consume credits.",
+                },
+                {
+                    "q": "How do I upgrade my plan or purchase more credits?",
+                    "a": "Navigate to 'Subscription & Credits' under the Company section. You can view your current plan (Free, Starter, Pro, Enterprise), check credit consumption analytics, and upgrade to higher quotas.",
+                },
+            ],
+        },
+    ]
+
+    return render(
+        request,
+        "dashboard/help_support.html",
+        {
+            "company": company,
+            "rbac": rbac,
+            "tickets": tickets,
+            "open_tickets_count": open_tickets_count,
+            "resolved_tickets_count": resolved_tickets_count,
+            "faqs": faqs,
+            "categories": SupportTicket.Category.choices,
+            "priorities": SupportTicket.Priority.choices,
+            "page_title": "Help & Support Desk",
+        },
+    )
+
+
+@login_required
+def create_support_ticket_view(request):
+    """
+    Processes support ticket creation submissions.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not company and not rbac["is_super_admin"]:
+        messages.error(request, "Active company required to submit support tickets.")
+        return redirect("dashboard")
+
+    if request.method == "POST":
+        subject = request.POST.get("subject", "").strip()
+        description = request.POST.get("description", "").strip()
+        category = request.POST.get("category", SupportTicket.Category.AI_SEARCH)
+        priority = request.POST.get("priority", SupportTicket.Priority.MEDIUM)
+        contact_email = request.POST.get("contact_email", "").strip() or request.user.email
+        contact_phone = request.POST.get("contact_phone", "").strip()
+
+        if not subject or not description:
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"success": False, "error": "Subject and description are required."}, status=400)
+            messages.error(request, "Please provide both a subject and a description for your support request.")
+            return redirect("help-support")
+
+        ticket = SupportTicket.objects.create(
+            company=company,
+            user=request.user,
+            category=category,
+            priority=priority,
+            subject=subject[:255],
+            description=description,
+            contact_email=contact_email,
+            contact_phone=contact_phone[:50],
+        )
+
+        if company:
+            ActivityLog.objects.create(
+                company=company,
+                user=request.user,
+                activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+                title=f"Support Ticket Created: {ticket.ticket_number}",
+                description=f"Ticket #{ticket.ticket_number} logged under {ticket.get_category_display()}.",
+                icon_type="life-ring",
+                color="blue",
+            )
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "ticket_number": ticket.ticket_number,
+                "subject": ticket.subject,
+                "status": ticket.get_status_display(),
+                "created_at": ticket.created_at.strftime("%b %d, %Y"),
+            })
+
+        messages.success(request, f"Support Ticket {ticket.ticket_number} created successfully! Our engineering team will review it shortly.")
+        return redirect("help-support")
+
+    return redirect("help-support")
+
+
+@login_required
+def support_ticket_detail_view(request, pk):
+    """
+    Returns JSON details of a support ticket for modal inspection.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if rbac["is_super_admin"]:
+        ticket = get_object_or_404(SupportTicket, pk=pk)
+    else:
+        ticket = get_object_or_404(SupportTicket, pk=pk, company=company)
+
+    return JsonResponse({
+        "success": True,
+        "id": ticket.id,
+        "ticket_number": ticket.ticket_number,
+        "subject": ticket.subject,
+        "description": ticket.description,
+        "category": ticket.get_category_display(),
+        "priority": ticket.get_priority_display(),
+        "status": ticket.get_status_display(),
+        "contact_email": ticket.contact_email,
+        "contact_phone": ticket.contact_phone,
+        "resolution": ticket.resolution or "In evaluation by technical operations team.",
+        "created_at": ticket.created_at.strftime("%b %d, %Y at %I:%M %p"),
+        "updated_at": ticket.updated_at.strftime("%b %d, %Y at %I:%M %p"),
+    })
+
 

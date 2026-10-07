@@ -9,7 +9,12 @@ from apps.accounts.web_views import (
     forgot_password_view,
     reset_password_view,
 )
-from apps.dashboard.views import global_search_view
+from apps.dashboard.views import (
+    global_search_view,
+    help_support_view,
+    create_support_ticket_view,
+    support_ticket_detail_view,
+)
 from apps.companies.web_views import (
     company_profile_web_view,
     company_team_web_view,
@@ -61,6 +66,14 @@ from apps.companies.admin_views import (
     admin_panel_users_view,
     admin_panel_apilogs_view,
 )
+from apps.ai_search.web_views import (
+    matching_parameters_view,
+    matching_parameter_create_view,
+    matching_parameter_edit_view,
+    matching_parameter_delete_view,
+    matching_parameter_toggle_view,
+    matching_parameter_reset_defaults_view,
+)
 
 urlpatterns = [
     # Django Builtin Admin
@@ -80,6 +93,9 @@ urlpatterns = [
     # Dashboard & Switchers
     path("dashboard/", include("apps.dashboard.urls")),
     path("search/", global_search_view, name="global-search"),
+    path("help/", help_support_view, name="help-support"),
+    path("help/ticket/create/", create_support_ticket_view, name="help-ticket-create"),
+    path("help/ticket/<int:pk>/", support_ticket_detail_view, name="help-ticket-detail"),
 
     # Company Management (Web)
     path("company/profile/", company_profile_web_view, name="company-profile-web"),
@@ -133,6 +149,12 @@ urlpatterns = [
     path("sales/roles/create/", seller_role_create_view, name="seller-role-create"),
     path("sales/roles/<int:role_id>/edit/", seller_role_edit_view, name="seller-role-edit"),
     path("sales/roles/<int:role_id>/delete/", seller_role_delete_view, name="seller-role-delete"),
+    path("sales/matching-parameters/", matching_parameters_view, name="matching-parameters"),
+    path("sales/matching-parameters/create/", matching_parameter_create_view, name="matching-parameter-create"),
+    path("sales/matching-parameters/<int:pk>/edit/", matching_parameter_edit_view, name="matching-parameter-edit"),
+    path("sales/matching-parameters/<int:pk>/delete/", matching_parameter_delete_view, name="matching-parameter-delete"),
+    path("sales/matching-parameters/<int:pk>/toggle/", matching_parameter_toggle_view, name="matching-parameter-toggle"),
+    path("sales/matching-parameters/reset/", matching_parameter_reset_defaults_view, name="matching-parameter-reset"),
 
     # Super Admin Panel (Web)
     path("admin-panel/companies/", admin_panel_companies_view, name="admin-panel-companies"),

@@ -169,6 +169,12 @@
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
+            <a href="{% url 'matching-parameters' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/matching-parameters/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-sliders w-5 text-center mr-2.5 text-xs"></i> Matching Parameters
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
           </div>
         </div>
         {% endif %}
@@ -232,7 +238,7 @@
 
       <!-- Sidebar Footer -->
       <div class="p-3 border-t border-slate-800 space-y-1 bg-slate-900/60 text-sm">
-        <a href="#" class="flex items-center px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+        <a href="{% url 'help-support' %}" class="flex items-center px-3 py-2 rounded-lg transition {% if request.path == '/help/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
           <i class="fa-regular fa-circle-question w-5 text-center mr-2.5"></i>
           <span>Help & Support</span>
         </a>
@@ -499,6 +505,23 @@
                     </div>
                   </div>
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition"></i>
+                </a>
+
+                <!-- Help & Support -->
+                <a 
+                  href="{% url 'help-support' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/help/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-emerald-500 group-hover:text-white transition">
+                      <i class="fa-regular fa-circle-question"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Help & Support</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Knowledge base, FAQs & Support tickets</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition"></i>
                 </a>
               </div>
 

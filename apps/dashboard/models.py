@@ -42,3 +42,76 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.company.name} - {self.title}"
+
+
+class SupportTicket(models.Model):
+    class Category(models.TextChoices):
+        AI_SEARCH = "ai_search", "AI Search & Lead Scraping"
+        MATCHING_RULES = "matching_rules", "Scoring & Matching Rules"
+        BILLING_CREDITS = "billing_credits", "Billing, Invoices & AI Credits"
+        CATALOG_RFQ = "catalog_rfq", "Product Catalog & RFQs"
+        ACCOUNT_RBAC = "account_rbac", "Account, RBAC & Team Access"
+        TECHNICAL_ISSUE = "technical_issue", "Technical Issue / Bug"
+        OTHER = "other", "General Inquiry"
+
+    class Priority(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+        URGENT = "urgent", "Urgent (Production Critical)"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        IN_PROGRESS = "in_progress", "In Progress"
+        RESOLVED = "resolved", "Resolved"
+        CLOSED = "closed", "Closed"
+
+    ticket_number = models.CharField(max_length=20, unique=True, blank=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="support_tickets",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="support_tickets",
+    )
+    category = models.CharField(
+        max_length=30,
+        choices=Category.choices,
+        default=Category.AI_SEARCH,
+    )
+    priority = models.CharField(
+        max_length=20,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    subject = models.CharField(max_length=255)
+    description = models.TextField()
+    contact_email = models.EmailField()
+    contact_phone = models.CharField(max_length=50, blank=True)
+    resolution = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.ticket_number:
+            import random
+            import string
+            code = "".join(random.choices(string.digits, k=5))
+            self.ticket_number = f"TKT-{code}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.ticket_number} - {self.subject} ({self.get_status_display()})"

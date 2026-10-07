@@ -177,6 +177,8 @@ class DynamicInquiriesAndReportsTestCase(TestCase):
         response = self.client.get(url, {"report_type": "leads"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Global Manufacturing Corp")
+        self.assertContains(response, "Download CSV")
+        self.assertNotContains(response, "Export JSON")
         self.assertIn("preview_records", response.context)
         self.assertGreaterEqual(len(response.context["preview_records"]), 1)
 

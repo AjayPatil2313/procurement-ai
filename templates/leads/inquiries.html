@@ -25,7 +25,7 @@
         <span class="w-8 h-8 rounded-xl {% if is_seller_context %}bg-orange-100 text-orange-600{% else %}bg-blue-100 text-blue-600{% endif %} flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-paper-plane"></i>
         </span>
-        <span>{% if is_seller_context %}Buyer Inquiries & Commercial Outreach{% else %}RFQs & Supplier Inquiries Tracking{% endif %}</span>
+        <span>{% if is_seller_context %}Buyer Inquiries{% else %}Inquiries Tracking{% endif %}</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         {% if is_seller_context %}
@@ -42,8 +42,8 @@
         <span>Export Reports</span>
       </a>
       <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
-        <i class="fa-solid fa-funnel-dollar text-orange-500"></i>
-        <span>Saved Buyers (CRM)</span>
+        <i class="fa-solid fa-bookmark text-orange-500"></i>
+        <span>Saved Buyers</span>
       </a>
       <a href="{% url 'find-buyers' %}{% if selected_product_id %}?product_id={{ selected_product_id }}{% endif %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm shadow-orange-500/20">
         <i class="fa-solid fa-crosshairs"></i>

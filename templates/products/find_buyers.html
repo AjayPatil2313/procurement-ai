@@ -19,13 +19,16 @@
         <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-crosshairs"></i>
         </span>
-        <span>AI Buyer Leads (Sales Engine)</span>
+        <span>AI Buyer Leads</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">Real-time Web Search & Scraper extracting verified buyer contacts, procurement signals, and RFQ intent.</p>
     </div>
     <div class="flex items-center gap-2">
+      <a href="{% url 'matching-parameters' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
+        <i class="fa-solid fa-sliders mr-1.5 text-blue-600"></i> Matching Criteria (⚙)
+      </a>
       <a href="{% url 'saved-leads' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
-        <i class="fa-solid fa-funnel-dollar mr-1.5 text-orange-500"></i> Sales CRM Pipeline
+        <i class="fa-solid fa-bookmark mr-1.5 text-orange-500"></i> Saved Buyers
       </a>
       <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
         <i class="fa-solid fa-signal mr-1.5 text-emerald-600"></i> Live Scraper Active
@@ -200,6 +203,16 @@
             Target: {{ lead.product_title }}
           </span>
         </div>
+
+        {% if lead.raw_data.matched_parameters %}
+        <div class="flex flex-wrap items-center gap-1 mt-2.5">
+          {% for param in lead.raw_data.matched_parameters %}
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <i class="fa-solid fa-check text-[8px]"></i> {{ param }}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
 
         <!-- Body: Why Fit + Need Signal -->
         <div class="mt-4 pt-3 border-t border-slate-100 space-y-2.5 text-xs">

@@ -1,0 +1,700 @@
+{% extends "base.html" %}
+
+{% block title %}AI Company Matching Parameters — AI Sales{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Breadcrumbs & Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'find-buyers' %}" class="hover:text-blue-600 transition">Sales</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Matching Parameters</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-sliders"></i>
+        </span>
+        <span>AI Company Matching Parameters</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Dynamically customize buyer scoring rules (Pvt Ltd status, verified contacts, location, product fit, capacity, B2B model). Add, edit, or toggle criteria applied during Find Buyers.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2.5">
+      <button 
+        type="button" 
+        onclick="openAddParameterModal()" 
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20"
+      >
+        <i class="fa-solid fa-plus"></i>
+        <span>Add Parameter</span>
+      </button>
+
+      <button 
+        type="button" 
+        onclick="openResetDefaultsModal()" 
+        class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3.5 py-2.5 rounded-xl transition shadow-sm"
+        title="Restore the 10 recommended default B2B parameters"
+      >
+        <i class="fa-solid fa-rotate-left text-slate-400"></i>
+        <span>Reset Defaults</span>
+      </button>
+
+      <a 
+        href="{% url 'find-buyers' %}" 
+        class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-orange-500/20"
+      >
+        <i class="fa-solid fa-crosshairs"></i>
+        <span>Find Buyers</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary KPI Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Total Parameters -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-list-check"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Configured Parameters</div>
+        <div class="text-xl font-black text-slate-900" id="statTotalCount">{{ total_count }}</div>
+      </div>
+    </div>
+
+    <!-- Active Criteria -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-toggle-on text-emerald-500"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Active Scoring Rules</div>
+        <div class="text-xl font-black text-slate-900" id="statActiveCount">{{ active_count }} <span class="text-xs font-normal text-slate-400">/ {{ total_count }}</span></div>
+      </div>
+    </div>
+
+    <!-- Total Active Weight -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-scale-balanced"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Total Active Weight</div>
+        <div class="text-xl font-black text-slate-900 flex items-center gap-1.5" id="statTotalWeight">
+          <span>{{ total_weight }}%</span>
+          {% if total_weight == 100 %}
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">Balanced</span>
+          {% else %}
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{{ total_weight }}% total</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Mandatory Rules -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 font-medium">Mandatory Hard Gates</div>
+        <div class="text-xl font-black text-slate-900" id="statMandatoryCount">{{ mandatory_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Informational Banner -->
+  <div class="bg-gradient-to-r from-blue-50 via-slate-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+    <div class="flex items-start md:items-center gap-3 text-slate-700">
+      <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 text-xs">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+      </span>
+      <div>
+        <strong class="text-slate-900 font-bold">How Active Parameters Work:</strong>
+        <span class="text-slate-600 ml-1">
+          When you click "Find Buyers", only active parameters are fed into the AI scoring pipeline. High-scoring companies receive verified parameter tags (e.g. <em>Pvt Ltd ✓</em>, <em>Verified ✓</em>, <em>B2B Match ✓</em>).
+        </span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-100/70 px-2.5 py-1 rounded-lg">
+        <i class="fa-solid fa-circle-check text-blue-600"></i> AI & Heuristic Synced
+      </span>
+    </div>
+  </div>
+
+  <!-- Parameters Table Container -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    
+    <!-- Table Toolbar -->
+    <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-slate-700">Active & Configured Scoring Parameters</span>
+        <span id="paramCountBadge" class="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700">{{ parameters|length }}</span>
+      </div>
+
+      <div class="w-full sm:w-80 relative">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+        <input 
+          type="text" 
+          id="paramTableSearch" 
+          placeholder="Filter by name, key, or criteria..." 
+          class="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+        >
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-600" id="parametersTable">
+        <thead class="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4 w-20 text-center">Status</th>
+            <th class="py-3 px-4 min-w-[200px]">Parameter Name</th>
+            <th class="py-3 px-4 min-w-[240px]">Evaluation Criteria</th>
+            <th class="py-3 px-4 w-32">Rule Type</th>
+            <th class="py-3 px-4 w-36">Weight Contribution</th>
+            <th class="py-3 px-4 w-28 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 font-medium">
+          {% for p in parameters %}
+          <tr class="hover:bg-slate-50/80 transition param-row" id="param-row-{{ p.id }}" data-search="{{ p.name|lower }} {{ p.parameter_key|lower }} {{ p.criteria_value|lower }} {{ p.description|lower }} {{ p.rule_type|lower }}">
+            
+            <!-- Status & Interactive Toggle -->
+            <td class="py-3.5 px-4 text-center">
+              <label class="relative inline-flex items-center cursor-pointer" title="Toggle active status">
+                <input 
+                  type="checkbox" 
+                  class="sr-only peer param-toggle-checkbox" 
+                  data-id="{{ p.id }}" 
+                  data-url="{% url 'matching-parameter-toggle' p.id %}"
+                  {% if p.is_active %}checked{% endif %}
+                >
+                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+              <div class="text-[10px] font-bold mt-0.5 param-status-text {% if p.is_active %}text-emerald-600{% else %}text-slate-400{% endif %}">
+                {% if p.is_active %}Active{% else %}Off{% endif %}
+              </div>
+            </td>
+
+            <!-- Parameter Name & Key -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-start gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 border border-blue-100">
+                  <i class="fa-solid fa-check-double"></i>
+                </div>
+                <div>
+                  <div class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <span>{{ p.name }}</span>
+                    {% if p.rule_type == 'mandatory' %}
+                    <span class="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 border border-rose-200">
+                      <i class="fa-solid fa-lock text-[8px]"></i> Gate
+                    </span>
+                    {% endif %}
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
+                    <span class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{{ p.parameter_key }}</span>
+                  </div>
+                  {% if p.description %}
+                  <div class="text-[11px] text-slate-500 mt-1 leading-snug">
+                    {{ p.description }}
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+
+            <!-- Criteria Value -->
+            <td class="py-3.5 px-4">
+              <div class="text-xs text-slate-800 font-medium">
+                {{ p.criteria_value|default:"Standard evaluation based on buyer profile and verified signals." }}
+              </div>
+            </td>
+
+            <!-- Rule Type Badge -->
+            <td class="py-3.5 px-4">
+              {% if p.rule_type == 'mandatory' %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                <i class="fa-solid fa-shield-halved text-rose-600"></i> Mandatory
+              </span>
+              {% elif p.rule_type == 'bonus' %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                <i class="fa-solid fa-star text-amber-600"></i> Bonus
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                <i class="fa-solid fa-chart-pie text-blue-600"></i> Weighted
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Weight Contribution & Bar -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <span class="font-bold text-slate-900">{{ p.weight_percentage }}%</span>
+                <span class="text-[10px] text-slate-400">score</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div class="h-1.5 rounded-full {% if p.is_active %}{% if p.rule_type == 'mandatory' %}bg-rose-500{% elif p.rule_type == 'bonus' %}bg-amber-500{% else %}bg-blue-600{% endif %}{% else %}bg-slate-300{% endif %}" style="width: {{ p.weight_percentage }}%;"></div>
+              </div>
+            </td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right">
+              <div class="inline-flex items-center gap-1">
+                <button 
+                  type="button" 
+                  onclick="openEditParameterModal('{{ p.id }}', '{{ p.name|escapejs }}', '{{ p.criteria_value|escapejs }}', '{{ p.rule_type }}', '{{ p.weight_percentage }}', '{{ p.description|escapejs }}', {{ p.is_active|yesno:'true,false' }})"
+                  class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center transition"
+                  title="Edit parameter"
+                >
+                  <i class="fa-solid fa-pen text-[11px]"></i>
+                </button>
+                <button 
+                  type="button" 
+                  onclick="openDeleteParameterModal('{{ p.id }}', '{{ p.name|escapejs }}')"
+                  class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 flex items-center justify-center transition"
+                  title="Delete parameter"
+                >
+                  <i class="fa-solid fa-trash text-[11px]"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="p-12 text-center text-slate-400">
+              <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-xl mx-auto mb-3">
+                <i class="fa-solid fa-sliders"></i>
+              </div>
+              <div class="text-sm font-bold text-slate-700">No matching parameters configured</div>
+              <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Click "Reset Defaults" to load the 10 standard recommended B2B scoring rules, or create your first custom parameter.
+              </p>
+              <div class="mt-4 flex items-center justify-center gap-2">
+                <button onclick="openResetDefaultsModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition">
+                  Load Standard 10 B2B Parameters
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 1: ADD NEW PARAMETER                 -->
+<!-- ========================================== -->
+<div id="addParameterModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Add Matching Parameter</h3>
+          <p class="text-xs text-slate-500">Define a new scoring rule for the buyer search engine</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeAddParameterModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'matching-parameter-create' %}" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Parameter Name <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          name="name" 
+          placeholder="e.g. Export License Required, Minimum Turnover $5M, ISO Certified" 
+          required
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
+        >
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Rule Type</label>
+          <select name="rule_type" class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs">
+            <option value="weighted" selected>Weighted (% Contribution)</option>
+            <option value="mandatory">Mandatory (Hard Requirement)</option>
+            <option value="bonus">Bonus (Extra Score Boost)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Weight Percentage (1-100%)</label>
+          <input 
+            type="number" 
+            name="weight_percentage" 
+            value="10" 
+            min="1" 
+            max="100" 
+            required
+            class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
+          >
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Evaluation Criteria & Keywords</label>
+        <input 
+          type="text" 
+          name="criteria_value" 
+          placeholder="e.g. Must have active export operations, ISO certification, or OEM capacity" 
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 text-xs"
+        >
+        <p class="text-[11px] text-slate-400 mt-1">Specific tokens or conditions evaluated against scraped company web data.</p>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Description</label>
+        <textarea 
+          name="description" 
+          rows="2" 
+          placeholder="Brief explanation of why this parameter matters for your business..."
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 text-xs resize-none"
+        ></textarea>
+      </div>
+
+      <div class="flex items-center gap-2 pt-1">
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" name="is_active" value="1" checked class="sr-only peer">
+          <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+        <span class="text-xs font-semibold text-slate-700">Activate immediately for buyer matching</span>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeAddParameterModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm">
+          Save Parameter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 2: EDIT PARAMETER                    -->
+<!-- ========================================== -->
+<div id="editParameterModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-pen"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Edit Matching Parameter</h3>
+          <p class="text-xs text-slate-500" id="editModalSubtitle">Update scoring weight or criteria</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeEditParameterModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="editParameterForm" method="POST" action="" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Parameter Name <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          id="edit_name" 
+          name="name" 
+          required
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
+        >
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Rule Type</label>
+          <select id="edit_rule_type" name="rule_type" class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs">
+            <option value="weighted">Weighted (% Contribution)</option>
+            <option value="mandatory">Mandatory (Hard Requirement)</option>
+            <option value="bonus">Bonus (Extra Score Boost)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Weight Percentage (1-100%)</label>
+          <input 
+            type="number" 
+            id="edit_weight" 
+            name="weight_percentage" 
+            min="1" 
+            max="100" 
+            required
+            class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
+          >
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Evaluation Criteria & Keywords</label>
+        <input 
+          type="text" 
+          id="edit_criteria" 
+          name="criteria_value" 
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 text-xs"
+        >
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Description</label>
+        <textarea 
+          id="edit_description" 
+          name="description" 
+          rows="2" 
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 text-xs resize-none"
+        ></textarea>
+      </div>
+
+      <div class="flex items-center gap-2 pt-1">
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="edit_is_active" name="is_active" value="1" class="sr-only peer">
+          <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+        <span class="text-xs font-semibold text-slate-700">Active rule for buyer matching</span>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeEditParameterModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm">
+          Update Parameter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 3: DELETE CONFIRMATION               -->
+<!-- ========================================== -->
+<div id="deleteParameterModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-rose-50/50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Delete Parameter</h3>
+          <p class="text-xs text-slate-500">Confirm removal of this criteria</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeDeleteParameterModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="deleteParameterForm" method="POST" action="" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      <p class="text-slate-600 leading-relaxed">
+        Are you sure you want to delete <strong id="deleteParamName" class="text-slate-900"></strong>? This parameter will no longer be considered during buyer search scoring.
+      </p>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeDeleteParameterModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition">
+          Cancel
+        </button>
+        <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm">
+          Delete Parameter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 4: RESET DEFAULTS CONFIRMATION       -->
+<!-- ========================================== -->
+<div id="resetDefaultsModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-rotate-left"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Reset to Default Parameters</h3>
+          <p class="text-xs text-slate-500">Restore 10 recommended B2B rules</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeResetDefaultsModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'matching-parameter-reset' %}" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      <p class="text-slate-600 leading-relaxed">
+        This will replace existing parameters with the standard 10 B2B parameters (Pvt Ltd status, verified phone/email, location proximity, product title match, category, buyer demand signal, industry match, capacity/grade, profile relevance, B2B wholesale model) totaling 100% weight.
+      </p>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeResetDefaultsModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm">
+          Yes, Reset to Defaults
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // 1. Search Filter for Parameters Table
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('paramTableSearch');
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.param-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+          const searchData = row.getAttribute('data-search') || '';
+          if (!query || searchData.includes(query)) {
+            row.style.display = '';
+            visibleCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        });
+
+        const badge = document.getElementById('paramCountBadge');
+        if (badge) badge.textContent = visibleCount;
+      });
+    }
+
+    // 2. Interactive AJAX Status Toggle for Checkboxes
+    const toggleCheckboxes = document.querySelectorAll('.param-toggle-checkbox');
+    toggleCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', async function() {
+        const paramId = this.getAttribute('data-id');
+        const url = this.getAttribute('data-url');
+        const row = document.getElementById(`param-row-${paramId}`);
+        const statusText = row ? row.querySelector('.param-status-text') : null;
+
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRFToken': getCookie('csrftoken')
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (statusText) {
+              if (data.is_active) {
+                statusText.textContent = 'Active';
+                statusText.classList.remove('text-slate-400');
+                statusText.classList.add('text-emerald-600');
+              } else {
+                statusText.textContent = 'Off';
+                statusText.classList.remove('text-emerald-600');
+                statusText.classList.add('text-slate-400');
+              }
+            }
+          } else {
+            // Revert state if failed
+            this.checked = !this.checked;
+            alert('Failed to update parameter status. Please refresh.');
+          }
+        } catch (err) {
+          console.error(err);
+          this.checked = !this.checked;
+        }
+      });
+    });
+  });
+
+  // CSRF helper
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  // Modal helpers
+  function openAddParameterModal() {
+    document.getElementById('addParameterModal').classList.remove('hidden');
+  }
+  function closeAddParameterModal() {
+    document.getElementById('addParameterModal').classList.add('hidden');
+  }
+
+  function openEditParameterModal(id, name, criteria, ruleType, weight, description, isActive) {
+    const form = document.getElementById('editParameterForm');
+    form.action = `/sales/matching-parameters/${id}/edit/`;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_criteria').value = criteria || '';
+    document.getElementById('edit_rule_type').value = ruleType || 'weighted';
+    document.getElementById('edit_weight').value = weight || 10;
+    document.getElementById('edit_description').value = description || '';
+    document.getElementById('edit_is_active').checked = !!isActive;
+    document.getElementById('editModalSubtitle').textContent = `Editing: ${name}`;
+    document.getElementById('editParameterModal').classList.remove('hidden');
+  }
+  function closeEditParameterModal() {
+    document.getElementById('editParameterModal').classList.add('hidden');
+  }
+
+  function openDeleteParameterModal(id, name) {
+    const form = document.getElementById('deleteParameterForm');
+    form.action = `/sales/matching-parameters/${id}/delete/`;
+    document.getElementById('deleteParamName').textContent = name;
+    document.getElementById('deleteParameterModal').classList.remove('hidden');
+  }
+  function closeDeleteParameterModal() {
+    document.getElementById('deleteParameterModal').classList.add('hidden');
+  }
+
+  function openResetDefaultsModal() {
+    document.getElementById('resetDefaultsModal').classList.remove('hidden');
+  }
+  function closeResetDefaultsModal() {
+    document.getElementById('resetDefaultsModal').classList.add('hidden');
+  }
+</script>
+{% endblock %}

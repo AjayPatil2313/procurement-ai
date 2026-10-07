@@ -15,13 +15,13 @@
           {% if is_seller_context %}Sales{% else %}Procurement{% endif %}
         </a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">Live Reports & Analytics</span>
+        <span class="text-slate-600 font-semibold">Dynamic Reports</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl {% if is_seller_context %}bg-orange-100 text-orange-600{% else %}bg-blue-100 text-blue-600{% endif %} flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-chart-pie"></i>
         </span>
-        <span>Dynamic Reports & Analytics Engine</span>
+        <span>Dynamic Reports</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         Real-time pipeline analytics, preview data tables, multi-dimension filters, and instant exports across all catalog products.
@@ -36,14 +36,6 @@
       >
         <i class="fa-solid fa-file-csv"></i>
         <span>Download CSV</span>
-      </a>
-
-      <a 
-        href="?download=1&format=json&report_type={{ report_type }}{% if selected_product %}&product_id={{ selected_product.id }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q_search %}&q={{ q_search }}{% endif %}" 
-        class="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl shadow-md transition"
-      >
-        <i class="fa-solid fa-code"></i>
-        <span>Export JSON</span>
       </a>
 
       <button 
@@ -388,12 +380,6 @@
         class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3 py-1.5 rounded-lg transition"
       >
         <i class="fa-solid fa-file-csv text-emerald-600 mr-1"></i> CSV
-      </a>
-      <a 
-        href="?download=1&format=json&report_type={{ report_type }}{% if selected_product %}&product_id={{ selected_product.id }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q_search %}&q={{ q_search }}{% endif %}" 
-        class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3 py-1.5 rounded-lg transition"
-      >
-        <i class="fa-solid fa-code text-blue-600 mr-1"></i> JSON
       </a>
     </div>
   </div>

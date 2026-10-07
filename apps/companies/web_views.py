@@ -50,70 +50,11 @@ def ensure_company_default_roles(company):
                 },
             )
 
-    mgr_role, m_created = CompanyRole.objects.get_or_create(
-        company=company,
-        name="Sales Manager",
-        defaults={
-            "description": "Supervises sales catalog, lead generation, customer proposals, and CRM pipeline.",
-            "is_system": False,
-        },
-    )
-    if m_created or not mgr_role.module_permissions.exists():
-        seller_mods = [
-            "products",
-            "find_buyers",
-            "leads",
-            "saved_buyers",
-            "inquiries",
-            "export_reports",
-            "team",
-            "company_profile",
-        ]
-        for mod in RolePermission.MODULE_TITLES.keys():
-            is_active = mod in seller_mods
-            RolePermission.objects.update_or_create(
-                role=mgr_role,
-                module=mod,
-                defaults={
-                    "can_read": is_active,
-                    "can_write": is_active,
-                    "can_edit": is_active,
-                    "can_delete": is_active and mod in ["products", "leads", "saved_buyers", "inquiries"],
-                    "can_admin": False,
-                },
-            )
-
-    exec_role, e_created = CompanyRole.objects.get_or_create(
-        company=company,
-        name="Sales Executive",
-        defaults={
-            "description": "Executes lead discovery, pipeline outreach, and buyer quoting workflows.",
-            "is_system": False,
-        },
-    )
-    if e_created or not exec_role.module_permissions.exists():
-        exec_mods = ["products", "find_buyers", "leads", "saved_buyers", "inquiries", "export_reports"]
-        for mod in RolePermission.MODULE_TITLES.keys():
-            is_active = mod in exec_mods
-            RolePermission.objects.update_or_create(
-                role=exec_role,
-                module=mod,
-                defaults={
-                    "can_read": is_active,
-                    "can_write": is_active and mod in ["find_buyers", "saved_buyers", "inquiries"],
-                    "can_edit": is_active and mod in ["saved_buyers", "inquiries"],
-                    "can_delete": False,
-                    "can_admin": False,
-                },
-            )
-
-    # Backfill any existing members who lack a custom_role
+    # Backfill any existing admin members who lack a custom_role
     for m in CompanyMember.objects.filter(company=company, custom_role__isnull=True):
         if m.role == CompanyMember.Role.ADMIN:
             m.custom_role = admin_role
-        else:
-            m.custom_role = exec_role
-        m.save(update_fields=["custom_role"])
+            m.save(update_fields=["custom_role"])
 
 
 def sync_member_permissions_from_role(member, custom_role):
@@ -693,7 +634,7 @@ def seller_roles_web_view(request):
                 "can_delete": mp.can_delete,
                 "can_admin": mp.can_admin,
             }
-        is_full_admin = r.is_system or any(mp.can_admin for mp in r.module_permissions.all()) or len(summary) >= 10
+        is_full_admin = bool(r.is_system)
         roles_data.append({
             "role": r,
             "summary": summary,
@@ -709,8 +650,8 @@ def seller_roles_web_view(request):
         {"key": "saved_buyers", "name": "Saved Buyers", "icon": "fa-bookmark", "desc": "CRM deal pipeline, notes, and sales rep assignments"},
         {"key": "inquiries", "name": "Buyer Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
         {"key": "export_reports", "name": "Export Reports", "icon": "fa-download", "desc": "CSV downloads & catalog matrix exports"},
-        {"key": "team", "name": "Team & Users", "icon": "fa-users", "desc": "Employee management & user assignments"},
-        {"key": "company_profile", "name": "Company Profile", "icon": "fa-building", "desc": "Organization details, GST, and address"},
+        {"key": "matching_parameters", "name": "Matching Parameters", "icon": "fa-sliders", "desc": "AI matching score criteria & rules"},
+        {"key": "team", "name": "User Management", "icon": "fa-users-gear", "desc": "Employee management & user assignments"},
         {"key": "billing", "name": "Subscription & Credits", "icon": "fa-coins", "desc": "Plan status and AI credits allocation"},
         {"key": "requirements", "name": "Requirements", "icon": "fa-clipboard-list", "desc": "Procurement requisitions & requests"},
         {"key": "find_suppliers", "name": "Find Suppliers", "icon": "fa-magnifying-glass-chart", "desc": "Supplier discovery & search"},
@@ -724,7 +665,7 @@ def seller_roles_web_view(request):
         "modules": modules,
         "system_role_count": sum(1 for r in roles if r.is_system),
         "custom_role_count": sum(1 for r in roles if not r.is_system),
-        "assigned_users_count": CompanyMember.objects.filter(company=company, custom_role__isnull=False).count(),
+        "assigned_users_count": CompanyMember.objects.filter(company=company, is_active=True).count(),
         "rbac": rbac,
         "page_title": "Role Management & Responsibilities",
     })
