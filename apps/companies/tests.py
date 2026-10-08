@@ -326,3 +326,168 @@ class SuperAdminSuiteTestCase(TestCase):
         edit_url = reverse("admin-panel-company-edit", kwargs={"pk": self.company.pk})
         self.assertContains(res, edit_url)
         self.assertContains(res, "Edit Company")
+
+    def test_login_page_superadmin_mode_and_no_self_registration(self):
+        """Login page includes Super Admin mode, removes Create Account link, and routes Super Admin to admin-panel."""
+        # 1. GET login page
+        res = self.client.get(reverse("login"))
+        self.assertEqual(res.status_code, 200)
+
+        # Super Admin tab present
+        self.assertContains(res, "Super Admin")
+        self.assertContains(res, "tabSuperAdminBtn")
+
+        # 'Create Account (Sign Up)' link removed
+        self.assertNotContains(res, "Create Account (Sign Up)")
+        self.assertContains(res, "Enterprise accounts are onboarded exclusively by Platform Super Admins")
+
+        # 2. POST login with Super Admin credentials
+        post_res = self.client.post(reverse("login"), {
+            "email": "superadmin@platform.ai",
+            "password": "Password123!",
+        }, follow=True)
+        self.assertEqual(post_res.status_code, 200)
+
+        # Should be redirected directly to admin-panel-dashboard
+        self.assertContains(post_res, "Platform Executive Dashboard")
+        self.assertContains(post_res, "Super Admin Dashboard")
+
+    def test_admin_panel_company_delete_view(self):
+        """Super Admin can soft-delete (archive) and restore a company with data preserved."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        test_comp = Company.objects.create(
+            name="Temporary Test Corp",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.superadmin,
+        )
+        comp_id = test_comp.id
+        self.assertTrue(Company.objects.filter(id=comp_id).exists())
+
+        # 1. POST soft-delete
+        res = self.client.post(reverse("admin-panel-company-delete", kwargs={"pk": comp_id}), follow=True)
+        self.assertEqual(res.status_code, 200)
+
+        # Record still exists in database, but marked as deleted
+        test_comp.refresh_from_db()
+        self.assertTrue(test_comp.is_deleted)
+        self.assertFalse(test_comp.is_active)
+        self.assertIsNotNone(test_comp.deleted_at)
+        self.assertContains(res, "soft-deleted")
+
+        # 2. Check that soft-deleted company does not appear in normal list, but appears in status=deleted
+        list_res = self.client.get(reverse("admin-panel-companies"))
+        self.assertNotContains(list_res, "Temporary Test Corp")
+
+        archived_res = self.client.get(reverse("admin-panel-companies") + "?status=deleted")
+        self.assertContains(archived_res, "Temporary Test Corp")
+
+        # 3. POST restore
+        restore_res = self.client.post(reverse("admin-panel-company-restore", kwargs={"pk": comp_id}), follow=True)
+        self.assertEqual(restore_res.status_code, 200)
+        test_comp.refresh_from_db()
+        self.assertFalse(test_comp.is_deleted)
+        self.assertTrue(test_comp.is_active)
+        self.assertIsNone(test_comp.deleted_at)
+        self.assertContains(restore_res, "successfully restored")
+
+    def test_one_click_company_admin_password_reset(self):
+        """Super Admin can reset any company user/admin password directly from dossier."""
+        # Non-superadmin cannot reset password
+        self.client.login(email="regular@vendor.com", password="Password123!")
+        denied_res = self.client.post(
+            reverse("admin-panel-reset-user-password", kwargs={"company_id": self.company.pk, "user_id": self.regular_user.pk}),
+            {"new_password": "NewSecretPassword999!"},
+        )
+        self.assertEqual(denied_res.status_code, 403)
+
+        # Super Admin resets password with custom password
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+        reset_res = self.client.post(
+            reverse("admin-panel-reset-user-password", kwargs={"company_id": self.company.pk, "user_id": self.regular_user.pk}),
+            {"new_password": "NewSecretPassword999!"},
+            follow=True,
+        )
+        self.assertEqual(reset_res.status_code, 200)
+
+        # Target user can now authenticate with new password
+        self.client.logout()
+        login_success = self.client.login(email="regular@vendor.com", password="NewSecretPassword999!")
+        self.assertTrue(login_success)
+
+        # Super Admin auto-generates password (empty string) via JSON API
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+        json_res = self.client.post(
+            reverse("admin-panel-reset-user-password", kwargs={"company_id": self.company.pk, "user_id": self.regular_user.pk}),
+            {"new_password": "", "format": "json"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(json_res.status_code, 200)
+        data = json_res.json()
+        self.assertTrue(data["success"])
+        self.assertTrue(data["auto_generated"])
+        self.assertTrue(len(data["password"]) >= 10)
+
+        # Authenticate with auto-generated password
+        self.client.logout()
+        login_auto = self.client.login(email="regular@vendor.com", password=data["password"])
+        self.assertTrue(login_auto)
+
+    def test_ai_credit_top_up_receipt_number(self):
+        """Credit allocations auto-generate reference receipt numbers (e.g. RCP-12345) and display them in ledgers."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        res = self.client.post(
+            reverse("admin-panel-update-subscription", kwargs={"company_id": self.company.pk}),
+            data={
+                "plan": "enterprise",
+                "credits_add": "250",
+                "notes": "Annual enterprise allocation",
+            },
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        tx = CreditTransaction.objects.filter(company=self.company).first()
+        self.assertIsNotNone(tx)
+        self.assertIsNotNone(tx.receipt_number)
+        self.assertTrue(tx.receipt_number.startswith("RCP-"))
+        self.assertContains(res, tx.receipt_number)
+
+    def test_platform_maintenance_mode_switch(self):
+        """Super Admin can toggle maintenance mode and regular users see banner."""
+        from apps.dashboard.models import PlatformSetting
+
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        # 1. Enable Maintenance Mode
+        res = self.client.post(
+            reverse("admin-panel-toggle-maintenance"),
+            data={
+                "action": "enable",
+                "maintenance_message": "Scheduled database migration in progress. Expected downtime: 15 mins.",
+            },
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(PlatformSetting.get_setting("maintenance_mode"), "true")
+        self.assertContains(res, "Platform Maintenance Mode is now ENABLED")
+
+        # 2. Regular user views page and sees maintenance banner
+        self.client.login(email="regular@vendor.com", password="Password123!")
+        user_res = self.client.get(reverse("dashboard"))
+        self.assertEqual(user_res.status_code, 200)
+        self.assertContains(user_res, "Platform Maintenance Mode Active")
+        self.assertContains(user_res, "Scheduled database migration in progress")
+
+        # 3. Super Admin disables maintenance mode
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+        disable_res = self.client.post(
+            reverse("admin-panel-toggle-maintenance"),
+            data={"action": "disable"},
+            follow=True,
+        )
+        self.assertEqual(disable_res.status_code, 200)
+        self.assertEqual(PlatformSetting.get_setting("maintenance_mode"), "false")
+        self.assertContains(disable_res, "Platform Maintenance Mode has been DISABLED")
+

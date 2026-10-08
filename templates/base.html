@@ -251,6 +251,12 @@
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
+            <a href="{% url 'help-support' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/help/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-headset w-5 text-center mr-2.5 text-xs text-blue-400"></i> Helpdesk & FAQs
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
           </div>
         </div>
         {% endif %}
@@ -258,10 +264,6 @@
 
       <!-- Sidebar Footer -->
       <div class="p-3 border-t border-slate-800 space-y-1 bg-slate-900/60 text-sm">
-        <a href="{% url 'help-support' %}" class="flex items-center px-3 py-2 rounded-lg transition {% if request.path == '/help/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-white hover:bg-slate-800{% endif %}">
-          <i class="fa-regular fa-circle-question w-5 text-center mr-2.5"></i>
-          <span>Help & Support</span>
-        </a>
         <a href="{% url 'logout-web' %}" class="flex items-center px-3 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition">
           <i class="fa-solid fa-arrow-right-from-bracket w-5 text-center mr-2.5"></i>
           <span>Logout</span>
@@ -489,15 +491,131 @@
                         <i class="fa-solid {% if rbac.is_super_admin %}fa-crown text-red-400{% elif rbac.role_label == 'Buyer' %}fa-cart-shopping text-emerald-400{% elif rbac.role_label == 'Seller' %}fa-bullhorn text-purple-400{% elif rbac.is_company_admin %}fa-user-tie text-blue-400{% else %}fa-user text-indigo-400{% endif %} text-[9px] mr-1"></i>
                         {{ rbac.role_label }}
                       </span>
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Pro Plan
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {% if rbac.is_super_admin %}bg-red-500/20 text-red-300 border border-red-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
+                        {% if rbac.is_super_admin %}Platform Executive{% else %}Pro Plan{% endif %}
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- 2. Organization / Company Overview -->
+              {% if rbac.is_super_admin %}
+              <!-- Super Admin Platform Navigation -->
+              <div class="p-2 space-y-1">
+                <a 
+                  href="{% url 'admin-panel-dashboard' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600/20 border border-red-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-red-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Executive Dashboard</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Platform-wide governance &amp; KPIs</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-red-400 transition"></i>
+                </a>
+
+                <a 
+                  href="{% url 'admin-panel-companies' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/admin-panel/companies/' %}bg-red-600/20 border border-red-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-blue-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-sitemap"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">All Companies Directory</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Company 360 dossiers &amp; edit settings</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-blue-400 transition"></i>
+                </a>
+
+                <a 
+                  href="{% url 'admin-panel-company-create' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/admin-panel/companies/create/' %}bg-emerald-600/20 border border-emerald-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-emerald-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-plus-circle"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Add New Company</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Onboard enterprise tenant with plan &amp; admin</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-emerald-400 transition"></i>
+                </a>
+
+                <a 
+                  href="{% url 'admin-panel-plans' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/admin-panel/plans/' %}bg-amber-600/20 border border-amber-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-amber-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-credit-card"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Plans &amp; AI Credits</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Tier allocation &amp; credit ledger</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-amber-400 transition"></i>
+                </a>
+
+                <a 
+                  href="{% url 'admin-panel-apilogs' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/admin-panel/api-logs/' %}bg-emerald-600/20 border border-emerald-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-emerald-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">API Invocations &amp; Costs</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Monitor scraper endpoints &amp; expenses</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-emerald-400 transition"></i>
+                </a>
+
+                <a 
+                  href="{% url 'admin-panel-auditlogs' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/admin-panel/audit-logs/' %}bg-purple-600/20 border border-purple-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-purple-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">System Audit Trail</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Review live user &amp; admin activity stream</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-purple-400 transition"></i>
+                </a>
+
+                <a 
+                  href="{% url 'help-support' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/help/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-blue-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-headset"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Helpdesk &amp; Support Queue</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Resolve company tickets &amp; manage FAQs</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-blue-400 transition"></i>
+                </a>
+              </div>
+              {% else %}
+              <!-- 2. Organization / Company Overview (For Company Members) -->
               {% if current_company %}
               <div class="p-3.5 bg-slate-900/90">
                 <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
@@ -577,7 +695,7 @@
                 </a>
 
                 <!-- Users (Admin only) -->
-                {% if rbac.is_company_admin or rbac.is_super_admin %}
+                {% if rbac.is_company_admin %}
                 <a 
                   href="{% url 'company-team-web' %}" 
                   class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/company/team/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
@@ -604,8 +722,8 @@
                       <i class="fa-solid fa-user-shield"></i>
                     </div>
                     <div>
-                      <div class="text-xs font-bold text-white leading-tight">Roles & Responsibilities</div>
-                      <div class="text-[10px] text-slate-400 leading-tight">Manage organizational roles & module matrix</div>
+                      <div class="text-xs font-bold text-white leading-tight">Roles &amp; Responsibilities</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Manage organizational roles &amp; module matrix</div>
                     </div>
                   </div>
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-orange-400 group-hover:translate-x-0.5 transition"></i>
@@ -622,8 +740,8 @@
                       <i class="fa-solid fa-coins"></i>
                     </div>
                     <div>
-                      <div class="text-xs font-bold text-white leading-tight">Subscription & Credits</div>
-                      <div class="text-[10px] text-slate-400 leading-tight">Plan overview & AI search quota</div>
+                      <div class="text-xs font-bold text-white leading-tight">Subscription &amp; Credits</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Plan overview &amp; AI search quota</div>
                     </div>
                   </div>
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition"></i>
@@ -639,13 +757,14 @@
                       <i class="fa-regular fa-circle-question"></i>
                     </div>
                     <div>
-                      <div class="text-xs font-bold text-white leading-tight">Help & Support</div>
-                      <div class="text-[10px] text-slate-400 leading-tight">Knowledge base, FAQs & Support tickets</div>
+                      <div class="text-xs font-bold text-white leading-tight">Help &amp; Support</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Knowledge base, FAQs &amp; Support tickets</div>
                     </div>
                   </div>
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition"></i>
                 </a>
               </div>
+              {% endif %}
 
               <!-- 4. Sign Out -->
               <div class="p-2 bg-slate-900">
@@ -663,6 +782,42 @@
           </div>
         </div>
       </header>
+
+      <!-- PLATFORM MAINTENANCE MODE ALERT BANNER -->
+      {% if platform_maintenance_active %}
+        <div class="px-6 md:px-8 pt-4">
+          <div class="p-3.5 rounded-2xl border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 {% if rbac.is_super_admin %}bg-gradient-to-r from-amber-900/40 via-amber-800/30 to-amber-900/40 border-amber-500/40 text-amber-200{% else %}bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border-amber-300 text-amber-900{% endif %}">
+            <div class="flex items-start sm:items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 {% if rbac.is_super_admin %}bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20{% else %}bg-amber-500 text-white shadow-md shadow-amber-500/30{% endif %}">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              </div>
+              <div>
+                <div class="text-xs font-black uppercase tracking-wider flex items-center gap-2 {% if rbac.is_super_admin %}text-amber-300{% else %}text-amber-900{% endif %}">
+                  <span>Platform Maintenance Mode Active</span>
+                  <span class="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-600">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 animate-ping"></span> Live Banner
+                  </span>
+                </div>
+                <p class="text-xs mt-0.5 leading-snug {% if rbac.is_super_admin %}text-amber-200/90{% else %}text-amber-800{% endif %}">
+                  {{ platform_maintenance_message|default:"System updates or scheduled database maintenance in progress. Regular user operations may experience brief restrictions." }}
+                </p>
+              </div>
+            </div>
+            {% if rbac.is_super_admin %}
+            <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <form method="POST" action="{% url 'admin-panel-toggle-maintenance' %}" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="disable">
+                <button type="submit" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm flex items-center gap-1.5 cursor-pointer">
+                  <i class="fa-solid fa-power-off"></i>
+                  <span>Disable Maintenance</span>
+                </button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
 
       <!-- FLASH MESSAGES -->
       {% if messages %}

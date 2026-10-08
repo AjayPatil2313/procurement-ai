@@ -2734,6 +2734,139 @@ class RealTimeNotificationsTestCase(TestCase):
         self.assertContains(response, "Navbar Alert")
 
 
+class SuperAdminHelpAndSupportTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.superadmin = User.objects.create_superuser(
+            email="superdesk@test.com",
+            password="Password@123",
+            first_name="Super",
+            last_name="DeskAdmin",
+        )
+        self.company = Company.objects.create(
+            name="Apex Heavy Machinery Ltd.",
+            city="Pune",
+            country="India",
+            state="Maharashtra",
+            company_type=Company.CompanyType.BOTH,
+            created_by=self.superadmin,
+        )
+        self.user = User.objects.create_user(
+            email="operator@apexheavy.com",
+            password="Password@123",
+            first_name="Vikram",
+            last_name="Mehta",
+        )
+        CompanyMember.objects.create(
+            user=self.user,
+            company=self.company,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+        from apps.dashboard.models import FAQ
+        self.faq1 = FAQ.objects.create(
+            category="AI Discovery",
+            icon="fa-brain",
+            question="How do I filter suppliers by MOQ?",
+            answer="Use the advanced MOQ slider in search filters.",
+            order=1,
+            is_active=True,
+        )
+        self.ticket1 = SupportTicket.objects.create(
+            company=self.company,
+            user=self.user,
+            category=SupportTicket.Category.AI_SEARCH,
+            priority=SupportTicket.Priority.HIGH,
+            status=SupportTicket.Status.OPEN,
+            subject="Question regarding MOQ landed price calculation",
+            description="We need landed price converted to INR with custom duties included.",
+            contact_email="operator@apexheavy.com",
+            contact_phone="+91 98200 99999",
+        )
+
+    def test_superadmin_help_support_view(self):
+        self.client.force_login(self.superadmin)
+        response = self.client.get(reverse("help-support"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["is_super_admin"])
+        # Check that Inbound query with Company ID, Name, Location, and Question is present
+        self.assertContains(response, f"ID #{self.company.id}")
+        self.assertContains(response, "Apex Heavy Machinery Ltd.")
+        self.assertContains(response, "Pune, India")
+        self.assertContains(response, "Question regarding MOQ landed price calculation")
+        self.assertContains(response, "operator@apexheavy.com")
+        # Check FAQ is present
+        self.assertContains(response, "How do I filter suppliers by MOQ?")
+        # Check only 2 contact channels (Email & WhatsApp)
+        self.assertContains(response, "support@procureai.in")
+        self.assertContains(response, "Priority WhatsApp Desk")
+        self.assertNotContains(response, "matching-parameters")
+
+    def test_superadmin_create_faq(self):
+        self.client.force_login(self.superadmin)
+        from apps.dashboard.models import FAQ
+        res = self.client.post(reverse("help-faq-create"), {
+            "category": "Billing & Quotas",
+            "icon": "fa-credit-card",
+            "order": "2",
+            "question": "Can I purchase extra AI search credits?",
+            "answer": "Yes, navigate to Subscription & Billing to add credit top-up packs.",
+        })
+        self.assertEqual(res.status_code, 302)
+        new_faq = FAQ.objects.filter(question="Can I purchase extra AI search credits?").first()
+        self.assertIsNotNone(new_faq)
+        self.assertEqual(new_faq.category, "Billing & Quotas")
+        self.assertEqual(new_faq.order, 2)
+
+    def test_superadmin_edit_faq(self):
+        self.client.force_login(self.superadmin)
+        res = self.client.post(reverse("help-faq-edit", kwargs={"pk": self.faq1.id}), {
+            "category": "AI Discovery Engine",
+            "icon": "fa-robot",
+            "order": "5",
+            "question": "Updated: How do I filter suppliers by MOQ?",
+            "answer": "Updated answer with new slider instructions.",
+            "is_active": "on",
+        })
+        self.assertEqual(res.status_code, 302)
+        self.faq1.refresh_from_db()
+        self.assertEqual(self.faq1.question, "Updated: How do I filter suppliers by MOQ?")
+        self.assertEqual(self.faq1.category, "AI Discovery Engine")
+        self.assertEqual(self.faq1.order, 5)
+
+    def test_superadmin_delete_faq(self):
+        self.client.force_login(self.superadmin)
+        from apps.dashboard.models import FAQ
+        faq_id = self.faq1.id
+        res = self.client.post(reverse("help-faq-delete", kwargs={"pk": faq_id}))
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(FAQ.objects.filter(id=faq_id).exists())
+
+    def test_superadmin_update_ticket_status_and_resolution(self):
+        self.client.force_login(self.superadmin)
+        res = self.client.post(reverse("help-ticket-update", kwargs={"pk": self.ticket1.id}), {
+            "status": "resolved",
+            "resolution": "Configured custom duties calculator formula in procurement settings.",
+        })
+        self.assertEqual(res.status_code, 302)
+        self.ticket1.refresh_from_db()
+        self.assertEqual(self.ticket1.status, SupportTicket.Status.RESOLVED)
+        self.assertEqual(self.ticket1.resolution, "Configured custom duties calculator formula in procurement settings.")
+
+    def test_regular_user_cannot_create_or_edit_faq(self):
+        self.client.force_login(self.user)
+        # Attempting create FAQ should be forbidden / redirected
+        res_create = self.client.post(reverse("help-faq-create"), {
+            "category": "Hacking",
+            "question": "Should fail",
+            "answer": "Forbidden",
+        })
+        self.assertNotEqual(res_create.status_code, 200)
+        from apps.dashboard.models import FAQ
+        self.assertFalse(FAQ.objects.filter(question="Should fail").exists())
+
+
+
 
 
 

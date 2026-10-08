@@ -16,9 +16,11 @@ from apps.billing.models import Subscription
 
 def login_view(request):
     if request.user.is_authenticated:
+        if request.user.is_superuser or request.user.is_staff:
+            return redirect("admin-panel-dashboard")
         return redirect("dashboard")
 
-    next_url = request.GET.get("next") or request.POST.get("next") or "dashboard"
+    next_url = request.GET.get("next") or request.POST.get("next") or ""
     login_type = request.POST.get("login_type") or request.GET.get("type") or "company"
 
     if request.method == "POST":
@@ -29,7 +31,13 @@ def login_view(request):
         if user is not None:
             login(request, user)
             messages.success(request, f"Welcome back, {user.first_name or user.email}!")
-            return redirect(next_url)
+            if user.is_superuser or user.is_staff:
+                request.session["active_company_id"] = None
+                if not next_url or next_url in ["dashboard", "/dashboard/", "dashboard"]:
+                    return redirect("admin-panel-dashboard")
+                return redirect(next_url)
+            else:
+                return redirect(next_url or "dashboard")
         else:
             existing_user = User.objects.filter(email=email).first()
             if existing_user and existing_user.check_password(password) and not existing_user.is_active:

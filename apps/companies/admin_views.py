@@ -1,7 +1,10 @@
 import datetime
+import random
+import string
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -10,7 +13,7 @@ from apps.companies.models import Company, CompanyMember
 from apps.accounts.models import User
 from apps.billing.models import Subscription, CreditTransaction
 from apps.ai_search.models import APILog, SearchJob
-from apps.dashboard.models import ActivityLog, SupportTicket
+from apps.dashboard.models import ActivityLog, SupportTicket, PlatformSetting
 from apps.leads.models import Inquiry
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
@@ -47,6 +50,10 @@ def admin_panel_dashboard_view(request):
     sub_free = Subscription.objects.filter(plan=Subscription.Plan.FREE).count()
     sub_pro = Subscription.objects.filter(plan=Subscription.Plan.PRO).count()
     sub_enterprise = Subscription.objects.filter(plan=Subscription.Plan.ENTERPRISE).count()
+
+    sub_free_pct = round((sub_free / total_companies) * 100, 1) if total_companies > 0 else 0
+    sub_pro_pct = round((sub_pro / total_companies) * 100, 1) if total_companies > 0 else 0
+    sub_enterprise_pct = round((sub_enterprise / total_companies) * 100, 1) if total_companies > 0 else 0
 
     credits_allocated = Subscription.objects.aggregate(total=Sum("credits_total"))["total"] or 0
     credits_used = Subscription.objects.aggregate(total=Sum("credits_used"))["total"] or 0
@@ -95,6 +102,9 @@ def admin_panel_dashboard_view(request):
         "sub_free": sub_free,
         "sub_pro": sub_pro,
         "sub_enterprise": sub_enterprise,
+        "sub_free_pct": sub_free_pct,
+        "sub_pro_pct": sub_pro_pct,
+        "sub_enterprise_pct": sub_enterprise_pct,
         "credits_allocated": credits_allocated,
         "credits_used": credits_used,
         "credits_remaining": credits_remaining,
@@ -137,9 +147,13 @@ def admin_panel_companies_view(request):
         )
 
     if status_filter == "active":
-        companies = companies.filter(is_active=True)
+        companies = companies.filter(is_deleted=False, is_active=True)
     elif status_filter == "inactive":
-        companies = companies.filter(is_active=False)
+        companies = companies.filter(is_deleted=False, is_active=False)
+    elif status_filter == "deleted":
+        companies = companies.filter(is_deleted=True)
+    else:
+        companies = companies.filter(is_deleted=False)
 
     if type_filter in [Company.CompanyType.BUYER, Company.CompanyType.SELLER, Company.CompanyType.BOTH]:
         companies = companies.filter(company_type=type_filter)
@@ -149,9 +163,10 @@ def admin_panel_companies_view(request):
     elif verified_filter == "pending":
         companies = companies.filter(is_verified=False)
 
-    total_count = Company.objects.count()
-    active_count = Company.objects.filter(is_active=True).count()
-    verified_count = Company.objects.filter(is_verified=True).count()
+    total_count = Company.objects.filter(is_deleted=False).count()
+    active_count = Company.objects.filter(is_deleted=False, is_active=True).count()
+    verified_count = Company.objects.filter(is_deleted=False, is_verified=True).count()
+    deleted_count = Company.objects.filter(is_deleted=True).count()
 
     return render(request, "admin_panel/companies.html", {
         "companies": companies,
@@ -163,6 +178,7 @@ def admin_panel_companies_view(request):
         "total_count": total_count,
         "active_count": active_count,
         "verified_count": verified_count,
+        "deleted_count": deleted_count,
     })
 
 
@@ -451,6 +467,62 @@ def admin_panel_toggle_company_verification_view(request, pk):
 
 @login_required
 @superadmin_required
+def admin_panel_company_delete_view(request, pk):
+    """
+    POST action to soft-delete (archive) a company and deactivate all user access.
+    Data, catalogs, requirements, inquiries, and billing records are safely preserved.
+    """
+    if request.method == "POST":
+        company = get_object_or_404(Company, pk=pk)
+        company_name = company.name
+        company.is_deleted = True
+        company.is_active = False
+        company.deleted_at = timezone.now()
+        company.save(update_fields=["is_deleted", "is_active", "deleted_at"])
+
+        ActivityLog.objects.create(
+            company=company,
+            user=request.user,
+            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+            title=f"Company Soft-Deleted: {company.name}",
+            description=f"Company account '{company.name}' was soft-deleted (archived) by Super Admin. All records preserved safely.",
+            icon_type="trash",
+            color="rose",
+        )
+
+        messages.success(request, f"Company '{company_name}' has been soft-deleted (archived). Company data and records are preserved safely.")
+    return redirect("admin-panel-companies")
+
+
+@login_required
+@superadmin_required
+def admin_panel_company_restore_view(request, pk):
+    """
+    POST action to restore a previously soft-deleted company.
+    """
+    if request.method == "POST":
+        company = get_object_or_404(Company, pk=pk)
+        company.is_deleted = False
+        company.is_active = True
+        company.deleted_at = None
+        company.save(update_fields=["is_deleted", "is_active", "deleted_at"])
+
+        ActivityLog.objects.create(
+            company=company,
+            user=request.user,
+            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+            title=f"Company Restored: {company.name}",
+            description=f"Company '{company.name}' was restored from archive by Super Admin.",
+            icon_type="rotate-left",
+            color="emerald",
+        )
+
+        messages.success(request, f"Company '{company.name}' has been successfully restored and re-activated.")
+    return redirect("admin-panel-companies")
+
+
+@login_required
+@superadmin_required
 def admin_panel_plans_view(request):
     """
     Super Admin Plans & Subscriptions Management.
@@ -526,9 +598,10 @@ def admin_panel_update_subscription_view(request, company_id):
         except ValueError:
             pass
 
+        receipt_ref_msg = ""
         if credits_delta != 0:
             subscription.credits_total = max(0, subscription.credits_total + credits_delta)
-            CreditTransaction.objects.create(
+            tx = CreditTransaction.objects.create(
                 company=company,
                 transaction_type=(
                     CreditTransaction.TransactionType.CREDIT
@@ -538,6 +611,8 @@ def admin_panel_update_subscription_view(request, company_id):
                 credits=abs(credits_delta),
                 notes=notes or f"Super Admin adjustment ({'+' if credits_delta > 0 else ''}{credits_delta} credits)",
             )
+            if tx.receipt_number:
+                receipt_ref_msg = f" Reference Receipt No: #{tx.receipt_number}."
 
         # 3. Update Valid Till Date
         if valid_till_raw:
@@ -553,7 +628,7 @@ def admin_panel_update_subscription_view(request, company_id):
             user=request.user,
             activity_type=ActivityLog.ActivityType.PLAN_UPGRADED,
             title="Subscription & Credits Adjusted by Super Admin",
-            description=f"Plan: {subscription.get_plan_display()}, Total Credits: {subscription.credits_total} ({'+' if credits_delta >= 0 else ''}{credits_delta}). Note: {notes}",
+            description=f"Plan: {subscription.get_plan_display()}, Total Credits: {subscription.credits_total} ({'+' if credits_delta >= 0 else ''}{credits_delta}). Note: {notes}{receipt_ref_msg}",
             icon_type="credit-card",
             color="blue",
         )
@@ -564,7 +639,7 @@ def admin_panel_update_subscription_view(request, company_id):
             company=company,
             notification_type="system",
             title="Subscription Updated by Platform Admin",
-            message=f"Your company subscription has been updated to {subscription.get_plan_display()} with {subscription.credits_remaining} search credits available.",
+            message=f"Your company subscription has been updated to {subscription.get_plan_display()} with {subscription.credits_remaining} search credits available.{receipt_ref_msg}",
             link="/company/billing/",
             icon="fa-shield-halved",
             color="indigo",
@@ -572,10 +647,13 @@ def admin_panel_update_subscription_view(request, company_id):
 
         messages.success(
             request,
-            f"Successfully updated subscription for {company.name} ({subscription.get_plan_display()}, {subscription.credits_remaining} remaining credits).",
+            f"Successfully updated subscription for {company.name} ({subscription.get_plan_display()}, {subscription.credits_remaining} remaining credits).{receipt_ref_msg}",
         )
 
-    return redirect("admin-panel-plans")
+        next_url = request.POST.get("next")
+        if next_url:
+            return redirect(next_url)
+        return redirect("admin-panel-plans")
 
 
 @login_required
@@ -750,3 +828,108 @@ def admin_panel_auditlogs_view(request):
         "q": q,
         "total_activities": total_activities,
     })
+
+
+@login_required
+@superadmin_required
+def admin_panel_reset_company_user_password_view(request, company_id, user_id):
+    """
+    Super Admin action to reset the password of any company administrator or team user.
+    Accepts either an explicit custom password or auto-generates a secure temporary password.
+    """
+    company = get_object_or_404(Company, pk=company_id)
+    target_user = get_object_or_404(User, pk=user_id)
+
+    if request.method == "POST":
+        new_password = request.POST.get("new_password", "").strip()
+        auto_generated = False
+        if not new_password:
+            chars = string.ascii_letters + string.digits + "!@#$%^&*"
+            new_password = "".join(random.choices(chars, k=12))
+            auto_generated = True
+
+        target_user.set_password(new_password)
+        target_user.save()
+
+        # Check role for descriptive activity logging
+        user_role_str = "Company Member"
+        membership = CompanyMember.objects.filter(company=company, user=target_user).first()
+        if membership and membership.role == CompanyMember.Role.ADMIN:
+            user_role_str = "Company Admin"
+
+        ActivityLog.objects.create(
+            company=company,
+            user=request.user,
+            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+            title=f"Password Reset for {user_role_str}: {target_user.email}",
+            description=f"Super Admin reset account password for {target_user.get_full_name() or target_user.email} ({user_role_str}). Temporary credentials generated.",
+            icon_type="key",
+            color="purple",
+        )
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.POST.get("format") == "json":
+            return JsonResponse({
+                "success": True,
+                "email": target_user.email,
+                "password": new_password,
+                "auto_generated": auto_generated,
+                "message": f"Password successfully reset for {target_user.email}.",
+            })
+
+        messages.success(
+            request,
+            f"Password successfully reset for {target_user.email}. New temporary password: {new_password}",
+        )
+
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
+    if next_url:
+        return redirect(next_url)
+    return redirect("admin-panel-company-detail", pk=company.pk)
+
+
+@login_required
+@superadmin_required
+def admin_panel_toggle_maintenance_view(request):
+    """
+    Super Admin action to toggle platform maintenance mode switch and update banner message.
+    """
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+        custom_message = request.POST.get("maintenance_message", "").strip()
+        current_state = PlatformSetting.get_setting("maintenance_mode", "false").strip().lower() in ("true", "1", "yes")
+
+        if action == "enable":
+            new_state = True
+        elif action == "disable":
+            new_state = False
+        else:
+            new_state = not current_state
+
+        PlatformSetting.set_setting(
+            "maintenance_mode",
+            "true" if new_state else "false",
+            "Platform maintenance mode toggle state",
+        )
+        if custom_message:
+            PlatformSetting.set_setting(
+                "maintenance_message",
+                custom_message,
+                "Platform maintenance alert banner message",
+            )
+
+        if new_state:
+            messages.warning(
+                request,
+                "Platform Maintenance Mode is now ENABLED. Normal users will see the active maintenance banner across all platform pages.",
+            )
+        else:
+            messages.success(
+                request,
+                "Platform Maintenance Mode has been DISABLED. Normal system operations resumed.",
+            )
+
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
+    if next_url:
+        return redirect(next_url)
+    return redirect("admin-panel-dashboard")
+

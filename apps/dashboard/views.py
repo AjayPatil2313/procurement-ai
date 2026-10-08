@@ -11,15 +11,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
+from apps.companies.models import Company, CompanyMember
 from apps.ai_search.models import ExternalCompany, SearchJob, SearchResult
 from apps.billing.models import Subscription
 from apps.catalog.models import Product
 from django.contrib import messages
 from django.utils.timesince import timesince
-from apps.companies.models import Company, CompanyMember
-from apps.companies.rbac import get_user_rbac_context, HasModulePermission
-from apps.dashboard.models import ActivityLog, SupportTicket, Notification
-from apps.dashboard.services.notification_service import notify_support_ticket
+from apps.companies.rbac import get_user_rbac_context, HasModulePermission, superadmin_required
+from apps.dashboard.models import ActivityLog, SupportTicket, Notification, FAQ
+from apps.dashboard.services.notification_service import notify_support_ticket, create_notification
 from apps.leads.models import SavedItem
 from apps.requirements.models import Requirement
 
@@ -349,6 +349,8 @@ def demo_login_as_view(request, role_name):
         if user:
             login(request, user, backend="django.contrib.auth.backends.ModelBackend")
             request.session["active_company_id"] = None
+            if user.is_superuser or user.is_staff:
+                return redirect("admin-panel-dashboard")
     return redirect("dashboard")
 
 
@@ -501,113 +503,209 @@ def global_search_view(request):
 def help_support_view(request):
     """
     Enterprise Help & Support Desk:
-    Provides an interactive knowledge base with searchable guides, categorized FAQs,
-    system operational health, contact channels, and a complete dynamic support ticket
-    management system for the company.
+    - Provides dynamic FAQs from the database (editable by Super Admin).
+    - Displays inbound company support queries and email inquiries to Super Admin with
+      Company ID, Name, Location, Question, Priority, and Status.
+    - Features direct Email Support and WhatsApp Support contact channels.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
+    is_super_admin = rbac["is_super_admin"]
 
-    tickets = []
-    if company:
-        tickets = list(SupportTicket.objects.filter(company=company).order_by("-created_at"))
-    elif rbac["is_super_admin"]:
-        tickets = list(SupportTicket.objects.all().order_by("-created_at"))
+    # 1. Dynamic FAQs from Database
+    faqs_qs = FAQ.objects.filter(is_active=True).order_by("order", "id")
 
-    open_tickets_count = sum(1 for t in tickets if t.status in [SupportTicket.Status.OPEN, SupportTicket.Status.IN_PROGRESS])
-    resolved_tickets_count = sum(1 for t in tickets if t.status in [SupportTicket.Status.RESOLVED, SupportTicket.Status.CLOSED])
+    # Group FAQs by category for customer-facing display
+    grouped_faqs = {}
+    for item in faqs_qs:
+        cat_key = item.category
+        if cat_key not in grouped_faqs:
+            grouped_faqs[cat_key] = {
+                "category": item.category,
+                "icon": item.icon or "fa-circle-question",
+                "items": [],
+            }
+        grouped_faqs[cat_key]["items"].append(item)
+    faqs_list = list(grouped_faqs.values())
+    all_faqs = list(FAQ.objects.all().order_by("order", "id"))
 
-    faqs = [
-        {
-            "category": "Getting Started & Accounts",
-            "icon": "fa-rocket",
-            "color": "blue",
-            "items": [
-                {
-                    "q": "How do I switch between Buyer and Seller workspaces?",
-                    "a": "You can switch roles or companies using the top navigation switcher. If your company is configured with both Buyer and Seller capabilities, your sidebar dynamically shows both 'Procurement' (Find Suppliers, Requirements) and 'Sales' (Find Buyers, My Products, Leads) menus.",
-                },
-                {
-                    "q": "How do I invite team members and assign custom roles?",
-                    "a": "Navigate to 'User Management' under Company to invite team members. To configure fine-grained permissions (Read, Write, Edit, Delete) across specific modules like Find Buyers or Inquiries, visit 'Roles & Responsibilities' in the Seller section.",
-                },
-                {
-                    "q": "Where can I view or update my company profile?",
-                    "a": "Click on your profile avatar at the top right of the screen. Inside the dropdown, click 'View & Edit Profile' or click the company organization card to update company details, contact information, industry, and address.",
-                },
-            ],
-        },
-        {
-            "category": "AI Discovery & Search Engine",
-            "icon": "fa-wand-magic-sparkles",
-            "color": "purple",
-            "items": [
-                {
-                    "q": "How does the AI Buyer and Supplier discovery work?",
-                    "a": "Our automated web scraper and AI search pipeline queries commercial B2B directories, public trade databases, and corporate portals in real time. It extracts corporate contacts, verified phone numbers, emails, and active purchase signals.",
-                },
-                {
-                    "q": "How is the Company Match Score calculated?",
-                    "a": "The score is dynamically computed based on your active 'Matching Parameters' (e.g., Pvt Ltd legal entity status, verified contacts, geographical proximity, product specifications, category match, capacity, and B2B wholesale model). Entities matching all active rules score between 80% and 98%.",
-                },
-                {
-                    "q": "How can I customize or add new matching parameters?",
-                    "a": "Go to 'Matching Parameters' in the Seller sidebar. You can toggle rules on/off, adjust percentage weights, or click '+ Add Parameter' to define custom keyword criteria (e.g. ISO 9001, Export Turnover > $1M, OEM Grade).",
-                },
-            ],
-        },
-        {
-            "category": "Sales CRM & Buyer Leads",
-            "icon": "fa-users-viewfinder",
-            "color": "orange",
-            "items": [
-                {
-                    "q": "How are buyer leads organized product-by-product?",
-                    "a": "In the 'Buyer Leads' section, leads are grouped under each product from your catalog. You can filter by any specific product from the dropdown or clear the filter to view all products at once.",
-                },
-                {
-                    "q": "What happens when I save a lead to the pipeline?",
-                    "a": "Clicking 'Save Lead' moves the discovered company into your 'Saved Buyers' CRM pipeline, where you can track deal stages (Discovered, Contacted, In Negotiation, Proposal Sent, Won, Lost) and add internal follow-up notes.",
-                },
-                {
-                    "q": "How do I send commercial proposals or RFQ inquiries?",
-                    "a": "Click 'Contact & Inquire' on any discovered buyer card or lead row. Fill in the proposal subject, target unit price, and requirement details to dispatch an inquiry directly to the buyer's contact channel.",
-                },
-            ],
-        },
-        {
-            "category": "Subscriptions, Billing & AI Credits",
-            "icon": "fa-coins",
-            "color": "emerald",
-            "items": [
-                {
-                    "q": "How are AI Search credits deducted?",
-                    "a": "Each AI search run (Find Buyers or Find Suppliers) consumes 1 search credit. Normal browsing, CRM pipeline updates, and exporting reports do not consume credits.",
-                },
-                {
-                    "q": "How do I upgrade my plan or purchase more credits?",
-                    "a": "Navigate to 'Subscription & Credits' under the Company section. You can view your current plan (Free, Starter, Pro, Enterprise), check credit consumption analytics, and upgrade to higher quotas.",
-                },
-            ],
-        },
-    ]
+    # 2. Support Tickets / Inbound Queries
+    query_search = request.GET.get("ticket_q", "").strip()
+    status_filter = request.GET.get("ticket_status", "all")
+    priority_filter = request.GET.get("ticket_priority", "all")
 
-    return render(
-        request,
-        "dashboard/help_support.html",
-        {
-            "company": company,
-            "rbac": rbac,
-            "tickets": tickets,
-            "open_tickets_count": open_tickets_count,
-            "resolved_tickets_count": resolved_tickets_count,
-            "faqs": faqs,
-            "categories": SupportTicket.Category.choices,
-            "priorities": SupportTicket.Priority.choices,
-            "page_title": "Help & Support Desk",
-        },
+    if is_super_admin:
+        tickets_qs = (
+            SupportTicket.objects.select_related("company", "user")
+            .order_by("-created_at")
+        )
+    elif company:
+        tickets_qs = (
+            SupportTicket.objects.filter(company=company)
+            .select_related("company", "user")
+            .order_by("-created_at")
+        )
+    else:
+        tickets_qs = SupportTicket.objects.none()
+
+    if status_filter != "all":
+        tickets_qs = tickets_qs.filter(status=status_filter)
+    if priority_filter != "all":
+        tickets_qs = tickets_qs.filter(priority=priority_filter)
+    if query_search:
+        tickets_qs = tickets_qs.filter(
+            Q(subject__icontains=query_search)
+            | Q(description__icontains=query_search)
+            | Q(ticket_number__icontains=query_search)
+            | Q(contact_email__icontains=query_search)
+            | Q(company__name__icontains=query_search)
+            | Q(company__id__icontains=query_search)
+            | Q(company__city__icontains=query_search)
+            | Q(company__country__icontains=query_search)
+        )
+
+    tickets = list(tickets_qs)
+
+    # Global KPI counts
+    all_base_tickets = (
+        SupportTicket.objects.all()
+        if is_super_admin
+        else (SupportTicket.objects.filter(company=company) if company else SupportTicket.objects.none())
     )
+    total_tickets_count = all_base_tickets.count()
+    open_tickets_count = all_base_tickets.filter(status=SupportTicket.Status.OPEN).count()
+    in_progress_count = all_base_tickets.filter(status=SupportTicket.Status.IN_PROGRESS).count()
+    resolved_tickets_count = all_base_tickets.filter(status__in=[SupportTicket.Status.RESOLVED, SupportTicket.Status.CLOSED]).count()
+
+    context = {
+        "company": company,
+        "rbac": rbac,
+        "is_super_admin": is_super_admin,
+        "tickets": tickets,
+        "total_tickets_count": total_tickets_count,
+        "open_tickets_count": open_tickets_count,
+        "in_progress_count": in_progress_count,
+        "resolved_tickets_count": resolved_tickets_count,
+        "faqs": faqs_list,
+        "all_faqs": all_faqs,
+        "categories": SupportTicket.Category.choices,
+        "priorities": SupportTicket.Priority.choices,
+        "statuses": SupportTicket.Status.choices,
+        "status_filter": status_filter,
+        "priority_filter": priority_filter,
+        "query_search": query_search,
+        "page_title": "Help & Support Desk",
+    }
+    return render(request, "dashboard/help_support.html", context)
+
+
+@login_required
+def update_support_ticket_view(request, pk):
+    """
+    Updates status and resolution notes of a support query/ticket.
+    Super Admins can update any ticket; Company users can update their company's tickets.
+    """
+    if request.method == "POST":
+        rbac = get_user_rbac_context(request.user)
+        if rbac["is_super_admin"]:
+            ticket = get_object_or_404(SupportTicket, pk=pk)
+        else:
+            ticket = get_object_or_404(SupportTicket, pk=pk, company=rbac["company"])
+
+        new_status = request.POST.get("status")
+        resolution = request.POST.get("resolution", "").strip()
+
+        if new_status in [SupportTicket.Status.OPEN, SupportTicket.Status.IN_PROGRESS, SupportTicket.Status.RESOLVED, SupportTicket.Status.CLOSED]:
+            ticket.status = new_status
+        if resolution:
+            ticket.resolution = resolution
+        ticket.save()
+
+        # In-app notification to company members
+        create_notification(
+            user=ticket.user,
+            company=ticket.company,
+            notification_type=Notification.NotificationType.TICKET_UPDATE,
+            title=f"Support Ticket #{ticket.ticket_number} Updated: {ticket.get_status_display()}",
+            message=f"Status: {ticket.get_status_display()}. {resolution or ''}",
+            link="/help/",
+            icon="fa-headset",
+            color="blue",
+        )
+
+        messages.success(request, f"Ticket #{ticket.ticket_number} status updated to {ticket.get_status_display()}.")
+    return redirect("help-support")
+
+
+@login_required
+@superadmin_required
+def create_faq_view(request):
+    """
+    Super Admin action to add a new dynamic FAQ to knowledge base.
+    """
+    if request.method == "POST":
+        category = request.POST.get("category", "Getting Started & Accounts").strip() or "General"
+        icon = request.POST.get("icon", "fa-circle-question").strip() or "fa-circle-question"
+        question = request.POST.get("question", "").strip()
+        answer = request.POST.get("answer", "").strip()
+        order_raw = request.POST.get("order", "0").strip()
+
+        try:
+            order = int(order_raw)
+        except ValueError:
+            order = 0
+
+        if question and answer:
+            FAQ.objects.create(
+                category=category,
+                icon=icon,
+                question=question,
+                answer=answer,
+                order=order,
+                is_active=True,
+            )
+            messages.success(request, "New FAQ added successfully.")
+        else:
+            messages.error(request, "Both Question and Answer are required.")
+    return redirect("help-support")
+
+
+@login_required
+@superadmin_required
+def edit_faq_view(request, pk):
+    """
+    Super Admin action to edit an existing dynamic FAQ.
+    """
+    faq = get_object_or_404(FAQ, pk=pk)
+    if request.method == "POST":
+        faq.category = request.POST.get("category", faq.category).strip()
+        faq.icon = request.POST.get("icon", faq.icon).strip() or faq.icon
+        faq.question = request.POST.get("question", faq.question).strip() or faq.question
+        faq.answer = request.POST.get("answer", faq.answer).strip() or faq.answer
+        order_raw = request.POST.get("order", str(faq.order)).strip()
+        try:
+            faq.order = int(order_raw)
+        except ValueError:
+            pass
+        faq.is_active = bool(request.POST.get("is_active", True))
+        faq.save()
+        messages.success(request, f"FAQ '{faq.question[:35]}...' updated successfully.")
+    return redirect("help-support")
+
+
+@login_required
+@superadmin_required
+def delete_faq_view(request, pk):
+    """
+    Super Admin action to delete a dynamic FAQ.
+    """
+    if request.method == "POST":
+        faq = get_object_or_404(FAQ, pk=pk)
+        q_title = faq.question[:35]
+        faq.delete()
+        messages.success(request, f"FAQ '{q_title}...' deleted.")
+    return redirect("help-support")
 
 
 @login_required
@@ -622,6 +720,9 @@ def create_support_ticket_view(request):
     if not company and not rbac["is_super_admin"]:
         messages.error(request, "Active company required to submit support tickets.")
         return redirect("dashboard")
+
+    if not company:
+        company = Company.objects.filter(is_active=True).first()
 
     if request.method == "POST":
         subject = request.POST.get("subject", "").strip()

@@ -118,6 +118,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "apps.companies.context_processors.rbac_context",
                 "apps.dashboard.context_processors.notifications_context",
+                "apps.dashboard.context_processors.platform_settings_context",
             ],
         },
     },

@@ -164,3 +164,51 @@ class Notification(models.Model):
             self.is_read = True
             self.save(update_fields=["is_read"])
 
+
+class FAQ(models.Model):
+    category = models.CharField(max_length=100, default="Getting Started & Accounts")
+    icon = models.CharField(max_length=50, default="fa-circle-question")
+    question = models.CharField(max_length=255)
+    answer = models.TextField()
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "FAQ"
+        verbose_name_plural = "FAQs"
+
+    def __str__(self):
+        return self.question
+
+
+class PlatformSetting(models.Model):
+    key = models.CharField(max_length=60, unique=True)
+    value = models.TextField(blank=True)
+    description = models.CharField(max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Platform Setting"
+        verbose_name_plural = "Platform Settings"
+
+    def __str__(self):
+        return f"{self.key}: {self.value}"
+
+    @classmethod
+    def get_setting(cls, key, default=""):
+        obj = cls.objects.filter(key=key).first()
+        return obj.value if obj else default
+
+    @classmethod
+    def set_setting(cls, key, value, description=""):
+        obj, _ = cls.objects.update_or_create(
+            key=key,
+            defaults={"value": str(value), "description": description},
+        )
+        return obj
+
+
+

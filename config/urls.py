@@ -16,6 +16,10 @@ from apps.dashboard.views import (
     help_support_view,
     create_support_ticket_view,
     support_ticket_detail_view,
+    update_support_ticket_view,
+    create_faq_view,
+    edit_faq_view,
+    delete_faq_view,
 )
 from apps.companies.web_views import (
     company_profile_web_view,
@@ -71,10 +75,14 @@ from apps.companies.admin_views import (
     admin_panel_company_edit_view,
     admin_panel_toggle_company_status_view,
     admin_panel_toggle_company_verification_view,
+    admin_panel_company_delete_view,
+    admin_panel_company_restore_view,
     admin_panel_plans_view,
     admin_panel_update_subscription_view,
     admin_panel_users_view,
     admin_panel_toggle_user_active_view,
+    admin_panel_reset_company_user_password_view,
+    admin_panel_toggle_maintenance_view,
     admin_panel_apilogs_view,
     admin_panel_auditlogs_view,
 )
@@ -108,6 +116,10 @@ urlpatterns = [
     path("help/", help_support_view, name="help-support"),
     path("help/ticket/create/", create_support_ticket_view, name="help-ticket-create"),
     path("help/ticket/<int:pk>/", support_ticket_detail_view, name="help-ticket-detail"),
+    path("help/ticket/<int:pk>/update/", update_support_ticket_view, name="help-ticket-update"),
+    path("help/faq/create/", create_faq_view, name="help-faq-create"),
+    path("help/faq/<int:pk>/edit/", edit_faq_view, name="help-faq-edit"),
+    path("help/faq/<int:pk>/delete/", delete_faq_view, name="help-faq-delete"),
 
     # Company Management (Web)
     path("company/profile/", company_profile_web_view, name="company-profile-web"),
@@ -175,12 +187,16 @@ urlpatterns = [
     path("admin-panel/companies/create/", admin_panel_company_create_view, name="admin-panel-company-create"),
     path("admin-panel/companies/<int:pk>/", admin_panel_company_detail_view, name="admin-panel-company-detail"),
     path("admin-panel/companies/<int:pk>/edit/", admin_panel_company_edit_view, name="admin-panel-company-edit"),
+    path("admin-panel/companies/<int:pk>/delete/", admin_panel_company_delete_view, name="admin-panel-company-delete"),
+    path("admin-panel/companies/<int:pk>/restore/", admin_panel_company_restore_view, name="admin-panel-company-restore"),
     path("admin-panel/companies/<int:pk>/toggle-status/", admin_panel_toggle_company_status_view, name="admin-panel-toggle-company-status"),
     path("admin-panel/companies/<int:pk>/toggle-verification/", admin_panel_toggle_company_verification_view, name="admin-panel-toggle-company-verification"),
     path("admin-panel/plans/", admin_panel_plans_view, name="admin-panel-plans"),
     path("admin-panel/plans/<int:company_id>/update/", admin_panel_update_subscription_view, name="admin-panel-update-subscription"),
     path("admin-panel/users/", admin_panel_users_view, name="admin-panel-users"),
     path("admin-panel/users/<int:pk>/toggle-active/", admin_panel_toggle_user_active_view, name="admin-panel-toggle-user-active"),
+    path("admin-panel/companies/<int:company_id>/users/<int:user_id>/reset-password/", admin_panel_reset_company_user_password_view, name="admin-panel-reset-user-password"),
+    path("admin-panel/maintenance/toggle/", admin_panel_toggle_maintenance_view, name="admin-panel-toggle-maintenance"),
     path("admin-panel/api-logs/", admin_panel_apilogs_view, name="admin-panel-apilogs"),
     path("admin-panel/audit-logs/", admin_panel_auditlogs_view, name="admin-panel-auditlogs"),
 

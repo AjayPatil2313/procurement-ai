@@ -63,10 +63,23 @@ class CreditTransaction(models.Model):
         related_name="credit_transactions",
     )
     notes = models.CharField(max_length=255, blank=True)
+    receipt_number = models.CharField(max_length=50, blank=True, null=True, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
 
+    def save(self, *args, **kwargs):
+        if not self.receipt_number:
+            import random
+            import string
+            for _ in range(10):
+                code = "".join(random.choices(string.digits, k=5))
+                candidate = f"RCP-{code}"
+                if not CreditTransaction.objects.filter(receipt_number=candidate).exists():
+                    self.receipt_number = candidate
+                    break
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.company.name} - {self.transaction_type} {self.credits} ({self.notes})"
+        return f"{self.receipt_number or 'RCP'} - {self.company.name} - {self.transaction_type} {self.credits} ({self.notes})"

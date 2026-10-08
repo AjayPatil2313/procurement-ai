@@ -3,32 +3,58 @@
 {% block title %}Help & Support Desk — AI Procurement & Sales Platform{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-6 pb-12">
 
   <!-- Breadcrumbs & Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        {% if is_super_admin %}
+        <a href="{% url 'admin-panel-dashboard' %}" class="hover:text-blue-600 transition">Admin Panel</a>
+        {% else %}
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        {% endif %}
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">Help & Support</span>
+        <span class="text-slate-600 font-semibold">Help & Support Desk</span>
       </div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-        <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
-          <i class="fa-solid fa-headset"></i>
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+          <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
+            <i class="fa-solid fa-headset"></i>
+          </span>
+          <span>Help &amp; Support Operations Desk</span>
+        </h1>
+        {% if is_super_admin %}
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+          <i class="fa-solid fa-shield-halved text-[10px]"></i> Super Admin View
         </span>
-        <span>Help & Support Center</span>
-      </h1>
+        {% endif %}
+      </div>
       <p class="text-xs text-slate-500 mt-1">
+        {% if is_super_admin %}
+        Manage inbound company inquiries, review contact emails with company identity &amp; location, and edit FAQ knowledge base articles.
+        {% else %}
         Search self-serve guides, browse frequently asked questions, or connect directly with our technical support operations desk.
+        {% endif %}
       </p>
     </div>
 
     <div class="flex flex-wrap items-center gap-2.5">
+      {% if is_super_admin %}
+      <button 
+        type="button" 
+        onclick="openCreateFaqModal()" 
+        class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-purple-600/20 cursor-pointer"
+      >
+        <i class="fa-solid fa-plus-circle"></i>
+        <span>Add New FAQ</span>
+      </button>
+      {% endif %}
+
       <button 
         type="button" 
         onclick="openCreateTicketModal()" 
-        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20"
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20 cursor-pointer"
       >
         <i class="fa-solid fa-paper-plane"></i>
         <span>Contact Support Desk</span>
@@ -39,43 +65,77 @@
         class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3.5 py-2.5 rounded-xl transition shadow-sm"
       >
         <i class="fa-solid fa-envelope text-blue-600"></i>
-        <span>Email: support@procureai.in</span>
+        <span>support@procureai.in</span>
       </a>
     </div>
   </div>
 
-  <!-- Search & Quick Navigation Hero -->
-  <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-    <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="relative z-10 max-w-2xl">
-      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 mb-3">
-        <i class="fa-solid fa-life-ring text-xs"></i> 24/7 Enterprise Knowledge Desk
-      </span>
-      <h2 class="text-xl sm:text-2xl font-black tracking-tight mb-2">
-        How can we help your business today?
-      </h2>
-      <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-5">
-        Find quick answers regarding AI scraping, matching score criteria, sending RFQs, roles & permissions, or quota management.
-      </p>
+  <!-- KPI Cards -->
+  {% if is_super_admin %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <!-- Total Inbound Tickets -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-inbox"></i>
+      </div>
+      <div>
+        <div class="text-[11px] text-slate-500 font-medium">Inbound Queries</div>
+        <div class="text-lg font-black text-slate-900">{{ total_tickets_count }} Total</div>
+      </div>
+    </div>
 
-      <!-- Instant Search Input -->
-      <div class="relative">
-        <span class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 text-sm">
-          <i class="fa-solid fa-magnifying-glass"></i>
-        </span>
-        <input 
-          type="text" 
-          id="faqSearchInput" 
-          placeholder="Search guides, FAQs, or keywords (e.g. Pvt Ltd, Match Score, CRM, Credits)..." 
-          class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white/15 transition shadow-inner"
-        >
+    <!-- Pending / Open -->
+    <div class="bg-white p-4 rounded-2xl border border-amber-200/80 bg-amber-50/20 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-clock"></i>
+      </div>
+      <div>
+        <div class="text-[11px] text-amber-800 font-semibold">Open &amp; Pending</div>
+        <div class="text-lg font-black text-amber-900 flex items-center gap-1.5">
+          <span>{{ open_tickets_count }}</span>
+          {% if open_tickets_count > 0 %}
+          <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- In Progress -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-arrows-rotate"></i>
+      </div>
+      <div>
+        <div class="text-[11px] text-slate-500 font-medium">In Progress</div>
+        <div class="text-lg font-black text-slate-900">{{ in_progress_count }}</div>
+      </div>
+    </div>
+
+    <!-- Resolved -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <div>
+        <div class="text-[11px] text-slate-500 font-medium">Resolved / Closed</div>
+        <div class="text-lg font-black text-emerald-700">{{ resolved_tickets_count }}</div>
+      </div>
+    </div>
+
+    <!-- Total FAQs -->
+    <div class="bg-white p-4 rounded-2xl border border-purple-200/80 bg-purple-50/20 shadow-sm flex items-center gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-base shrink-0">
+        <i class="fa-solid fa-book-open"></i>
+      </div>
+      <div>
+        <div class="text-[11px] text-purple-800 font-semibold">Knowledge FAQs</div>
+        <div class="text-lg font-black text-purple-900">{{ all_faqs|length }} Articles</div>
       </div>
     </div>
   </div>
-
-  <!-- Summary KPI Cards -->
+  {% else %}
+  <!-- Regular User KPI Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <!-- System Status -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
       <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base shrink-0">
         <i class="fa-solid fa-circle-check"></i>
@@ -89,7 +149,6 @@
       </div>
     </div>
 
-    <!-- Response SLA -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
       <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-base shrink-0">
         <i class="fa-solid fa-bolt"></i>
@@ -100,18 +159,16 @@
       </div>
     </div>
 
-    <!-- Knowledge Base Articles -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
       <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
         <i class="fa-solid fa-book-open"></i>
       </div>
       <div>
         <div class="text-xs text-slate-500 font-medium">Knowledge Base</div>
-        <div class="text-sm font-black text-slate-900">12 Verified Guides &amp; FAQs</div>
+        <div class="text-sm font-black text-slate-900">{{ all_faqs|length }} Verified Guides &amp; FAQs</div>
       </div>
     </div>
 
-    <!-- Direct Coverage -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
       <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-base shrink-0">
         <i class="fa-solid fa-headset"></i>
@@ -122,110 +179,508 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
-  <!-- Frequently Asked Questions (Accordion) -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-      <div>
-        <h3 class="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-          <i class="fa-solid fa-circle-question text-blue-600"></i>
-          <span>Frequently Asked Questions & Guides</span>
-        </h3>
-        <p class="text-xs text-slate-500 mt-0.5">Click any question to view instructions and operational explanations.</p>
-      </div>
-      <div class="text-xs font-semibold text-slate-400" id="faqCounter">
-        Showing all topics
-      </div>
-    </div>
+  <!-- Super Admin Workspace Tabs Navigation -->
+  {% if is_super_admin %}
+  <div class="border-b border-slate-200 flex items-center gap-3">
+    <button 
+      type="button" 
+      onclick="switchAdminTab('queries')" 
+      id="tabBtnQueries" 
+      class="pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 border-blue-600 text-blue-600 flex items-center gap-2 transition cursor-pointer"
+    >
+      <i class="fa-solid fa-inbox"></i>
+      <span>Inbound Inquiries &amp; Support Tickets</span>
+      <span class="px-2 py-0.5 rounded-full text-[10px] font-black {% if open_tickets_count > 0 %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+        {{ open_tickets_count }} Open
+      </span>
+    </button>
+    <button 
+      type="button" 
+      onclick="switchAdminTab('faqs')" 
+      id="tabBtnFaqs" 
+      class="pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2 transition cursor-pointer"
+    >
+      <i class="fa-solid fa-circle-question"></i>
+      <span>FAQ Knowledge Base Manager</span>
+      <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-600">
+        {{ all_faqs|length }}
+      </span>
+    </button>
+  </div>
+  {% endif %}
 
-    <!-- Category Groups -->
-    <div class="space-y-6" id="faqAccordionContainer">
-      {% for cat in faqs %}
-      <div class="faq-category-block space-y-3">
-        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
-          <span class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-[11px]">
-            <i class="fa-solid {{ cat.icon }}"></i>
-          </span>
-          <span>{{ cat.category }}</span>
+  <!-- ========================================================================= -->
+  <!-- TAB 1: INBOUND COMPANY SUPPORT QUERIES & EMAILS (SUPER ADMIN VIEW)       -->
+  <!-- ========================================================================= -->
+  <div id="sectionQueries" class="{% if is_super_admin %}{% else %}{% if tickets %}block{% else %}hidden{% endif %}{% endif %} space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <!-- Section Header & Filters -->
+      <div class="p-5 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50/60">
+        <div>
+          <h2 class="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <span class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-inbox"></i>
+            </span>
+            <span>{% if is_super_admin %}Inbound Company Support Queries &amp; Email Inquiries{% else %}Your Company's Support Requests{% endif %}</span>
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">
+            {% if is_super_admin %}
+            All inquiries received via email and in-app support desk, mapped with Company ID, Name, Location, and User info.
+            {% else %}
+            Track the real-time progress and resolutions for tickets submitted by your team.
+            {% endif %}
+          </p>
         </div>
 
-        <div class="space-y-2.5">
-          {% for item in cat.items %}
-          <div class="faq-item border border-slate-200 rounded-xl overflow-hidden transition" data-search="{{ item.q|lower }} {{ item.a|lower }} {{ cat.category|lower }}">
-            <button 
-              type="button" 
-              onclick="toggleFaq(this)"
-              class="w-full text-left p-4 bg-slate-50/60 hover:bg-slate-100/60 flex items-center justify-between gap-4 transition cursor-pointer"
+        <!-- Filter Form -->
+        <form method="GET" action="{% url 'help-support' %}" class="flex flex-wrap items-center gap-2 text-xs">
+          <!-- Keyword Search -->
+          <div class="relative min-w-[200px]">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <i class="fa-solid fa-magnifying-glass text-xs"></i>
+            </span>
+            <input 
+              type="text" 
+              name="ticket_q" 
+              value="{{ query_search }}" 
+              placeholder="Search ID, company, location, question..."
+              class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-300 bg-white font-medium text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              <span class="text-xs sm:text-sm font-bold text-slate-800 leading-snug">
-                {{ item.q }}
-              </span>
-              <span class="w-6 h-6 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center text-[10px] shrink-0 transition-transform duration-200 chevron-icon">
-                <i class="fa-solid fa-chevron-down"></i>
-              </span>
-            </button>
-            <div class="faq-answer hidden p-4 bg-white border-t border-slate-100 text-xs text-slate-600 leading-relaxed font-normal">
-              {{ item.a }}
-            </div>
           </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
 
-    <div id="noFaqResults" class="hidden py-8 text-center text-slate-400">
-      <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2 text-base">
-        <i class="fa-solid fa-magnifying-glass"></i>
+          <!-- Status Filter -->
+          <select name="ticket_status" class="py-1.5 px-3 rounded-xl border border-slate-300 bg-white font-medium text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+            {% for code, label in statuses %}
+            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <!-- Priority Filter -->
+          <select name="ticket_priority" class="py-1.5 px-3 rounded-xl border border-slate-300 bg-white font-medium text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="all" {% if priority_filter == 'all' %}selected{% endif %}>All Priorities</option>
+            {% for code, label in priorities %}
+            <option value="{{ code }}" {% if priority_filter == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-xl transition cursor-pointer">
+            Filter
+          </button>
+          {% if query_search or status_filter != 'all' or priority_filter != 'all' %}
+          <a href="{% url 'help-support' %}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition">
+            Reset
+          </a>
+          {% endif %}
+        </form>
       </div>
-      <p class="text-xs font-bold text-slate-600">No matching help articles found</p>
-      <p class="text-[11px] text-slate-400 mt-0.5">Try searching with other keywords, or contact our support desk directly below.</p>
+
+      <!-- Inbound Queries Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-100/70 text-slate-600 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Ticket &amp; Date</th>
+              <th class="py-3 px-4">Company Details</th>
+              <th class="py-3 px-4">Location</th>
+              <th class="py-3 px-4">User &amp; Contact</th>
+              <th class="py-3 px-4 min-w-[220px]">Question &amp; Issue Details</th>
+              <th class="py-3 px-4">Priority</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+            {% for ticket in tickets %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <!-- Ticket & Date -->
+              <td class="py-3 px-4 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1 font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 text-[11px]">
+                  #{{ ticket.ticket_number }}
+                </span>
+                <div class="text-[11px] text-slate-400 mt-1 font-normal">
+                  {{ ticket.created_at|date:"M d, Y H:i" }}
+                </div>
+                <span class="inline-block mt-0.5 text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                  {{ ticket.get_category_display }}
+                </span>
+              </td>
+
+              <!-- Company ID & Name -->
+              <td class="py-3 px-4">
+                {% if ticket.company %}
+                <div class="flex items-center gap-1.5">
+                  <span class="font-mono text-[10px] font-black bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded shrink-0">
+                    ID #{{ ticket.company.id }}
+                  </span>
+                  {% if is_super_admin %}
+                  <a href="{% url 'admin-panel-company-detail' ticket.company.id %}" class="font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 truncate max-w-[140px]" title="View Company 360 Dossier">
+                    <span class="truncate">{{ ticket.company.name }}</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-blue-400 shrink-0"></i>
+                  </a>
+                  {% else %}
+                  <span class="font-bold text-slate-900 truncate max-w-[140px]">{{ ticket.company.name }}</span>
+                  {% endif %}
+                </div>
+                <div class="text-[10px] text-slate-400 mt-0.5">
+                  {{ ticket.company.get_company_type_display|default:"B2B Enterprise" }}
+                </div>
+                {% else %}
+                <span class="text-slate-400 italic">No Company Linked</span>
+                {% endif %}
+              </td>
+
+              <!-- Location (City, Country) -->
+              <td class="py-3 px-4 whitespace-nowrap">
+                {% if ticket.company and ticket.company.city or ticket.company.country %}
+                <div class="flex items-center gap-1.5 text-slate-800 font-semibold">
+                  <i class="fa-solid fa-location-dot text-rose-500 text-xs shrink-0"></i>
+                  <span>{{ ticket.company.city|default:"-" }}, {{ ticket.company.country|default:"India" }}</span>
+                </div>
+                {% if ticket.company.state %}
+                <div class="text-[10px] text-slate-400 pl-4">{{ ticket.company.state }}</div>
+                {% endif %}
+                {% else %}
+                <span class="text-slate-400 italic">Location unassigned</span>
+                {% endif %}
+              </td>
+
+              <!-- User & Contact Info -->
+              <td class="py-3 px-4">
+                <div class="font-bold text-slate-900 flex items-center gap-1">
+                  <i class="fa-regular fa-user text-slate-400 text-xs"></i>
+                  <span>{{ ticket.user.get_full_name|default:ticket.user.email }}</span>
+                </div>
+                <div class="mt-0.5">
+                  <a href="mailto:{{ ticket.contact_email }}" class="text-blue-600 hover:underline flex items-center gap-1 text-[11px]" title="Direct Email">
+                    <i class="fa-regular fa-envelope text-slate-400 text-[10px]"></i>
+                    <span class="truncate max-w-[150px]">{{ ticket.contact_email }}</span>
+                  </a>
+                </div>
+                {% if ticket.contact_phone %}
+                <div class="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
+                  <i class="fa-solid fa-phone text-slate-400 text-[10px]"></i>
+                  <span>{{ ticket.contact_phone }}</span>
+                </div>
+                {% endif %}
+              </td>
+
+              <!-- Question & Issue Details -->
+              <td class="py-3 px-4">
+                <div class="font-bold text-slate-900 leading-snug">
+                  {{ ticket.subject }}
+                </div>
+                <div class="text-[11px] text-slate-500 line-clamp-2 mt-0.5 font-normal">
+                  {{ ticket.description }}
+                </div>
+                {% if ticket.resolution %}
+                <div class="mt-1.5 p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[10px] text-emerald-800">
+                  <span class="font-bold"><i class="fa-solid fa-check-circle text-emerald-600"></i> Resolution:</span> {{ ticket.resolution|truncatechars:80 }}
+                </div>
+                {% endif %}
+              </td>
+
+              <!-- Priority -->
+              <td class="py-3 px-4 whitespace-nowrap">
+                {% if ticket.priority == 'urgent' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                  <i class="fa-solid fa-triangle-exclamation"></i> Urgent
+                </span>
+                {% elif ticket.priority == 'high' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                  <i class="fa-solid fa-angles-up"></i> High
+                </span>
+                {% elif ticket.priority == 'medium' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                  <i class="fa-solid fa-minus"></i> Medium
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                  <i class="fa-solid fa-arrow-down"></i> Low
+                </span>
+                {% endif %}
+              </td>
+
+              <!-- Status -->
+              <td class="py-3 px-4 whitespace-nowrap">
+                {% if ticket.status == 'open' %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Open
+                </span>
+                {% elif ticket.status == 'in_progress' %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-blue-100 text-blue-800 border border-blue-300">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> In Progress
+                </span>
+                {% elif ticket.status == 'resolved' %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Resolved
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                  Closed
+                </span>
+                {% endif %}
+              </td>
+
+              <!-- Actions -->
+              <td class="py-3 px-4 whitespace-nowrap text-right">
+                <button 
+                  type="button" 
+                  onclick="openUpdateTicketModal(
+                    '{{ ticket.id }}', 
+                    '{{ ticket.ticket_number|escapejs }}', 
+                    '{{ ticket.company.id|default:"" }}', 
+                    '{{ ticket.company.name|default:"-"|escapejs }}', 
+                    '{{ ticket.company.city|default:""|escapejs }}', 
+                    '{{ ticket.company.country|default:""|escapejs }}', 
+                    '{{ ticket.user.get_full_name|default:ticket.user.email|escapejs }}', 
+                    '{{ ticket.contact_email|escapejs }}', 
+                    '{{ ticket.contact_phone|default:""|escapejs }}', 
+                    '{{ ticket.subject|escapejs }}', 
+                    '{{ ticket.description|escapejs }}', 
+                    '{{ ticket.status }}', 
+                    '{{ ticket.priority }}', 
+                    '{{ ticket.resolution|default:""|escapejs }}', 
+                    '{{ ticket.created_at|date:"M d, Y H:i" }}'
+                  )" 
+                  class="inline-flex items-center gap-1 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 font-bold px-3 py-1.5 rounded-lg transition text-xs cursor-pointer shadow-xs"
+                >
+                  <i class="fa-solid fa-pen-to-square"></i>
+                  <span>{% if is_super_admin %}Resolve &amp; Update{% else %}View Details{% endif %}</span>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="py-10 text-center text-slate-400">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2 text-xl">
+                  <i class="fa-solid fa-inbox"></i>
+                </div>
+                <p class="text-sm font-bold text-slate-700">No support tickets found</p>
+                <p class="text-xs text-slate-400 mt-0.5">There are no inquiries matching your active filters or keywords.</p>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- Direct Assistance & Channels Cards -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <!-- Channel 1: Email Support -->
-    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
-      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base shrink-0">
-        <i class="fa-solid fa-envelope"></i>
+  <!-- ========================================================================= -->
+  <!-- TAB 2 / MAIN: DYNAMIC FAQ KNOWLEDGE BASE (EDITABLE BY SUPER ADMIN)       -->
+  <!-- ========================================================================= -->
+  <div id="sectionFaqs" class="space-y-6">
+
+    <!-- Search Hero & Quick Navigation -->
+    <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="relative z-10 max-w-2xl">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+            <i class="fa-solid fa-life-ring text-xs"></i> 24/7 Enterprise Knowledge Desk
+          </span>
+          {% if is_super_admin %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-500/30 text-purple-200 border border-purple-400/40">
+            <i class="fa-solid fa-wrench text-xs"></i> Editable by Super Admin
+          </span>
+          {% endif %}
+        </div>
+        <h2 class="text-xl sm:text-2xl font-black tracking-tight mb-2">
+          How can we help your business today?
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-5">
+          Find instant answers regarding AI scraping, matching score criteria, sending RFQs, roles &amp; permissions, or quota management.
+        </p>
+
+        <!-- Instant Search Input -->
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 text-sm">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </span>
+          <input 
+            type="text" 
+            id="faqSearchInput" 
+            placeholder="Search guides, FAQs, or keywords (e.g. Pvt Ltd, Match Score, CRM, Credits)..." 
+            class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white/15 transition shadow-inner"
+          >
+        </div>
       </div>
+    </div>
+
+    <!-- Frequently Asked Questions (Accordion + Super Admin Controls) -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div>
+          <h3 class="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <i class="fa-solid fa-circle-question text-blue-600"></i>
+            <span>Frequently Asked Questions &amp; Guides</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Click any question to view instructions and operational explanations.
+            {% if is_super_admin %}
+            Super Admins can edit or delete questions directly below.
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          {% if is_super_admin %}
+          <button 
+            type="button" 
+            onclick="openCreateFaqModal()" 
+            class="inline-flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1.5 rounded-xl border border-blue-200 transition cursor-pointer"
+          >
+            <i class="fa-solid fa-plus-circle"></i>
+            <span>+ Add FAQ</span>
+          </button>
+          {% endif %}
+          <div class="text-xs font-semibold text-slate-400" id="faqCounter">
+            Showing all topics
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Groups -->
+      <div class="space-y-6" id="faqAccordionContainer">
+        {% for cat in faqs %}
+        <div class="faq-category-block space-y-3">
+          <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+            <span class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-[11px]">
+              <i class="fa-solid {{ cat.icon }}"></i>
+            </span>
+            <span>{{ cat.category }}</span>
+          </div>
+
+          <div class="space-y-2.5">
+            {% for item in cat.items %}
+            <div class="faq-item border border-slate-200 rounded-xl overflow-hidden transition" data-search="{{ item.question|lower }} {{ item.answer|lower }} {{ cat.category|lower }}">
+              <div class="w-full p-4 bg-slate-50/60 hover:bg-slate-100/60 flex items-center justify-between gap-4 transition">
+                <button 
+                  type="button" 
+                  onclick="toggleFaq(this)"
+                  class="flex-1 text-left flex items-center justify-between gap-4 cursor-pointer focus:outline-none"
+                >
+                  <span class="text-xs sm:text-sm font-bold text-slate-800 leading-snug">
+                    {{ item.question }}
+                  </span>
+                  <span class="w-6 h-6 rounded-full bg-white border border-slate-200 text-slate-400 flex items-center justify-center text-[10px] shrink-0 transition-transform duration-200 chevron-icon">
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </span>
+                </button>
+
+                <!-- Super Admin Quick Action Buttons -->
+                {% if is_super_admin %}
+                <div class="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-200">
+                  <button 
+                    type="button" 
+                    title="Edit FAQ"
+                    onclick="openEditFaqModal('{{ item.id }}', '{{ item.question|escapejs }}', '{{ item.answer|escapejs }}', '{{ item.category|escapejs }}', '{{ item.icon|escapejs }}', '{{ item.order }}', {{ item.is_active|yesno:'true,false' }})"
+                    class="w-7 h-7 rounded-lg bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-600 border border-slate-200 flex items-center justify-center text-xs transition cursor-pointer shadow-xs"
+                  >
+                    <i class="fa-solid fa-pen-to-square"></i>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onclick="openDeleteFaqModal('{{ item.id }}', '{{ item.question|escapejs }}')"
+                    title="Delete FAQ"
+                    class="w-7 h-7 rounded-lg bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 flex items-center justify-center text-xs transition cursor-pointer shadow-xs"
+                  >
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </div>
+                {% endif %}
+              </div>
+              
+              <div class="faq-answer hidden p-4 bg-white border-t border-slate-100 text-xs text-slate-600 leading-relaxed font-normal">
+                {{ item.answer|linebreaksbr }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div id="noFaqResults" class="hidden py-8 text-center text-slate-400">
+        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2 text-base">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </div>
+        <p class="text-xs font-bold text-slate-600">No matching help articles found</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Try searching with other keywords, or reach out to our support channels below.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- BOTTOM SECTION: STRICTLY 2 CHANNELS ONLY (EMAIL SUPPORT & WHATSAPP)       -->
+  <!-- ========================================================================= -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+    <!-- Channel 1: Email Support Desk -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-blue-300 transition group">
       <div>
-        <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">Email Support</h4>
-        <p class="text-xs text-slate-500 mb-2">Detailed technical investigations, billing inquiries, and custom features.</p>
-        <a href="mailto:support@procureai.in" class="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
+        <div class="flex items-center gap-3.5 mb-3">
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+            <i class="fa-solid fa-envelope"></i>
+          </div>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Primary Channel</span>
+            <h4 class="text-sm font-black text-slate-900 mt-0.5">Email Support Desk</h4>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 leading-relaxed mb-3">
+          Inquiries sent here are automatically routed to the Super Admin control desk, capturing your verified Company ID, Name, and Location for prioritized technical assistance.
+        </p>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <a href="mailto:support@procureai.in" class="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
           <span>support@procureai.in</span>
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
         </a>
+        <button 
+          type="button" 
+          onclick="openCreateTicketModal()" 
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm cursor-pointer"
+        >
+          Send Support Query &rarr;
+        </button>
       </div>
     </div>
 
-    <!-- Channel 2: WhatsApp / Urgent Hotline -->
-    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
-      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base shrink-0">
-        <i class="fa-brands fa-whatsapp"></i>
-      </div>
+    <!-- Channel 2: WhatsApp Support Hotline -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-emerald-300 transition group">
       <div>
-        <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">Priority WhatsApp Desk</h4>
-        <p class="text-xs text-slate-500 mb-2">Mon - Sat (9:00 AM - 7:00 PM IST) for quick operational assistance.</p>
-        <a href="https://wa.me/918000000000" target="_blank" rel="noopener noreferrer" class="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
+        <div class="flex items-center gap-3.5 mb-3">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition">
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Instant Messaging</span>
+            <h4 class="text-sm font-black text-slate-900 mt-0.5">Priority WhatsApp Desk</h4>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 leading-relaxed mb-3">
+          Available Mon - Sat (9:00 AM - 7:00 PM IST) for swift operational questions, live onboarding walkthroughs, and urgent query resolutions directly on mobile.
+        </p>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+          <i class="fa-solid fa-phone text-emerald-600 text-xs"></i>
           <span>+91 8000-AI-PROC</span>
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-        </a>
-      </div>
-    </div>
-
-    <!-- Channel 3: Documentation -->
-    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-start gap-4">
-      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base shrink-0">
-        <i class="fa-solid fa-sliders"></i>
-      </div>
-      <div>
-        <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">Scoring Criteria & Rules</h4>
-        <p class="text-xs text-slate-500 mb-2">Tune parameters for entity type (Pvt Ltd), location, and specifications.</p>
-        <a href="{% url 'matching-parameters' %}" class="text-xs font-bold text-purple-600 hover:underline flex items-center gap-1">
-          <span>Configure Matching Parameters (⚙)</span>
-          <i class="fa-solid fa-arrow-right text-[10px]"></i>
+        </span>
+        <a 
+          href="https://wa.me/918000000000" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5"
+        >
+          <i class="fa-brands fa-whatsapp text-sm"></i>
+          <span>Chat on WhatsApp</span>
         </a>
       </div>
     </div>
@@ -233,9 +688,9 @@
 
 </div>
 
-<!-- ========================================== -->
-<!-- MODAL: CONTACT SUPPORT DESK                -->
-<!-- ========================================== -->
+<!-- ========================================================================= -->
+<!-- MODAL: CONTACT SUPPORT DESK / SUBMIT QUERY                                -->
+<!-- ========================================================================= -->
 <div id="createTicketModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
     <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -244,11 +699,11 @@
           <i class="fa-solid fa-headset"></i>
         </div>
         <div>
-          <h3 class="text-sm font-bold text-slate-900">Contact Technical Support</h3>
-          <p class="text-xs text-slate-500">Our engineering team responds within 4 business hours</p>
+          <h3 class="text-sm font-bold text-slate-900">Contact Support Operations Desk</h3>
+          <p class="text-xs text-slate-500">Your query will be submitted to the Super Admin desk</p>
         </div>
       </div>
-      <button type="button" onclick="closeCreateTicketModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+      <button type="button" onclick="closeCreateTicketModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
         <i class="fa-solid fa-xmark text-sm"></i>
       </button>
     </div>
@@ -258,12 +713,12 @@
 
       <div>
         <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-          Subject / Brief Summary <span class="text-rose-500">*</span>
+          Subject / Question Summary <span class="text-rose-500">*</span>
         </label>
         <input 
           type="text" 
           name="subject" 
-          placeholder="e.g. Scraper query timeout on machinery search, or Need custom matching parameter" 
+          placeholder="e.g. Landed price calculation clarification, or Custom user role required" 
           required
           class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
         >
@@ -312,35 +767,394 @@
 
       <div>
         <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-          Detailed Description <span class="text-rose-500">*</span>
+          Detailed Description / Question <span class="text-rose-500">*</span>
         </label>
         <textarea 
           name="description" 
           rows="4" 
           required
-          placeholder="Please describe what you are trying to achieve, steps to reproduce any issue, or specifics of your question..."
+          placeholder="Please describe what you are trying to achieve, specific details of your query, or any error encountered..."
           class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 text-xs resize-none"
         ></textarea>
       </div>
 
       <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-        <button type="button" onclick="closeCreateTicketModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition">
+        <button type="button" onclick="closeCreateTicketModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
           Cancel
         </button>
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm">
-          Send Message
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer">
+          Submit to Super Admin Desk
         </button>
       </div>
     </form>
   </div>
 </div>
 
+<!-- ========================================================================= -->
+<!-- MODAL: REVIEW & UPDATE SUPPORT TICKET (SUPER ADMIN)                       -->
+<!-- ========================================================================= -->
+<div id="updateTicketModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-headset"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-sm font-bold text-slate-900">Support Ticket <span id="modalTicketNum" class="font-mono text-blue-600"></span></h3>
+          </div>
+          <p class="text-xs text-slate-500">Inbound inquiry details, company identity &amp; resolution</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeUpdateTicketModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Ticket Summary Box -->
+    <div class="p-5 space-y-4 text-xs max-h-[70vh] overflow-y-auto">
+      <!-- Company & Sender Dossier -->
+      <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 grid grid-cols-2 gap-3">
+        <div>
+          <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Company Identity</span>
+          <div class="font-bold text-slate-900 flex items-center gap-1.5">
+            <span id="modalCompIdBadge" class="bg-slate-200 text-slate-800 text-[10px] px-1.5 py-0.5 rounded font-mono"></span>
+            <span id="modalCompName" class="text-blue-700"></span>
+          </div>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Location</span>
+          <div class="font-semibold text-slate-800 flex items-center gap-1">
+            <i class="fa-solid fa-location-dot text-rose-500 text-xs"></i>
+            <span id="modalCompLocation"></span>
+          </div>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Contact Person</span>
+          <div id="modalUserName" class="font-bold text-slate-900"></div>
+          <div id="modalUserEmail" class="text-slate-500 text-[11px]"></div>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Phone / Date</span>
+          <div id="modalUserPhone" class="text-slate-700 font-medium"></div>
+          <div id="modalDate" class="text-slate-400 text-[11px]"></div>
+        </div>
+      </div>
+
+      <!-- Question Subject & Body -->
+      <div>
+        <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Question / Inquiry Subject</span>
+        <div id="modalSubject" class="font-bold text-slate-900 bg-white p-2.5 rounded-xl border border-slate-200 text-xs leading-relaxed"></div>
+      </div>
+
+      <div>
+        <span class="text-[10px] font-bold uppercase text-slate-400 block mb-1">Detailed Description</span>
+        <div id="modalDescription" class="font-normal text-slate-700 bg-slate-50/80 p-3 rounded-xl border border-slate-200 text-xs leading-relaxed whitespace-pre-wrap"></div>
+      </div>
+
+      <!-- Form for Super Admin Status Update & Resolution -->
+      {% if is_super_admin %}
+      <form id="updateTicketForm" method="POST" action="" class="pt-3 border-t border-slate-200 space-y-3">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Update Status</label>
+            <select name="status" id="modalStatusSelect" class="w-full rounded-xl border border-slate-300 p-2.5 bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-blue-500">
+              {% for code, label in statuses %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Priority</label>
+            <div id="modalPriorityDisplay" class="p-2 font-bold text-slate-700"></div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Resolution Notes / Reply Message
+          </label>
+          <textarea 
+            name="resolution" 
+            id="modalResolution" 
+            rows="3" 
+            placeholder="Write official resolution notes, troubleshooting findings, or instructions..."
+            class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 text-xs resize-none"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-2">
+          <button type="button" onclick="closeUpdateTicketModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
+            Close
+          </button>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer">
+            Save &amp; Update Ticket
+          </button>
+        </div>
+      </form>
+      {% else %}
+      <div class="pt-3 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="closeUpdateTicketModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition">
+          Close
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: ADD NEW FAQ (SUPER ADMIN)                                          -->
+<!-- ========================================================================= -->
+{% if is_super_admin %}
+<div id="createFaqModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-plus-circle"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Add New FAQ Knowledge Article</h3>
+          <p class="text-xs text-slate-500">Add a helpful question &amp; answer to customer knowledge base</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeCreateFaqModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'help-faq-create' %}" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Topic Category <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          name="category" 
+          placeholder="e.g. Getting Started & Accounts, AI Discovery, Billing & Credits" 
+          value="Getting Started & Accounts"
+          required
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 font-semibold text-slate-900 text-xs"
+        >
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Icon Class</label>
+          <input 
+            type="text" 
+            name="icon" 
+            placeholder="fa-circle-question" 
+            value="fa-circle-question"
+            class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 font-mono text-slate-900 text-xs"
+          >
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Display Order</label>
+          <input 
+            type="number" 
+            name="order" 
+            value="0" 
+            class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 font-semibold text-slate-900 text-xs"
+          >
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Question <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          name="question" 
+          placeholder="e.g. How do I switch between Buyer and Seller workspaces?" 
+          required
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 font-semibold text-slate-900 text-xs"
+        >
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Answer / Explanation <span class="text-rose-500">*</span>
+        </label>
+        <textarea 
+          name="answer" 
+          rows="4" 
+          required
+          placeholder="Provide step-by-step guidance, instructions, or operational details..."
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 font-medium text-slate-800 text-xs resize-none"
+        ></textarea>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeCreateFaqModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer">
+          Create FAQ Article
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: EDIT FAQ (SUPER ADMIN)                                             -->
+<!-- ========================================================================= -->
+<div id="editFaqModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Edit FAQ Article</h3>
+          <p class="text-xs text-slate-500">Update question title, explanation, or ordering</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeEditFaqModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="editFaqForm" method="POST" action="" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Topic Category <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          name="category" 
+          id="editFaqCategory" 
+          required
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
+        >
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Icon Class</label>
+          <input 
+            type="text" 
+            name="icon" 
+            id="editFaqIcon" 
+            class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-mono text-slate-900 text-xs"
+          >
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Display Order</label>
+          <input 
+            type="number" 
+            name="order" 
+            id="editFaqOrder" 
+            class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
+          >
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Question <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          name="question" 
+          id="editFaqQuestion" 
+          required
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900 text-xs"
+        >
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Answer / Explanation <span class="text-rose-500">*</span>
+        </label>
+        <textarea 
+          name="answer" 
+          id="editFaqAnswer" 
+          rows="4" 
+          required
+          class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-medium text-slate-800 text-xs resize-none"
+        ></textarea>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="is_active" id="editFaqIsActive" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+        <label for="editFaqIsActive" class="font-bold text-slate-700">Active &amp; Visible in Knowledge Base</label>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeEditFaqModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer">
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- ========================================================================= -->
+<!-- JAVASCRIPT: TAB SWITCHER, ACCORDION & MODALS                              -->
+<!-- ========================================================================= -->
 <script>
-  // 1. Accordion Toggle
+  // 1. Super Admin Tab Switcher
+  function switchAdminTab(tab) {
+    const secQueries = document.getElementById('sectionQueries');
+    const secFaqs = document.getElementById('sectionFaqs');
+    const btnQueries = document.getElementById('tabBtnQueries');
+    const btnFaqs = document.getElementById('tabBtnFaqs');
+
+    if (tab === 'queries') {
+      if (secQueries) secQueries.classList.remove('hidden');
+      if (secFaqs) secFaqs.classList.add('hidden');
+      if (btnQueries) {
+        btnQueries.className = 'pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 border-blue-600 text-blue-600 flex items-center gap-2 transition cursor-pointer';
+      }
+      if (btnFaqs) {
+        btnFaqs.className = 'pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2 transition cursor-pointer';
+      }
+      window.location.hash = 'queries';
+    } else {
+      if (secQueries) secQueries.classList.add('hidden');
+      if (secFaqs) secFaqs.classList.remove('hidden');
+      if (btnQueries) {
+        btnQueries.className = 'pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-2 transition cursor-pointer';
+      }
+      if (btnFaqs) {
+        btnFaqs.className = 'pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 border-blue-600 text-blue-600 flex items-center gap-2 transition cursor-pointer';
+      }
+      window.location.hash = 'faqs';
+    }
+  }
+
+  // Restore active tab on load
+  document.addEventListener('DOMContentLoaded', () => {
+    {% if is_super_admin %}
+    if (window.location.hash === '#faqs') {
+      switchAdminTab('faqs');
+    } else {
+      switchAdminTab('queries');
+    }
+    {% endif %}
+  });
+
+  // 2. FAQ Accordion Toggle
   function toggleFaq(btn) {
     const parent = btn.closest('.faq-item');
     const answer = parent.querySelector('.faq-answer');
-    const chevron = btn.querySelector('.chevron-icon');
+    const chevron = parent.querySelector('.chevron-icon');
 
     const isOpen = !answer.classList.contains('hidden');
     if (isOpen) {
@@ -356,10 +1170,9 @@
     }
   }
 
-  // 2. Instant FAQ Search Filter
+  // 3. Instant FAQ Search Filter
   document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('faqSearchInput');
-    const faqContainer = document.getElementById('faqAccordionContainer');
     const noResults = document.getElementById('noFaqResults');
     const counter = document.getElementById('faqCounter');
 
@@ -403,12 +1216,116 @@
     }
   });
 
-  // 3. Modal management
+  // 4. Modal Management: Create Ticket
   function openCreateTicketModal() {
     document.getElementById('createTicketModal').classList.remove('hidden');
   }
   function closeCreateTicketModal() {
     document.getElementById('createTicketModal').classList.add('hidden');
   }
+
+  // 5. Modal Management: Update Ticket (Super Admin)
+  function openUpdateTicketModal(id, ticketNum, compId, compName, city, country, userName, userEmail, phone, subject, desc, status, priority, resolution, dateStr) {
+    document.getElementById('modalTicketNum').textContent = '#' + ticketNum;
+    document.getElementById('modalCompIdBadge').textContent = compId ? 'ID #' + compId : 'N/A';
+    document.getElementById('modalCompName').textContent = compName;
+    document.getElementById('modalCompLocation').textContent = (city ? city + ', ' : '') + (country || 'India');
+    document.getElementById('modalUserName').textContent = userName;
+    document.getElementById('modalUserEmail').textContent = userEmail;
+    document.getElementById('modalUserPhone').textContent = phone ? phone : 'No phone provided';
+    document.getElementById('modalDate').textContent = dateStr;
+    document.getElementById('modalSubject').textContent = subject;
+    document.getElementById('modalDescription').textContent = desc;
+
+    const form = document.getElementById('updateTicketForm');
+    if (form) {
+      form.action = '/help/ticket/' + id + '/update/';
+      const statusSelect = document.getElementById('modalStatusSelect');
+      if (statusSelect) statusSelect.value = status;
+      const resText = document.getElementById('modalResolution');
+      if (resText) resText.value = resolution;
+      const priorityDisplay = document.getElementById('modalPriorityDisplay');
+      if (priorityDisplay) {
+        priorityDisplay.textContent = priority.toUpperCase();
+      }
+    }
+
+    document.getElementById('updateTicketModal').classList.remove('hidden');
+  }
+  function closeUpdateTicketModal() {
+    document.getElementById('updateTicketModal').classList.add('hidden');
+  }
+
+  // 6. Modal Management: Add FAQ (Super Admin)
+  function openCreateFaqModal() {
+    const modal = document.getElementById('createFaqModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+  function closeCreateFaqModal() {
+    const modal = document.getElementById('createFaqModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // 7. Modal Management: Edit FAQ (Super Admin)
+  function openEditFaqModal(id, question, answer, category, icon, order, isActive) {
+    const modal = document.getElementById('editFaqModal');
+    if (!modal) return;
+
+    document.getElementById('editFaqForm').action = '/help/faq/' + id + '/edit/';
+    document.getElementById('editFaqCategory').value = category;
+    document.getElementById('editFaqIcon').value = icon || 'fa-circle-question';
+    document.getElementById('editFaqOrder').value = order;
+    document.getElementById('editFaqQuestion').value = question;
+    document.getElementById('editFaqAnswer').value = answer;
+    document.getElementById('editFaqIsActive').checked = isActive;
+
+    modal.classList.remove('hidden');
+  }
+  function closeEditFaqModal() {
+    const modal = document.getElementById('editFaqModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // 8. Modal Management: Delete FAQ (Super Admin)
+  function openDeleteFaqModal(id, question) {
+    const form = document.getElementById('deleteFaqForm');
+    if (form) form.action = '/help/faq/' + id + '/delete/';
+    const qEl = document.getElementById('deleteFaqQuestionText');
+    if (qEl) qEl.textContent = question;
+    const modal = document.getElementById('deleteFaqModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+  function closeDeleteFaqModal() {
+    const modal = document.getElementById('deleteFaqModal');
+    if (modal) modal.classList.add('hidden');
+  }
 </script>
+
+<!-- Delete FAQ Confirmation Modal -->
+<div id="deleteFaqModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4">
+        <i class="fa-solid fa-trash-can"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900">Delete FAQ Entry?</h3>
+      <p class="text-xs text-slate-500 mt-1">This FAQ article will be permanently removed from knowledge base.</p>
+      
+      <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-left text-xs font-semibold text-slate-800" id="deleteFaqQuestionText">
+        FAQ Question
+      </div>
+
+      <form id="deleteFaqForm" method="POST" action="" class="mt-5 flex items-center justify-end gap-2.5">
+        {% csrf_token %}
+        <button type="button" onclick="closeDeleteFaqModal()" class="w-1/2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Confirm Delete</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}
