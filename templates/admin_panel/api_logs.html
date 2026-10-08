@@ -5,63 +5,160 @@
 {% block content %}
 <div class="space-y-6">
 
-  <div>
-    <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200 mb-2">
-      <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">API Logs & External Provider Costs</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Real-time audit log of Anthropic Claude LLM extractions, Google Custom Search, and Places endpoints</p>
     </div>
-    <h1 class="text-2xl font-black text-slate-900 tracking-tight">API Logs & External Provider Costs</h1>
-    <p class="text-xs text-slate-500 mt-0.5">Audit log of Anthropic/OpenAI LLM extractions, Google Places API, and Search endpoints</p>
+
+    <!-- Quick Stats -->
+    <div class="flex items-center gap-2">
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Total Calls:</span> <span class="font-bold text-slate-900">{{ total_calls }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm text-xs">
+        <span class="text-emerald-700">Cost:</span> <span class="font-black text-emerald-900">${{ total_cost|floatformat:4 }}</span>
+      </div>
+    </div>
   </div>
 
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-xs space-y-4">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b border-slate-100">
-      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-        <span class="text-slate-500 block text-[11px]">Monthly API Budget</span>
-        <span class="text-lg font-black text-slate-900">$250.00</span>
+  <!-- KPI Overview Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <span class="text-slate-500 block text-xs font-semibold uppercase tracking-wider">Monthly API Budget</span>
+      <span class="text-2xl font-black text-slate-900 mt-1 block">${{ monthly_budget|floatformat:2 }}</span>
+      <span class="text-[11px] text-slate-400 mt-1 block">Allocated operational buffer</span>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <span class="text-slate-500 block text-xs font-semibold uppercase tracking-wider">Total Incurred Cost</span>
+      <span class="text-2xl font-black text-emerald-600 mt-1 block">${{ total_cost|floatformat:4 }}</span>
+      <span class="text-[11px] text-slate-400 mt-1 block">Aggregated across all search runs</span>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <span class="text-slate-500 block text-xs font-semibold uppercase tracking-wider">Search Engine Invocations</span>
+      <span class="text-2xl font-black text-blue-600 mt-1 block">{{ total_calls }} calls</span>
+      <span class="text-[11px] text-slate-400 mt-1 block">Google Search, Places & AI extractions</span>
+    </div>
+  </div>
+
+  <!-- Provider Breakdown Row -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center">
+      <i class="fa-solid fa-server mr-2 text-indigo-500"></i> Active Provider Breakdown
+    </h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {% for ps in provider_stats %}
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+        <div class="font-bold text-slate-900 text-xs">{{ ps.provider }}</div>
+        <div class="flex items-center justify-between mt-1 text-[11px]">
+          <span class="text-slate-500">{{ ps.calls }} calls</span>
+          <span class="font-bold text-emerald-600">${{ ps.cost|floatformat:4 }}</span>
+        </div>
       </div>
-      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-        <span class="text-slate-500 block text-[11px]">Current Month Incurred Cost</span>
-        <span class="text-lg font-black text-emerald-600">$42.80</span>
+      {% empty %}
+      <div class="col-span-4 p-4 text-center text-slate-400 text-xs">
+        No external providers registered yet.
       </div>
-      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-        <span class="text-slate-500 block text-[11px]">Total AI Search Invocations</span>
-        <span class="text-lg font-black text-blue-600">1,842 calls</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search endpoint, provider, company..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none">
       </div>
+
+      <!-- Provider Filter -->
+      <div>
+        <select name="provider" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if provider_filter == 'all' %}selected{% endif %}>All Providers</option>
+          {% for p in available_providers %}
+          <option value="{{ p }}" {% if provider_filter == p %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div class="flex items-center gap-2">
+        <select name="status" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All HTTP Statuses</option>
+          <option value="200" {% if status_filter == '200' %}selected{% endif %}>200 OK Only</option>
+          <option value="error" {% if status_filter == 'error' %}selected{% endif %}>Errors (Non-200)</option>
+        </select>
+        {% if q or provider_filter != 'all' or status_filter != 'all' %}
+        <a href="{% url 'admin-panel-apilogs' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- API Logs Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="text-sm font-bold text-slate-900 flex items-center">
+        <i class="fa-solid fa-terminal text-emerald-500 mr-2"></i> Incurred API Invocations Ledger
+      </h3>
+      <span class="text-xs text-slate-500">Showing latest {{ logs|length }} entries</span>
     </div>
 
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-2.5 px-3">Provider</th>
+            <th class="py-2.5 px-4">Provider</th>
             <th class="py-2.5 px-3">Endpoint</th>
-            <th class="py-2.5 px-3">Status</th>
+            <th class="py-2.5 px-3">Company Context</th>
+            <th class="py-2.5 px-3">HTTP Status</th>
             <th class="py-2.5 px-3">Cost ($)</th>
-            <th class="py-2.5 px-3">Timestamp</th>
+            <th class="py-2.5 px-3 text-right">Timestamp</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          <tr class="hover:bg-slate-50">
-            <td class="py-3 px-3 font-bold text-slate-800">Anthropic Claude 3.5</td>
-            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">/v1/messages (JSON Schema Extraction)</td>
-            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">200 OK</span></td>
-            <td class="py-3 px-3 font-semibold text-slate-800">$0.0120</td>
-            <td class="py-3 px-3 text-slate-400">Just now</td>
+          {% for log in logs %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-900">{{ log.provider }}</td>
+            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">{{ log.endpoint }}</td>
+            <td class="py-3 px-3 text-slate-700">
+              {% if log.search_job and log.search_job.company %}
+                <span class="font-medium text-slate-800">{{ log.search_job.company.name }}</span>
+              {% else %}
+                <span class="text-slate-400 italic">Global / System</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3">
+              {% if log.status_code == 200 %}
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-check text-[8px] mr-1"></i> 200 OK
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                  <i class="fa-solid fa-triangle-exclamation text-[8px] mr-1"></i> {{ log.status_code }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 font-semibold text-slate-900">${{ log.cost|floatformat:4 }}</td>
+            <td class="py-3 px-3 text-right text-slate-400">{{ log.created_at|date:"M d, Y H:i" }}</td>
           </tr>
-          <tr class="hover:bg-slate-50">
-            <td class="py-3 px-3 font-bold text-slate-800">Google Custom Search</td>
-            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">/customsearch/v1</td>
-            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">200 OK</span></td>
-            <td class="py-3 px-3 font-semibold text-slate-800">$0.0050</td>
-            <td class="py-3 px-3 text-slate-400">2 mins ago</td>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-terminal text-3xl mb-2 text-slate-300 block"></i>
+              No API logs found matching criteria.
+            </td>
           </tr>
-          <tr class="hover:bg-slate-50">
-            <td class="py-3 px-3 font-bold text-slate-800">Google Places API</td>
-            <td class="py-3 px-3 font-mono text-[11px] text-slate-600">/maps/api/place/nearbysearch/json</td>
-            <td class="py-3 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">200 OK</span></td>
-            <td class="py-3 px-3 font-semibold text-slate-800">$0.0170</td>
-            <td class="py-3 px-3 text-slate-400">5 mins ago</td>
-          </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>

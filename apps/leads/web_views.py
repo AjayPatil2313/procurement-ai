@@ -15,6 +15,12 @@ from apps.leads.services.email_service import send_inquiry_email
 from apps.ai_search.models import SearchResult, ExternalCompany
 from apps.catalog.models import Product
 from apps.companies.rbac import get_user_rbac_context
+from apps.dashboard.services.notification_service import (
+    notify_proposal_sent,
+    notify_quote_recorded,
+    notify_status_changed,
+    notify_message_logged,
+)
 
 
 # ============================================================
@@ -524,6 +530,9 @@ def send_rfq_view(request, result_id):
                 f"Inquiry #{inquiry.id} successfully recorded and dispatched to {result.external_company.name} ({sent_to_email})!"
             )
 
+        # Dispatch real-time in-app notification
+        notify_proposal_sent(inquiry, user=request.user)
+
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({
                 "success": True,
@@ -790,6 +799,9 @@ def add_inquiry_message_view(request, pk):
                     attachment_file=uploaded_attachment,
                 )
 
+            # Dispatch real-time in-app notification
+            notify_message_logged(inquiry, inquiry_msg, user=request.user)
+
             messages.success(request, "Message logged to inquiry thread successfully.")
 
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -836,6 +848,9 @@ def update_inquiry_status_view(request, pk):
                 subject=f"Status Changed to {inquiry.get_status_display()}",
                 body=f"Commercial status transitioned from '{old_status}' to '{inquiry.get_status_display()}' by {request.user.get_full_name() or request.user.email}.",
             )
+
+            # Dispatch real-time in-app notification
+            notify_status_changed(inquiry, old_status, user=request.user)
 
             if request.headers.get("x-requested-with") == "XMLHttpRequest":
                 return JsonResponse({
@@ -912,6 +927,9 @@ def record_inquiry_quote_view(request, pk):
             subject=f"Quotation Submitted: {currency} {quoted_price_str}",
             body=quote_body,
         )
+
+        # Dispatch real-time in-app notification
+        notify_quote_recorded(inquiry, user=request.user)
 
         messages.success(
             request,

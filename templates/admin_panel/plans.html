@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Plans & Subscription Management — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Plans & Subscription Allocation</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Control company subscription tiers, allocate AI search credits, adjust credit balances, and review credit ledger</p>
+    </div>
+
+    <!-- Quick Plan Summary Cards -->
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Free:</span> <span class="font-bold text-slate-700">{{ sub_free }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Pro:</span> <span class="font-bold text-blue-600">{{ sub_pro }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Enterprise:</span> <span class="font-bold text-purple-600">{{ sub_enterprise }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl shadow-sm text-xs">
+        <span class="text-amber-700 font-semibold">Active Credits:</span> <span class="font-black text-amber-900">{{ total_remaining }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <form method="GET" class="flex flex-1 items-center gap-3">
+      <!-- Search -->
+      <div class="relative flex-1 max-w-sm">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search company name..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-amber-500 outline-none">
+      </div>
+
+      <!-- Plan Filter -->
+      <div class="w-48">
+        <select name="plan" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if plan_filter == 'all' %}selected{% endif %}>All Plans</option>
+          <option value="free" {% if plan_filter == 'free' %}selected{% endif %}>Free Plan</option>
+          <option value="pro" {% if plan_filter == 'pro' %}selected{% endif %}>Pro Plan</option>
+          <option value="enterprise" {% if plan_filter == 'enterprise' %}selected{% endif %}>Enterprise Plan</option>
+        </select>
+      </div>
+
+      {% if q or plan_filter != 'all' %}
+      <a href="{% url 'admin-panel-plans' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
+        <i class="fa-solid fa-xmark"></i>
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Subscriptions Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="text-sm font-bold text-slate-900 flex items-center">
+        <i class="fa-solid fa-credit-card text-amber-500 mr-2"></i> Company Subscriptions & AI Credits Ledger
+      </h3>
+      <span class="text-xs text-slate-500">{{ subscriptions.count }} active company plans</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Company</th>
+            <th class="py-3 px-4">Current Plan</th>
+            <th class="py-3 px-4">Total Pool</th>
+            <th class="py-3 px-4">Credits Remaining</th>
+            <th class="py-3 px-4">Usage %</th>
+            <th class="py-3 px-4">Valid Till</th>
+            <th class="py-3 px-4 text-right">Adjustment Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for sub in subscriptions %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- Company -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center">
+                <span class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mr-2.5 flex-shrink-0">
+                  <i class="fa-solid fa-building text-xs"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900 text-xs">{{ sub.company.name }}</div>
+                  <div class="text-[11px] font-normal text-slate-500">{{ sub.company.country|default:"Global" }}</div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Plan -->
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold {% if sub.plan == 'enterprise' %}bg-purple-100 text-purple-800 border border-purple-200{% elif sub.plan == 'pro' %}bg-blue-100 text-blue-800 border border-blue-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                <i class="fa-solid fa-shield-halved mr-1 text-[9px]"></i> {{ sub.get_plan_display }}
+              </span>
+            </td>
+
+            <!-- Total Credits -->
+            <td class="py-3.5 px-4 font-semibold text-slate-700">{{ sub.credits_total }} credits</td>
+
+            <!-- Credits Remaining -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-center gap-2">
+                <span class="font-bold {% if sub.credits_remaining > 20 %}text-emerald-600{% elif sub.credits_remaining > 5 %}text-amber-600{% else %}text-rose-600{% endif %}">
+                  {{ sub.credits_remaining }}
+                </span>
+                <span class="text-slate-400">/ {{ sub.credits_total }}</span>
+              </div>
+            </td>
+
+            <!-- Usage Progress Bar -->
+            <td class="py-3.5 px-4 w-36">
+              <div class="flex items-center gap-2">
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="{% if sub.usage_percentage > 80 %}bg-rose-500{% elif sub.usage_percentage > 50 %}bg-amber-500{% else %}bg-emerald-500{% endif %} h-1.5 rounded-full" style="width: {{ sub.usage_percentage }}%"></div>
+                </div>
+                <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">{{ sub.usage_percentage }}%</span>
+              </div>
+            </td>
+
+            <!-- Valid Till -->
+            <td class="py-3.5 px-4 text-slate-500">
+              {% if sub.valid_till %}
+                {{ sub.valid_till|date:"M d, Y" }}
+              {% else %}
+                <span class="text-slate-400">Lifetime / No Expiry</span>
+              {% endif %}
+            </td>
+
+            <!-- Action Button (Opens adjustment modal) -->
+            <td class="py-3.5 px-4 text-right">
+              <button type="button" onclick="openPlanModal('{{ sub.company.id }}', '{{ sub.company.name|escapejs }}', '{{ sub.plan }}', '{{ sub.credits_total }}', '{{ sub.credits_remaining }}', '{{ sub.valid_till|date:'Y-m-d'|default:'' }}')" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-sm">
+                <i class="fa-solid fa-pen-to-square mr-1.5"></i> Adjust Plan & Credits
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-credit-card text-3xl mb-2 text-slate-300 block"></i>
+              No subscriptions found matching query.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Credit Transactions Ledger -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="text-sm font-bold text-slate-900 flex items-center">
+        <i class="fa-solid fa-receipt text-blue-600 mr-2"></i> Recent Credit Transactions Ledger (All Companies)
+      </h3>
+      <span class="text-xs text-slate-500">Last 20 transactions</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Company</th>
+            <th class="py-2.5 px-3">Type</th>
+            <th class="py-2.5 px-3">Credits</th>
+            <th class="py-2.5 px-3">Reason / Description</th>
+            <th class="py-2.5 px-3 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for tx in recent_transactions %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-900">{{ tx.company.name }}</td>
+            <td class="py-3 px-3">
+              {% if tx.transaction_type == 'credit' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-plus text-[8px] mr-1"></i> Credit
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                  <i class="fa-solid fa-minus text-[8px] mr-1"></i> Debit
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 font-bold {% if tx.transaction_type == 'credit' %}text-emerald-600{% else %}text-rose-600{% endif %}">
+              {% if tx.transaction_type == 'credit' %}+{% else %}-{% endif %}{{ tx.credits }}
+            </td>
+            <td class="py-3 px-3 text-slate-600">{{ tx.notes|default:"Search Job Query Deduction" }}</td>
+            <td class="py-3 px-3 text-right text-slate-400">{{ tx.created_at|date:"M d, Y H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="py-6 text-center text-slate-400">No credit transactions recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Adjustment Modal -->
+<div id="planModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div>
+        <h3 class="text-base font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-credit-card text-amber-500 mr-2"></i> Adjust Subscription & Credits
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5" id="modalCompanyName">Target Company</p>
+      </div>
+      <button type="button" onclick="closePlanModal()" class="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="planForm" method="POST" action="" class="space-y-4 pt-4 text-xs">
+      {% csrf_token %}
+
+      <!-- Tier Selection -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Subscription Plan Tier</label>
+        <select name="plan" id="modalPlanSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-1 focus:ring-amber-500">
+          <option value="free">Free Starter Plan (Default 50 credits)</option>
+          <option value="pro">Pro Plan (Default 200 credits)</option>
+          <option value="enterprise">Enterprise Plan (Unlimited / Custom)</option>
+        </select>
+      </div>
+
+      <!-- Add / Deduct Credits -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Adjust Credits (+ / -)</label>
+          <input type="number" name="credits_add" id="modalCreditsAdd" value="0" step="5" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-amber-500" placeholder="e.g. 50 or -10">
+          <span class="text-[10px] text-slate-400 mt-0.5 block">Enter positive to add, negative to deduct</span>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Valid Till Date</label>
+          <input type="date" name="valid_till" id="modalValidTill" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-amber-500">
+          <span class="text-[10px] text-slate-400 mt-0.5 block">Leave empty for lifetime</span>
+        </div>
+      </div>
+
+      <!-- Notes / Reason -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Adjustment Reason / Notes</label>
+        <input type="text" name="notes" placeholder="e.g. Super Admin complimentary top-up, contract extension" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-amber-500">
+      </div>
+
+      <!-- Submit / Cancel -->
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="closePlanModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-sm">
+          <i class="fa-solid fa-check mr-1.5"></i> Save Adjustments
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openPlanModal(companyId, companyName, currentPlan, totalCredits, remainingCredits, validTill) {
+  document.getElementById('modalCompanyName').textContent = companyName;
+  document.getElementById('modalPlanSelect').value = currentPlan;
+  document.getElementById('modalCreditsAdd').value = "0";
+  document.getElementById('modalValidTill').value = validTill || "";
+  document.getElementById('planForm').action = "/admin-panel/plans/" + companyId + "/update/";
+  document.getElementById('planModal').classList.remove('hidden');
+}
+
+function closePlanModal() {
+  document.getElementById('planModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

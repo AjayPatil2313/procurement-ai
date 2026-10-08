@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Add New Company — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+
+  <!-- Breadcrumb & Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
+        <a href="{% url 'admin-panel-dashboard' %}" class="hover:text-slate-800 transition">Super Admin</a>
+        <span>/</span>
+        <a href="{% url 'admin-panel-companies' %}" class="hover:text-slate-800 transition">Companies</a>
+        <span>/</span>
+        <span class="text-slate-900 font-semibold">Onboard New Company</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center">
+        <i class="fa-solid fa-plus-circle text-red-500 mr-2.5 text-xl"></i> Onboard New Enterprise Account
+      </h1>
+      <p class="text-xs text-slate-500 mt-0.5">Register a new corporate account, configure access type, assign subscription credits, and set up the company admin.</p>
+    </div>
+
+    <a href="{% url 'admin-panel-companies' %}" class="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-300 rounded-xl transition shadow-sm">
+      <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Directory
+    </a>
+  </div>
+
+  <form method="POST" action="{% url 'admin-panel-company-create' %}" class="space-y-6 text-xs">
+    {% csrf_token %}
+
+    <!-- Card 1: Company Profile & Commercial Identity -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-building text-blue-600 mr-2"></i> Corporate Profile & Identity
+        </h3>
+        <span class="text-[11px] font-semibold text-rose-500">* Required Fields</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Company Name -->
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-800 mb-1">Company Trade Name <span class="text-rose-500">*</span></label>
+          <input type="text" name="name" required placeholder="e.g. Apex Industrial Solutions Pvt. Ltd." class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <!-- Legal Name -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Registered Legal Name (Optional)</label>
+          <input type="text" name="legal_name" placeholder="Official legal entity name" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <!-- Company Type -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Platform Role / Access Scope <span class="text-rose-500">*</span></label>
+          <select name="company_type" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-white text-slate-800 outline-none focus:ring-1 focus:ring-blue-500 font-semibold">
+            <option value="BOTH" selected>Hybrid (Buyer & Seller — Full Access)</option>
+            <option value="BUYER">Procurement Buyer (Requirements & RFQs)</option>
+            <option value="SELLER">Sales Vendor (Products & Leads)</option>
+          </select>
+        </div>
+
+        <!-- Industry -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Industry / Sector</label>
+          <input type="text" name="industry" placeholder="e.g. Metallurgy, Electronics, Chemical, Automotive" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <!-- GST / Tax ID -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">GSTIN / VAT / Corporate Tax ID</label>
+          <input type="text" name="gst_vat_no" placeholder="e.g. 27AAACA1234A1Z5" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <!-- Website -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Official Website URL</label>
+          <input type="url" name="website" placeholder="https://www.company.com" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <!-- Email & Phone -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Corporate Contact Email</label>
+          <input type="email" name="email" placeholder="contact@company.com" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Phone Number</label>
+          <input type="text" name="phone" placeholder="+91 9876543210" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <!-- Geographic Location -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Country</label>
+          <input type="text" name="country" value="India" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">City</label>
+            <input type="text" name="city" placeholder="Mumbai" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">State / Province</label>
+            <input type="text" name="state" placeholder="Maharashtra" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-blue-500">
+          </div>
+        </div>
+
+        <!-- Verification & Status Flags -->
+        <div class="md:col-span-2 pt-2 flex flex-wrap items-center gap-6">
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="is_verified" value="1" checked class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300">
+            <span class="font-bold text-slate-800">Grant Verified Enterprise Badge</span>
+            <span class="text-[10px] text-slate-400 font-normal">(Displays blue checkmark on directory & inquiries)</span>
+          </label>
+
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="is_active" value="1" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300">
+            <span class="font-bold text-slate-800">Account Active Immediately</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Subscription Plan & Search Credits Allocation -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-credit-card text-amber-500 mr-2"></i> Subscription Plan & AI Search Credits
+        </h3>
+        <span class="text-[11px] text-slate-500">Initial Allocation</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Plan Tier -->
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">Subscription Plan Tier</label>
+          <select name="plan" id="planTierSelect" onchange="autoFillCredits()" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl bg-white text-slate-800 outline-none focus:ring-1 focus:ring-amber-500 font-semibold">
+            <option value="pro" selected>Pro Plan (Recommended for SMEs)</option>
+            <option value="free">Free Starter Plan</option>
+            <option value="enterprise">Enterprise Plan (High Volume)</option>
+          </select>
+        </div>
+
+        <!-- Starting Credits -->
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">Starting AI Search Credits</label>
+          <input type="number" name="credits_total" id="creditsInput" value="200" step="10" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-amber-500 font-bold text-slate-900">
+          <span class="text-[10px] text-slate-400 mt-0.5 block">Used for running Find Suppliers & Find Buyers queries</span>
+        </div>
+
+        <!-- Valid Till -->
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">Subscription Valid Until</label>
+          <input type="date" name="valid_till" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-amber-500">
+          <span class="text-[10px] text-slate-400 mt-0.5 block">Leave blank for lifetime / auto-renewing</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Primary Company Admin User Account -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-user-tie text-purple-600 mr-2"></i> Initial Company Admin Account
+        </h3>
+        <span class="text-[11px] text-slate-500">Account Owner</span>
+      </div>
+
+      <p class="text-slate-500 text-[11px]">
+        Specify the email address of the person who owns this company. If the user already exists, they will be assigned as the Company Admin. If not, a new account will be created.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Admin Email -->
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-800 mb-1">Company Admin Email</label>
+          <input type="email" name="admin_email" placeholder="e.g. owner@apexind.com" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-purple-500">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">First Name</label>
+          <input type="text" name="admin_first_name" placeholder="John" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-purple-500">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Last Name</label>
+          <input type="text" name="admin_last_name" placeholder="Doe" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-1 focus:ring-purple-500">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-700 mb-1">Initial Temporary Password</label>
+          <input type="text" name="admin_password" value="Welcome@123" class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl font-mono text-slate-800 outline-none focus:ring-1 focus:ring-purple-500">
+          <span class="text-[10px] text-slate-400 mt-0.5 block">Default is Welcome@123 (user can reset upon first sign in)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions Bar -->
+    <div class="flex items-center justify-between pt-2">
+      <a href="{% url 'admin-panel-companies' %}" class="px-5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-100 transition">
+        Cancel
+      </a>
+      <button type="submit" class="px-6 py-2.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 transition flex items-center gap-2">
+        <i class="fa-solid fa-check"></i>
+        <span>Register & Onboard Company</span>
+      </button>
+    </div>
+
+  </form>
+
+</div>
+
+<script>
+function autoFillCredits() {
+  const plan = document.getElementById('planTierSelect').value;
+  const creditsInput = document.getElementById('creditsInput');
+  if (plan === 'free') {
+    creditsInput.value = 50;
+  } else if (plan === 'pro') {
+    creditsInput.value = 200;
+  } else if (plan === 'enterprise') {
+    creditsInput.value = 1000;
+  }
+}
+</script>
+{% endblock %}

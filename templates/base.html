@@ -65,14 +65,15 @@
       <nav class="flex-1 px-3 py-4 space-y-6">
         <!-- Main Section -->
         <div>
-          <a href="{% url 'dashboard' %}" class="flex items-center px-3 py-2.5 rounded-lg text-sm font-semibold transition {% if request.path == '/dashboard/' or request.path == '/' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}">
-            <i class="fa-solid fa-house w-5 text-center mr-2.5"></i>
-            <span>{% if rbac.is_buyer_only %}Buyer Dashboard{% elif rbac.is_seller_only %}Seller Dashboard{% else %}Dashboard{% endif %}</span>
+          <a href="{% if rbac.is_super_admin %}{% url 'admin-panel-dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" class="flex items-center px-3 py-2.5 rounded-lg text-sm font-semibold transition {% if rbac.is_super_admin %}{% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600 text-white shadow-md shadow-red-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}{% else %}{% if request.path == '/dashboard/' or request.path == '/' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}{% endif %}">
+            <i class="fa-solid {% if rbac.is_super_admin %}fa-chart-line{% else %}fa-house{% endif %} w-5 text-center mr-2.5"></i>
+            <span>{% if rbac.is_super_admin %}Super Admin Dashboard{% elif rbac.is_buyer_only %}Buyer Dashboard{% elif rbac.is_seller_only %}Seller Dashboard{% else %}Dashboard{% endif %}</span>
           </a>
         </div>
 
+        {% if not rbac.is_super_admin %}
         <!-- Buyer (Procurement) Section -->
-        {% if rbac.can_view_buyer or rbac.is_super_admin %}
+        {% if rbac.can_view_buyer %}
         <div>
           <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
             <span>BUYER</span>
@@ -120,7 +121,7 @@
         {% endif %}
 
         <!-- Seller (Sales) Section -->
-        {% if rbac.can_view_seller or rbac.is_super_admin %}
+        {% if rbac.can_view_seller %}
         <div>
           <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
             <span>SELLER</span>
@@ -186,8 +187,8 @@
             <i class="fa-solid fa-building text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
-            <!-- User Management: visible to Company Admin & Super Admin -->
-            {% if rbac.is_company_admin or rbac.is_super_admin %}
+            <!-- User Management: visible to Company Admin -->
+            {% if rbac.is_company_admin %}
             <a href="{% url 'company-team-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/team/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-users-gear w-5 text-center mr-2.5 text-xs"></i> User Management
@@ -204,6 +205,7 @@
             </a>
           </div>
         </div>
+        {% endif %}
 
         <!-- Super Admin Section (Only rendered for Super Admins) -->
         {% if rbac.is_super_admin %}
@@ -213,21 +215,39 @@
             <i class="fa-solid fa-shield-halved text-red-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
+            <a href="{% url 'admin-panel-dashboard' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-chart-line w-5 text-center mr-2.5 text-xs text-red-400"></i> Dashboard
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
             <a href="{% url 'admin-panel-companies' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/companies/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-sitemap w-5 text-center mr-2.5 text-xs text-red-400"></i> All Companies
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
-            <a href="{% url 'admin-panel-users' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/users/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+            <a href="{% url 'admin-panel-company-create' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/companies/create/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-users w-5 text-center mr-2.5 text-xs text-red-400"></i> Users
+                <i class="fa-solid fa-plus-circle w-5 text-center mr-2.5 text-xs text-emerald-400"></i> Add New Company
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
+            <a href="{% url 'admin-panel-plans' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/plans/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-credit-card w-5 text-center mr-2.5 text-xs text-amber-400"></i> Plans & Credits
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             <a href="{% url 'admin-panel-apilogs' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/api-logs/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-terminal w-5 text-center mr-2.5 text-xs text-red-400"></i> API Logs
+                <i class="fa-solid fa-terminal w-5 text-center mr-2.5 text-xs text-emerald-400"></i> API Costs
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
+            <a href="{% url 'admin-panel-auditlogs' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/audit-logs/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-clock-rotate-left w-5 text-center mr-2.5 text-xs text-purple-400"></i> Audit Trail
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -280,13 +300,115 @@
 
         <!-- Right Side Nav Controls -->
         <div class="flex items-center space-x-3">
-          <!-- Notification Bell -->
-          <button class="relative p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition focus:outline-none">
-            <i class="fa-regular fa-bell text-lg"></i>
-            <span class="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
-              {{ notifications_count|default:3 }}
-            </span>
-          </button>
+          <!-- Real-Time Notification Bell with Interactive Dropdown Container -->
+          <div class="relative" id="notificationDropdownContainer">
+            <button 
+              id="notificationDropdownBtn" 
+              type="button" 
+              class="relative p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition focus:outline-none cursor-pointer"
+              aria-haspopup="true"
+              aria-expanded="false"
+              title="Notifications & Activity Stream"
+            >
+              <i class="fa-regular fa-bell text-lg"></i>
+              <span 
+                id="notificationBadge" 
+                class="{% if not unread_notifications_count %}hidden{% endif %} absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-sm ring-2 ring-slate-900"
+              >
+                {{ unread_notifications_count|default:0 }}
+              </span>
+            </button>
+
+            <!-- Interactive Notification Dropdown Panel -->
+            <div 
+              id="notificationDropdownMenu" 
+              class="hidden absolute right-0 top-full mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl divide-y divide-slate-800/80 animate-in fade-in zoom-in-95 duration-150"
+            >
+              <!-- Header -->
+              <div class="p-3.5 bg-slate-800/60 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs border border-blue-500/30">
+                    <i class="fa-solid fa-bell"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-bold text-white leading-tight">Notifications</h4>
+                    <p class="text-[10px] text-slate-400 font-medium" id="notificationStatusText">
+                      {% if unread_notifications_count %}{{ unread_notifications_count }} unread alert{{ unread_notifications_count|pluralize }}{% else %}All caught up{% endif %}
+                    </p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button 
+                    type="button" 
+                    onclick="markAllNotificationsAsRead()" 
+                    class="text-[11px] font-bold text-blue-400 hover:text-blue-300 transition hover:underline cursor-pointer"
+                    title="Mark all notifications as read"
+                  >
+                    Mark all read
+                  </button>
+                </div>
+              </div>
+
+              <!-- Notification List Container -->
+              <div id="notificationList" class="max-h-80 overflow-y-auto divide-y divide-slate-800/60 custom-scrollbar">
+                {% for notif in recent_notifications %}
+                <div 
+                  id="notif-item-{{ notif.id }}"
+                  onclick="handleNotificationClick('{{ notif.id }}', '{{ notif.link|default:''|escapejs }}')"
+                  class="p-3 hover:bg-slate-800/60 transition cursor-pointer flex items-start gap-3 relative group {% if not notif.is_read %}bg-slate-800/40{% endif %}"
+                >
+                  <div class="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center font-bold text-xs mt-0.5
+                    {% if notif.color == 'emerald' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30
+                    {% elif notif.color == 'orange' %}bg-orange-500/20 text-orange-400 border border-orange-500/30
+                    {% elif notif.color == 'rose' %}bg-rose-500/20 text-rose-400 border border-rose-500/30
+                    {% elif notif.color == 'purple' %}bg-purple-500/20 text-purple-400 border border-purple-500/30
+                    {% elif notif.color == 'amber' %}bg-amber-500/20 text-amber-400 border border-amber-500/30
+                    {% else %}bg-blue-500/20 text-blue-400 border border-blue-500/30{% endif %}">
+                    <i class="fa-solid {{ notif.icon|default:'fa-bell' }}"></i>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-1.5">
+                      <h5 class="text-xs font-bold {% if not notif.is_read %}text-white{% else %}text-slate-300{% endif %} truncate">
+                        {{ notif.title }}
+                      </h5>
+                      {% if not notif.is_read %}
+                      <span class="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                      {% endif %}
+                    </div>
+                    <p class="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
+                      {{ notif.message }}
+                    </p>
+                    <div class="text-[10px] text-slate-500 font-mono mt-1 flex items-center gap-1">
+                      <i class="fa-regular fa-clock text-[9px]"></i>
+                      <span>{{ notif.created_at|timesince }} ago</span>
+                    </div>
+                  </div>
+                </div>
+                {% empty %}
+                <div class="p-8 text-center text-slate-400 space-y-2" id="notificationEmptyState">
+                  <div class="w-10 h-10 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto text-sm">
+                    <i class="fa-regular fa-bell-slash"></i>
+                  </div>
+                  <div class="text-xs font-bold text-slate-300">All caught up!</div>
+                  <p class="text-[11px] text-slate-500 max-w-xs mx-auto">No notifications right now. New activity will appear here automatically.</p>
+                </div>
+                {% endfor %}
+              </div>
+
+              <!-- Footer -->
+              <div class="p-2.5 bg-slate-800/40 flex items-center justify-between text-xs px-4">
+                <button 
+                  type="button" 
+                  onclick="clearAllNotifications()" 
+                  class="text-[11px] text-slate-400 hover:text-rose-400 transition flex items-center gap-1 cursor-pointer"
+                >
+                  <i class="fa-solid fa-trash-can text-[10px]"></i>
+                  <span>Clear all</span>
+                </button>
+                <span class="text-[10px] text-slate-500 font-medium">Live Activity Stream</span>
+              </div>
+            </div>
+          </div>
 
           <!-- User Profile Icon with Interactive Company & Account Dropdown -->
           <div class="relative" id="profileDropdownContainer">
@@ -623,7 +745,241 @@
         }
       });
     }
+
+    // ============================================================
+    // REAL-TIME NOTIFICATION BELL & ACTIVITY STREAM LOGIC
+    // ============================================================
+    const notificationDropdownBtn = document.getElementById('notificationDropdownBtn');
+    const notificationDropdownMenu = document.getElementById('notificationDropdownMenu');
+    const notificationDropdownContainer = document.getElementById('notificationDropdownContainer');
+    let lastKnownNotifIds = new Set([{% for n in recent_notifications %}'{{ n.id }}',{% endfor %}]);
+
+    if (notificationDropdownBtn && notificationDropdownMenu) {
+      notificationDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close profile dropdown if open
+        if (typeof profileDropdownMenu !== 'undefined' && profileDropdownMenu) {
+          profileDropdownMenu.classList.add('hidden');
+          if (typeof profileChevron !== 'undefined' && profileChevron) profileChevron.classList.remove('rotate-180');
+        }
+
+        const isHidden = notificationDropdownMenu.classList.contains('hidden');
+        if (isHidden) {
+          notificationDropdownMenu.classList.remove('hidden');
+          notificationDropdownBtn.setAttribute('aria-expanded', 'true');
+        } else {
+          notificationDropdownMenu.classList.add('hidden');
+          notificationDropdownBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      // Close notification dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (notificationDropdownContainer && !notificationDropdownContainer.contains(e.target)) {
+          notificationDropdownMenu.classList.add('hidden');
+          notificationDropdownBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      // Close notification dropdown on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !notificationDropdownMenu.classList.contains('hidden')) {
+          notificationDropdownMenu.classList.add('hidden');
+          notificationDropdownBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    // Handle individual notification click
+    function handleNotificationClick(notifId, targetUrl) {
+      fetch(`/dashboard/notifications/${notifId}/read/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success) {
+          updateNotificationBadge(data.unread_count);
+          const item = document.getElementById(`notif-item-${notifId}`);
+          if (item) {
+            item.classList.remove('bg-slate-800/40');
+            const dot = item.querySelector('.bg-blue-500.rounded-full');
+            if (dot) dot.remove();
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (targetUrl && targetUrl !== '#' && targetUrl !== '') {
+          window.location.href = targetUrl;
+        }
+      });
+    }
+
+    // Mark all notifications as read
+    function markAllNotificationsAsRead() {
+      fetch('/dashboard/notifications/read-all/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success) {
+          updateNotificationBadge(0);
+          document.querySelectorAll('#notificationList > div').forEach(item => {
+            item.classList.remove('bg-slate-800/40');
+            const dot = item.querySelector('.bg-blue-500.rounded-full');
+            if (dot) dot.remove();
+          });
+          const statusText = document.getElementById('notificationStatusText');
+          if (statusText) statusText.textContent = 'All caught up';
+          showToastNotification('Notifications Read', 'All alerts have been marked as read.', 'fa-check', 'emerald');
+        }
+      })
+      .catch(() => {});
+    }
+
+    // Clear all notifications
+    function clearAllNotifications() {
+      if (!confirm('Clear all activity notifications from list?')) return;
+      fetch('/dashboard/notifications/clear-all/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCookie('csrftoken') || '{{ csrf_token }}',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success) {
+          updateNotificationBadge(0);
+          const list = document.getElementById('notificationList');
+          if (list) {
+            list.innerHTML = `
+              <div class="p-8 text-center text-slate-400 space-y-2">
+                <div class="w-10 h-10 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto text-sm">
+                  <i class="fa-regular fa-bell-slash"></i>
+                </div>
+                <div class="text-xs font-bold text-slate-300">All caught up!</div>
+                <p class="text-[11px] text-slate-500 max-w-xs mx-auto">No notifications right now. New activity will appear here automatically.</p>
+              </div>
+            `;
+          }
+          const statusText = document.getElementById('notificationStatusText');
+          if (statusText) statusText.textContent = 'No new alerts';
+        }
+      })
+      .catch(() => {});
+    }
+
+    // Update notification bell badge count
+    function updateNotificationBadge(count) {
+      const badge = document.getElementById('notificationBadge');
+      const statusText = document.getElementById('notificationStatusText');
+      if (badge) {
+        if (count > 0) {
+          badge.textContent = count;
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+      if (statusText) {
+        statusText.textContent = count > 0 ? `${count} unread alert${count > 1 ? 's' : ''}` : 'All caught up';
+      }
+    }
+
+    // Floating Toast Notification
+    function showToastNotification(title, message, icon = 'fa-bell', color = 'blue') {
+      const container = document.getElementById('toastNotificationContainer');
+      if (!container) return;
+
+      const colorMap = {
+        emerald: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+        orange: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
+        purple: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+        rose: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
+        blue: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
+        amber: 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+      };
+
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto bg-slate-900/95 border border-slate-700/80 p-3.5 rounded-2xl shadow-2xl flex items-start gap-3 backdrop-blur-xl transform transition-all duration-300 translate-y-4 opacity-0 max-w-sm w-full';
+      toast.innerHTML = `
+        <div class="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center font-bold text-xs border ${colorMap[color] || colorMap.blue}">
+          <i class="fa-solid ${icon}"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-bold text-white">${title}</div>
+          <div class="text-[11px] text-slate-300 mt-0.5 line-clamp-2 leading-relaxed">${message}</div>
+        </div>
+        <button type="button" class="text-slate-400 hover:text-white transition p-1 cursor-pointer" onclick="this.parentElement.remove()">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      `;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-4', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 6000);
+    }
+
+    // Real-time periodic polling (every 20s)
+    function pollNotifications() {
+      fetch('/dashboard/notifications/')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success) {
+            updateNotificationBadge(data.unread_count);
+            if (data.notifications && data.notifications.length > 0) {
+              data.notifications.forEach(n => {
+                const idStr = String(n.id);
+                if (!lastKnownNotifIds.has(idStr) && !n.is_read) {
+                  lastKnownNotifIds.add(idStr);
+                  showToastNotification(n.title, n.message, n.icon, n.color);
+                }
+              });
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    // CSRF cookie helper
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
+    // Start polling every 20 seconds
+    setInterval(pollNotifications, 20000);
   </script>
+
+  <!-- Real-Time Floating Toast Notifications Container -->
+  <div id="toastNotificationContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2.5 pointer-events-none max-w-sm w-full"></div>
+
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

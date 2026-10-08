@@ -15,9 +15,11 @@ from apps.ai_search.models import ExternalCompany, SearchJob, SearchResult
 from apps.billing.models import Subscription
 from apps.catalog.models import Product
 from django.contrib import messages
+from django.utils.timesince import timesince
 from apps.companies.models import Company, CompanyMember
 from apps.companies.rbac import get_user_rbac_context, HasModulePermission
-from apps.dashboard.models import ActivityLog, SupportTicket
+from apps.dashboard.models import ActivityLog, SupportTicket, Notification
+from apps.dashboard.services.notification_service import notify_support_ticket
 from apps.leads.models import SavedItem
 from apps.requirements.models import Requirement
 
@@ -240,6 +242,11 @@ def dashboard_view(request):
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+
+    # Super Admin default landing goes directly to the Super Admin Executive Control Center
+    if rbac["is_super_admin"] and not selected_company_id:
+        return redirect("admin-panel-dashboard")
+
     company = rbac["company"]
 
     # If superuser or no company assigned yet, pick or create ABC Trading Pvt. Ltd.
@@ -652,6 +659,8 @@ def create_support_ticket_view(request):
                 color="blue",
             )
 
+        notify_support_ticket(ticket, event_type="created", user=request.user)
+
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({
                 "success": True,
@@ -696,5 +705,89 @@ def support_ticket_detail_view(request, pk):
         "created_at": ticket.created_at.strftime("%b %d, %Y at %I:%M %p"),
         "updated_at": ticket.updated_at.strftime("%b %d, %Y at %I:%M %p"),
     })
+
+
+# ============================================================
+# REAL-TIME NOTIFICATION CENTER & ACTIVITY STREAM APIS
+# ============================================================
+
+@login_required
+def notifications_list_api(request):
+    """
+    Returns JSON list of notifications and unread count for real-time navbar polling.
+    """
+    notifications = Notification.objects.filter(user=request.user)
+    unread_count = notifications.filter(is_read=False).count()
+    recent = list(notifications[:15])
+
+    data = []
+    for n in recent:
+        data.append({
+            "id": n.id,
+            "type": n.notification_type,
+            "title": n.title,
+            "message": n.message,
+            "link": n.link,
+            "is_read": n.is_read,
+            "icon": n.icon,
+            "color": n.color,
+            "created_at": n.created_at.strftime("%b %d, %H:%M"),
+            "time_ago": f"{timesince(n.created_at)} ago",
+        })
+
+    return JsonResponse({
+        "success": True,
+        "unread_count": unread_count,
+        "notifications": data,
+    })
+
+
+@login_required
+def mark_notification_read_view(request, pk):
+    """
+    Marks a single notification as read and routes to its target URL if provided.
+    """
+    notif = get_object_or_404(Notification, pk=pk, user=request.user)
+    notif.mark_as_read()
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.GET.get("format") == "json":
+        unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        return JsonResponse({
+            "success": True,
+            "id": notif.id,
+            "unread_count": unread_count,
+            "link": notif.link,
+        })
+
+    if notif.link:
+        return redirect(notif.link)
+    return redirect("dashboard")
+
+
+@login_required
+def mark_all_notifications_read_view(request):
+    """
+    Marks all notifications for the current user as read.
+    """
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.method == "POST":
+        return JsonResponse({"success": True, "unread_count": 0})
+
+    return redirect(request.META.get("HTTP_REFERER") or "dashboard")
+
+
+@login_required
+def clear_all_notifications_view(request):
+    """
+    Clears all notification items for the current user.
+    """
+    Notification.objects.filter(user=request.user).delete()
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.method == "POST":
+        return JsonResponse({"success": True, "unread_count": 0})
+
+    return redirect(request.META.get("HTTP_REFERER") or "dashboard")
+
 
 

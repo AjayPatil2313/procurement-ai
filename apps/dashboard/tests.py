@@ -9,7 +9,7 @@ from apps.requirements.models import Requirement
 from apps.catalog.models import Product, Category, ProductImage
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany
 from apps.leads.models import SavedItem, Inquiry
-from apps.dashboard.models import SupportTicket
+from apps.dashboard.models import SupportTicket, Notification
 
 
 class RBACTestCase(TestCase):
@@ -2635,6 +2635,104 @@ class HelpSupportTestCase(TestCase):
         self.assertTrue(data["success"])
         self.assertEqual(data["ticket_number"], ticket.ticket_number)
         self.assertEqual(data["subject"], "Test Scraper Issue")
+
+
+class RealTimeNotificationsTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="notifuser@example.com",
+            password="SecurePassword@123",
+            first_name="Raj",
+            last_name="Sharma",
+        )
+        self.company = Company.objects.create(
+            name="Apex Dynamics",
+            company_type=Company.CompanyType.SELLER,
+            created_by=self.user,
+        )
+        CompanyMember.objects.create(
+            user=self.user,
+            company=self.company,
+            role=CompanyMember.Role.ADMIN,
+        )
+        self.client.login(email="notifuser@example.com", password="SecurePassword@123")
+
+    def test_notification_creation_and_mark_read(self):
+        notif = Notification.objects.create(
+            user=self.user,
+            company=self.company,
+            notification_type=Notification.NotificationType.PROPOSAL_SENT,
+            title="Proposal Dispatched",
+            message="Proposal sent to Acme Corp.",
+            link="/sales/inquiries/1/",
+            icon="fa-paper-plane",
+            color="orange",
+        )
+        self.assertFalse(notif.is_read)
+
+        # Mark read via API
+        url = reverse("notification-mark-read", args=[notif.id])
+        res = self.client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()["success"])
+        self.assertEqual(res.json()["unread_count"], 0)
+
+        notif.refresh_from_db()
+        self.assertTrue(notif.is_read)
+
+    def test_notifications_list_api(self):
+        Notification.objects.create(
+            user=self.user,
+            company=self.company,
+            notification_type=Notification.NotificationType.DEAL_WON,
+            title="Deal Won! 🎉",
+            message="Inquiry #5 marked won.",
+            icon="fa-trophy",
+            color="emerald",
+        )
+        url = reverse("notifications-list-api")
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["unread_count"], 1)
+        self.assertEqual(len(data["notifications"]), 1)
+        self.assertEqual(data["notifications"][0]["title"], "Deal Won! 🎉")
+
+    def test_mark_all_read_and_clear_all(self):
+        for i in range(3):
+            Notification.objects.create(
+                user=self.user,
+                company=self.company,
+                title=f"Alert #{i}",
+                message=f"Message #{i}",
+            )
+        self.assertEqual(Notification.objects.filter(user=self.user, is_read=False).count(), 3)
+
+        # Mark all read
+        res_read = self.client.post(reverse("notifications-mark-all-read"), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(res_read.status_code, 200)
+        self.assertEqual(res_read.json()["unread_count"], 0)
+        self.assertEqual(Notification.objects.filter(user=self.user, is_read=False).count(), 0)
+
+        # Clear all
+        res_clear = self.client.post(reverse("notifications-clear-all"), HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(res_clear.status_code, 200)
+        self.assertEqual(Notification.objects.filter(user=self.user).count(), 0)
+
+    def test_context_processor_in_template_rendering(self):
+        Notification.objects.create(
+            user=self.user,
+            company=self.company,
+            title="Navbar Alert",
+            message="Should appear in bell dropdown.",
+        )
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("unread_notifications_count", response.context)
+        self.assertEqual(response.context["unread_notifications_count"], 1)
+        self.assertContains(response, "Navbar Alert")
+
 
 
 

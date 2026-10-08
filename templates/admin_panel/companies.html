@@ -1,20 +1,84 @@
 {% extends "base.html" %}
 
-{% block title %}All Companies — Super Admin Panel{% endblock %}
+{% block title %}All Platform Companies — Super Admin Panel{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
-  <div class="flex items-center justify-between">
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
       <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200 mb-2">
         <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
       </div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Companies</h1>
-      <p class="text-xs text-slate-500 mt-0.5">Manage registered corporate accounts, verification badges, and plan allocations</p>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Corporate Accounts</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Manage registered corporate accounts, active/suspended status, verification badges, and plan allocations</p>
+    </div>
+
+    <!-- Quick Stats Pill & Add Company Button -->
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-2">
+        <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+          <span class="text-slate-500">Total:</span> <span class="font-bold text-slate-900">{{ total_count }}</span>
+        </div>
+        <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+          <span class="text-slate-500">Active:</span> <span class="font-bold text-emerald-600">{{ active_count }}</span>
+        </div>
+        <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+          <span class="text-slate-500">Verified:</span> <span class="font-bold text-blue-600">{{ verified_count }}</span>
+        </div>
+      </div>
+      <a href="{% url 'admin-panel-company-create' %}" class="inline-flex items-center px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition">
+        <i class="fa-solid fa-plus mr-1.5"></i> Add New Company
+      </a>
     </div>
   </div>
 
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <!-- Search Input -->
+      <div class="relative md:col-span-1">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search company, country, industry..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
+      </div>
+
+      <!-- Type Filter -->
+      <div>
+        <select name="type" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if type_filter == 'all' %}selected{% endif %}>All Types</option>
+          <option value="BUYER" {% if type_filter == 'BUYER' %}selected{% endif %}>Buyers (Procurement)</option>
+          <option value="SELLER" {% if type_filter == 'SELLER' %}selected{% endif %}>Sellers (Vendors)</option>
+          <option value="BOTH" {% if type_filter == 'BOTH' %}selected{% endif %}>Hybrid (Both)</option>
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div>
+        <select name="status" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Suspended Only</option>
+        </select>
+      </div>
+
+      <!-- Verification Filter -->
+      <div class="flex items-center gap-2">
+        <select name="verified" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if verified_filter == 'all' %}selected{% endif %}>All Verifications</option>
+          <option value="verified" {% if verified_filter == 'verified' %}selected{% endif %}>Verified Only</option>
+          <option value="pending" {% if verified_filter == 'pending' %}selected{% endif %}>Pending Verification</option>
+        </select>
+        {% if q or type_filter != 'all' or status_filter != 'all' or verified_filter != 'all' %}
+        <a href="{% url 'admin-panel-companies' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Companies Table Card -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs">
@@ -22,45 +86,115 @@
           <tr>
             <th class="py-3 px-4">Company Name</th>
             <th class="py-3 px-4">Type</th>
-            <th class="py-3 px-4">Industry</th>
-            <th class="py-3 px-4">Country</th>
+            <th class="py-3 px-4">Subscription & Credits</th>
             <th class="py-3 px-4">Verification</th>
+            <th class="py-3 px-4">Account Status</th>
             <th class="py-3 px-4">Created Date</th>
-            <th class="py-3 px-4 text-right">Switch Context</th>
+            <th class="py-3 px-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for c in companies %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center">
-              <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-2.5">
-                <i class="fa-solid fa-building text-xs"></i>
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- Company Info (Clickable to 360 Dossier) -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <a href="{% url 'admin-panel-company-detail' c.id %}" class="flex items-center group">
+                <span class="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-blue-50 text-slate-700 group-hover:text-blue-600 flex items-center justify-center mr-2.5 flex-shrink-0 transition">
+                  <i class="fa-solid fa-building text-xs"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900 group-hover:text-blue-600 text-xs transition flex items-center gap-1.5">
+                    <span>{{ c.name }}</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400 group-hover:text-blue-500 transition"></i>
+                  </div>
+                  <div class="text-[11px] font-normal text-slate-500">
+                    {{ c.industry|default:"General" }} • {{ c.country|default:"Global" }}
+                  </div>
+                </div>
+              </a>
+            </td>
+
+            <!-- Type -->
+            <td class="py-3.5 px-4 font-medium text-slate-700">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if c.company_type == 'BUYER' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif c.company_type == 'SELLER' %}bg-purple-50 text-purple-800 border border-purple-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+                {{ c.get_company_type_display }}
               </span>
-              <span>{{ c.name }}</span>
             </td>
-            <td class="py-3.5 px-4 font-medium text-slate-700">{{ c.get_company_type_display }}</td>
-            <td class="py-3.5 px-4 text-slate-600">{{ c.industry|default:"General" }}</td>
-            <td class="py-3.5 px-4 text-slate-600">{{ c.country }}</td>
+
+            <!-- Subscription & Credits -->
             <td class="py-3.5 px-4">
-              {% if c.is_verified %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                  <i class="fa-solid fa-check mr-1"></i> Verified
+              <div class="flex items-center gap-1.5">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if c.subscription.plan == 'enterprise' %}bg-purple-100 text-purple-800{% elif c.subscription.plan == 'pro' %}bg-blue-100 text-blue-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                  {{ c.subscription.get_plan_display|default:"Free Plan" }}
                 </span>
-              {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800">
-                  Pending
+                <span class="text-[11px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                  {{ c.subscription.credits_remaining|default:0 }} credits
                 </span>
-              {% endif %}
+              </div>
             </td>
-            <td class="py-3.5 px-4 text-slate-500">{{ c.created_at|date:"M d, Y" }}</td>
-            <td class="py-3.5 px-4 text-right">
-              <form method="POST" action="{% url 'switch-company' %}" class="inline">
+
+            <!-- Verification Toggle -->
+            <td class="py-3.5 px-4">
+              <form method="POST" action="{% url 'admin-panel-toggle-company-verification' c.id %}" class="inline">
                 {% csrf_token %}
-                <input type="hidden" name="company_id" value="{{ c.id }}">
-                <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
-                  Enter Workspace
-                </button>
+                {% if c.is_verified %}
+                  <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition" title="Click to remove verified status">
+                    <i class="fa-solid fa-circle-check mr-1 text-blue-600"></i> Verified
+                  </button>
+                {% else %}
+                  <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 transition" title="Click to grant verification badge">
+                    <i class="fa-regular fa-circle mr-1 text-slate-400"></i> Unverified
+                  </button>
+                {% endif %}
               </form>
+            </td>
+
+            <!-- Account Status Toggle (Active / Suspend) -->
+            <td class="py-3.5 px-4">
+              <form method="POST" action="{% url 'admin-panel-toggle-company-status' c.id %}" class="inline">
+                {% csrf_token %}
+                {% if c.is_active %}
+                  <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-emerald-200 transition group" title="Click to suspend company account">
+                    <i class="fa-solid fa-circle text-[8px] mr-1.5 text-emerald-500 group-hover:text-rose-500"></i>
+                    <span class="group-hover:hidden">Active</span>
+                    <span class="hidden group-hover:inline">Suspend</span>
+                  </button>
+                {% else %}
+                  <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-rose-200 transition group" title="Click to activate company account">
+                    <i class="fa-solid fa-ban text-[9px] mr-1.5 text-rose-500 group-hover:text-emerald-500"></i>
+                    <span class="group-hover:hidden">Suspended</span>
+                    <span class="hidden group-hover:inline">Activate</span>
+                  </button>
+                {% endif %}
+              </form>
+            </td>
+
+            <!-- Created Date -->
+            <td class="py-3.5 px-4 text-slate-500">{{ c.created_at|date:"M d, Y" }}</td>
+
+            <!-- Action Buttons: View, Edit Company, Plan -->
+            <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+              <!-- View Dossier Link -->
+              <a href="{% url 'admin-panel-company-detail' c.id %}" class="inline-flex items-center px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 transition" title="View complete 360 data dossier">
+                <i class="fa-solid fa-eye mr-1 text-slate-500"></i> View
+              </a>
+
+              <!-- Edit Company Link -->
+              <a href="{% url 'admin-panel-company-edit' c.id %}" class="inline-flex items-center px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold rounded-lg border border-blue-200 transition" title="Edit company details and settings">
+                <i class="fa-solid fa-pen-to-square mr-1 text-blue-600"></i> Edit Company
+              </a>
+
+              <!-- Manage Plan Link -->
+              <a href="{% url 'admin-panel-plans' %}?q={{ c.name }}" class="inline-flex items-center px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold rounded-lg border border-amber-200 transition" title="Adjust credits or plan tier">
+                <i class="fa-solid fa-credit-card mr-1 text-amber-600"></i> Plan
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-building text-3xl mb-2 text-slate-300 block"></i>
+              No companies match your search criteria.
             </td>
           </tr>
           {% endfor %}

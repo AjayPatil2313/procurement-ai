@@ -64,9 +64,19 @@ from apps.leads.web_views import (
     send_rfq_view,
 )
 from apps.companies.admin_views import (
+    admin_panel_dashboard_view,
     admin_panel_companies_view,
+    admin_panel_company_create_view,
+    admin_panel_company_detail_view,
+    admin_panel_company_edit_view,
+    admin_panel_toggle_company_status_view,
+    admin_panel_toggle_company_verification_view,
+    admin_panel_plans_view,
+    admin_panel_update_subscription_view,
     admin_panel_users_view,
+    admin_panel_toggle_user_active_view,
     admin_panel_apilogs_view,
+    admin_panel_auditlogs_view,
 )
 from apps.ai_search.web_views import (
     matching_parameters_view,
@@ -159,9 +169,20 @@ urlpatterns = [
     path("sales/matching-parameters/reset/", matching_parameter_reset_defaults_view, name="matching-parameter-reset"),
 
     # Super Admin Panel (Web)
+    path("admin-panel/", admin_panel_dashboard_view, name="admin-panel-dashboard"),
+    path("admin-panel/dashboard/", admin_panel_dashboard_view, name="admin-panel-dashboard-alias"),
     path("admin-panel/companies/", admin_panel_companies_view, name="admin-panel-companies"),
+    path("admin-panel/companies/create/", admin_panel_company_create_view, name="admin-panel-company-create"),
+    path("admin-panel/companies/<int:pk>/", admin_panel_company_detail_view, name="admin-panel-company-detail"),
+    path("admin-panel/companies/<int:pk>/edit/", admin_panel_company_edit_view, name="admin-panel-company-edit"),
+    path("admin-panel/companies/<int:pk>/toggle-status/", admin_panel_toggle_company_status_view, name="admin-panel-toggle-company-status"),
+    path("admin-panel/companies/<int:pk>/toggle-verification/", admin_panel_toggle_company_verification_view, name="admin-panel-toggle-company-verification"),
+    path("admin-panel/plans/", admin_panel_plans_view, name="admin-panel-plans"),
+    path("admin-panel/plans/<int:company_id>/update/", admin_panel_update_subscription_view, name="admin-panel-update-subscription"),
     path("admin-panel/users/", admin_panel_users_view, name="admin-panel-users"),
+    path("admin-panel/users/<int:pk>/toggle-active/", admin_panel_toggle_user_active_view, name="admin-panel-toggle-user-active"),
     path("admin-panel/api-logs/", admin_panel_apilogs_view, name="admin-panel-apilogs"),
+    path("admin-panel/audit-logs/", admin_panel_auditlogs_view, name="admin-panel-auditlogs"),
 
     # REST APIs
     path("api/auth/", include("apps.accounts.urls")),

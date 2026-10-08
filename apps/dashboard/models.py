@@ -115,3 +115,52 @@ class SupportTicket(models.Model):
 
     def __str__(self):
         return f"{self.ticket_number} - {self.subject} ({self.get_status_display()})"
+
+
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        PROPOSAL_SENT = "proposal_sent", "Proposal / RFQ Sent"
+        INQUIRY_REPLY = "inquiry_reply", "Inquiry Follow-up / Reply"
+        QUOTE_RECEIVED = "quote_received", "Quote Recorded / Received"
+        STATUS_CHANGED = "status_changed", "Stage Transition"
+        DEAL_WON = "deal_won", "Deal Won"
+        DEAL_LOST = "deal_lost", "Deal Lost"
+        TICKET_UPDATE = "ticket_update", "Support Ticket Update"
+        SYSTEM = "system", "System Notification"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        null=True,
+        blank=True,
+    )
+    notification_type = models.CharField(
+        max_length=30,
+        choices=NotificationType.choices,
+        default=NotificationType.SYSTEM,
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    link = models.CharField(max_length=500, blank=True)
+    is_read = models.BooleanField(default=False)
+    icon = models.CharField(max_length=50, default="fa-bell")
+    color = models.CharField(max_length=30, default="blue")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Notification for {self.user}: {self.title}"
+
+    def mark_as_read(self):
+        if not self.is_read:
+            self.is_read = True
+            self.save(update_fields=["is_read"])
+

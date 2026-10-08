@@ -1,0 +1,880 @@
+{% extends "base.html" %}
+
+{% block title %}{{ company.name }} — Company 360 Dossier (Super Admin){% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Breadcrumbs & Quick Back -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
+        <a href="{% url 'admin-panel-dashboard' %}" class="hover:text-slate-800 transition">Super Admin</a>
+        <span>/</span>
+        <a href="{% url 'admin-panel-companies' %}" class="hover:text-slate-800 transition">Companies</a>
+        <span>/</span>
+        <span class="text-slate-900 font-semibold">{{ company.name }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200">
+          <i class="fa-solid fa-crown mr-1"></i> Super Admin 360 Dossier
+        </div>
+        <span class="text-xs text-slate-400">• ID #{{ company.id }}</span>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2.5">
+      <a href="{% url 'admin-panel-company-edit' company.id %}" class="inline-flex items-center px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-md shadow-blue-600/30 transition">
+        <i class="fa-solid fa-pen-to-square mr-1.5"></i> Edit Company
+      </a>
+      <a href="{% url 'admin-panel-plans' %}?q={{ company.name }}" class="inline-flex items-center px-3.5 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl transition">
+        <i class="fa-solid fa-credit-card mr-1.5"></i> Adjust Plan & Credits
+      </a>
+      <a href="{% url 'admin-panel-companies' %}" class="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Companies
+      </a>
+    </div>
+  </div>
+
+  <!-- Hero Corporate Profile Header Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+      <div class="flex items-start gap-4">
+        <!-- Logo / Avatar -->
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white flex items-center justify-center text-2xl font-black shadow-md flex-shrink-0">
+          {% if company.logo %}
+            <img src="{{ company.logo.url }}" alt="{{ company.name }}" class="w-full h-full object-cover rounded-2xl">
+          {% else %}
+            {{ company.name|slice:":2"|upper }}
+          {% endif %}
+        </div>
+
+        <div>
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight">{{ company.name }}</h1>
+            {% if company.is_verified %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <i class="fa-solid fa-circle-check mr-1 text-blue-600"></i> Verified Enterprise
+              </span>
+            {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                <i class="fa-regular fa-circle mr-1 text-slate-400"></i> Unverified
+              </span>
+            {% endif %}
+
+            {% if company.is_active %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <i class="fa-solid fa-circle text-[8px] mr-1 text-emerald-500"></i> Active Account
+              </span>
+            {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                <i class="fa-solid fa-ban text-[8px] mr-1 text-rose-500"></i> Suspended
+              </span>
+            {% endif %}
+
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if company.company_type == 'BUYER' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif company.company_type == 'SELLER' %}bg-purple-50 text-purple-800 border border-purple-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+              {{ company.get_company_type_display }}
+            </span>
+          </div>
+
+          <p class="text-xs text-slate-500 font-medium">
+            {% if company.legal_name %}<span class="text-slate-700 font-semibold">{{ company.legal_name }}</span> • {% endif %}
+            {{ company.industry|default:"General Industry" }} • {{ company.city|default:"" }}{% if company.city and company.country %}, {% endif %}{{ company.country|default:"Global" }}
+            • Member since {{ company.created_at|date:"M d, Y" }}
+          </p>
+
+          <div class="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-600">
+            {% if company.email %}
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-envelope text-slate-400"></i>
+                <a href="mailto:{{ company.email }}" class="text-blue-600 hover:underline">{{ company.email }}</a>
+              </div>
+            {% endif %}
+            {% if company.phone %}
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-phone text-slate-400"></i>
+                <span>{{ company.phone }}</span>
+              </div>
+            {% endif %}
+            {% if company.website %}
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-globe text-slate-400"></i>
+                <a href="{{ company.website }}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline flex items-center gap-1">
+                  {{ company.website }} <i class="fa-solid fa-external-link text-[10px]"></i>
+                </a>
+              </div>
+            {% endif %}
+            {% if company.gst_vat_no %}
+              <div class="flex items-center gap-1.5 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                <span class="text-slate-400 font-bold text-[10px]">GSTIN/TAX:</span>
+                <span class="font-mono font-semibold text-slate-800">{{ company.gst_vat_no }}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Super Admin Actions -->
+      <div class="flex flex-wrap lg:flex-col items-end gap-2 text-xs">
+        <form method="POST" action="{% url 'admin-panel-toggle-company-status' company.id %}">
+          {% csrf_token %}
+          {% if company.is_active %}
+            <button type="submit" class="w-full text-left px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold rounded-lg border border-rose-200 transition flex items-center gap-1.5" onclick="return confirm('Suspend this company account? Users will not be able to log in.')">
+              <i class="fa-solid fa-ban text-rose-600"></i> Suspend Account
+            </button>
+          {% else %}
+            <button type="submit" class="w-full text-left px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold rounded-lg border border-emerald-200 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-check text-emerald-600"></i> Re-activate Account
+            </button>
+          {% endif %}
+        </form>
+
+        <form method="POST" action="{% url 'admin-panel-toggle-company-verification' company.id %}">
+          {% csrf_token %}
+          {% if company.is_verified %}
+            <button type="submit" class="w-full text-left px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg border border-slate-200 transition flex items-center gap-1.5">
+              <i class="fa-regular fa-circle-xmark text-slate-500"></i> Revoke Verification
+            </button>
+          {% else %}
+            <button type="submit" class="w-full text-left px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-lg border border-blue-200 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-check text-blue-600"></i> Grant Verified Badge
+            </button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    <!-- Quick Stats Cards Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 pt-5">
+      <!-- Subscription -->
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Subscription</div>
+        <div class="text-sm font-black text-slate-900 mt-1 capitalize">{{ subscription.get_plan_display|default:"Free Plan" }}</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">
+          {% if subscription.valid_till %}Till {{ subscription.valid_till|date:"M d, Y" }}{% else %}Lifetime / Active{% endif %}
+        </div>
+      </div>
+
+      <!-- AI Credits -->
+      <div class="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3">
+        <div class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">Credits Pool</div>
+        <div class="text-sm font-black text-amber-900 mt-1">{{ subscription.credits_remaining|default:0 }} left</div>
+        <div class="text-[11px] text-amber-700/80 mt-0.5">
+          {{ subscription.credits_used|default:0 }} used / {{ subscription.credits_total|default:0 }} total
+        </div>
+      </div>
+
+      <!-- Team Members -->
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Team Users</div>
+        <div class="text-sm font-black text-slate-900 mt-1">{{ members|length }} Active</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">{{ admin_members|length }} Admin(s)</div>
+      </div>
+
+      <!-- Product Catalog -->
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Product Catalog</div>
+        <div class="text-sm font-black text-purple-700 mt-1">{{ products|length }} Items</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Sales listings</div>
+      </div>
+
+      <!-- Requirements -->
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Requirements</div>
+        <div class="text-sm font-black text-emerald-700 mt-1">{{ requirements|length }} Posted</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Procurement RFQs</div>
+      </div>
+
+      <!-- Inquiries -->
+      <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+        <div class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Commercial Deals</div>
+        <div class="text-sm font-black text-blue-700 mt-1">{{ inquiries|length }} Inquiries</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">{{ search_jobs|length }} AI Searches</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation Bar -->
+  <div class="flex items-center gap-1 border-b border-slate-200 overflow-x-auto text-xs font-bold text-slate-600">
+    <button onclick="switchTab('tab-team')" id="btn-tab-team" class="tab-btn px-4 py-2.5 border-b-2 border-blue-600 text-blue-600 flex items-center gap-2 whitespace-nowrap transition">
+      <i class="fa-solid fa-users"></i>
+      <span>Team Members & Admins ({{ members|length }})</span>
+    </button>
+    <button onclick="switchTab('tab-products')" id="btn-tab-products" class="tab-btn px-4 py-2.5 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap transition">
+      <i class="fa-solid fa-boxes-stacked"></i>
+      <span>Product Catalog ({{ products|length }})</span>
+    </button>
+    <button onclick="switchTab('tab-requirements')" id="btn-tab-requirements" class="tab-btn px-4 py-2.5 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap transition">
+      <i class="fa-solid fa-file-invoice"></i>
+      <span>Procurement Requirements ({{ requirements|length }})</span>
+    </button>
+    <button onclick="switchTab('tab-inquiries')" id="btn-tab-inquiries" class="tab-btn px-4 py-2.5 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap transition">
+      <i class="fa-solid fa-comments-dollar"></i>
+      <span>B2B Inquiries & RFQs ({{ inquiries|length }})</span>
+    </button>
+    <button onclick="switchTab('tab-subscription')" id="btn-tab-subscription" class="tab-btn px-4 py-2.5 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap transition">
+      <i class="fa-solid fa-credit-card"></i>
+      <span>Plan & Credit Ledger</span>
+    </button>
+    <button onclick="switchTab('tab-profile')" id="btn-tab-profile" class="tab-btn px-4 py-2.5 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap transition">
+      <i class="fa-solid fa-building"></i>
+      <span>Company Identity & Meta</span>
+    </button>
+    <button onclick="switchTab('tab-activity')" id="btn-tab-activity" class="tab-btn px-4 py-2.5 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center gap-2 whitespace-nowrap transition">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+      <span>Activity Logs ({{ activity_logs|length }})</span>
+    </button>
+  </div>
+
+  <!-- TAB 1: TEAM MEMBERS & ADMINS -->
+  <div id="tab-team" class="tab-pane space-y-4">
+    <!-- Company Admin Highlight Card -->
+    {% if admin_members %}
+    <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200/80 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold text-sm shadow">
+          <i class="fa-solid fa-user-tie"></i>
+        </span>
+        <div>
+          <div class="text-[11px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
+            <span>Designated Company Admin(s)</span>
+            <span class="bg-purple-200 text-purple-900 text-[10px] px-1.5 py-0.2 rounded font-black">{{ admin_members|length }}</span>
+          </div>
+          <div class="font-black text-slate-900 text-sm mt-0.5">
+            {% for adm in admin_members %}
+              {{ adm.user.get_full_name|default:adm.user.email }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          </div>
+          <div class="text-xs text-slate-600 mt-0.5">
+            Full enterprise control over company team, catalog, billing, and procurement operations.
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Members Table Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-slate-900 text-xs">All Company Users & Team Members</h3>
+          <p class="text-[11px] text-slate-500">Every account authorized to operate within this company workspace</p>
+        </div>
+        <span class="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+          {{ members|length }} Registered Member(s)
+        </span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Member Name & Email</th>
+              <th class="py-3 px-4">Assigned Role</th>
+              <th class="py-3 px-4">Custom Role Title</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Joined At</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for m in members %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-4">
+                <div class="flex items-center">
+                  <span class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center mr-2.5 flex-shrink-0 text-xs">
+                    {{ m.user.first_name|slice:":1"|default:m.user.email|slice:":1"|upper }}
+                  </span>
+                  <div>
+                    <div class="font-bold text-slate-900 text-xs">
+                      {{ m.user.get_full_name|default:m.user.email }}
+                    </div>
+                    <div class="text-[11px] text-slate-500 font-mono">{{ m.user.email }}</div>
+                  </div>
+                </div>
+              </td>
+
+              <td class="py-3 px-4">
+                {% if m.role == 'ADMIN' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                    <i class="fa-solid fa-crown mr-1 text-[9px]"></i> Company Admin
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                    <i class="fa-solid fa-user mr-1 text-[9px]"></i> Team User
+                  </span>
+                {% endif %}
+              </td>
+
+              <td class="py-3 px-4 text-slate-600 font-medium">
+                {{ m.custom_role.name|default:"Standard" }}
+              </td>
+
+              <td class="py-3 px-4">
+                {% if m.user.is_active %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                    <i class="fa-solid fa-circle text-[7px] mr-1 text-emerald-500"></i> Active
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700">
+                    <i class="fa-solid fa-ban text-[7px] mr-1 text-rose-500"></i> Deactivated
+                  </span>
+                {% endif %}
+              </td>
+
+              <td class="py-3 px-4 text-slate-500 font-medium">
+                {{ m.joined_at|date:"M d, Y" }}
+              </td>
+
+              <td class="py-3 px-4 text-right">
+                <form method="POST" action="{% url 'admin-panel-toggle-user-active' m.user.id %}" class="inline">
+                  {% csrf_token %}
+                  {% if m.user.is_active %}
+                    <button type="submit" class="px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 rounded-lg border border-rose-200 transition" title="Deactivate user">
+                      Deactivate
+                    </button>
+                  {% else %}
+                    <button type="submit" class="px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition" title="Activate user">
+                      Activate
+                    </button>
+                  {% endif %}
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400 text-xs">
+                No team members enrolled in this company yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: PRODUCT CATALOG -->
+  <div id="tab-products" class="tab-pane hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-slate-900 text-xs">Product & Service Catalog</h3>
+          <p class="text-[11px] text-slate-500">Items listed by this company for AI sales matching & buyer inquiries</p>
+        </div>
+        <span class="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200">
+          {{ products|length }} Product(s)
+        </span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Product Name</th>
+              <th class="py-3 px-4">Category</th>
+              <th class="py-3 px-4">Price & Currency</th>
+              <th class="py-3 px-4">MOQ</th>
+              <th class="py-3 px-4">Availability</th>
+              <th class="py-3 px-4">Listed Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for p in products %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <div class="font-bold text-slate-900 text-xs">{{ p.name }}</div>
+                <div class="text-[10px] text-slate-400 font-normal uppercase">{{ p.type }}</div>
+              </td>
+              <td class="py-3 px-4 text-slate-600 font-medium">
+                {{ p.category.name|default:"Uncategorized" }}
+              </td>
+              <td class="py-3 px-4 font-bold text-slate-900 font-mono">
+                {% if p.price %}
+                  {{ p.currency }} {{ p.price }} / {{ p.unit }}
+                {% elif p.price_min and p.price_max %}
+                  {{ p.currency }} {{ p.price_min }} - {{ p.price_max }}
+                {% else %}
+                  <span class="text-slate-400 font-normal">Contact for Quote</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-slate-600 font-medium">
+                {{ p.moq|default:"1" }} {{ p.unit }}
+              </td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if p.availability == 'IN_STOCK' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                  {{ p.get_availability_display|default:p.availability }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-slate-500">
+                {{ p.created_at|date:"M d, Y" }}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400 text-xs">
+                No catalog items uploaded by this company yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: PROCUREMENT REQUIREMENTS -->
+  <div id="tab-requirements" class="tab-pane hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-slate-900 text-xs">Procurement Requirements & Demands</h3>
+          <p class="text-[11px] text-slate-500">Purchase requests created for AI supplier discovery & live RFQs</p>
+        </div>
+        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+          {{ requirements|length }} Requirement(s)
+        </span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Item Demand</th>
+              <th class="py-3 px-4">Category</th>
+              <th class="py-3 px-4">Quantity</th>
+              <th class="py-3 px-4">Target Budget</th>
+              <th class="py-3 px-4">Delivery Location</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Created Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for r in requirements %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <div class="font-bold text-slate-900 text-xs">{{ r.item_name }}</div>
+                {% if r.description %}
+                  <div class="text-[11px] text-slate-500 font-normal line-clamp-1">{{ r.description }}</div>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-slate-600 font-medium">
+                {{ r.category.name|default:"General" }}
+              </td>
+              <td class="py-3 px-4 font-bold text-slate-900 font-mono">
+                {{ r.quantity }} {{ r.unit }}
+              </td>
+              <td class="py-3 px-4 text-slate-700 font-medium font-mono">
+                {% if r.target_price %}
+                  {{ r.currency }} {{ r.target_price }}
+                {% else %}
+                  <span class="text-slate-400">Open Budget</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-slate-600">
+                {{ r.delivery_city|default:"" }}{% if r.delivery_city and r.delivery_country %}, {% endif %}{{ r.delivery_country|default:"India" }}
+              </td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if r.status == 'searching' %}bg-blue-50 text-blue-800 border border-blue-200{% elif r.status == 'completed' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                  {{ r.get_status_display }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-slate-500">
+                {{ r.created_at|date:"M d, Y" }}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="py-8 text-center text-slate-400 text-xs">
+                No procurement requirements posted by this company yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: B2B INQUIRIES & RFQS -->
+  <div id="tab-inquiries" class="tab-pane hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-slate-900 text-xs">B2B Commercial Outreach & RFQs</h3>
+          <p class="text-[11px] text-slate-500">Commercial inquiry proposals, email communications, and deals</p>
+        </div>
+        <span class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+          {{ inquiries|length }} Inquiry(s)
+        </span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Subject & Product</th>
+              <th class="py-3 px-4">Sent To Email</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Quoted Deal Value</th>
+              <th class="py-3 px-4">Attachment</th>
+              <th class="py-3 px-4">Sent Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for inq in inquiries %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <div class="font-bold text-slate-900 text-xs">{{ inq.subject }}</div>
+                <div class="text-[11px] text-slate-500 font-normal">
+                  {{ inq.search_result.product_title|default:"Commercial RFQ" }}
+                </div>
+              </td>
+              <td class="py-3 px-4 text-slate-600 font-mono text-[11px]">
+                {{ inq.sent_to_email }}
+              </td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if inq.status == 'won' %}bg-emerald-100 text-emerald-800{% elif inq.status == 'replied' %}bg-blue-100 text-blue-800{% elif inq.status == 'lost' %}bg-rose-100 text-rose-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                  {{ inq.get_status_display }}
+                </span>
+              </td>
+              <td class="py-3 px-4 font-bold text-slate-900 font-mono">
+                {% if inq.quoted_price %}
+                  {{ inq.quoted_currency }} {{ inq.quoted_price }}
+                {% else %}
+                  <span class="text-slate-400 font-normal">None</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-slate-600">
+                {% if inq.attachment %}
+                  <a href="{{ inq.attachment.url }}" target="_blank" class="inline-flex items-center text-blue-600 hover:underline gap-1 text-[11px]">
+                    <i class="fa-solid fa-paperclip"></i>
+                    <span>{{ inq.attachment_name|default:"View PDF"|truncatechars:18 }}</span>
+                  </a>
+                {% else %}
+                  <span class="text-slate-400 text-[11px]">None</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-slate-500">
+                {{ inq.sent_at|date:"M d, Y" }}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400 text-xs">
+                No inquiries sent or recorded by this company yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: SUBSCRIPTION & CREDIT LEDGER -->
+  <div id="tab-subscription" class="tab-pane hidden space-y-4">
+    <!-- Active Subscription Details Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-credit-card text-amber-500"></i> Active Subscription & Credit Allocation
+          </h3>
+          <p class="text-xs text-slate-500">Controls search queries capacity, tier permissions, and renewal dates</p>
+        </div>
+        <a href="{% url 'admin-panel-plans' %}?q={{ company.name }}" class="px-3.5 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl transition shadow-sm">
+          <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Plan / Add Credits
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 text-xs">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase">Tier Plan</div>
+          <div class="text-base font-black text-slate-900 capitalize mt-1">
+            {{ subscription.get_plan_display|default:"Free Starter" }}
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase">Remaining Credits</div>
+          <div class="text-base font-black text-amber-700 mt-1">
+            {{ subscription.credits_remaining|default:0 }}
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase">Total Allocated / Used</div>
+          <div class="text-sm font-bold text-slate-800 mt-1">
+            {{ subscription.credits_total|default:0 }} allocated / {{ subscription.credits_used|default:0 }} used
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+          <div class="text-[11px] font-semibold text-slate-500 uppercase">Validity Expiration</div>
+          <div class="text-sm font-bold text-slate-800 mt-1">
+            {% if subscription.valid_till %}
+              {{ subscription.valid_till|date:"M d, Y" }}
+            {% else %}
+              <span class="text-emerald-600 font-semibold">No Expiration Date</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Credit Transactions History -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <h4 class="font-bold text-slate-900 text-xs">Credit Transaction History</h4>
+        <span class="text-[11px] text-slate-500">{{ recent_transactions|length }} Recent Entries</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Transaction Type</th>
+              <th class="py-3 px-4">Credits</th>
+              <th class="py-3 px-4">Notes / Reason</th>
+              <th class="py-3 px-4">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for tx in recent_transactions %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="py-3 px-4 font-bold">
+                {% if tx.transaction_type == 'credit' %}
+                  <span class="text-emerald-600 flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-down-left"></i> Credit Added
+                  </span>
+                {% else %}
+                  <span class="text-rose-600 flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-up-right"></i> Credit Deducted
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 font-black font-mono {% if tx.transaction_type == 'credit' %}text-emerald-700{% else %}text-rose-700{% endif %}">
+                {% if tx.transaction_type == 'credit' %}+{% else %}-{% endif %}{{ tx.credits }}
+              </td>
+              <td class="py-3 px-4 text-slate-600">
+                {{ tx.notes|default:"System credit ledger update" }}
+              </td>
+              <td class="py-3 px-4 text-slate-500">
+                {{ tx.created_at|date:"M d, Y H:i" }}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="py-8 text-center text-slate-400 text-xs">
+                No credit transactions logged for this account.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 6: COMPANY IDENTITY & META -->
+  <div id="tab-profile" class="tab-pane hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6 text-xs">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">Full Corporate Identity & Registration Data</h3>
+          <p class="text-slate-500 text-[11px]">Official registration identifiers, tax compliance, and location coordinates</p>
+        </div>
+        <a href="{% url 'admin-panel-company-edit' company.id %}" class="px-3.5 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition">
+          <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Information
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Company Trade Name</div>
+          <div class="text-slate-900 font-bold text-sm">{{ company.name }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Registered Legal Entity</div>
+          <div class="text-slate-900 font-medium">{{ company.legal_name|default:"Not specified" }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Platform Role Type</div>
+          <div class="text-slate-900 font-bold">{{ company.get_company_type_display }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">GSTIN / VAT / Tax ID</div>
+          <div class="text-slate-900 font-mono font-bold">{{ company.gst_vat_no|default:"Not specified" }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Company Registration No. (CIN)</div>
+          <div class="text-slate-900 font-mono font-semibold">{{ company.registration_no|default:"Not specified" }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Company Size</div>
+          <div class="text-slate-900 font-medium">{{ company.get_company_size_display|default:company.company_size|default:"Not specified" }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Industry / Sector</div>
+          <div class="text-slate-900 font-medium">{{ company.industry|default:"Not specified" }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Official Website</div>
+          {% if company.website %}
+            <a href="{{ company.website }}" target="_blank" class="text-blue-600 hover:underline flex items-center gap-1 font-medium">
+              {{ company.website }} <i class="fa-solid fa-external-link text-[10px]"></i>
+            </a>
+          {% else %}
+            <span class="text-slate-400">Not provided</span>
+          {% endif %}
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Corporate Contact Email</div>
+          <div class="text-slate-900 font-medium">{{ company.email|default:"Not provided" }}</div>
+        </div>
+
+        <div>
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Corporate Phone Number</div>
+          <div class="text-slate-900 font-medium">{{ company.phone|default:"Not provided" }}</div>
+        </div>
+
+        <div class="md:col-span-2">
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Registered Address</div>
+          <div class="text-slate-900 font-medium">
+            {% if company.address_line1 %}{{ company.address_line1 }}, {% endif %}
+            {% if company.address_line2 %}{{ company.address_line2 }}, {% endif %}
+            {{ company.city|default:"" }}{% if company.city and company.state %}, {% endif %}
+            {{ company.state|default:"" }}{% if company.postal_code %} - {{ company.postal_code }}{% endif %}
+            <br>
+            <span class="text-slate-600 font-bold">{{ company.country|default:"India" }}</span>
+          </div>
+        </div>
+
+        {% if company.about %}
+        <div class="md:col-span-3">
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">About Company</div>
+          <div class="text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line leading-relaxed">
+            {{ company.about }}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if company.description %}
+        <div class="md:col-span-3">
+          <div class="font-bold text-slate-400 uppercase text-[10px] tracking-wider mb-1">Company Description</div>
+          <div class="text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-line leading-relaxed">
+            {{ company.description }}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 7: ACTIVITY LOGS & SEARCH JOBS -->
+  <div id="tab-activity" class="tab-pane hidden space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Search Jobs Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+          <h4 class="font-bold text-slate-900 text-xs flex items-center gap-2">
+            <i class="fa-solid fa-robot text-purple-600"></i> AI Search Jobs Executed
+          </h4>
+          <span class="text-[11px] text-slate-500">{{ search_jobs|length }} Jobs</span>
+        </div>
+
+        <div class="divide-y divide-slate-100 text-xs">
+          {% for sj in search_jobs %}
+          <div class="p-3.5 hover:bg-slate-50 transition">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-slate-900">{{ sj.query_text|truncatechars:45 }}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if sj.status == 'COMPLETED' %}bg-emerald-50 text-emerald-700{% elif sj.status == 'FAILED' %}bg-rose-50 text-rose-700{% else %}bg-blue-50 text-blue-700{% endif %}">
+                {{ sj.get_status_display|default:sj.status }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-500">
+              <span>{{ sj.results_count|default:0 }} results extracted</span>
+              <span>{{ sj.created_at|date:"M d, Y H:i" }}</span>
+            </div>
+          </div>
+          {% empty %}
+          <div class="p-6 text-center text-slate-400 text-xs">
+            No AI search jobs run by this company yet.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Audit Activity Log Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+          <h4 class="font-bold text-slate-900 text-xs flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-blue-600"></i> Audit Activity Trail
+          </h4>
+          <span class="text-[11px] text-slate-500">{{ activity_logs|length }} Events</span>
+        </div>
+
+        <div class="divide-y divide-slate-100 text-xs">
+          {% for log in activity_logs %}
+          <div class="p-3.5 hover:bg-slate-50 transition flex items-start gap-3">
+            <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs mt-0.5">
+              <i class="fa-solid fa-bolt"></i>
+            </span>
+            <div class="flex-1">
+              <div class="font-bold text-slate-900 text-xs">{{ log.title }}</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">{{ log.description }}</div>
+              <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
+                <span><i class="fa-regular fa-clock mr-1"></i>{{ log.created_at|date:"M d, Y H:i" }}</span>
+                {% if log.user %}
+                  <span>• By {{ log.user.get_full_name|default:log.user.email }}</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="p-6 text-center text-slate-400 text-xs">
+            No activity events recorded yet.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tab Switching Script -->
+<script>
+function switchTab(targetId) {
+  // Hide all panes
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+  // Remove active state from all buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('border-blue-600', 'text-blue-600');
+    btn.classList.add('border-transparent', 'text-slate-600');
+  });
+
+  // Show target pane
+  const targetPane = document.getElementById(targetId);
+  if (targetPane) {
+    targetPane.classList.remove('hidden');
+  }
+
+  // Set active on clicked button
+  const activeBtn = document.getElementById('btn-' + targetId);
+  if (activeBtn) {
+    activeBtn.classList.remove('border-transparent', 'text-slate-600');
+    activeBtn.classList.add('border-blue-600', 'text-blue-600');
+  }
+}
+</script>
+{% endblock %}

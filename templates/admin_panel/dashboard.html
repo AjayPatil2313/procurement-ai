@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Super Admin Executive Dashboard — AI Procurement & Sales Platform{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-red-400"></i> Platform Super Admin Control Center
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Platform Executive Dashboard</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Global multi-tenant governance, company subscriptions, AI usage monitoring, and system activity logs
+      </p>
+    </div>
+
+    <!-- Quick Action Shortcut Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{% url 'admin-panel-company-create' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-plus mr-1.5"></i> Add Company
+      </a>
+      <a href="{% url 'admin-panel-companies' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-sitemap mr-2 text-red-400"></i> Companies
+      </a>
+      <a href="{% url 'admin-panel-plans' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-credit-card mr-2 text-amber-400"></i> Plans & Credits
+      </a>
+      <a href="{% url 'admin-panel-apilogs' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-terminal mr-2 text-emerald-400"></i> API Costs
+      </a>
+      <a href="{% url 'admin-panel-auditlogs' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-clock-rotate-left mr-2 text-purple-400"></i> Audit Trail
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary KPI Metric Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Card 1: Companies -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Companies</span>
+        <span class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-building"></i>
+        </span>
+      </div>
+      <div class="mt-3">
+        <div class="text-2xl font-black text-slate-900">{{ total_companies }}</div>
+        <div class="flex items-center gap-2 mt-2 text-xs">
+          <span class="inline-flex items-center px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700">
+            <i class="fa-solid fa-circle-check text-[10px] mr-1"></i> {{ active_companies }} Active
+          </span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded font-bold bg-blue-50 text-blue-700">
+            <i class="fa-solid fa-award text-[10px] mr-1"></i> {{ verified_companies }} Verified
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Users -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Platform Users</span>
+        <span class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-users"></i>
+        </span>
+      </div>
+      <div class="mt-3">
+        <div class="text-2xl font-black text-slate-900">{{ total_users }}</div>
+        <div class="flex items-center gap-2 mt-2 text-xs text-slate-600">
+          <span class="font-semibold text-purple-700">{{ company_admins }} Admins</span>
+          <span>•</span>
+          <span class="font-medium text-slate-600">{{ company_users }} Users</span>
+          <span>•</span>
+          <span class="font-semibold text-red-600">{{ super_admins }} Super</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Subscriptions & Credits -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">AI Credit Pool</span>
+        <span class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-coins"></i>
+        </span>
+      </div>
+      <div class="mt-3">
+        <div class="text-2xl font-black text-amber-600">{{ credits_remaining }} <span class="text-xs font-medium text-slate-500">left</span></div>
+        <div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+          <span>Allocated: {{ credits_allocated }}</span>
+          <span>Used: {{ credits_used }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: External API Cost -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total API Expense</span>
+        <span class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-receipt"></i>
+        </span>
+      </div>
+      <div class="mt-3">
+        <div class="text-2xl font-black text-emerald-600">${{ total_api_cost|floatformat:2 }}</div>
+        <div class="flex items-center justify-between mt-2 text-xs text-slate-500">
+          <span>{{ total_api_calls }} calls logged</span>
+          <span class="text-emerald-700 font-semibold">{{ completed_jobs }} jobs OK</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Visual Distributions & Breakdown -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Plan Subscriptions Breakdown -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-layer-group text-amber-500 mr-2"></i> Subscription Plans
+        </h3>
+        <a href="{% url 'admin-panel-plans' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">Manage &rarr;</a>
+      </div>
+
+      <div class="space-y-3 pt-1">
+        <!-- Enterprise -->
+        <div>
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-purple-600 mr-2"></span>Enterprise Plan</span>
+            <span>{{ sub_enterprise }} companies</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2">
+            <div class="bg-purple-600 h-2 rounded-full" style="width: {% if total_companies %}{{ sub_enterprise|floatformat:1 }}%{% else %}0%{% endif %}"></div>
+          </div>
+        </div>
+
+        <!-- Pro -->
+        <div>
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 mr-2"></span>Pro Plan</span>
+            <span>{{ sub_pro }} companies</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2">
+            <div class="bg-blue-600 h-2 rounded-full" style="width: {% if total_companies %}{{ sub_pro|floatformat:1 }}%{% else %}0%{% endif %}"></div>
+          </div>
+        </div>
+
+        <!-- Free -->
+        <div>
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-slate-400 mr-2"></span>Free Starter Plan</span>
+            <span>{{ sub_free }} companies</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2">
+            <div class="bg-slate-400 h-2 rounded-full" style="width: {% if total_companies %}{{ sub_free|floatformat:1 }}%{% else %}0%{% endif %}"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600 flex items-center justify-between">
+        <span>Average Credits / Org:</span>
+        <span class="font-bold text-slate-900">
+          {% if total_companies %}{{ credits_allocated|default:0 }}{% else %}0{% endif %} credits
+        </span>
+      </div>
+    </div>
+
+    <!-- Company Role Distribution -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-network-wired text-blue-500 mr-2"></i> Company Roles Distribution
+        </h3>
+        <a href="{% url 'admin-panel-companies' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">Directory &rarr;</a>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 text-center pt-2">
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+          <div class="text-emerald-700 text-base font-bold">{{ buyer_companies }}</div>
+          <div class="text-[11px] font-semibold text-emerald-800 mt-0.5">Procurement Buyers</div>
+        </div>
+        <div class="p-3 bg-purple-50 rounded-xl border border-purple-100">
+          <div class="text-purple-700 text-base font-bold">{{ seller_companies }}</div>
+          <div class="text-[11px] font-semibold text-purple-800 mt-0.5">Sales Vendors</div>
+        </div>
+        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
+          <div class="text-blue-700 text-base font-bold">{{ both_companies }}</div>
+          <div class="text-[11px] font-semibold text-blue-800 mt-0.5">Hybrid (Both)</div>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-2">
+        <div class="flex items-center justify-between">
+          <span>Total B2B Inquiries / RFQs:</span>
+          <span class="font-bold text-slate-900">{{ total_inquiries }}</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Deals Closed (Won 🎉):</span>
+          <span class="font-bold text-emerald-600">{{ deals_won }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- External API Providers -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-server text-emerald-500 mr-2"></i> API Provider Breakdown
+        </h3>
+        <a href="{% url 'admin-panel-apilogs' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">API Logs &rarr;</a>
+      </div>
+
+      <div class="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+        {% for p in provider_breakdown %}
+        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs">
+          <div>
+            <div class="font-bold text-slate-900">{{ p.provider }}</div>
+            <div class="text-[11px] text-slate-500">{{ p.total_calls }} invocations</div>
+          </div>
+          <div class="text-right">
+            <span class="font-bold text-emerald-600">${{ p.total_cost|floatformat:4 }}</span>
+          </div>
+        </div>
+        {% empty %}
+        <div class="p-4 text-center text-slate-400 text-xs">
+          No external API calls logged yet.
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+        <span>Open Support Tickets:</span>
+        <span class="font-bold {% if open_tickets > 0 %}text-rose-600{% else %}text-slate-600{% endif %}">
+          {{ open_tickets }} pending
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Row 3: Two-column feed (Companies Directory Preview & Live System Audit Trail) -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Recent Platform Companies -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-building text-blue-600 mr-2"></i> Recently Registered Companies
+        </h3>
+        <a href="{% url 'admin-panel-companies' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">View All ({{ total_companies }}) &rarr;</a>
+      </div>
+
+      <div class="divide-y divide-slate-100 flex-1 overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase font-semibold">
+            <tr>
+              <th class="py-2.5 px-4">Company</th>
+              <th class="py-2.5 px-3">Type</th>
+              <th class="py-2.5 px-3">Plan</th>
+              <th class="py-2.5 px-3">Status</th>
+              <th class="py-2.5 px-3 text-right">Switch</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in recent_companies %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <div>{{ c.name }}</div>
+                <div class="text-[11px] font-normal text-slate-400">{{ c.country|default:"Global" }}</div>
+              </td>
+              <td class="py-3 px-3 font-medium text-slate-700">{{ c.get_company_type_display }}</td>
+              <td class="py-3 px-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if c.subscription.plan == 'enterprise' %}bg-purple-100 text-purple-800{% elif c.subscription.plan == 'pro' %}bg-blue-100 text-blue-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                  {{ c.subscription.get_plan_display|default:"Free" }}
+                </span>
+              </td>
+              <td class="py-3 px-3">
+                {% if c.is_active %}
+                  <span class="inline-flex items-center text-emerald-600 font-semibold"><i class="fa-solid fa-circle text-[8px] mr-1.5"></i> Active</span>
+                {% else %}
+                  <span class="inline-flex items-center text-rose-500 font-semibold"><i class="fa-solid fa-circle text-[8px] mr-1.5"></i> Suspended</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-3 text-right">
+                <form method="POST" action="{% url 'switch-company' %}" class="inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="company_id" value="{{ c.id }}">
+                  <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold text-[11px] px-2.5 py-1 rounded-lg transition" title="Switch context into this company">
+                    <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i> Enter
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="py-6 text-center text-slate-400">No companies found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Live System Activity & Audit Feed -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-clock-rotate-left text-purple-600 mr-2"></i> Platform Activity Feed
+        </h3>
+        <a href="{% url 'admin-panel-auditlogs' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">Full Audit Trail &rarr;</a>
+      </div>
+
+      <div class="p-4 divide-y divide-slate-100 flex-1 overflow-y-auto max-h-96 space-y-3">
+        {% for act in recent_activities %}
+        <div class="pt-3 first:pt-0 flex items-start space-x-3 text-xs">
+          <div class="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fa-solid fa-{{ act.icon_type|default:'bell' }} text-xs"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-900 truncate">{{ act.title }}</span>
+              <span class="text-[10px] text-slate-400 whitespace-nowrap ml-2">{{ act.created_at|timesince }} ago</span>
+            </div>
+            <p class="text-slate-600 text-[11px] mt-0.5 line-clamp-2">{{ act.description }}</p>
+            <div class="flex items-center space-x-2 mt-1 text-[10px] text-slate-400">
+              <span><i class="fa-solid fa-building text-[9px] mr-1"></i>{{ act.company.name }}</span>
+              {% if act.user %}
+              <span>•</span>
+              <span><i class="fa-solid fa-user text-[9px] mr-1"></i>{{ act.user.email }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="py-8 text-center text-slate-400 text-xs">
+          No system activities recorded yet.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

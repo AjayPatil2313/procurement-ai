@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}System Audit Trail & Platform Logs — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Audit Trail & Activity Logs</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Comprehensive audit log of user logins, plan upgrades, search executions, company status adjustments, and RFQs</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="flex items-center gap-2">
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Total Audit Events:</span> <span class="font-bold text-slate-900">{{ total_activities }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search title, description, company..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-purple-500 outline-none">
+      </div>
+
+      <!-- Activity Type Filter -->
+      <div>
+        <select name="type" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if type_filter == 'all' %}selected{% endif %}>All Activity Types</option>
+          {% for code, label in activity_types %}
+          <option value="{{ code }}" {% if type_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Company Filter -->
+      <div class="flex items-center gap-2">
+        <select name="company_id" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if company_id == 'all' %}selected{% endif %}>All Companies</option>
+          {% for c in companies %}
+          <option value="{{ c.id }}" {% if company_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        {% if q or type_filter != 'all' or company_id != 'all' %}
+        <a href="{% url 'admin-panel-auditlogs' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Audit Trail Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="text-sm font-bold text-slate-900 flex items-center">
+        <i class="fa-solid fa-clock-rotate-left text-purple-600 mr-2"></i> Audit Event Stream
+      </h3>
+      <span class="text-xs text-slate-500">Showing latest {{ activities|length }} events</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Event Type</th>
+            <th class="py-2.5 px-3">Title & Action Details</th>
+            <th class="py-2.5 px-3">Company</th>
+            <th class="py-2.5 px-3">User</th>
+            <th class="py-2.5 px-3 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for act in activities %}
+          <tr class="hover:bg-slate-50 transition">
+            <!-- Event Type Badge -->
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                <i class="fa-solid fa-{{ act.icon_type|default:'circle-dot' }} mr-1 text-[9px] text-purple-600"></i>
+                {{ act.get_activity_type_display }}
+              </span>
+            </td>
+
+            <!-- Title & Description -->
+            <td class="py-3.5 px-3">
+              <div class="font-bold text-slate-900">{{ act.title }}</div>
+              <div class="text-[11px] text-slate-500 mt-0.5 max-w-md">{{ act.description }}</div>
+            </td>
+
+            <!-- Company -->
+            <td class="py-3.5 px-3">
+              <span class="font-semibold text-slate-800">{{ act.company.name }}</span>
+            </td>
+
+            <!-- User -->
+            <td class="py-3.5 px-3 text-slate-600">
+              {% if act.user %}
+                <span class="font-medium text-slate-700">{{ act.user.email }}</span>
+              {% else %}
+                <span class="text-slate-400 italic">System Engine</span>
+              {% endif %}
+            </td>
+
+            <!-- Timestamp -->
+            <td class="py-3.5 px-3 text-right text-slate-400 whitespace-nowrap">
+              <div>{{ act.created_at|date:"M d, Y" }}</div>
+              <div class="text-[10px] text-slate-400">{{ act.created_at|time:"H:i:s" }}</div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-clock-rotate-left text-3xl mb-2 text-slate-300 block"></i>
+              No audit logs found matching criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

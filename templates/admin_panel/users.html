@@ -1,56 +1,196 @@
 {% extends "base.html" %}
 
-{% block title %}All Users — Super Admin Panel{% endblock %}
+{% block title %}All Platform Users — Super Admin Panel{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
-  <div class="flex items-center justify-between">
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
-      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200 mb-2">
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
         <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
       </div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Users</h1>
-      <p class="text-xs text-slate-500 mt-0.5">Manage user credentials, staff status, and company memberships</p>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Users & Access Control</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Manage user credentials, company memberships, role allocations, and account activation states</p>
+    </div>
+
+    <!-- Quick Stats Pill -->
+    <div class="flex items-center gap-2">
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Total Users:</span> <span class="font-bold text-slate-900">{{ total_users }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Active:</span> <span class="font-bold text-emerald-600">{{ active_users }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Super Admins:</span> <span class="font-bold text-red-600">{{ superadmin_count }}</span>
+      </div>
     </div>
   </div>
 
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search email or full name..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
+      </div>
+
+      <!-- Role Filter -->
+      <div>
+        <select name="role" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if role_filter == 'all' %}selected{% endif %}>All Roles</option>
+          <option value="super_admin" {% if role_filter == 'super_admin' %}selected{% endif %}>Super Admins</option>
+          <option value="company_admin" {% if role_filter == 'company_admin' %}selected{% endif %}>Company Admins</option>
+          <option value="company_user" {% if role_filter == 'company_user' %}selected{% endif %}>Company Users</option>
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div class="flex items-center gap-2">
+        <select name="status" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Accounts Only</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Deactivated Only</option>
+        </select>
+        {% if q or role_filter != 'all' or status_filter != 'all' %}
+        <a href="{% url 'admin-panel-users' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Users Table -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-3 px-4">User</th>
-            <th class="py-3 px-4">Email</th>
-            <th class="py-3 px-4">Staff / Superuser</th>
-            <th class="py-3 px-4">Verified</th>
+            <th class="py-3 px-4">User Details</th>
+            <th class="py-3 px-4">Company & Membership</th>
+            <th class="py-3 px-4">System Role</th>
+            <th class="py-3 px-4">Email Verified</th>
+            <th class="py-3 px-4">Account Status</th>
             <th class="py-3 px-4">Joined Date</th>
+            <th class="py-3 px-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for u in users %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3.5 px-4 font-bold text-slate-900">{{ u.first_name }} {{ u.last_name }}</td>
-            <td class="py-3.5 px-4 text-slate-700 font-medium">{{ u.email }}</td>
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- User Name & Email -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center">
+                <span class="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center mr-2.5 flex-shrink-0 text-xs">
+                  {{ u.first_name|first|default:u.email|first|upper }}
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">{{ u.get_full_name|default:u.email }}</div>
+                  <div class="text-[11px] font-normal text-slate-500 font-mono">{{ u.email }}</div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Company & Membership -->
+            <td class="py-3.5 px-4 text-slate-700">
+              {% if u.company_membership %}
+                <div class="font-semibold text-slate-800">{{ u.company_membership.company.name }}</div>
+                <div class="text-[10px] text-slate-400">
+                  {{ u.company_membership.get_role_display }}
+                </div>
+              {% else %}
+                <span class="text-slate-400 italic">No Company Assigned</span>
+              {% endif %}
+            </td>
+
+            <!-- Role Badge -->
             <td class="py-3.5 px-4">
               {% if u.is_superuser %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800">
-                  Super Admin
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">
+                  <i class="fa-solid fa-crown mr-1 text-[9px]"></i> Super Admin
+                </span>
+              {% elif u.is_staff %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  Staff Admin
+                </span>
+              {% elif u.company_membership.role == 'ADMIN' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                  Company Admin
                 </span>
               {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">
-                  Standard
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700">
+                  Company User
                 </span>
               {% endif %}
             </td>
+
+            <!-- Verified -->
             <td class="py-3.5 px-4">
               {% if u.is_email_verified %}
-                <span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Yes</span>
+                <span class="inline-flex items-center text-emerald-600 font-semibold">
+                  <i class="fa-solid fa-circle-check text-[10px] mr-1"></i> Verified
+                </span>
               {% else %}
-                <span class="text-slate-400">No</span>
+                <span class="inline-flex items-center text-slate-400">
+                  <i class="fa-regular fa-circle text-[10px] mr-1"></i> Unverified
+                </span>
               {% endif %}
             </td>
+
+            <!-- Account Active Toggle -->
+            <td class="py-3.5 px-4">
+              {% if u == request.user %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <i class="fa-solid fa-lock text-[9px] mr-1 text-emerald-500"></i> Active (Current)
+                </span>
+              {% else %}
+                <form method="POST" action="{% url 'admin-panel-toggle-user-active' u.id %}" class="inline">
+                  {% csrf_token %}
+                  {% if u.is_active %}
+                    <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-emerald-200 transition group" title="Click to deactivate user account">
+                      <i class="fa-solid fa-circle text-[8px] mr-1.5 text-emerald-500 group-hover:text-rose-500"></i>
+                      <span class="group-hover:hidden">Active</span>
+                      <span class="hidden group-hover:inline">Deactivate</span>
+                    </button>
+                  {% else %}
+                    <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-rose-200 transition group" title="Click to activate user account">
+                      <i class="fa-solid fa-ban text-[9px] mr-1.5 text-rose-500 group-hover:text-emerald-500"></i>
+                      <span class="group-hover:hidden">Deactivated</span>
+                      <span class="hidden group-hover:inline">Activate</span>
+                    </button>
+                  {% endif %}
+                </form>
+              {% endif %}
+            </td>
+
+            <!-- Joined Date -->
             <td class="py-3.5 px-4 text-slate-500">{{ u.created_at|date:"M d, Y" }}</td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right">
+              {% if u.company_membership %}
+              <form method="POST" action="{% url 'switch-company' %}" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="company_id" value="{{ u.company_membership.company.id }}">
+                <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold text-[11px] px-2.5 py-1 rounded-lg transition" title="Inspect user company context">
+                  <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i> Org
+                </button>
+              </form>
+              {% else %}
+              <span class="text-slate-300 text-[11px]">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-users text-3xl mb-2 text-slate-300 block"></i>
+              No users found matching query.
+            </td>
           </tr>
           {% endfor %}
         </tbody>
