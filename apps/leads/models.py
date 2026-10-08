@@ -62,7 +62,9 @@ class Inquiry(models.Model):
     )
     search_result = models.ForeignKey(
         SearchResult,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="inquiries",
     )
     subject = models.CharField(max_length=255)

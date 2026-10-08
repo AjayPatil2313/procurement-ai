@@ -12,9 +12,9 @@
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
         {% if is_seller_context %}
-        <a href="{% url 'sales-inquiries-list' %}" class="hover:text-blue-600 transition">Buyer Inquiries</a>
+        <a href="{% url 'sales-inquiries-list' %}" class="hover:text-blue-600 transition">{% if rbac.is_both %}Buyer Inquiries{% else %}Inquiries{% endif %}</a>
         {% else %}
-        <a href="{% url 'inquiries-list' %}" class="hover:text-blue-600 transition">RFQs & Inquiries</a>
+        <a href="{% url 'inquiries-list' %}" class="hover:text-blue-600 transition">{% if rbac.is_both %}Supplier Inquiries{% else %}Inquiries{% endif %}</a>
         {% endif %}
         <span>&bull;</span>
         <span class="text-slate-600 font-semibold">Dossier #{{ inquiry.id }}</span>

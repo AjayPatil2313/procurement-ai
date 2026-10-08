@@ -85,6 +85,7 @@ def sync_member_permissions_from_role(member, custom_role):
                 actions.append("EDIT")
             if mp.can_edit:
                 actions.append("EDIT")
+                actions.append("UPDATE")
             if mp.can_delete:
                 actions.append("DELETE")
 

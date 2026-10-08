@@ -41,19 +41,34 @@ def save_lead_toggle_view(request, result_id):
         messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
-    result = get_object_or_404(SearchResult, id=result_id)
+    if rbac["is_super_admin"] and not company:
+        result = get_object_or_404(SearchResult, id=result_id)
+    else:
+        result = get_object_or_404(SearchResult, id=result_id, search_job__company=company)
 
-    saved_item, created = SavedItem.objects.get_or_create(
+    # Prevent duplicate bookmarking of the same external vendor for this product
+    target_product = result.search_job.product if result.search_job else None
+    existing_saved = SavedItem.objects.filter(
         company=company,
-        search_result=result,
-        defaults={"status": SavedItem.Status.NEW},
-    )
+        search_result__external_company=result.external_company,
+        search_result__search_job__product=target_product,
+    ).first()
+
+    if existing_saved:
+        saved_item = existing_saved
+        created = False
+    else:
+        saved_item, created = SavedItem.objects.get_or_create(
+            company=company,
+            search_result=result,
+            defaults={"status": SavedItem.Status.NEW},
+        )
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "success": True,
             "created": created,
-            "message": f"Lead '{result.external_company.name}' saved to pipeline!" if created else "Lead is already saved.",
+            "message": f"Lead '{result.external_company.name}' saved to pipeline!" if created else "Lead is already saved in your pipeline.",
         })
 
     if created:
@@ -89,6 +104,8 @@ def saved_leads_view(request):
     base_qs = SavedItem.objects.filter(
         company=company,
         search_result__result_type=SearchResult.ResultType.LEAD,
+    ).filter(
+        Q(search_result__search_job__product__is_deleted=False) | Q(search_result__search_job__product__isnull=True)
     ).select_related(
         "search_result",
         "search_result__external_company",
@@ -194,7 +211,7 @@ def saved_leads_view(request):
         "status_choices": SavedItem.Status.choices,
         "status_filter": status_filter,
         "assigned_filter": assigned_filter,
-        "page_title": f"Saved Buyers - {selected_product.name}" if selected_product else "Saved Buyers (Product-Wise)",
+        "page_title": f"Prequalified Vendors - {selected_product.name}" if selected_product else "Prequalified Vendors (Product-Wise)",
     })
 
 
@@ -281,7 +298,7 @@ def leads_list_view(request):
     company = rbac["company"]
 
     if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
-        messages.error(request, "Access restricted: Sales Leads is only available for Seller accounts.")
+        messages.error(request, "Access restricted: Vendor list is only available for Seller accounts.")
         return redirect("dashboard")
 
     # Fetch company products sorted strictly alphabetically A to Z
@@ -291,6 +308,8 @@ def leads_list_view(request):
     base_leads_qs = SearchResult.objects.filter(
         search_job__company=company,
         result_type=SearchResult.ResultType.LEAD,
+    ).filter(
+        Q(search_job__product__is_deleted=False) | Q(search_job__product__isnull=True)
     ).select_related(
         "external_company",
         "search_job",
@@ -364,7 +383,7 @@ def leads_list_view(request):
         "saved_result_ids": saved_result_ids,
         "company": company,
         "rbac": rbac,
-        "page_title": f"Buyer Leads - {selected_product.name}" if selected_product else "Sales Leads (Product-Wise)",
+        "page_title": f"Vendor List - {selected_product.name}" if selected_product else "Vendor List (Product-Wise)",
     })
 
 
@@ -477,7 +496,11 @@ def send_rfq_view(request, result_id):
         messages.error(request, "Access restricted: Active company module permission required.")
         return redirect("dashboard")
 
-    result = get_object_or_404(SearchResult, id=result_id)
+    if rbac["is_super_admin"] and not company:
+        result = get_object_or_404(SearchResult, id=result_id)
+    else:
+        result = get_object_or_404(SearchResult, id=result_id, search_job__company=company)
+
     is_seller_context = request.path.startswith("/sales/") or (rbac["can_view_seller"] and not rbac["can_view_buyer"])
 
     if request.method == "POST":
@@ -489,7 +512,7 @@ def send_rfq_view(request, result_id):
         if not sent_to_email:
             sent_to_email = f"sales@{result.external_company.domain or 'company.com'}"
 
-        target_price_str = request.POST.get("target_price", "").strip()
+        target_price_str = request.POST.get("target_price", "").strip() or request.POST.get("quoted_price", "").strip()
         delivery_terms = request.POST.get("delivery_terms", "").strip()
 
         quoted_price = None
@@ -513,6 +536,13 @@ def send_rfq_view(request, result_id):
             attachment=uploaded_attachment,
             attachment_name=uploaded_attachment.name if uploaded_attachment else "",
         )
+
+        # Lifecycle sync: Update corresponding SavedItem to CONTACTED
+        SavedItem.objects.filter(
+            company=company,
+            search_result__external_company=result.external_company,
+            status=SavedItem.Status.NEW,
+        ).update(status=SavedItem.Status.CONTACTED)
 
         # Log initial outbound message in conversation thread
         InquiryMessage.objects.create(
@@ -854,6 +884,19 @@ def update_inquiry_status_view(request, pk):
             inquiry.status = new_status
             inquiry.save(update_fields=["status", "updated_at"])
 
+            # Sync CRM SavedItem stage with Inquiry lifecycle
+            if inquiry.search_result:
+                if new_status == Inquiry.Status.WON:
+                    SavedItem.objects.filter(
+                        company=company,
+                        search_result=inquiry.search_result,
+                    ).update(status=SavedItem.Status.WON)
+                elif new_status == Inquiry.Status.LOST:
+                    SavedItem.objects.filter(
+                        company=company,
+                        search_result=inquiry.search_result,
+                    ).update(status=SavedItem.Status.LOST)
+
             # Log system event in messages
             InquiryMessage.objects.create(
                 inquiry=inquiry,
@@ -907,12 +950,13 @@ def record_inquiry_quote_view(request, pk):
         if quoted_price_str:
             try:
                 price_val = Decimal(quoted_price_str)
-                PriceHistory.objects.create(
-                    external_company=inquiry.search_result.external_company,
-                    item_name=inquiry.search_result.product_title,
-                    price=price_val,
-                    currency=currency,
-                )
+                if inquiry.search_result:
+                    PriceHistory.objects.create(
+                        external_company=inquiry.search_result.external_company,
+                        item_name=inquiry.search_result.product_title,
+                        price=price_val,
+                        currency=currency,
+                    )
             except Exception:
                 pass
 
@@ -927,6 +971,14 @@ def record_inquiry_quote_view(request, pk):
 
         inquiry.save(update_fields=["status", "quoted_price", "quoted_currency", "delivery_terms", "message", "updated_at"])
 
+        # Advance SavedItem from CONTACTED to NEGOTIATING
+        if inquiry.search_result:
+            SavedItem.objects.filter(
+                company=company,
+                search_result=inquiry.search_result,
+                status=SavedItem.Status.CONTACTED,
+            ).update(status=SavedItem.Status.NEGOTIATING)
+
         # Log quote into conversation thread
         quote_body = f"Quoted Terms Recorded:\n• Price: {currency} {quoted_price_str}\n"
         if delivery_terms:
@@ -934,10 +986,11 @@ def record_inquiry_quote_view(request, pk):
         if notes:
             quote_body += f"• Notes: {notes}"
 
+        vendor_name = inquiry.search_result.external_company.name if inquiry.search_result else "External Vendor"
         InquiryMessage.objects.create(
             inquiry=inquiry,
             sender=request.user,
-            sender_name=inquiry.search_result.external_company.name,
+            sender_name=vendor_name,
             message_type=InquiryMessage.MessageType.INBOUND,
             subject=f"Quotation Submitted: {currency} {quoted_price_str}",
             body=quote_body,

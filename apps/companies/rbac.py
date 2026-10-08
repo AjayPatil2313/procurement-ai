@@ -150,7 +150,7 @@ def ensure_default_permissions():
     """
     Ensures standard 6 permissions exist for all modules in CompanyPermission.
     """
-    modules = ["requirements", "products", "leads", "search", "categories", "dashboard", "general"]
+    modules = ["requirements", "products", "leads", "inquiries", "search", "categories", "dashboard", "general"]
     actions = ["READ", "EDIT", "DELETE", "UPDATE", "IMPORT", "EXPORT"]
     for mod in modules:
         for act in actions:

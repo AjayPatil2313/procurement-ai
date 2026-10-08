@@ -28,7 +28,7 @@
     <div class="flex items-center gap-2.5">
       <a href="{% url 'find-buyers' %}{% if selected_product %}?product_id={{ selected_product.id }}{% endif %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
         <i class="fa-solid fa-wand-magic-sparkles"></i>
-        <span>Find New Vendors</span>
+        <span>Find vendors</span>
       </a>
       <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm">
         <i class="fa-regular fa-bookmark text-orange-500"></i>
@@ -46,7 +46,7 @@
         <label for="product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
           <span class="flex items-center gap-1.5">
             <i class="fa-solid fa-filter text-orange-500"></i>
-            <span>Filter Leads by Product</span>
+            <span>Filter Vendors by Product</span>
           </span>
           <span class="text-slate-400 font-medium normal-case">
             {{ products|length }} Products &bull; A-Z
@@ -62,7 +62,7 @@
             type="text" 
             id="product_filter_input" 
             autocomplete="off"
-            placeholder="Type product name or category to filter leads (A-Z)..."
+            placeholder="Type product name or category to filter vendors (A-Z)..."
             value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
             class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
           >
@@ -169,7 +169,7 @@
           <a 
             href="{% url 'leads-list' %}?product_id=unassigned" 
             class="leads-product-option px-3.5 py-2.5 hover:bg-orange-50/70 flex items-center justify-between transition group {% if is_unassigned_view %}bg-orange-50 text-orange-950 font-bold{% endif %}"
-            data-name="other search leads"
+            data-name="other search vendors"
             data-category="general"
           >
             <div class="flex items-center space-x-2.5 min-w-0">
@@ -177,11 +177,11 @@
                 <i class="fa-solid fa-magnifying-glass"></i>
               </span>
               <span class="text-xs font-semibold text-slate-700">
-                Other / Custom Search Leads
+                Other / Custom Search Vendors
               </span>
             </div>
             <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">
-              {{ unassigned_count }} Leads
+              {{ unassigned_count }} Vendors
             </span>
           </a>
           {% endif %}
@@ -469,7 +469,7 @@
                 {% else %}
                 <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
                   {% csrf_token %}
-                  <button type="submit" class="inline-flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 transition" title="Save Lead to Pipeline">
+                  <button type="submit" class="inline-flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 transition" title="Save Vendor to Pipeline">
                     <i class="fa-regular fa-bookmark text-[10px] mr-1"></i> Save
                   </button>
                 </form>

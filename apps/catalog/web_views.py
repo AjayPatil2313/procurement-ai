@@ -4,6 +4,7 @@ import re
 from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.http import HttpResponse, JsonResponse
@@ -978,74 +979,75 @@ def products_import_csv_view(request):
         imported_count = 0
         skipped_count = 0
 
-        for row in reader:
-            raw_name = row.get(name_col, "").strip()
-            if not raw_name:
-                skipped_count += 1
-                continue
+        with transaction.atomic():
+            for row in reader:
+                raw_name = row.get(name_col, "").strip()
+                if not raw_name:
+                    skipped_count += 1
+                    continue
 
-            category_obj = None
-            if cat_col and row.get(cat_col, "").strip():
-                cat_name = row.get(cat_col, "").strip()
-                category_obj, _ = Category.objects.get_or_create(name=cat_name)
+                category_obj = None
+                if cat_col and row.get(cat_col, "").strip():
+                    cat_name = row.get(cat_col, "").strip()
+                    category_obj, _ = Category.objects.get_or_create(name=cat_name)
 
-            price = None
-            if price_col and row.get(price_col, "").strip():
-                try:
-                    price = Decimal(row[price_col].strip().replace(",", ""))
-                except Exception:
-                    price = None
+                price = None
+                if price_col and row.get(price_col, "").strip():
+                    try:
+                        price = Decimal(row[price_col].strip().replace(",", ""))
+                    except Exception:
+                        price = None
 
-            moq = Decimal(1)
-            if moq_col and row.get(moq_col, "").strip():
-                try:
-                    moq = Decimal(row[moq_col].strip().replace(",", ""))
-                except Exception:
-                    moq = Decimal(1)
+                moq = Decimal(1)
+                if moq_col and row.get(moq_col, "").strip():
+                    try:
+                        moq = Decimal(row[moq_col].strip().replace(",", ""))
+                    except Exception:
+                        moq = Decimal(1)
 
-            currency = (row.get(curr_col, "INR").strip().upper() if curr_col else "INR") or "INR"
-            unit = (row.get(unit_col, "pcs").strip() if unit_col else "pcs") or "pcs"
+                currency = (row.get(curr_col, "INR").strip().upper() if curr_col else "INR") or "INR"
+                unit = (row.get(unit_col, "pcs").strip() if unit_col else "pcs") or "pcs"
 
-            avail_val = Product.Availability.IN_STOCK
-            if avail_col and row.get(avail_col, "").strip():
-                raw_avail = row.get(avail_col, "").strip().upper().replace(" ", "_")
-                if raw_avail in dict(Product.Availability.choices):
-                    avail_val = raw_avail
-                elif "OUT" in raw_avail:
-                    avail_val = Product.Availability.OUT_OF_STOCK
-                elif "ORDER" in raw_avail:
-                    avail_val = Product.Availability.MADE_TO_ORDER
-                elif "REQUEST" in raw_avail:
-                    avail_val = Product.Availability.AVAILABLE_ON_REQUEST
+                avail_val = Product.Availability.IN_STOCK
+                if avail_col and row.get(avail_col, "").strip():
+                    raw_avail = row.get(avail_col, "").strip().upper().replace(" ", "_")
+                    if raw_avail in dict(Product.Availability.choices):
+                        avail_val = raw_avail
+                    elif "OUT" in raw_avail:
+                        avail_val = Product.Availability.OUT_OF_STOCK
+                    elif "ORDER" in raw_avail:
+                        avail_val = Product.Availability.MADE_TO_ORDER
+                    elif "REQUEST" in raw_avail:
+                        avail_val = Product.Availability.AVAILABLE_ON_REQUEST
 
-            scope_val = Product.SearchScope.COUNTRY
-            if scope_col and row.get(scope_col, "").strip():
-                raw_scope = row.get(scope_col, "").strip().lower()
-                if raw_scope in dict(Product.SearchScope.choices):
-                    scope_val = raw_scope
+                scope_val = Product.SearchScope.COUNTRY
+                if scope_col and row.get(scope_col, "").strip():
+                    raw_scope = row.get(scope_col, "").strip().lower()
+                    if raw_scope in dict(Product.SearchScope.choices):
+                        scope_val = raw_scope
 
-            location_val = row.get(loc_col, "").strip() if loc_col else ""
-            desc_val = row.get(desc_col, "").strip() if desc_col else ""
-            specs_val = row.get(specs_col, "").strip() if specs_col else ""
+                location_val = row.get(loc_col, "").strip() if loc_col else ""
+                desc_val = row.get(desc_col, "").strip() if desc_col else ""
+                specs_val = row.get(specs_col, "").strip() if specs_col else ""
 
-            Product.objects.create(
-                company=company,
-                name=raw_name,
-                category=category_obj,
-                price=price,
-                price_min=price,
-                currency=currency,
-                minimum_order_quantity=moq,
-                moq=moq,
-                unit=unit,
-                availability=avail_val,
-                location=location_val,
-                search_scope=scope_val,
-                description=desc_val,
-                specifications=specs_val,
-                created_by=request.user,
-            )
-            imported_count += 1
+                Product.objects.create(
+                    company=company,
+                    name=raw_name,
+                    category=category_obj,
+                    price=price,
+                    price_min=price,
+                    currency=currency,
+                    minimum_order_quantity=moq,
+                    moq=moq,
+                    unit=unit,
+                    availability=avail_val,
+                    location=location_val,
+                    search_scope=scope_val,
+                    description=desc_val,
+                    specifications=specs_val,
+                    created_by=request.user,
+                )
+                imported_count += 1
 
         if imported_count > 0:
             messages.success(request, f"Successfully imported {imported_count} products into your catalog! ({skipped_count} empty rows skipped)")

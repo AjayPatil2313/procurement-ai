@@ -60,6 +60,10 @@ def matching_parameter_create_view(request):
         messages.error(request, "Access restricted: Company module permission required.")
         return redirect("dashboard")
 
+    if not (rbac["is_super_admin"] or rbac["is_company_admin"] or "EDIT" in rbac["permissions"] or "UPDATE" in rbac["permissions"]):
+        messages.error(request, "Permission denied: Admin or Edit permission required to configure matching parameters.")
+        return redirect("matching-parameters")
+
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
         criteria_value = request.POST.get("criteria_value", "").strip()
@@ -107,6 +111,10 @@ def matching_parameter_edit_view(request, pk):
         messages.error(request, "Access restricted: Company module permission required.")
         return redirect("dashboard")
 
+    if not (rbac["is_super_admin"] or rbac["is_company_admin"] or "EDIT" in rbac["permissions"] or "UPDATE" in rbac["permissions"]):
+        messages.error(request, "Permission denied: Admin or Edit permission required to edit matching parameters.")
+        return redirect("matching-parameters")
+
     param = get_object_or_404(MatchingParameter, pk=pk, company=company)
 
     if request.method == "POST":
@@ -147,6 +155,10 @@ def matching_parameter_delete_view(request, pk):
         messages.error(request, "Access restricted: Company module permission required.")
         return redirect("dashboard")
 
+    if not (rbac["is_super_admin"] or rbac["is_company_admin"] or "DELETE" in rbac["permissions"]):
+        messages.error(request, "Permission denied: Admin or Delete permission required to delete matching parameters.")
+        return redirect("matching-parameters")
+
     param = get_object_or_404(MatchingParameter, pk=pk, company=company)
     param_name = param.name
     param.delete()
@@ -170,6 +182,12 @@ def matching_parameter_toggle_view(request, pk):
             return JsonResponse({"success": False, "error": "Access restricted"}, status=403)
         messages.error(request, "Access restricted.")
         return redirect("dashboard")
+
+    if not (rbac["is_super_admin"] or rbac["is_company_admin"] or "EDIT" in rbac["permissions"] or "UPDATE" in rbac["permissions"]):
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"success": False, "error": "Permission denied"}, status=403)
+        messages.error(request, "Permission denied: Admin or Edit permission required.")
+        return redirect("matching-parameters")
 
     param = get_object_or_404(MatchingParameter, pk=pk, company=company)
     param.is_active = not param.is_active
@@ -200,6 +218,10 @@ def matching_parameter_reset_defaults_view(request):
     if not (rbac["can_view_seller"] or rbac["can_view_buyer"] or rbac["is_super_admin"]):
         messages.error(request, "Access restricted: Company module permission required.")
         return redirect("dashboard")
+
+    if not (rbac["is_super_admin"] or rbac["is_company_admin"] or "EDIT" in rbac["permissions"] or "UPDATE" in rbac["permissions"]):
+        messages.error(request, "Permission denied: Admin or Edit permission required to restore matching parameters.")
+        return redirect("matching-parameters")
 
     if request.method == "POST":
         MatchingParameter.objects.filter(company=company).delete()
