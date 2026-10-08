@@ -16,13 +16,25 @@
         Manage products and services your company manufactures or distributes to match with verified B2B vendors
       </p>
     </div>
-    {% if can_create %}
-    <div class="flex items-center gap-2">
+    <div class="flex items-center flex-wrap gap-2">
+      {% if can_export %}
+      <a href="{% url 'products-export-csv' %}" class="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 flex items-center shadow-xs transition" title="Export product catalog to CSV">
+        <i class="fa-solid fa-file-csv text-emerald-600 mr-2 text-sm"></i> Export CSV
+      </a>
+      {% endif %}
+
+      {% if can_import %}
+      <button type="button" onclick="openImportModal()" class="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 flex items-center shadow-xs transition cursor-pointer" title="Bulk import products from CSV file">
+        <i class="fa-solid fa-file-import text-blue-600 mr-2 text-sm"></i> Bulk Import (CSV)
+      </button>
+      {% endif %}
+
+      {% if can_create %}
       <a href="{% url 'products-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center shadow-md shadow-blue-500/20 transition">
         <i class="fa-solid fa-plus mr-2"></i> Add Product
       </a>
+      {% endif %}
     </div>
-    {% endif %}
   </div>
 
   <!-- Metric Stats Cards -->
@@ -174,24 +186,52 @@
               {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}
             </td>
 
-            <!-- Availability -->
+            <!-- Availability with 1-Click Toggle Dropdown -->
             <td class="py-3.5 px-4 whitespace-nowrap">
-              {% if p.availability == "IN_STOCK" %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  <i class="fa-solid fa-circle text-[5px] mr-1 text-emerald-600"></i> In Stock
-                </span>
-              {% elif p.availability == "MADE_TO_ORDER" %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                  <i class="fa-solid fa-industry text-[8px] mr-1 text-purple-600"></i> Made to Order
-                </span>
-              {% elif p.availability == "AVAILABLE_ON_REQUEST" %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                  <i class="fa-solid fa-clock text-[8px] mr-1 text-blue-600"></i> On Request
-                </span>
+              {% if can_edit %}
+              <div class="relative inline-block text-left" id="avail-wrapper-{{ p.id }}">
+                <button 
+                  type="button" 
+                  onclick="toggleAvailDropdown('{{ p.id }}', event)" 
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition cursor-pointer hover:shadow-xs
+                    {% if p.availability == 'IN_STOCK' %}bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100
+                    {% elif p.availability == 'MADE_TO_ORDER' %}bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100
+                    {% elif p.availability == 'AVAILABLE_ON_REQUEST' %}bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100
+                    {% else %}bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200{% endif %}"
+                  id="avail-btn-{{ p.id }}" 
+                  title="Click to quickly toggle stock availability"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full {% if p.availability == 'IN_STOCK' %}bg-emerald-500{% elif p.availability == 'MADE_TO_ORDER' %}bg-purple-500{% elif p.availability == 'AVAILABLE_ON_REQUEST' %}bg-blue-500{% else %}bg-slate-400{% endif %}"></span>
+                  <span id="avail-text-{{ p.id }}">{{ p.get_availability_display }}</span>
+                  <i class="fa-solid fa-chevron-down text-[8px] opacity-70"></i>
+                </button>
+                <div id="avail-menu-{{ p.id }}" class="hidden absolute left-0 z-30 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden py-1 text-xs">
+                  <button type="button" onclick="changeAvailability('{{ p.id }}', 'IN_STOCK', '{% url 'product-toggle-availability' p.id %}')" class="w-full text-left px-3 py-1.5 hover:bg-emerald-50 flex items-center gap-2 text-slate-700 hover:text-emerald-800 transition cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="font-semibold text-[11px]">In Stock</span>
+                  </button>
+                  <button type="button" onclick="changeAvailability('{{ p.id }}', 'MADE_TO_ORDER', '{% url 'product-toggle-availability' p.id %}')" class="w-full text-left px-3 py-1.5 hover:bg-purple-50 flex items-center gap-2 text-slate-700 hover:text-purple-800 transition cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                    <span class="font-semibold text-[11px]">Made to Order</span>
+                  </button>
+                  <button type="button" onclick="changeAvailability('{{ p.id }}', 'AVAILABLE_ON_REQUEST', '{% url 'product-toggle-availability' p.id %}')" class="w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-800 transition cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span class="font-semibold text-[11px]">Available on Request</span>
+                  </button>
+                  <button type="button" onclick="changeAvailability('{{ p.id }}', 'OUT_OF_STOCK', '{% url 'product-toggle-availability' p.id %}')" class="w-full text-left px-3 py-1.5 hover:bg-slate-100 flex items-center gap-2 text-slate-700 hover:text-slate-900 transition cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <span class="font-semibold text-[11px]">Out of Stock</span>
+                  </button>
+                </div>
+              </div>
               {% else %}
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                  Out of Stock
-                </span>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border
+                {% if p.availability == 'IN_STOCK' %}bg-emerald-50 text-emerald-700 border-emerald-200
+                {% elif p.availability == 'MADE_TO_ORDER' %}bg-purple-50 text-purple-700 border-purple-200
+                {% elif p.availability == 'AVAILABLE_ON_REQUEST' %}bg-blue-50 text-blue-700 border-blue-200
+                {% else %}bg-slate-100 text-slate-600 border-slate-200{% endif %}">
+                {{ p.get_availability_display }}
+              </span>
               {% endif %}
             </td>
 
@@ -225,12 +265,14 @@
 
                 <!-- Soft Delete (if permitted) -->
                 {% if can_delete %}
-                <form method="POST" action="{% url 'product-delete' p.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete \'{{ p.name }}\'? This will soft-delete the product from your catalog.');">
-                  {% csrf_token %}
-                  <button type="submit" class="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg border border-rose-200 transition" title="Soft Delete Product">
-                    <i class="fa-solid fa-trash-can text-xs"></i>
-                  </button>
-                </form>
+                <button 
+                  type="button" 
+                  onclick="openSoftDeleteProductModal('{{ p.id }}', '{{ p.name|escapejs }}')" 
+                  class="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg border border-rose-200 transition cursor-pointer" 
+                  title="Soft Delete Product"
+                >
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
                 {% endif %}
               </div>
             </td>
@@ -247,13 +289,20 @@
                   {% if q or selected_category or selected_availability %}
                     No products matched your search filters. Try clearing filters.
                   {% else %}
-                    You haven't added any products to your catalog yet. Click "Add Product" to get started.
+                    You haven't added any products to your catalog yet. Click "Add Product" or "Bulk Import" to get started.
                   {% endif %}
                 </p>
                 {% if can_create and not q and not selected_category and not selected_availability %}
-                <a href="{% url 'products-create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition">
-                  <i class="fa-solid fa-plus mr-1.5"></i> Add First Product
-                </a>
+                <div class="flex items-center justify-center gap-2 pt-1">
+                  <a href="{% url 'products-create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition">
+                    <i class="fa-solid fa-plus mr-1.5"></i> Add First Product
+                  </a>
+                  {% if can_import %}
+                  <button type="button" onclick="openImportModal()" class="inline-flex items-center px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold shadow-xs transition">
+                    <i class="fa-solid fa-file-import text-blue-600 mr-1.5"></i> Bulk Upload CSV
+                  </button>
+                  {% endif %}
+                </div>
                 {% endif %}
               </div>
             </td>
@@ -266,4 +315,202 @@
   </div>
 
 </div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: SOFT DELETE PRODUCT CONFIRMATION                                  -->
+<!-- ========================================================================= -->
+<div id="deleteProductModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4">
+        <i class="fa-solid fa-trash-can"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900">Soft-Delete Product?</h3>
+      <p class="text-xs text-slate-500 mt-1">
+        This product will be removed from your catalog and vendor search. All associated specifications and records will remain safely preserved in the database.
+      </p>
+      
+      <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-left text-xs font-semibold text-slate-800 flex items-center gap-2">
+        <i class="fa-solid fa-box text-slate-400"></i>
+        <span id="deleteProductNameText" class="truncate">Product Name</span>
+      </div>
+
+      <form id="deleteProductForm" method="POST" action="" class="mt-5 flex items-center justify-end gap-2.5">
+        {% csrf_token %}
+        <button type="button" onclick="closeSoftDeleteProductModal()" class="w-1/2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Confirm Delete</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: BULK CSV PRODUCT IMPORT                                           -->
+<!-- ========================================================================= -->
+<div id="importProductsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-base">
+          <i class="fa-solid fa-file-csv"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Bulk Import Products (CSV)</h3>
+          <p class="text-xs text-slate-500">Upload multiple catalog items at once</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeImportModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'products-import-csv' %}" enctype="multipart/form-data" class="p-6 space-y-4">
+      {% csrf_token %}
+
+      <!-- Step 1: Download Sample Template -->
+      <div class="p-4 bg-blue-50/70 rounded-2xl border border-blue-100 flex items-center justify-between gap-3 text-xs">
+        <div>
+          <span class="font-bold text-blue-900 block">Need the standard CSV format?</span>
+          <span class="text-slate-500 text-[11px]">Download our pre-formatted spreadsheet template with sample rows.</span>
+        </div>
+        <a href="{% url 'products-import-template' %}" class="shrink-0 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5">
+          <i class="fa-solid fa-download text-[11px]"></i>
+          <span>Sample CSV</span>
+        </a>
+      </div>
+
+      <!-- Step 2: Upload File Box -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Select .CSV File <span class="text-rose-500">*</span>
+        </label>
+        <input 
+          type="file" 
+          name="csv_file" 
+          accept=".csv" 
+          required
+          class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-slate-200 rounded-xl bg-slate-50 cursor-pointer focus:outline-none"
+        >
+        <p class="text-[11px] text-slate-400 mt-1.5">
+          Supported columns: <em>Product Name, Category, Price, Currency, MOQ, Unit, Availability, Location, Search Scope, Description, Specifications</em>
+        </p>
+      </div>
+
+      <!-- Actions -->
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeImportModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition text-xs cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20 flex items-center gap-2 text-xs cursor-pointer">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Upload &amp; Import Products</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // 1. Soft Delete Product Modal
+  function openSoftDeleteProductModal(id, name) {
+    const form = document.getElementById('deleteProductForm');
+    const nameEl = document.getElementById('deleteProductNameText');
+    const modal = document.getElementById('deleteProductModal');
+    if (form) form.action = `/sales/products/${id}/delete/`;
+    if (nameEl) nameEl.textContent = name;
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function closeSoftDeleteProductModal() {
+    const modal = document.getElementById('deleteProductModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // 2. Bulk Import Modal
+  function openImportModal() {
+    const modal = document.getElementById('importProductsModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function closeImportModal() {
+    const modal = document.getElementById('importProductsModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // 3. 1-Click Availability Dropdown & AJAX Updater
+  function toggleAvailDropdown(id, event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById(`avail-menu-${id}`);
+    const isHidden = menu.classList.contains('hidden');
+    // Close any other open availability menus
+    document.querySelectorAll('[id^="avail-menu-"]').forEach(m => m.classList.add('hidden'));
+    if (isHidden) {
+      menu.classList.remove('hidden');
+    }
+  }
+
+  // Close menus on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[id^="avail-wrapper-"]')) {
+      document.querySelectorAll('[id^="avail-menu-"]').forEach(m => m.classList.add('hidden'));
+    }
+  });
+
+  function changeAvailability(productId, newStatus, url) {
+    const menu = document.getElementById(`avail-menu-${productId}`);
+    if (menu) menu.classList.add('hidden');
+
+    const csrfToken = '{{ csrf_token }}';
+    const formData = new FormData();
+    formData.append('availability', newStatus);
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success) {
+        const btn = document.getElementById(`avail-btn-${productId}`);
+        const text = document.getElementById(`avail-text-${productId}`);
+        if (text) text.textContent = data.availability_display;
+
+        if (btn) {
+          // Reset styling classes
+          btn.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition cursor-pointer hover:shadow-xs ";
+          const dot = btn.querySelector('span.rounded-full');
+          if (newStatus === 'IN_STOCK') {
+            btn.className += "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100";
+            if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-emerald-500";
+          } else if (newStatus === 'MADE_TO_ORDER') {
+            btn.className += "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100";
+            if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-purple-500";
+          } else if (newStatus === 'AVAILABLE_ON_REQUEST') {
+            btn.className += "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100";
+            if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-blue-500";
+          } else {
+            btn.className += "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200";
+            if (dot) dot.className = "w-1.5 h-1.5 rounded-full bg-slate-400";
+          }
+        }
+
+        if (typeof showToastNotification === 'function') {
+          showToastNotification('Stock Updated', data.message || 'Availability status updated.', 'fa-circle-check', 'emerald');
+        }
+      }
+    })
+    .catch(() => {
+      window.location.reload();
+    });
+  }
+</script>
 {% endblock %}

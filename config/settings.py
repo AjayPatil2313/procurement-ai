@@ -272,10 +272,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Development frontend
 CORS_ALLOW_ALL_ORIGINS = True
 
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.smtp.EmailBackend" if os.getenv("EMAIL_HOST_USER") else "django.core.mail.backends.console.EmailBackend",
-)
+_email_backend_setting = (os.getenv("EMAIL_BACKEND") or "").strip()
+if _email_backend_setting:
+    EMAIL_BACKEND = _email_backend_setting
+elif (os.getenv("EMAIL_HOST_USER") or "").strip() and (os.getenv("EMAIL_HOST_PASSWORD") or "").strip():
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"

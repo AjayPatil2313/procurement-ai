@@ -8,6 +8,7 @@ from apps.ai_search.services.web_scraper import CompanyWebScraper
 from apps.ai_search.services.ai_matcher import AIMatcher
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
+from apps.billing.models import Subscription, CreditTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -163,18 +164,41 @@ def _save_or_update_external_company(cand: dict, scraped: dict, default_role: st
     return ext_company
 
 
-def run_find_buyers_search(product: Product, user, company) -> SearchJob:
+def run_find_buyers_search(product: Product, user, company, criteria_override: list | None = None) -> SearchJob:
     """
     High-Performance Find Buyers Pipeline (Parallel Concurrency):
     1. Formulates search query based on product name, category, and target location.
     2. Runs WebSearchProvider to retrieve candidate B2B companies / procurement notices.
     3. Crawls company websites AND evaluates Gemini AI matches concurrently via ThreadPoolExecutor
-       applying the company's active dynamic Matching Parameters.
+       applying the company's active dynamic Matching Parameters or custom criteria override.
     4. Saves/updates ExternalCompany and SearchResult (type LEAD) in MySQL.
     """
     category_name = product.category.name if product.category else ""
     location = product.location or (company.city if company else "India")
     query = f"{product.name} {category_name} industrial buyers procurement rfq {location}".strip()
+
+    # Credit enforcement
+    subscription = None
+    if company:
+        subscription = getattr(company, "subscription", None)
+        if not subscription:
+            subscription, _ = Subscription.objects.get_or_create(
+                company=company,
+                defaults={"plan": Subscription.Plan.PRO, "credits_total": 500, "credits_used": 0}
+            )
+
+        if subscription.credits_remaining <= 0:
+            return SearchJob.objects.create(
+                company=company,
+                user=user,
+                job_type=SearchJob.JobType.FIND_BUYERS,
+                product=product,
+                search_query=query,
+                status=SearchJob.Status.FAILED,
+                error_message="Insufficient AI search credits. Please contact Super Admin or upgrade your subscription plan.",
+                started_at=timezone.now(),
+                finished_at=timezone.now(),
+            )
 
     job = SearchJob.objects.create(
         company=company,
@@ -188,9 +212,12 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
     )
 
     try:
-        # Load active matching criteria for this company
-        matching_params = ensure_default_parameters_for_company(company)
-        active_params = [p for p in matching_params if p.is_active]
+        # Load active matching criteria for this company or use criteria_override
+        if criteria_override is not None:
+            active_params = criteria_override
+        else:
+            matching_params = ensure_default_parameters_for_company(company)
+            active_params = [p for p in matching_params if p.is_active]
 
         search_provider = WebSearchProvider(timeout=3.5)
         candidates = search_provider.search(query, num_results=6)
@@ -246,6 +273,18 @@ def run_find_buyers_search(product: Product, user, company) -> SearchJob:
         job.finished_at = timezone.now()
         job.save()
 
+        # Deduct AI search credit & record transaction
+        if subscription:
+            subscription.credits_used += 1
+            subscription.save(update_fields=["credits_used", "updated_at"])
+            CreditTransaction.objects.create(
+                company=company,
+                transaction_type=CreditTransaction.TransactionType.DEBIT,
+                credits=1,
+                search_job=job,
+                notes=f"AI Buyer Search: {product.name[:70]}",
+            )
+
         APILog.objects.create(
             provider="WebSearchProvider & Scraper (Parallel)",
             endpoint="run_find_buyers_search",
@@ -274,6 +313,29 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
     category_name = requirement.category.name if requirement.category else ""
     country = requirement.delivery_country or "India"
     query = f"{requirement.item_name} {category_name} manufacturers suppliers exporters {country}".strip()
+
+    # Credit enforcement
+    subscription = None
+    if company:
+        subscription = getattr(company, "subscription", None)
+        if not subscription:
+            subscription, _ = Subscription.objects.get_or_create(
+                company=company,
+                defaults={"plan": Subscription.Plan.PRO, "credits_total": 500, "credits_used": 0}
+            )
+
+        if subscription.credits_remaining <= 0:
+            return SearchJob.objects.create(
+                company=company,
+                user=user,
+                job_type=SearchJob.JobType.FIND_SUPPLIERS,
+                requirement=requirement,
+                search_query=query,
+                status=SearchJob.Status.FAILED,
+                error_message="Insufficient AI search credits. Please contact Super Admin or upgrade your subscription plan.",
+                started_at=timezone.now(),
+                finished_at=timezone.now(),
+            )
 
     job = SearchJob.objects.create(
         company=company,
@@ -342,6 +404,18 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
         if requirement.status == Requirement.Status.DRAFT:
             requirement.status = Requirement.Status.SEARCHING
             requirement.save(update_fields=["status"])
+
+        # Deduct AI search credit & record transaction
+        if subscription:
+            subscription.credits_used += 1
+            subscription.save(update_fields=["credits_used", "updated_at"])
+            CreditTransaction.objects.create(
+                company=company,
+                transaction_type=CreditTransaction.TransactionType.DEBIT,
+                credits=1,
+                search_job=job,
+                notes=f"AI Supplier Search: {requirement.item_name[:70]}",
+            )
 
         APILog.objects.create(
             provider="WebSearchProvider & Scraper (Parallel)",

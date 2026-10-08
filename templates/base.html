@@ -170,12 +170,6 @@
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
-            <a href="{% url 'matching-parameters' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/matching-parameters/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-sliders w-5 text-center mr-2.5 text-xs"></i> Matching Parameters
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
-            </a>
           </div>
         </div>
         {% endif %}
@@ -264,6 +258,14 @@
 
       <!-- Sidebar Footer -->
       <div class="p-3 border-t border-slate-800 space-y-1 bg-slate-900/60 text-sm">
+        {% if not rbac.is_super_admin %}
+        <a href="{% url 'help-support' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/help/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+          <span class="flex items-center">
+            <i class="fa-solid fa-headset w-5 text-center mr-2.5 text-xs text-blue-400"></i> Help &amp; Support
+          </span>
+          <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+        </a>
+        {% endif %}
         <a href="{% url 'logout-web' %}" class="flex items-center px-3 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition">
           <i class="fa-solid fa-arrow-right-from-bracket w-5 text-center mr-2.5"></i>
           <span>Logout</span>

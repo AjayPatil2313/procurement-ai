@@ -237,28 +237,18 @@
                     <i class="fa-solid fa-ban text-xs"></i>
                   </span>
                 {% else %}
-                  <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to {% if m.user.is_active and m.is_active %}deactivate{% else %}activate{% endif %} this user?');">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="toggle_status">
-                    <input type="hidden" name="member_id" value="{{ m.id }}">
+                  <button 
+                    type="button" 
+                    onclick="openToggleStatusUserModal('{{ m.id }}', '{{ m.user.get_full_name|default:m.user.email|escapejs }}', {{ m.user.is_active|yesno:'true,false' }})"
+                    title="{% if m.user.is_active and m.is_active %}Deactivate User Account{% else %}Activate User Account{% endif %}"
+                    class="p-1.5 {% if m.user.is_active and m.is_active %}text-amber-600 hover:text-amber-800 hover:bg-amber-50 border-amber-200{% else %}text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200{% endif %} rounded-lg border transition cursor-pointer"
+                  >
                     {% if m.user.is_active and m.is_active %}
-                      <button 
-                        type="submit" 
-                        title="Deactivate User Account"
-                        class="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg border border-amber-200 transition cursor-pointer"
-                      >
-                        <i class="fa-solid fa-user-slash text-xs"></i>
-                      </button>
+                      <i class="fa-solid fa-user-slash text-xs"></i>
                     {% else %}
-                      <button 
-                        type="submit" 
-                        title="Activate User Account"
-                        class="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition cursor-pointer"
-                      >
-                        <i class="fa-solid fa-user-check text-xs"></i>
-                      </button>
+                      <i class="fa-solid fa-user-check text-xs"></i>
                     {% endif %}
-                  </form>
+                  </button>
                 {% endif %}
 
                 <!-- Delete User (Protected against self-delete) -->
@@ -267,18 +257,14 @@
                     <i class="fa-solid fa-trash-can text-xs"></i>
                   </span>
                 {% else %}
-                  <form method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete user {{ m.user.email|escapejs }} from this company team? This action cannot be undone.');">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="delete_member">
-                    <input type="hidden" name="member_id" value="{{ m.id }}">
-                    <button 
-                      type="submit" 
-                      title="Delete User from Team"
-                      class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 hover:border-rose-200 transition cursor-pointer"
-                    >
-                      <i class="fa-solid fa-trash-can text-xs"></i>
-                    </button>
-                  </form>
+                  <button 
+                    type="button" 
+                    onclick="openDeleteTeamMemberModal('{{ m.id }}', '{{ m.user.email|escapejs }}')"
+                    title="Delete User from Team"
+                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 hover:border-rose-200 transition cursor-pointer"
+                  >
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                  </button>
                 {% endif %}
 
                 <!-- Roles & Responsibilities Quick Link -->
@@ -1004,13 +990,122 @@
     }
   });
 
+  // Toggle Status Modal Functions
+  function openToggleStatusUserModal(memberId, userName, isActive) {
+    document.getElementById('toggleStatusMemberId').value = memberId;
+    const titleEl = document.getElementById('toggleStatusModalTitle');
+    const descEl = document.getElementById('toggleStatusModalDesc');
+    const iconContainer = document.getElementById('toggleStatusModalIcon');
+    const submitBtn = document.getElementById('toggleStatusSubmitBtn');
+
+    if (isActive) {
+      titleEl.textContent = 'Deactivate User Account?';
+      descEl.innerHTML = `Are you sure you want to deactivate <strong class="text-slate-900">${userName}</strong>? This user will be temporarily prevented from logging into the workspace.`;
+      iconContainer.className = 'w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4';
+      iconContainer.innerHTML = '<i class="fa-solid fa-user-slash"></i>';
+      submitBtn.className = 'w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer';
+      submitBtn.innerHTML = '<i class="fa-solid fa-user-slash"></i><span>Deactivate User</span>';
+    } else {
+      titleEl.textContent = 'Activate User Account?';
+      descEl.innerHTML = `Are you sure you want to activate <strong class="text-slate-900">${userName}</strong>? This user will regain full access to their company workspace.`;
+      iconContainer.className = 'w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4';
+      iconContainer.innerHTML = '<i class="fa-solid fa-user-check"></i>';
+      submitBtn.className = 'w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer';
+      submitBtn.innerHTML = '<i class="fa-solid fa-user-check"></i><span>Activate User</span>';
+    }
+
+    document.getElementById('toggleStatusUserModal')?.classList.remove('hidden');
+  }
+
+  function closeToggleStatusUserModal() {
+    document.getElementById('toggleStatusUserModal')?.classList.add('hidden');
+  }
+
+  // Delete Team Member Modal Functions
+  function openDeleteTeamMemberModal(memberId, userEmail) {
+    document.getElementById('deleteTeamMemberId').value = memberId;
+    document.getElementById('deleteTeamMemberEmail').textContent = userEmail;
+    document.getElementById('deleteTeamMemberModal')?.classList.remove('hidden');
+  }
+
+  function closeDeleteTeamMemberModal() {
+    document.getElementById('deleteTeamMemberModal')?.classList.add('hidden');
+  }
+
+  // Close modals on outside click
+  ['toggleStatusUserModal', 'deleteTeamMemberModal'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.classList.add('hidden');
+      }
+    });
+  });
+
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       hideAddRoleDropdown();
       hideEditRoleDropdown();
       document.getElementById('addMemberModal')?.classList.add('hidden');
       document.getElementById('editMemberModal')?.classList.add('hidden');
+      closeToggleStatusUserModal();
+      closeDeleteTeamMemberModal();
     }
   });
 </script>
+
+<!-- Toggle User Status Modal -->
+<div id="toggleStatusUserModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 text-center">
+      <div id="toggleStatusModalIcon" class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4">
+        <i class="fa-solid fa-user-slash"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900" id="toggleStatusModalTitle">Change Account Status</h3>
+      <p class="text-xs text-slate-500 mt-2" id="toggleStatusModalDesc">
+        Are you sure you want to change this user's account status?
+      </p>
+
+      <form method="POST" action="{% url 'company-team-web' %}" class="mt-5 flex items-center justify-end gap-2.5">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_status">
+        <input type="hidden" name="member_id" id="toggleStatusMemberId" value="">
+        <button type="button" onclick="closeToggleStatusUserModal()" class="w-1/2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" id="toggleStatusSubmitBtn" class="w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-user-slash"></i>
+          <span>Confirm</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Team Member Modal -->
+<div id="deleteTeamMemberModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4">
+        <i class="fa-solid fa-trash-can"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900">Remove Team Member?</h3>
+      <p class="text-xs text-slate-500 mt-2">
+        Are you sure you want to remove <strong id="deleteTeamMemberEmail" class="text-slate-800">this member</strong> from the company team? They will immediately lose access to the portal and catalog data.
+      </p>
+
+      <form method="POST" action="{% url 'company-team-web' %}" class="mt-5 flex items-center justify-end gap-2.5">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_member">
+        <input type="hidden" name="member_id" id="deleteTeamMemberId" value="">
+        <button type="button" onclick="closeDeleteTeamMemberModal()" class="w-1/2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Confirm Remove</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}

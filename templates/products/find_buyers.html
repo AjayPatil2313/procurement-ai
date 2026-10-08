@@ -24,9 +24,11 @@
       <p class="text-xs text-slate-500 mt-1">Real-time Web Search & Scraper extracting verified vendor contacts, procurement signals, and RFQ intent.</p>
     </div>
     <div class="flex items-center gap-2">
-      <a href="{% url 'matching-parameters' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
-        <i class="fa-solid fa-sliders mr-1.5 text-blue-600"></i> Matching Criteria (⚙)
+      {% if subscription %}
+      <a href="{% url 'subscription-billing-web' %}" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold {% if subscription.credits_remaining > 5 %}bg-purple-100 text-purple-800 border border-purple-200 hover:bg-purple-200/70{% elif subscription.credits_remaining > 0 %}bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200/70{% else %}bg-rose-100 text-rose-800 border border-rose-200 hover:bg-rose-200/70{% endif %} shadow-sm transition" title="Remaining AI Search Quota (Click to view billing)">
+        <i class="fa-solid fa-coins mr-1.5 text-purple-600"></i> {{ subscription.credits_remaining }} Credits Left
       </a>
+      {% endif %}
       <a href="{% url 'saved-leads' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
         <i class="fa-solid fa-bookmark mr-1.5 text-orange-500"></i> Prequalified Vendors
       </a>
@@ -36,113 +38,367 @@
     </div>
   </div>
 
+  {% if subscription and subscription.credits_remaining <= 0 %}
+  <div class="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl flex items-center justify-between text-xs">
+    <div class="flex items-center gap-2">
+      <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base"></i>
+      <span><strong>AI Search Credits Exhausted:</strong> You have used all allocated credits ({{ subscription.credits_used }}/{{ subscription.credits_total }}). Contact Super Admin to top up credits.</span>
+    </div>
+    <a href="{% url 'subscription-billing-web' %}" class="px-3 py-1.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition shrink-0">
+      View Subscription
+    </a>
+  </div>
+  {% endif %}
+
   <!-- Product Search Trigger Card -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-    <form method="POST" action="{% url 'find-buyers' %}" id="find-buyers-form" class="flex flex-col md:flex-row items-center gap-4">
+    <form method="POST" action="{% url 'find-buyers' %}" id="find-buyers-form" class="space-y-4">
       {% csrf_token %}
-      <input type="hidden" name="action" value="run_search">
+      <input type="hidden" name="action" id="form_action" value="run_search">
+      <input type="hidden" name="has_criteria_payload" value="1">
       <input type="hidden" name="product_id" id="selected_product_id" value="{% if selected_product %}{{ selected_product.id }}{% elif selected_product_id %}{{ selected_product_id }}{% endif %}">
 
-      <div class="flex-1 w-full relative" id="searchable-combobox-wrapper">
-        <label for="product_search_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-          <span class="flex items-center gap-1.5">
-            <i class="fa-solid fa-boxes-stacked text-orange-500"></i>
-            <span>Select Product to Find Vendors</span>
-          </span>
-          <span class="text-[11px] text-slate-400 font-medium normal-case">
-            {{ products|length }} Products &bull; Alphabetical A-Z
-          </span>
-        </label>
-        
-        <div class="relative">
-          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+      <!-- Top Row: Shortened Search Bar + Apply Criteria + Launch Button -->
+      <div class="flex flex-col md:flex-row items-stretch md:items-end justify-between gap-3">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 flex-1">
+          
+          <!-- Shortened Product Combobox -->
+          <div class="w-full sm:w-72 md:w-80 lg:w-96 relative shrink-0" id="searchable-combobox-wrapper">
+            <label for="product_search_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-boxes-stacked text-orange-500"></i>
+                <span>Select Product</span>
+              </span>
+              <span class="text-[11px] text-slate-400 font-medium normal-case">
+                {{ products|length }} Products &bull; A-Z
+              </span>
+            </label>
+            
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+              </div>
+
+              <input 
+                type="text" 
+                id="product_search_input" 
+                autocomplete="off"
+                placeholder="Type to search products..." 
+                value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
+                class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
+              >
+
+              <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+                <button 
+                  type="button" 
+                  id="clear_product_btn" 
+                  class="{% if not selected_product %}hidden{% endif %} text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+                  title="Clear selection"
+                >
+                  <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+                <button 
+                  type="button" 
+                  id="toggle_dropdown_btn" 
+                  class="text-slate-400 hover:text-orange-600 p-1 rounded-md transition"
+                  title="Toggle product list"
+                >
+                  <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="dropdown_chevron"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom Dropdown Panel -->
+            <div 
+              id="product_dropdown_menu" 
+              class="hidden absolute z-50 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
+            >
+              <div id="product_options_container">
+                {% for p in products %}
+                <div 
+                  class="product-option px-3.5 py-2.5 hover:bg-orange-50/70 cursor-pointer flex items-center justify-between transition group {% if selected_product and selected_product.id == p.id %}bg-orange-50 text-orange-950 font-bold{% endif %}"
+                  data-id="{{ p.id }}"
+                  data-name="{{ p.name }}"
+                  data-category="{{ p.category.name|default:'' }}"
+                >
+                  <div class="flex items-center space-x-2.5 min-w-0">
+                    <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-orange-100 text-slate-500 group-hover:text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                      {{ forloop.counter }}
+                    </span>
+                    <div class="truncate">
+                      <div class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">
+                        {{ p.name }}
+                      </div>
+                      <div class="text-[10px] text-slate-400 font-normal">
+                        {{ p.category.name|default:"General Category" }} &bull; MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}
+                      </div>
+                    </div>
+                  </div>
+                  <span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-slate-100 text-slate-600 shrink-0 group-hover:bg-orange-100 group-hover:text-orange-700">
+                    {{ p.category.name|default:"General" }}
+                  </span>
+                </div>
+                {% empty %}
+                <div class="px-4 py-5 text-xs text-center text-slate-400">
+                  <i class="fa-solid fa-box-open text-base mb-1 block text-slate-300"></i>
+                  No products found in catalog. Add products first.
+                </div>
+                {% endfor %}
+              </div>
+              <div id="no_match_item" class="hidden px-4 py-5 text-xs text-center text-slate-400">
+                <i class="fa-solid fa-magnifying-glass text-base mb-1 block text-slate-300"></i>
+                No products match "<span id="no_match_query" class="font-semibold text-slate-600"></span>"
+              </div>
+            </div>
           </div>
 
-          <input 
-            type="text" 
-            id="product_search_input" 
-            autocomplete="off"
-            placeholder="Type to search products (e.g. Steel, Valve, Chemical)..." 
-            value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
-            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
-          >
-
-          <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+          <!-- Apply Criteria Button (Directly Next to Search Bar) -->
+          <div class="shrink-0">
             <button 
               type="button" 
-              id="clear_product_btn" 
-              class="{% if not selected_product %}hidden{% endif %} text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
-              title="Clear selection"
+              id="toggle_criteria_btn" 
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-900 font-bold text-xs transition shadow-xs hover:border-orange-300 cursor-pointer"
+              title="Configure AI matching and evaluation criteria"
             >
-              <i class="fa-solid fa-xmark text-xs"></i>
-            </button>
-            <button 
-              type="button" 
-              id="toggle_dropdown_btn" 
-              class="text-slate-400 hover:text-orange-600 p-1 rounded-md transition"
-              title="Toggle product list"
-            >
-              <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="dropdown_chevron"></i>
+              <i class="fa-solid fa-sliders text-orange-600"></i>
+              <span>Apply Criteria</span>
+              <span id="criteria_badge_count" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-600 text-white shadow-xs">
+                {{ active_criteria_count }} Active
+              </span>
+              <i class="fa-solid fa-chevron-down text-[10px] text-orange-500 transition-transform duration-200" id="criteria_chevron"></i>
             </button>
           </div>
         </div>
 
-        <!-- Custom Dropdown Panel -->
-        <div 
-          id="product_dropdown_menu" 
-          class="hidden absolute z-30 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
-        >
-          <div id="product_options_container">
-            {% for p in products %}
-            <div 
-              class="product-option px-3.5 py-2.5 hover:bg-orange-50/70 cursor-pointer flex items-center justify-between transition group {% if selected_product and selected_product.id == p.id %}bg-orange-50 text-orange-950 font-bold{% endif %}"
-              data-id="{{ p.id }}"
-              data-name="{{ p.name }}"
-              data-category="{{ p.category.name|default:'' }}"
-            >
-              <div class="flex items-center space-x-2.5 min-w-0">
-                <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-orange-100 text-slate-500 group-hover:text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
-                  {{ forloop.counter }}
-                </span>
-                <div class="truncate">
-                  <div class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">
-                    {{ p.name }}
-                  </div>
-                  <div class="text-[10px] text-slate-400 font-normal">
-                    {{ p.category.name|default:"General Category" }} &bull; MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}
-                  </div>
-                </div>
-              </div>
-              <span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-slate-100 text-slate-600 shrink-0 group-hover:bg-orange-100 group-hover:text-orange-700">
-                {{ p.category.name|default:"General" }}
-              </span>
-            </div>
-            {% empty %}
-            <div class="px-4 py-5 text-xs text-center text-slate-400">
-              <i class="fa-solid fa-box-open text-base mb-1 block text-slate-300"></i>
-              No products found in catalog. Add products first.
-            </div>
-            {% endfor %}
-          </div>
-          <div id="no_match_item" class="hidden px-4 py-5 text-xs text-center text-slate-400">
-            <i class="fa-solid fa-magnifying-glass text-base mb-1 block text-slate-300"></i>
-            No products match "<span id="no_match_query" class="font-semibold text-slate-600"></span>"
-          </div>
+        <!-- Right Side: Launch Button & Clear Filter -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button 
+            type="submit" 
+            id="launch_search_btn" 
+            class="flex-1 sm:flex-initial bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition"
+          >
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>Launch AI Vendor Search</span>
+          </button>
+
+          {% if selected_product_id %}
+          <a href="{% url 'find-buyers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition shrink-0" title="Reset search">
+            Clear Filter
+          </a>
+          {% endif %}
         </div>
       </div>
 
-      <div class="flex items-center gap-2 w-full md:w-auto md:mt-5 shrink-0">
-        <button type="submit" id="launch_search_btn" class="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition">
-          <i class="fa-solid fa-wand-magic-sparkles"></i>
-          <span>Launch AI Vendor Search</span>
-        </button>
+      <!-- Collapsible Criteria Configuration Box -->
+      <div id="criteria_config_box" class="hidden border border-slate-200 bg-slate-50/80 rounded-2xl p-5 mt-3 space-y-5 transition-all">
+        
+        <!-- Criteria Drawer Header & Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-sliders"></i>
+              </span>
+              <h3 class="text-sm font-bold text-slate-900 tracking-tight">AI Matching Criteria & Parameters</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
+                Live AI Engine
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              Select standard enterprise evaluation fields and add custom key-value criteria. The AI scoring pipeline uses these parameters to calculate vendor fit scores.
+            </p>
+          </div>
 
-        {% if selected_product_id %}
-        <a href="{% url 'find-buyers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition shrink-0">
-          Clear Filter
-        </a>
-        {% endif %}
+          <div class="flex items-center gap-2 shrink-0">
+            <button 
+              type="button" 
+              id="select_all_static_btn" 
+              class="text-[11px] font-semibold text-slate-600 hover:text-orange-600 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-orange-300 transition"
+            >
+              Select All
+            </button>
+            <button 
+              type="button" 
+              id="reset_static_btn" 
+              class="text-[11px] font-semibold text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition"
+            >
+              Reset
+            </button>
+            <button 
+              type="button" 
+              id="add_criteria_btn_top" 
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-xs transition"
+            >
+              <i class="fa-solid fa-plus text-[10px]"></i>
+              <span>+ Add Criteria</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 1: Static Criteria Fields (Pre-configured Enterprise Standards) -->
+        <div>
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-shield-halved text-orange-500"></i>
+              <span>Standard Enterprise Criteria (Pre-Configured)</span>
+            </div>
+            <span class="text-[11px] text-slate-400">
+              Checkbox enables criteria &bull; Target values editable
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="static_criteria_grid">
+            {% for item in static_criteria_list %}
+            <div class="static-criteria-card bg-white rounded-xl border border-slate-200 p-3.5 hover:border-orange-300 transition shadow-xs flex flex-col justify-between group">
+              <div>
+                <div class="flex items-start justify-between gap-2 mb-1.5">
+                  <label for="crit_{{ item.key }}" class="flex items-center gap-2 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      name="static_criteria" 
+                      value="{{ item.key }}" 
+                      id="crit_{{ item.key }}" 
+                      {% if item.is_active %}checked{% endif %}
+                      class="static-criteria-checkbox w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 cursor-pointer"
+                    >
+                    <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition flex items-center gap-1.5">
+                      <i class="fa-solid {{ item.icon }} text-[11px] text-slate-400 group-hover:text-orange-500 transition"></i>
+                      <span>{{ item.name }}</span>
+                    </span>
+                  </label>
+                  <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
+                    {{ item.key }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-snug mb-2 pl-6">
+                  {{ item.description }}
+                </p>
+              </div>
+              <div class="pl-6 pt-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-slate-400 font-semibold shrink-0">Target:</span>
+                  <input 
+                    type="text" 
+                    name="static_val_{{ item.key }}" 
+                    value="{{ item.criteria_value }}" 
+                    placeholder="Target criteria specification..." 
+                    class="w-full text-[11px] font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition"
+                  >
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Section 2: Custom Dynamic Criteria (2-Col Key & Value Rows) -->
+        <div class="pt-2 border-t border-slate-200">
+          <div class="flex items-center justify-between mb-2.5">
+            <div>
+              <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-code-branch text-purple-600"></i>
+                <span>Custom Dynamic Criteria (Key & Value Mapping)</span>
+              </div>
+              <p class="text-[11px] text-slate-500">
+                Add specialized procurement requirements. Key and Value columns will be mapped directly into the AI search engine.
+              </p>
+            </div>
+
+            <button 
+              type="button" 
+              id="add_criteria_btn_bottom" 
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition shadow-xs"
+            >
+              <i class="fa-solid fa-plus text-[11px]"></i>
+              <span>+ Add Criteria</span>
+            </button>
+          </div>
+
+          <!-- Dynamic Key-Value Rows Container -->
+          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+            <div class="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-100/80 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+              <div class="col-span-5 sm:col-span-4 flex items-center gap-1">
+                <span>Column 1: Key (Criteria Name)</span>
+              </div>
+              <div class="col-span-6 sm:col-span-7 flex items-center gap-1">
+                <span>Column 2: Value (Criteria Requirement / Condition)</span>
+              </div>
+              <div class="col-span-1 text-center">
+                <span>Action</span>
+              </div>
+            </div>
+
+            <div id="custom_criteria_container" class="divide-y divide-slate-100 p-1">
+              {% for custom in custom_criteria_list %}
+              <div class="custom-criteria-row grid grid-cols-12 gap-2 p-2 items-center hover:bg-orange-50/30 transition rounded-lg">
+                <div class="col-span-5 sm:col-span-4">
+                  <input 
+                    type="text" 
+                    name="custom_criteria_key[]" 
+                    value="{{ custom.name }}" 
+                    placeholder="e.g. OEM Experience, Payment Terms 30 Days..." 
+                    class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                    required
+                  >
+                </div>
+                <div class="col-span-6 sm:col-span-7">
+                  <input 
+                    type="text" 
+                    name="custom_criteria_val[]" 
+                    value="{{ custom.criteria_value }}" 
+                    placeholder="e.g. Min 3 years Tier-1 supplier track record, Net 30..." 
+                    class="w-full text-xs font-normal text-slate-700 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                    required
+                  >
+                </div>
+                <div class="col-span-1 flex items-center justify-center">
+                  <button 
+                    type="button" 
+                    class="remove-custom-row-btn w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition" 
+                    title="Remove criteria row"
+                  >
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                  </button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+            <div id="empty_custom_placeholder" class="{% if custom_criteria_list %}hidden{% endif %} px-4 py-6 text-center text-xs text-slate-400">
+              <i class="fa-solid fa-sliders text-base text-slate-300 mb-1 block"></i>
+              <span>No custom criteria added yet. Click <strong>"+ Add Criteria"</strong> to create a custom Key & Value mapping.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Criteria Drawer Footer -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
+          <div class="flex items-center gap-2 text-xs text-slate-600">
+            <i class="fa-solid fa-circle-check text-emerald-500"></i>
+            <span>Active Criteria: <strong id="criteria_summary_text" class="text-slate-900">{{ active_criteria_count }} Parameters Applied</strong></span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span id="save_feedback_toast" class="hidden text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+              <i class="fa-solid fa-check mr-1"></i> Saved!
+            </span>
+            <button 
+              type="button" 
+              id="save_criteria_ajax_btn" 
+              class="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition shadow-xs"
+            >
+              <i class="fa-solid fa-floppy-disk text-slate-500 mr-1"></i> Save Criteria
+            </button>
+            <button 
+              type="button" 
+              id="close_criteria_btn" 
+              class="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+
       </div>
     </form>
   </div>
@@ -160,35 +416,9 @@
         </span>
         <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to Launch AI Vendor Discovery</h2>
         <p class="text-xs text-slate-500 mt-2 leading-relaxed">
-          AI Vendor Discovery searches real-time commercial directories, company web pages, and B2B portals to discover verified vendor contacts, match technical specifications, and evaluate buying intent signals. <strong>Please select a product from the dropdown above or click one below to discover qualified vendors.</strong>
+          AI Vendor Discovery searches real-time commercial directories, company web pages, and B2B portals to discover verified vendor contacts, match technical specifications, and evaluate buying intent signals. <strong>Please select a product from the searchable dropdown above to discover qualified vendors.</strong>
         </p>
       </div>
-
-      <!-- Quick 1-click product selector chips -->
-      {% if products %}
-      <div class="pt-4 border-t border-slate-100 text-left">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 text-center">
-          Or select an active product from your catalog:
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {% for p in products %}
-          <a 
-            href="{% url 'find-buyers' %}?product_id={{ p.id }}" 
-            class="block text-left p-3.5 rounded-xl border border-slate-200 hover:border-orange-500 hover:bg-orange-50/50 transition group cursor-pointer bg-slate-50/50"
-          >
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">{{ p.name }}</span>
-              <i class="fa-solid fa-arrow-right text-[10px] text-slate-300 group-hover:text-orange-500 transition ml-2"></i>
-            </div>
-            <div class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
-              <span>{{ p.category.name|default:"General" }}</span>
-              <span>MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }}</span>
-            </div>
-          </a>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
     </div>
   </div>
 
@@ -201,142 +431,12 @@
     </div>
   </div>
 
-  <!-- Results Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+  <!-- Results Grid (Compact Cards) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     {% for lead in leads %}
-    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
-      <div>
-        <!-- Top row: Avatar, Name, Location, Fit Badge -->
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex items-center space-x-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 font-bold flex items-center justify-center text-sm border border-orange-100 shrink-0">
-              <i class="fa-solid fa-industry"></i>
-            </div>
-            <div class="min-w-0">
-              <h3 class="font-bold text-slate-900 text-sm leading-tight truncate" title="{{ lead.external_company.name }}">
-                {{ lead.external_company.name }}
-              </h3>
-              <span class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                <i class="fa-solid fa-location-dot text-[11px] text-rose-500"></i>
-                <span class="truncate">
-                  {% if lead.external_company.city and lead.external_company.state %}
-                    {{ lead.external_company.city }}, {{ lead.external_company.state }}
-                  {% elif lead.external_company.city %}
-                    {{ lead.external_company.city }}, {{ lead.external_company.country|default:"India" }}
-                  {% elif lead.external_company.state %}
-                    {{ lead.external_company.state }}, {{ lead.external_company.country|default:"India" }}
-                  {% else %}
-                    Industrial Hub, {{ lead.external_company.country|default:"India" }}
-                  {% endif %}
-                </span>
-              </span>
-            </div>
-          </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold shrink-0 {% if lead.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
-            {{ lead.match_score }}% Fit
-          </span>
-        </div>
-
-        <!-- Industry & Product Badge -->
-        <div class="flex flex-wrap items-center gap-1.5 mt-3 text-[11px]">
-          <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">
-            {{ lead.external_company.get_company_role_display|default:"End User" }}
-          </span>
-          <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold border border-blue-100 truncate max-w-[200px]">
-            Target: {{ lead.product_title }}
-          </span>
-        </div>
-
-        {% if lead.raw_data.matched_parameters %}
-        <div class="flex flex-wrap items-center gap-1 mt-2.5">
-          {% for param in lead.raw_data.matched_parameters %}
-          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <i class="fa-solid fa-check text-[8px]"></i> {{ param }}
-          </span>
-          {% endfor %}
-        </div>
-        {% endif %}
-
-        <!-- Body: Why Fit + Need Signal -->
-        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2.5 text-xs">
-          <div>
-            <span class="text-slate-400 block text-[11px] font-medium">Why they are a fit:</span>
-            <p class="font-medium text-slate-700 mt-0.5 leading-relaxed">
-              {{ lead.match_reason|truncatewords:28 }}
-            </p>
-          </div>
-
-          {% if lead.need_signal %}
-          <div class="p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-orange-900 text-[11px] font-semibold flex items-start gap-2">
-            <i class="fa-solid fa-signal text-orange-600 mt-0.5 shrink-0"></i>
-            <span class="leading-snug">{{ lead.need_signal }}</span>
-          </div>
-          {% endif %}
-
-          <!-- Contact Details Block (Extracted via Scraper) -->
-          <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1.5 text-[11px]">
-            <div class="flex items-center justify-between text-slate-600">
-              <span class="text-slate-400"><i class="fa-solid fa-envelope mr-1.5 text-slate-400"></i> Email:</span>
-              {% if lead.external_company.email %}
-              <a href="mailto:{{ lead.external_company.email }}" class="font-semibold text-blue-600 hover:underline truncate max-w-[170px]" title="{{ lead.external_company.email }}">
-                {{ lead.external_company.email }}
-              </a>
-              {% else %}
-              <span class="text-slate-400 italic">Available on site</span>
-              {% endif %}
-            </div>
-
-            <div class="flex items-center justify-between text-slate-600">
-              <span class="text-slate-400"><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i> Phone:</span>
-              {% if lead.external_company.phone %}
-              <a href="tel:{{ lead.external_company.phone }}" class="font-semibold text-slate-800 hover:text-blue-600">
-                {{ lead.external_company.phone }}
-              </a>
-              {% else %}
-              <span class="text-slate-400 italic">Direct via website</span>
-              {% endif %}
-            </div>
-
-            {% if lead.external_company.address %}
-            <div class="pt-1 border-t border-slate-200 text-slate-500 truncate" title="{{ lead.external_company.address }}">
-              <i class="fa-solid fa-map-pin mr-1 text-slate-400"></i> {{ lead.external_company.address }}
-            </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <!-- Action Card Footer -->
-      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        <a href="{{ lead.external_company.website|default:lead.source_url }}" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-600 hover:underline font-semibold flex items-center">
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Website
-        </a>
-
-        <div class="flex items-center gap-2">
-          {% if lead.id in saved_result_ids %}
-          <a href="{% url 'saved-leads' %}" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-emerald-100 transition" title="Already in your Sales Pipeline">
-            <i class="fa-solid fa-check text-[10px]"></i>
-            <span>In Pipeline</span>
-          </a>
-          {% else %}
-          <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-300 flex items-center gap-1.5 transition">
-              <i class="fa-regular fa-bookmark text-[10px]"></i>
-              <span>Save Lead</span>
-            </button>
-          </form>
-          {% endif %}
-
-          <button type="button" onclick="openSendProposalModal('{{ lead.id }}', '{{ lead.external_company.name|escapejs }}', '{{ lead.external_company.email|default:''|escapejs }}', '{{ lead.product_title|escapejs }}')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
-            <i class="fa-solid fa-paper-plane text-[10px]"></i>
-            <span>Contact & Inquire</span>
-          </button>
-        </div>
-      </div>
-    </div>
+      {% include "components/vendor_compact_card.html" with lead=lead %}
     {% empty %}
-    <div class="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
+    <div class="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
       <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-4 border border-orange-100">
         <i class="fa-solid fa-crosshairs"></i>
       </div>
@@ -366,13 +466,16 @@
 
 </div>
 
+<!-- Company 360° Credentials Modal Component -->
+{% include "components/company_details_modal.html" %}
+
 <!-- Send Commercial Proposal Modal -->
 <div id="sendProposalModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
     <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-sm">
-          <i class="fa-solid fa-paper-plane"></i>
+          <i class="fa-solid fa-envelope"></i>
         </div>
         <div>
           <h3 class="text-sm font-bold text-slate-900">Send Commercial Proposal</h3>
@@ -445,7 +548,7 @@
           Cancel
         </button>
         <button type="submit" class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 transition text-xs">
-          <i class="fa-solid fa-paper-plane"></i>
+          <i class="fa-solid fa-envelope"></i>
           <span>Send Commercial Proposal</span>
         </button>
       </div>
@@ -578,6 +681,12 @@ document.addEventListener('DOMContentLoaded', function() {
       openDropdown();
     });
 
+    searchInput.addEventListener('click', function(e) {
+      e.stopPropagation();
+      filterOptions(searchInput.value);
+      openDropdown();
+    });
+
     searchInput.addEventListener('input', function() {
       const query = this.value;
       if (query) {
@@ -684,6 +793,215 @@ document.addEventListener('DOMContentLoaded', function() {
           openDropdown();
         }
       }
+    });
+  }
+
+  // ==========================================
+  // Criteria Drawer & Dynamic Key-Value Rows
+  // ==========================================
+  const toggleCriteriaBtn = document.getElementById('toggle_criteria_btn');
+  const criteriaConfigBox = document.getElementById('criteria_config_box');
+  const criteriaChevron = document.getElementById('criteria_chevron');
+  const criteriaBadgeCount = document.getElementById('criteria_badge_count');
+  const criteriaSummaryText = document.getElementById('criteria_summary_text');
+  const customCriteriaContainer = document.getElementById('custom_criteria_container');
+  const emptyCustomPlaceholder = document.getElementById('empty_custom_placeholder');
+  const addCriteriaBtnTop = document.getElementById('add_criteria_btn_top');
+  const addCriteriaBtnBottom = document.getElementById('add_criteria_btn_bottom');
+  const selectAllStaticBtn = document.getElementById('select_all_static_btn');
+  const resetStaticBtn = document.getElementById('reset_static_btn');
+  const closeCriteriaBtn = document.getElementById('close_criteria_btn');
+  const saveCriteriaAjaxBtn = document.getElementById('save_criteria_ajax_btn');
+  const saveFeedbackToast = document.getElementById('save_feedback_toast');
+
+  function updateCriteriaCount() {
+    const checkedStatic = document.querySelectorAll('.static-criteria-checkbox:checked').length;
+    const customRows = document.querySelectorAll('.custom-criteria-row').length;
+    const totalActive = checkedStatic + customRows;
+    if (criteriaBadgeCount) {
+      criteriaBadgeCount.textContent = `${totalActive} Active`;
+    }
+    if (criteriaSummaryText) {
+      criteriaSummaryText.textContent = `${totalActive} Parameters Applied (${checkedStatic} Static + ${customRows} Custom)`;
+    }
+  }
+
+  function toggleCriteriaDrawer(open) {
+    if (!criteriaConfigBox) return;
+    const shouldOpen = open !== undefined ? open : criteriaConfigBox.classList.contains('hidden');
+    if (shouldOpen) {
+      criteriaConfigBox.classList.remove('hidden');
+      if (criteriaChevron) criteriaChevron.classList.add('rotate-180');
+    } else {
+      criteriaConfigBox.classList.add('hidden');
+      if (criteriaChevron) criteriaChevron.classList.remove('rotate-180');
+    }
+  }
+
+  if (toggleCriteriaBtn) {
+    toggleCriteriaBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      toggleCriteriaDrawer();
+    });
+  }
+
+  if (closeCriteriaBtn) {
+    closeCriteriaBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      toggleCriteriaDrawer(false);
+    });
+  }
+
+  function addCustomCriteriaRow(keyVal = '', valueVal = '') {
+    if (!customCriteriaContainer) return;
+    toggleCriteriaDrawer(true);
+
+    if (emptyCustomPlaceholder) {
+      emptyCustomPlaceholder.classList.add('hidden');
+    }
+
+    const row = document.createElement('div');
+    row.className = 'custom-criteria-row grid grid-cols-12 gap-2 p-2 items-center hover:bg-orange-50/30 transition rounded-lg animate-in fade-in duration-150';
+    row.innerHTML = `
+      <div class="col-span-5 sm:col-span-4">
+        <input 
+          type="text" 
+          name="custom_criteria_key[]" 
+          value="${keyVal}" 
+          placeholder="e.g. OEM Experience, Payment Terms 30 Days..." 
+          class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+          required
+        >
+      </div>
+      <div class="col-span-6 sm:col-span-7">
+        <input 
+          type="text" 
+          name="custom_criteria_val[]" 
+          value="${valueVal}" 
+          placeholder="e.g. Min 3 years Tier-1 supplier track record, Net 30..." 
+          class="w-full text-xs font-normal text-slate-700 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+          required
+        >
+      </div>
+      <div class="col-span-1 flex items-center justify-center">
+        <button 
+          type="button" 
+          class="remove-custom-row-btn w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition" 
+          title="Remove criteria row"
+        >
+          <i class="fa-solid fa-trash-can text-xs"></i>
+        </button>
+      </div>
+    `;
+
+    customCriteriaContainer.appendChild(row);
+
+    const keyInput = row.querySelector('input[name="custom_criteria_key[]"]');
+    if (keyInput) keyInput.focus();
+
+    updateCriteriaCount();
+  }
+
+  if (addCriteriaBtnTop) {
+    addCriteriaBtnTop.addEventListener('click', function(e) {
+      e.preventDefault();
+      addCustomCriteriaRow();
+    });
+  }
+
+  if (addCriteriaBtnBottom) {
+    addCriteriaBtnBottom.addEventListener('click', function(e) {
+      e.preventDefault();
+      addCustomCriteriaRow();
+    });
+  }
+
+  // Event delegation for removing custom criteria rows
+  if (customCriteriaContainer) {
+    customCriteriaContainer.addEventListener('click', function(e) {
+      const removeBtn = e.target.closest('.remove-custom-row-btn');
+      if (removeBtn) {
+        e.preventDefault();
+        const row = removeBtn.closest('.custom-criteria-row');
+        if (row) {
+          row.remove();
+          const remaining = document.querySelectorAll('.custom-criteria-row').length;
+          if (remaining === 0 && emptyCustomPlaceholder) {
+            emptyCustomPlaceholder.classList.remove('hidden');
+          }
+          updateCriteriaCount();
+        }
+      }
+    });
+  }
+
+  // Static checkbox change listeners
+  document.querySelectorAll('.static-criteria-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateCriteriaCount);
+  });
+
+  // Select all static
+  if (selectAllStaticBtn) {
+    selectAllStaticBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.static-criteria-checkbox').forEach(cb => {
+        cb.checked = true;
+      });
+      updateCriteriaCount();
+    });
+  }
+
+  // Reset static
+  if (resetStaticBtn) {
+    resetStaticBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.static-criteria-checkbox').forEach(cb => {
+        cb.checked = true;
+      });
+      updateCriteriaCount();
+    });
+  }
+
+  // AJAX save criteria button
+  if (saveCriteriaAjaxBtn) {
+    saveCriteriaAjaxBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const saveBtn = this;
+      const originalHtml = saveBtn.innerHTML;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+
+      const formData = new FormData(form);
+      formData.set('action', 'save_criteria');
+
+      fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHtml;
+        if (data.success) {
+          if (saveFeedbackToast) {
+            saveFeedbackToast.classList.remove('hidden');
+            setTimeout(() => {
+              saveFeedbackToast.classList.add('hidden');
+            }, 2500);
+          }
+          if (data.active_count !== undefined && criteriaBadgeCount) {
+            criteriaBadgeCount.textContent = `${data.active_count} Active`;
+          }
+        }
+      })
+      .catch(err => {
+        console.error('Save criteria error:', err);
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHtml;
+      });
     });
   }
 });

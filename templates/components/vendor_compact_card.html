@@ -1,0 +1,119 @@
+<div 
+  class="vendor-compact-card bg-white rounded-2xl p-4 border border-slate-200 hover:border-orange-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between cursor-pointer group relative"
+  onclick="openCompanyDetailsFromElement(this)"
+  data-lead-id="{{ lead.id }}"
+  data-company-name="{{ lead.external_company.name|escape }}"
+  data-company-role="{{ lead.external_company.get_company_role_display|default:'Vendor'|escape }}"
+  data-company-industry="{{ lead.external_company.industry|default:'Commercial Enterprise'|escape }}"
+  data-company-email="{{ lead.external_company.email|default:''|escape }}"
+  data-company-phone="{{ lead.external_company.phone|default:''|escape }}"
+  data-company-website="{{ lead.external_company.website|default:lead.source_url|default:''|escape }}"
+  data-company-address="{{ lead.external_company.address|default:''|escape }}"
+  data-company-location="{% if lead.external_company.city and lead.external_company.state %}{{ lead.external_company.city }}, {{ lead.external_company.state }}{% elif lead.external_company.city %}{{ lead.external_company.city }}, {{ lead.external_company.country|default:'India' }}{% elif lead.external_company.state %}{{ lead.external_company.state }}, {{ lead.external_company.country|default:'India' }}{% else %}{{ lead.external_company.country|default:'India' }}{% endif %}"
+  data-match-score="{{ lead.match_score }}"
+  data-product-title="{{ lead.product_title|escape }}"
+  data-match-reason="{{ lead.match_reason|escape }}"
+  data-need-signal="{{ lead.need_signal|default:''|escape }}"
+  data-source-url="{{ lead.source_url|default:lead.external_company.website|default:''|escape }}"
+  data-matched-params="{% if lead.raw_data.matched_parameters %}{{ lead.raw_data.matched_parameters|join:', '|escape }}{% endif %}"
+  data-price="{% if lead.price %}{{ lead.price_currency }} {{ lead.price }}{% if lead.price_unit %} / {{ lead.price_unit }}{% endif %}{% endif %}"
+  data-moq="{{ lead.moq|default:''|escape }}"
+  data-is-saved="{% if lead.id in saved_result_ids %}true{% else %}false{% endif %}"
+  data-save-url="{% url 'save-lead-toggle' lead.id %}"
+  title="Click to view full company credentials & dossier"
+>
+  <div>
+    <!-- Top row: Avatar, Name, Location, Fit Score -->
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white font-bold flex items-center justify-center text-xs border border-orange-100 shrink-0 transition">
+          <i class="fa-solid fa-industry"></i>
+        </div>
+        <div class="min-w-0">
+          <h3 class="font-bold text-slate-900 text-xs leading-tight truncate group-hover:text-orange-600 transition" title="{{ lead.external_company.name }}">
+            {{ lead.external_company.name }}
+          </h3>
+          <span class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+            <i class="fa-solid fa-location-dot text-[9px] text-rose-500 shrink-0"></i>
+            <span class="truncate">
+              {% if lead.external_company.city %}{{ lead.external_company.city }}, {% endif %}{{ lead.external_company.country|default:"India" }}
+            </span>
+          </span>
+        </div>
+      </div>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black shrink-0 {% if lead.match_score >= 85 %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif lead.match_score >= 70 %}bg-blue-50 text-blue-700 border border-blue-200{% else %}bg-slate-100 text-slate-700{% endif %}">
+        {{ lead.match_score }}% Fit
+      </span>
+    </div>
+
+    <!-- Contact Details (Compact) -->
+    <div class="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5 text-[11px]">
+      <div class="flex items-center justify-between text-slate-600 min-w-0">
+        <span class="text-slate-400 shrink-0 flex items-center gap-1.5">
+          <i class="fa-solid fa-envelope text-slate-400 text-[10px]"></i> Email:
+        </span>
+        {% if lead.external_company.email %}
+        <span class="font-semibold text-blue-600 truncate max-w-[140px]" title="{{ lead.external_company.email }}">
+          {{ lead.external_company.email }}
+        </span>
+        {% else %}
+        <span class="text-slate-400 italic">Available on site</span>
+        {% endif %}
+      </div>
+
+      <div class="flex items-center justify-between text-slate-600 min-w-0">
+        <span class="text-slate-400 shrink-0 flex items-center gap-1.5">
+          <i class="fa-solid fa-phone text-slate-400 text-[10px]"></i> Phone:
+        </span>
+        {% if lead.external_company.phone %}
+        <span class="font-semibold text-slate-800 truncate max-w-[140px]">
+          {{ lead.external_company.phone }}
+        </span>
+        {% else %}
+        <span class="text-slate-400 italic">Direct via website</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Interactive Dossier Cue -->
+    <div class="mt-2 text-[10px] text-slate-400 group-hover:text-orange-600 flex items-center justify-between transition pt-1.5 border-t border-slate-50">
+      <span class="flex items-center gap-1 font-semibold">
+        <i class="fa-solid fa-id-card text-[10px]"></i> Full Credentials
+      </span>
+      <i class="fa-solid fa-arrow-right text-[9px] transform group-hover:translate-x-0.5 transition"></i>
+    </div>
+  </div>
+
+  <!-- Action Card Footer -->
+  <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5" onclick="event.stopPropagation()">
+    {% if lead.external_company.website %}
+    <a href="{{ lead.external_company.website }}" target="_blank" rel="noopener noreferrer" class="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition" title="Visit Website">
+      <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+    </a>
+    {% else %}
+    <div></div>
+    {% endif %}
+
+    <div class="flex items-center gap-1.5">
+      {% if lead.id in saved_result_ids %}
+      <a href="{% url 'saved-leads' %}" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition" title="In Pipeline">
+        <i class="fa-solid fa-check text-[9px]"></i>
+        <span>Saved</span>
+      </a>
+      {% else %}
+      <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
+        {% csrf_token %}
+        <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] px-2 py-1 rounded-lg border border-slate-300 flex items-center gap-1 transition" title="Save to Pipeline">
+          <i class="fa-regular fa-bookmark text-[9px]"></i>
+          <span>Save</span>
+        </button>
+      </form>
+      {% endif %}
+
+      <button type="button" onclick="event.stopPropagation(); openSendProposalModal('{{ lead.id }}', '{{ lead.external_company.name|escapejs }}', '{{ lead.external_company.email|default:''|escapejs }}', '{{ lead.product_title|escapejs }}')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg shadow-sm transition flex items-center gap-1">
+        <i class="fa-solid fa-envelope text-[9px]"></i>
+        <span>Contact</span>
+      </button>
+    </div>
+  </div>
+</div>

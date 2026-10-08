@@ -313,10 +313,27 @@ Respond ONLY with a valid JSON object with the following fields:
                 elif "b2b" in p_key or "b2b" in p_name.lower():
                     param_score = 1.0 if role in ["end_user", "manufacturer", "trader", "distributor", "supplier", "exporter"] else 0.75
 
-                # Custom parameter added by user
+                # 11. Quality Certifications (ISO/CE)
+                elif "certif" in p_key or "certif" in p_name.lower():
+                    has_cert = any(t in text_corpus for t in ["iso", "ce", "astm", "bis", "certified", "standard", "compliance", "mtc"])
+                    param_score = 1.0 if has_cert else 0.8
+
+                # 12. Minimum Procurement Volume / MOQ Fit
+                elif "moq" in p_key or "moq" in p_name.lower() or "volume" in p_name.lower():
+                    has_moq = any(t in text_corpus for t in ["moq", "batch", "qty", "quantity", "order", "unit", "pieces", "lot", "bulk"])
+                    param_score = 1.0 if has_moq else 0.8
+
+                # 13. Financial Turnover & Stability
+                elif "turnover" in p_key or "financial" in p_name.lower() or "turnover" in p_name.lower():
+                    has_fin = any(t in text_corpus for t in ["ltd", "limited", "pvt", "crore", "turnover", "annual", "established", "revenue", "corp"])
+                    param_score = 1.0 if has_fin else 0.8
+
+                # Custom dynamic parameters added by user (Key and Value mapping)
                 else:
-                    crit_words = [w for w in p_criteria.split() if len(w) > 3]
-                    if crit_words and any(w in text_corpus for w in crit_words):
+                    crit_words = [w.lower() for w in p_criteria.split() if len(w) > 3]
+                    name_words = [w.lower() for w in p_name.split() if len(w) > 3]
+                    all_words = crit_words + name_words
+                    if all_words and any(w in text_corpus for w in all_words):
                         param_score = 1.0
                     else:
                         param_score = 0.8

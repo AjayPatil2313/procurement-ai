@@ -458,14 +458,21 @@ def find_suppliers_view(request):
         return redirect("dashboard")
 
     requirements = Requirement.objects.filter(company=company, is_deleted=False).order_by("-created_at")
+    subscription = getattr(company, "subscription", None) if company else None
 
     # Handle search initiation via POST or GET ?run_search=1
     if request.method == "POST" and request.POST.get("action") == "run_search":
         req_id = request.POST.get("requirement_id")
         target_req = Requirement.objects.filter(id=req_id, company=company, is_deleted=False).first()
         if target_req:
+            if subscription and subscription.credits_remaining <= 0:
+                messages.error(request, f"Search blocked: AI credits exhausted ({subscription.credits_used}/{subscription.credits_total}). Please contact Super Admin to top up credits.")
+                return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
             job = run_find_suppliers_search(target_req, request.user, company)
-            messages.success(request, f"Supplier discovery complete! Found {job.total_results} matching suppliers for '{target_req.item_name}'.")
+            if job.status == SearchJob.Status.FAILED:
+                messages.error(request, f"Search failed: {job.error_message}")
+            else:
+                messages.success(request, f"Supplier discovery complete! Found {job.total_results} matching suppliers for '{target_req.item_name}'. (1 AI credit debited)")
             return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
         else:
             messages.error(request, "Please select an active requirement to find suppliers.")
@@ -475,8 +482,14 @@ def find_suppliers_view(request):
     if request.GET.get("run_search") == "1" and requirement_id:
         target_req = Requirement.objects.filter(id=requirement_id, company=company, is_deleted=False).first()
         if target_req:
+            if subscription and subscription.credits_remaining <= 0:
+                messages.error(request, f"Search blocked: AI credits exhausted ({subscription.credits_used}/{subscription.credits_total}). Please contact Super Admin to top up credits.")
+                return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
             job = run_find_suppliers_search(target_req, request.user, company)
-            messages.success(request, f"Search completed: Identified {job.total_results} suppliers for '{target_req.item_name}'.")
+            if job.status == SearchJob.Status.FAILED:
+                messages.error(request, f"Search failed: {job.error_message}")
+            else:
+                messages.success(request, f"Search completed: Identified {job.total_results} suppliers for '{target_req.item_name}'. (1 AI credit debited)")
             return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
 
     results_qs = SearchResult.objects.filter(

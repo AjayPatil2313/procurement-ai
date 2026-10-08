@@ -98,6 +98,19 @@ def saved_leads_view(request):
         "assigned_to",
     ).order_by("-created_at")
 
+    # Optional Status and Assignee Filters
+    status_filter = request.GET.get("status", "").strip().lower()
+    assigned_filter = request.GET.get("assigned_to", "").strip()
+
+    if status_filter and status_filter in dict(SavedItem.Status.choices):
+        base_qs = base_qs.filter(status=status_filter)
+
+    if assigned_filter:
+        if assigned_filter == "unassigned":
+            base_qs = base_qs.filter(assigned_to__isnull=True)
+        elif assigned_filter.isdigit():
+            base_qs = base_qs.filter(assigned_to_id=int(assigned_filter))
+
     # Calculate saved lead counts per product
     product_saved_counts = (
         base_qs
@@ -179,6 +192,8 @@ def saved_leads_view(request):
         "rbac": rbac,
         "team_members": team_members,
         "status_choices": SavedItem.Status.choices,
+        "status_filter": status_filter,
+        "assigned_filter": assigned_filter,
         "page_title": f"Saved Buyers - {selected_product.name}" if selected_product else "Saved Buyers (Product-Wise)",
     })
 
@@ -1076,7 +1091,7 @@ def export_reports_view(request):
 
     # Active Report Type
     report_type = request.GET.get("type") or request.GET.get("report_type") or "leads"
-    valid_types = ["leads", "inquiries"]
+    valid_types = ["leads", "inquiries", "catalog"]
     if report_type not in valid_types:
         report_type = "leads"
 
@@ -1219,6 +1234,30 @@ def export_reports_view(request):
                     item.match_reason or "",
                     item.need_signal or "",
                     item.created_at.strftime("%Y-%m-%d %H:%M"),
+                ])
+            return response
+
+        elif report_type == "catalog":
+            response["Content-Disposition"] = f'attachment; filename="Product_Catalog_{prod_slug}.csv"'
+            writer.writerow(["Product Name", "Category", "Type", "Price", "Currency", "MOQ", "Unit", "Availability", "Location", "Search Scope", "Description", "Specifications", "Created At"])
+            prods_to_export = Product.objects.filter(company=company, is_deleted=False)
+            if selected_product:
+                prods_to_export = prods_to_export.filter(id=selected_product.id)
+            for p in prods_to_export.order_by("name"):
+                writer.writerow([
+                    p.name,
+                    p.category.name if p.category else "General",
+                    p.get_type_display(),
+                    p.price or "",
+                    p.currency,
+                    p.minimum_order_quantity or p.moq or 1,
+                    p.unit,
+                    p.get_availability_display(),
+                    p.location or (company.city if company else "India"),
+                    p.get_search_scope_display(),
+                    p.description or "",
+                    p.specifications or "",
+                    p.created_at.strftime("%Y-%m-%d %H:%M"),
                 ])
             return response
 
