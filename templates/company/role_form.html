@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Edit Role: {{ role.name }}{% else %}Add New Role{% endif %} — AI Sales{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto pb-12">
+
+  <!-- Breadcrumbs & Back Navigation -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'seller-roles-web' %}" class="hover:text-blue-600 transition">Roles & Responsibilities</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">{% if is_edit %}Edit Role{% else %}Add New Role{% endif %}</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid {% if is_edit %}fa-pen-to-square{% else %}fa-user-shield{% endif %}"></i>
+        </span>
+        <span>{% if is_edit %}Edit Role: {{ role.name }}{% else %}Add New Organizational Role{% endif %}</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Define role identity and configure granular module-by-module authorization matrix across platform operations.
+      </p>
+    </div>
+
+    <div>
+      <a 
+        href="{% url 'seller-roles-web' %}" 
+        class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm"
+      >
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Back to Roles List</span>
+      </a>
+    </div>
+  </div>
+
+  <form method="POST" action="{% if is_edit %}{% url 'seller-role-edit' role.id %}{% else %}{% url 'seller-role-create' %}{% endif %}" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- CARD 1: Role Identity -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs font-bold">1</span>
+          <h2 class="text-sm font-bold text-slate-900">Role Identity & Description</h2>
+        </div>
+        {% if is_edit and role.is_system %}
+        <span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-700 border border-purple-200">
+          <i class="fa-solid fa-shield-halved mr-1"></i> System Protected Role
+        </span>
+        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Role Name <span class="text-rose-500">*</span>
+          </label>
+          <input 
+            type="text" 
+            name="name" 
+            required 
+            {% if is_edit and role.is_system %}readonly{% endif %}
+            value="{% if is_edit %}{{ role.name }}{% endif %}"
+            placeholder="e.g. Sales Manager, Procurement Analyst, Sourcing Lead..." 
+            class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-3 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition {% if is_edit and role.is_system %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
+          >
+          {% if is_edit and role.is_system %}
+          <p class="text-[11px] text-slate-400 mt-1">System default role names cannot be renamed.</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Role Description
+          </label>
+          <textarea 
+            name="description" 
+            rows="3" 
+            placeholder="Describe the operational responsibilities and scope of this role..." 
+            class="w-full text-xs font-normal rounded-xl border border-slate-300 p-3 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          >{% if is_edit %}{{ role.description }}{% endif %}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 2: Permissions Matrix -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs font-bold">2</span>
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">Module Permission Matrix</h2>
+            <p class="text-[11px] text-slate-500">Configure access levels across each functional module</p>
+          </div>
+        </div>
+
+        <!-- Quick Select Toolbar -->
+        <div class="flex items-center gap-2">
+          <button 
+            type="button" 
+            onclick="setAllPermissions(true)"
+            class="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition"
+          >
+            <i class="fa-solid fa-check-double mr-1"></i> Grant All
+          </button>
+          <button 
+            type="button" 
+            onclick="setAllReadOnly()"
+            class="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition"
+          >
+            <i class="fa-regular fa-eye mr-1"></i> Read-Only All
+          </button>
+          <button 
+            type="button" 
+            onclick="setAllPermissions(false)"
+            class="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition"
+          >
+            <i class="fa-solid fa-xmark mr-1"></i> Clear All
+          </button>
+        </div>
+      </div>
+
+      <!-- Matrix Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs min-w-[760px]">
+          <thead class="bg-slate-100/80 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200 text-[11px]">
+            <tr>
+              <th class="py-3 px-5 w-64">Functional Module</th>
+              <th class="py-3 px-3 text-center w-24">
+                <span class="inline-flex items-center gap-1">
+                  <i class="fa-regular fa-eye text-blue-600"></i> Read
+                </span>
+              </th>
+              <th class="py-3 px-3 text-center w-24">
+                <span class="inline-flex items-center gap-1">
+                  <i class="fa-solid fa-pen text-amber-600"></i> Write
+                </span>
+              </th>
+              <th class="py-3 px-3 text-center w-24">
+                <span class="inline-flex items-center gap-1">
+                  <i class="fa-solid fa-pencil text-indigo-600"></i> Edit
+                </span>
+              </th>
+              <th class="py-3 px-3 text-center w-24">
+                <span class="inline-flex items-center gap-1">
+                  <i class="fa-solid fa-trash-can text-rose-600"></i> Delete
+                </span>
+              </th>
+              <th class="py-3 px-3 text-center w-28 bg-blue-50/50">
+                <span class="inline-flex items-center gap-1 text-blue-900">
+                  <i class="fa-solid fa-crown text-amber-500"></i> Admin
+                </span>
+              </th>
+              <th class="py-3 px-4 text-right w-24">Row Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for mod in modules %}
+            {% with p=perms_map|default:None %}
+            <tr class="hover:bg-slate-50/70 transition module-row" id="row-{{ mod.key }}" data-module="{{ mod.key }}">
+              <td class="py-3.5 px-5">
+                <div class="flex items-center space-x-3">
+                  <span class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-xs shrink-0">
+                    <i class="fa-solid {{ mod.icon }}"></i>
+                  </span>
+                  <div>
+                    <div class="font-bold text-slate-900 text-xs">{{ mod.name }}</div>
+                    <div class="text-[10px] text-slate-400 font-normal leading-tight">{{ mod.desc }}</div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Read -->
+              <td class="py-3 px-3 text-center">
+                <label class="inline-flex items-center justify-center cursor-pointer p-1">
+                  <input 
+                    type="checkbox" 
+                    name="perm_{{ mod.key }}_read" 
+                    value="1" 
+                    class="perm-checkbox perm-read w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 transition cursor-pointer"
+                    id="chk_{{ mod.key }}_read"
+                    {% if mod.can_read %}checked{% endif %}
+                  >
+                </label>
+              </td>
+
+              <!-- Write -->
+              <td class="py-3 px-3 text-center">
+                <label class="inline-flex items-center justify-center cursor-pointer p-1">
+                  <input 
+                    type="checkbox" 
+                    name="perm_{{ mod.key }}_write" 
+                    value="1" 
+                    class="perm-checkbox perm-write w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 transition cursor-pointer"
+                    id="chk_{{ mod.key }}_write"
+                    {% if mod.can_write %}checked{% endif %}
+                  >
+                </label>
+              </td>
+
+              <!-- Edit -->
+              <td class="py-3 px-3 text-center">
+                <label class="inline-flex items-center justify-center cursor-pointer p-1">
+                  <input 
+                    type="checkbox" 
+                    name="perm_{{ mod.key }}_edit" 
+                    value="1" 
+                    class="perm-checkbox perm-edit w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 transition cursor-pointer"
+                    id="chk_{{ mod.key }}_edit"
+                    {% if mod.can_edit %}checked{% endif %}
+                  >
+                </label>
+              </td>
+
+              <!-- Delete -->
+              <td class="py-3 px-3 text-center">
+                <label class="inline-flex items-center justify-center cursor-pointer p-1">
+                  <input 
+                    type="checkbox" 
+                    name="perm_{{ mod.key }}_delete" 
+                    value="1" 
+                    class="perm-checkbox perm-delete w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 transition cursor-pointer"
+                    id="chk_{{ mod.key }}_delete"
+                    {% if mod.can_delete %}checked{% endif %}
+                  >
+                </label>
+              </td>
+
+              <!-- Admin -->
+              <td class="py-3 px-3 text-center bg-blue-50/30">
+                <label class="inline-flex items-center justify-center cursor-pointer p-1">
+                  <input 
+                    type="checkbox" 
+                    name="perm_{{ mod.key }}_admin" 
+                    value="1" 
+                    class="perm-checkbox perm-admin w-4.5 h-4.5 text-blue-700 rounded border-slate-300 focus:ring-blue-600 transition cursor-pointer"
+                    id="chk_{{ mod.key }}_admin"
+                    onchange="toggleRowAdmin('{{ mod.key }}', this.checked)"
+                    {% if mod.can_admin %}checked{% endif %}
+                  >
+                </label>
+              </td>
+
+              <!-- Row Quick Toggle -->
+              <td class="py-3 px-4 text-right">
+                <button 
+                  type="button" 
+                  onclick="toggleFullRow('{{ mod.key }}')"
+                  class="text-[10px] font-semibold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                  title="Toggle all for this module"
+                >
+                  Toggle
+                </button>
+              </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Actions Footer -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center justify-between">
+      <a 
+        href="{% url 'seller-roles-web' %}" 
+        class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition text-xs"
+      >
+        Cancel
+      </a>
+      <button 
+        type="submit" 
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20 flex items-center gap-2"
+      >
+        <i class="fa-solid fa-check"></i>
+        <span>{% if is_edit %}Save Changes to Role{% else %}Create Role & Assign Permissions{% endif %}</span>
+      </button>
+    </div>
+  </form>
+
+</div>
+
+<script>
+function toggleRowAdmin(modKey, isChecked) {
+  const readChk = document.getElementById(`chk_${modKey}_read`);
+  const writeChk = document.getElementById(`chk_${modKey}_write`);
+  const editChk = document.getElementById(`chk_${modKey}_edit`);
+  const deleteChk = document.getElementById(`chk_${modKey}_delete`);
+
+  if (isChecked) {
+    if (readChk) readChk.checked = true;
+    if (writeChk) writeChk.checked = true;
+    if (editChk) editChk.checked = true;
+    if (deleteChk) deleteChk.checked = true;
+  }
+}
+
+function toggleFullRow(modKey) {
+  const adminChk = document.getElementById(`chk_${modKey}_admin`);
+  const readChk = document.getElementById(`chk_${modKey}_read`);
+  const writeChk = document.getElementById(`chk_${modKey}_write`);
+  const editChk = document.getElementById(`chk_${modKey}_edit`);
+  const deleteChk = document.getElementById(`chk_${modKey}_delete`);
+
+  const current = adminChk ? adminChk.checked : false;
+  const next = !current;
+
+  if (adminChk) adminChk.checked = next;
+  if (readChk) readChk.checked = next;
+  if (writeChk) writeChk.checked = next;
+  if (editChk) editChk.checked = next;
+  if (deleteChk) deleteChk.checked = next;
+}
+
+function setAllPermissions(grant) {
+  document.querySelectorAll('.perm-checkbox').forEach(chk => {
+    chk.checked = grant;
+  });
+}
+
+function setAllReadOnly() {
+  document.querySelectorAll('.perm-checkbox').forEach(chk => {
+    if (chk.classList.contains('perm-read')) {
+      chk.checked = true;
+    } else {
+      chk.checked = false;
+    }
+  });
+}
+</script>
+{% endblock %}

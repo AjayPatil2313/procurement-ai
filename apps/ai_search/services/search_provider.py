@@ -54,18 +54,36 @@ class WebSearchProvider:
         """
         Executes discovery search for the given query and returns candidate URLs with snippets.
         Returns: list of dicts: [{"title": ..., "url": ..., "snippet": ..., "phone": ..., "email": ...}]
+        Strategies (cascade in priority order):
+          1. SerpAPI (if SERPAPI_API_KEY is configured in .env)
+          2. Google Custom Search Engine (if GOOGLE_SEARCH_API_KEY & GOOGLE_CSE_ID configured)
+          3. AI-Powered Verified Discovery via Gemini (using GEMINI_API_KEY)
+          4. Live Web Search Engine (DuckDuckGo HTML live crawl)
+          5. Verified Real Industrial Enterprise Directory Fallback
         """
         query_clean = query.strip()
         if not query_clean:
             return []
 
-        # 1. Primary Strategy: AI-Powered Verified Discovery via Gemini
+        # 1. SerpAPI Google Search Strategy
+        serpapi_candidates = self._search_via_serpapi(query_clean, num_results=num_results)
+        if serpapi_candidates:
+            logger.info(f"Discovered {len(serpapi_candidates)} live candidates via SerpAPI Google Search for '{query_clean}'")
+            return serpapi_candidates[:num_results]
+
+        # 2. Google Custom Search JSON API Strategy
+        google_cse_candidates = self._search_via_google_cse(query_clean, num_results=num_results)
+        if google_cse_candidates:
+            logger.info(f"Discovered {len(google_cse_candidates)} live candidates via Google Custom Search API for '{query_clean}'")
+            return google_cse_candidates[:num_results]
+
+        # 3. AI-Powered Verified Discovery via Gemini
         ai_candidates = self._search_via_gemini(query_clean, num_results=num_results)
         if ai_candidates:
             logger.info(f"Discovered {len(ai_candidates)} real verified candidates via Gemini AI for '{query_clean}'")
             return ai_candidates[:num_results]
 
-        # 2. Secondary Strategy: Live Web Search Engine
+        # 4. Live Web Search Engine (DuckDuckGo)
         try:
             live_results = self._search_duckduckgo(query_clean, num_results=num_results)
             if live_results:
@@ -73,8 +91,90 @@ class WebSearchProvider:
         except Exception as e:
             logger.warning(f"Web search engine exception: {e}")
 
-        # 3. Tertiary Strategy: Verified Real Industrial Enterprise Directory
+        # 5. Verified Real Industrial Enterprise Directory Fallback
         return self._generate_fallback_candidates(query_clean, num_results=num_results)
+
+    def _search_via_serpapi(self, query: str, num_results: int = 6) -> list[dict]:
+        """Queries SerpAPI (Google Search API) for real-time live web search results."""
+        api_key = os.getenv("SERPAPI_API_KEY", "").strip()
+        if not api_key:
+            return []
+
+        try:
+            params = {
+                "engine": "google",
+                "q": query,
+                "api_key": api_key,
+                "num": num_results,
+                "gl": "in",
+                "hl": "en",
+            }
+            resp = requests.get("https://serpapi.com/search.json", params=params, timeout=self.timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                organic_results = data.get("organic_results", [])
+                candidates = []
+                for item in organic_results:
+                    link = item.get("link", "").strip()
+                    if not link or not link.startswith("http"):
+                        continue
+                    domain = urllib.parse.urlparse(link).netloc.lower()
+                    if any(excluded in domain for excluded in EXCLUDED_DOMAINS):
+                        continue
+                    candidates.append({
+                        "title": item.get("title", domain)[:200],
+                        "url": link,
+                        "snippet": item.get("snippet", "")[:400],
+                        "phone": "",
+                        "email": "",
+                    })
+                    if len(candidates) >= num_results:
+                        break
+                return candidates
+        except Exception as e:
+            logger.warning(f"SerpAPI discovery exception: {e}")
+        return []
+
+    def _search_via_google_cse(self, query: str, num_results: int = 6) -> list[dict]:
+        """Queries Google Custom Search JSON API for live web results."""
+        api_key = os.getenv("GOOGLE_SEARCH_API_KEY", "").strip()
+        cse_id = os.getenv("GOOGLE_CSE_ID", "").strip()
+        if not api_key or not cse_id:
+            return []
+
+        try:
+            params = {
+                "key": api_key,
+                "cx": cse_id,
+                "q": query,
+                "num": min(num_results, 10),
+                "gl": "in",
+            }
+            resp = requests.get("https://www.googleapis.com/customsearch/v1", params=params, timeout=self.timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                items = data.get("items", [])
+                candidates = []
+                for item in items:
+                    link = item.get("link", "").strip()
+                    if not link or not link.startswith("http"):
+                        continue
+                    domain = urllib.parse.urlparse(link).netloc.lower()
+                    if any(excluded in domain for excluded in EXCLUDED_DOMAINS):
+                        continue
+                    candidates.append({
+                        "title": item.get("title", domain)[:200],
+                        "url": link,
+                        "snippet": item.get("snippet", "")[:400],
+                        "phone": "",
+                        "email": "",
+                    })
+                    if len(candidates) >= num_results:
+                        break
+                return candidates
+        except Exception as e:
+            logger.warning(f"Google CSE discovery exception: {e}")
+        return []
 
     def _search_via_gemini(self, query: str, num_results: int = 6) -> list[dict]:
         """Queries Gemini LLM for verified real manufacturing enterprises and buyers with official sites."""

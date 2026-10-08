@@ -479,7 +479,7 @@ def find_buyers_view(request):
         leads_qs = leads_qs.filter(search_job__product_id=product_id)
         selected_product = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
 
-    leads = leads_qs[:30]
+    leads = list(leads_qs[:30]) if selected_product else []
     saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
     return render(request, "products/find_buyers.html", {

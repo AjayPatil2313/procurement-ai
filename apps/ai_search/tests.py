@@ -207,3 +207,34 @@ class DynamicMatchingParametersTestCase(TestCase):
         params = MatchingParameter.objects.filter(company=self.company)
         self.assertEqual(params.count(), 10)
         self.assertFalse(params.filter(parameter_key="junk").exists())
+
+    def test_web_search_provider_serpapi_and_google_cse_adapters(self):
+        """Verify WebSearchProvider handles SerpAPI, Google CSE, and fallback candidates safely."""
+        from unittest.mock import patch, MagicMock
+        from apps.ai_search.services.search_provider import WebSearchProvider
+
+        provider = WebSearchProvider(timeout=1.0)
+
+        # 1. Test SerpAPI with mocked response
+        with patch.dict("os.environ", {"SERPAPI_API_KEY": "test_serp_key"}):
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {
+                "organic_results": [
+                    {
+                        "title": "Tata Steel Industrial Procurement",
+                        "link": "https://www.tatasteel.com/procurement",
+                        "snippet": "Official procurement portal for industrial buyers and vendors.",
+                    }
+                ]
+            }
+            with patch("requests.get", return_value=mock_resp):
+                results = provider.search("steel procurement india", num_results=1)
+                self.assertEqual(len(results), 1)
+                self.assertIn("tatasteel.com", results[0]["url"])
+
+        # 2. Test Fallback candidates when no APIs configured
+        with patch.dict("os.environ", {"SERPAPI_API_KEY": "", "GOOGLE_SEARCH_API_KEY": "", "GEMINI_API_KEY": ""}):
+            results_fallback = provider.search("industrial valves manufacturers", num_results=2)
+            self.assertGreaterEqual(len(results_fallback), 1)
+            self.assertTrue(results_fallback[0]["url"].startswith("http"))

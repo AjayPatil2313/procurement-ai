@@ -88,6 +88,17 @@ class Inquiry(models.Model):
         max_length=255,
         blank=True,
     )
+    attachment = models.FileField(
+        upload_to="inquiries/%Y/%m/",
+        null=True,
+        blank=True,
+        help_text="Optional Quotation PDF, Technical Specs, or RFQ Document",
+    )
+    attachment_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Original filename of the attached document",
+    )
     sent_at = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -99,6 +110,33 @@ class Inquiry(models.Model):
     def __str__(self):
         return f"Inquiry to {self.sent_to_email}: {self.subject}"
 
+    def get_attachment_filename(self):
+        if self.attachment_name:
+            return self.attachment_name
+        if self.attachment:
+            return self.attachment.name.replace("\\", "/").split("/")[-1]
+        return ""
+
+    def get_attachment_extension(self):
+        name = self.get_attachment_filename().lower()
+        if "." in name:
+            return name.rsplit(".", 1)[-1]
+        return ""
+
+    def get_attachment_size_display(self):
+        if not self.attachment:
+            return ""
+        try:
+            size = self.attachment.size
+            if size < 1024:
+                return f"{size} B"
+            elif size < 1024 * 1024:
+                return f"{size / 1024:.1f} KB"
+            else:
+                return f"{size / (1024 * 1024):.1f} MB"
+        except Exception:
+            return ""
+
     def ensure_initial_message(self):
         """Ensures the primary dispatched message is logged in the message thread."""
         if not self.messages.exists() and self.message:
@@ -108,6 +146,8 @@ class Inquiry(models.Model):
                 message_type=InquiryMessage.MessageType.OUTBOUND,
                 subject=self.subject,
                 body=self.message,
+                attachment=self.attachment,
+                attachment_name=self.attachment_name,
             )
 
 
@@ -141,6 +181,17 @@ class InquiryMessage(models.Model):
     )
     subject = models.CharField(max_length=255, blank=True)
     body = models.TextField()
+    attachment = models.FileField(
+        upload_to="inquiry_messages/%Y/%m/",
+        null=True,
+        blank=True,
+        help_text="Attached commercial document or specification",
+    )
+    attachment_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Original filename of the attached document",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -148,6 +199,33 @@ class InquiryMessage(models.Model):
 
     def __str__(self):
         return f"Message #{self.id} for Inquiry #{self.inquiry_id} ({self.message_type})"
+
+    def get_attachment_filename(self):
+        if self.attachment_name:
+            return self.attachment_name
+        if self.attachment:
+            return self.attachment.name.replace("\\", "/").split("/")[-1]
+        return ""
+
+    def get_attachment_extension(self):
+        name = self.get_attachment_filename().lower()
+        if "." in name:
+            return name.rsplit(".", 1)[-1]
+        return ""
+
+    def get_attachment_size_display(self):
+        if not self.attachment:
+            return ""
+        try:
+            size = self.attachment.size
+            if size < 1024:
+                return f"{size} B"
+            elif size < 1024 * 1024:
+                return f"{size / 1024:.1f} KB"
+            else:
+                return f"{size / (1024 * 1024):.1f} MB"
+        except Exception:
+            return ""
 
 
 class PriceHistory(models.Model):

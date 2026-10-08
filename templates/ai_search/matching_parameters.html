@@ -22,7 +22,7 @@
         <span>AI Company Matching Parameters</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
-        Dynamically customize buyer scoring rules (Pvt Ltd status, verified contacts, location, product fit, capacity, B2B model). Add, edit, or toggle criteria applied during Find Buyers.
+        Dynamically customize vendor scoring rules (Pvt Ltd status, verified contacts, location, product fit, capacity, B2B model). Add, edit, or toggle criteria applied during Find Vendors.
       </p>
     </div>
 
@@ -51,7 +51,7 @@
         class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-orange-500/20"
       >
         <i class="fa-solid fa-crosshairs"></i>
-        <span>Find Buyers</span>
+        <span>Find Vendors</span>
       </a>
     </div>
   </div>
@@ -119,7 +119,7 @@
       <div>
         <strong class="text-slate-900 font-bold">How Active Parameters Work:</strong>
         <span class="text-slate-600 ml-1">
-          When you click "Find Buyers", only active parameters are fed into the AI scoring pipeline. High-scoring companies receive verified parameter tags (e.g. <em>Pvt Ltd ✓</em>, <em>Verified ✓</em>, <em>B2B Match ✓</em>).
+          When you click "Find Vendors", only active parameters are fed into the AI scoring pipeline. High-scoring companies receive verified parameter tags (e.g. <em>Pvt Ltd ✓</em>, <em>Verified ✓</em>, <em>B2B Match ✓</em>).
         </span>
       </div>
     </div>
@@ -217,7 +217,7 @@
             <!-- Criteria Value -->
             <td class="py-3.5 px-4">
               <div class="text-xs text-slate-800 font-medium">
-                {{ p.criteria_value|default:"Standard evaluation based on buyer profile and verified signals." }}
+                {{ p.criteria_value|default:"Standard evaluation based on vendor profile and verified signals." }}
               </div>
             </td>
 
@@ -308,7 +308,7 @@
         </div>
         <div>
           <h3 class="text-sm font-bold text-slate-900">Add Matching Parameter</h3>
-          <p class="text-xs text-slate-500">Define a new scoring rule for the buyer search engine</p>
+          <p class="text-xs text-slate-500">Define a new scoring rule for the vendor search engine</p>
         </div>
       </div>
       <button type="button" onclick="closeAddParameterModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
@@ -381,7 +381,7 @@
           <input type="checkbox" name="is_active" value="1" checked class="sr-only peer">
           <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
         </label>
-        <span class="text-xs font-semibold text-slate-700">Activate immediately for buyer matching</span>
+        <span class="text-xs font-semibold text-slate-700">Activate immediately for vendor matching</span>
       </div>
 
       <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -480,7 +480,7 @@
           <input type="checkbox" id="edit_is_active" name="is_active" value="1" class="sr-only peer">
           <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
         </label>
-        <span class="text-xs font-semibold text-slate-700">Active rule for buyer matching</span>
+        <span class="text-xs font-semibold text-slate-700">Active rule for vendor matching</span>
       </div>
 
       <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -518,7 +518,7 @@
     <form id="deleteParameterForm" method="POST" action="" class="p-5 space-y-4 text-xs">
       {% csrf_token %}
       <p class="text-slate-600 leading-relaxed">
-        Are you sure you want to delete <strong id="deleteParamName" class="text-slate-900"></strong>? This parameter will no longer be considered during buyer search scoring.
+        Are you sure you want to delete <strong id="deleteParamName" class="text-slate-900"></strong>? This parameter will no longer be considered during vendor search scoring.
       </p>
 
       <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -556,7 +556,7 @@
     <form method="POST" action="{% url 'matching-parameter-reset' %}" class="p-5 space-y-4 text-xs">
       {% csrf_token %}
       <p class="text-slate-600 leading-relaxed">
-        This will replace existing parameters with the standard 10 B2B parameters (Pvt Ltd status, verified phone/email, location proximity, product title match, category, buyer demand signal, industry match, capacity/grade, profile relevance, B2B wholesale model) totaling 100% weight.
+        This will replace existing parameters with the standard 10 B2B parameters (Pvt Ltd status, verified phone/email, location proximity, product title match, category, vendor requirement match, industry match, capacity/grade, profile relevance, B2B wholesale model) totaling 100% weight.
       </p>
 
       <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">

@@ -163,13 +163,13 @@ class RBACTestCase(TestCase):
         # 1. Leads list works
         resp_leads = self.client.get(reverse("leads-list"))
         self.assertEqual(resp_leads.status_code, 200)
-        self.assertContains(resp_leads, "Sales Leads")
+        self.assertContains(resp_leads, "Vendor List")
         self.assertNotContains(resp_leads, "Lead Pipeline")
 
         # 2. Saved leads works
         resp_saved = self.client.get(reverse("saved-leads"))
         self.assertEqual(resp_saved.status_code, 200)
-        self.assertContains(resp_saved, "Saved Leads")
+        self.assertContains(resp_saved, "Prequalified Vendors")
 
         # 3. Pipeline route should not exist (404)
         resp_pipeline = self.client.get("/sales/pipeline/")
@@ -514,7 +514,7 @@ class DynamicCompanyTypeAndRBACTestCase(TestCase):
         self.assertContains(dash_resp, "My Requirements")
         self.assertContains(dash_resp, "Buyer Dashboard")
         self.assertNotContains(dash_resp, "SELLER")
-        self.assertNotContains(dash_resp, "My Products")
+        self.assertNotContains(dash_resp, "Find vendors")
 
         # 3. Buyer API allowed: GET /api/requirements/
         req_api_resp = self.client.get(reverse("api-requirements-list"))
@@ -549,7 +549,9 @@ class DynamicCompanyTypeAndRBACTestCase(TestCase):
         dash_resp = self.client.get(reverse("dashboard"))
         self.assertEqual(dash_resp.status_code, 200)
         self.assertContains(dash_resp, "SELLER")
-        self.assertContains(dash_resp, "My Products")
+        self.assertContains(dash_resp, "Find vendors")
+        self.assertContains(dash_resp, "Vendor list")
+        self.assertContains(dash_resp, "Prequalified Vendors")
         self.assertContains(dash_resp, "Seller Dashboard")
         self.assertNotContains(dash_resp, "BUYER")
         self.assertNotContains(dash_resp, "My Requirements")
@@ -1250,22 +1252,14 @@ class SellerModuleTestCase(TestCase):
             match_reason="Procuring control valves for steam boiler circuits",
         )
 
-        # 1. GET /sales/leads/ without filter -> Groups by product
+        # 1. GET /sales/leads/ without filter -> Shows prompt card prompting product selection
         resp = self.client.get(reverse("leads-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Sales Leads")
+        self.assertContains(resp, "Vendor List")
         self.assertContains(resp, "product_filter_input")
         self.assertContains(resp, "Product A - ANSI Pump")
         self.assertContains(resp, "Product B - Control Valve")
-        self.assertContains(resp, "Apex Refinery Ltd")
-        self.assertContains(resp, "Zenith Power Station")
-
-        # Verify context has product groups
-        product_groups = resp.context["product_groups"]
-        self.assertEqual(len(product_groups), 2)
-        group_products = [g["product"].name for g in product_groups]
-        self.assertIn(self.prod_a.name, group_products)
-        self.assertIn(self.prod_b.name, group_products)
+        self.assertContains(resp, "Select a Product to View Discovered Vendors")
 
         # 2. GET /sales/leads/?product_id=prod_a.id -> Filters strictly to prod_a
         resp_filtered = self.client.get(reverse("leads-list"), {"product_id": self.prod_a.id})
@@ -1906,7 +1900,7 @@ class AISearchScrapingEngineTestCase(TestCase):
         # 1. GET page before search
         resp_get = self.client.get(reverse("find-buyers"))
         self.assertEqual(resp_get.status_code, 200)
-        self.assertContains(resp_get, "AI Buyer Leads")
+        self.assertContains(resp_get, "AI Find Vendors")
         self.assertContains(resp_get, "product_search_input")
         self.assertContains(resp_get, "product_dropdown_menu")
         # Verify alphabetical ordering A-Z
@@ -2107,7 +2101,7 @@ class LeadCRMandRFQWorkflowTestCase(TestCase):
         self.assertTrue(ajax_resp.json()["success"])
 
     def test_saved_leads_view_renders_crm(self):
-        """Saved leads view renders CRM pipeline, stages, and assigned members"""
+        """Saved leads view prompts to select product and renders CRM pipeline when product selected"""
         SavedItem.objects.create(
             company=self.seller_company,
             search_result=self.lead_result,
@@ -2115,12 +2109,19 @@ class LeadCRMandRFQWorkflowTestCase(TestCase):
             notes="Follow up after client board meeting",
         )
         self.client.login(email="selleradmin@steelcorp.com", password="Password@123")
+        
+        # 1. Unselected product view shows prompt card
         resp = self.client.get(reverse("saved-leads"))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Metro Infra Projects Ltd")
-        self.assertContains(resp, "Follow up after client board meeting")
-        self.assertContains(resp, "Contacted")
-        self.assertContains(resp, "Negotiating")
+        self.assertContains(resp, "Select a Product to Access Prequalified Vendors")
+
+        # 2. Selected product view renders CRM pipeline, stages, and assigned members
+        resp_prod = self.client.get(f"{reverse('saved-leads')}?product_id={self.product.id}")
+        self.assertEqual(resp_prod.status_code, 200)
+        self.assertContains(resp_prod, "Metro Infra Projects Ltd")
+        self.assertContains(resp_prod, "Follow up after client board meeting")
+        self.assertContains(resp_prod, "Contacted")
+        self.assertContains(resp_prod, "Negotiating")
 
     def test_update_saved_lead_view(self):
         """Seller can update stage, private notes, and assigned team rep"""
@@ -2295,13 +2296,17 @@ class LeadCRMandRFQWorkflowTestCase(TestCase):
         )
         self.client.login(email="selleradmin@steelcorp.com", password="Password@123")
 
-        # 1. Access via sales inquiries URL
+        # 1. Access via sales inquiries URL without product selection -> shows prompt card
         resp_sales = self.client.get(reverse("sales-inquiries-list"))
         self.assertEqual(resp_sales.status_code, 200)
         self.assertContains(resp_sales, "Buyer Inquiries")
         self.assertNotContains(resp_sales, "Commercial Outreach")
-        self.assertContains(resp_sales, "Commercial Proposal - TMT Steel Bars")
-        self.assertContains(resp_sales, "Find New Buyers")
+        self.assertContains(resp_sales, "Select a Product to Manage Inquiries & Quotes")
+
+        # Access with product selection -> displays product inquiries
+        resp_sales_prod = self.client.get(f"{reverse('sales-inquiries-list')}?product_id={self.product.id}")
+        self.assertEqual(resp_sales_prod.status_code, 200)
+        self.assertContains(resp_sales_prod, "Commercial Proposal - TMT Steel Bars")
 
         # 2. Access inquiry detail dossier
         resp_detail = self.client.get(reverse("inquiry-detail", args=[inquiry.id]))
@@ -2467,11 +2472,16 @@ class SellerRolesAndTeamManagementTestCase(TestCase):
         self.assertTrue(prod_perm.can_write)
         self.assertTrue(prod_perm.can_edit)
 
-        # Verify page renders the row with role-perms script tag safely
+        # Verify roles management page renders row and dedicated full-page edit link
         resp_web = self.client.get(reverse("seller-roles-web"))
         self.assertEqual(resp_web.status_code, 200)
-        self.assertContains(resp_web, f'id="role-perms-{custom_role.id}"')
-        self.assertContains(resp_web, f"openEditRoleModal('{custom_role.id}')")
+        self.assertContains(resp_web, reverse("seller-role-edit", args=[custom_role.id]))
+
+        # Verify dedicated full-page role edit view renders form matrix
+        resp_edit_page = self.client.get(reverse("seller-role-edit", args=[custom_role.id]))
+        self.assertEqual(resp_edit_page.status_code, 200)
+        self.assertContains(resp_edit_page, "Senior Salesman")
+        self.assertContains(resp_edit_page, "Senior rep duties and catalogs")
 
         # 2. Delete the custom role
         resp_del = self.client.post(reverse("seller-role-delete", args=[custom_role.id]))

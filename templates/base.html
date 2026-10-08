@@ -129,25 +129,25 @@
           <div class="space-y-0.5">
             <a href="{% url 'products-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/products/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-box-open w-5 text-center mr-2.5 text-xs"></i> My Products
+                <i class="fa-solid fa-box-open w-5 text-center mr-2.5 text-xs"></i> Products
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             <a href="{% url 'find-buyers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/find-buyers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-crosshairs w-5 text-center mr-2.5 text-xs"></i> Find Buyers
+                <i class="fa-solid fa-crosshairs w-5 text-center mr-2.5 text-xs"></i> Find vendors
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             <a href="{% url 'leads-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-users-viewfinder w-5 text-center mr-2.5 text-xs"></i> Buyer Leads
+                <i class="fa-solid fa-users-viewfinder w-5 text-center mr-2.5 text-xs"></i> Vendor list
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             <a href="{% url 'saved-leads' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/saved-leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Saved Buyers
+                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Prequalified Vendors
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>

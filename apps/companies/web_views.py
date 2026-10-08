@@ -645,9 +645,9 @@ def seller_roles_web_view(request):
 
     modules = [
         {"key": "products", "name": "Products", "icon": "fa-box-open", "desc": "Product catalog, items, specifications & MOQ"},
-        {"key": "find_buyers", "name": "Find Buyers", "icon": "fa-crosshairs", "desc": "AI buyer discovery & targeted web scraping"},
-        {"key": "leads", "name": "Buyer Leads", "icon": "fa-users-viewfinder", "desc": "Discovered enterprise leads & fit scoring"},
-        {"key": "saved_buyers", "name": "Saved Buyers", "icon": "fa-bookmark", "desc": "CRM deal pipeline, notes, and sales rep assignments"},
+        {"key": "find_buyers", "name": "Find vendors", "icon": "fa-crosshairs", "desc": "AI vendor discovery & targeted web scraping"},
+        {"key": "leads", "name": "Vendor list", "icon": "fa-users-viewfinder", "desc": "Discovered enterprise vendors & fit scoring"},
+        {"key": "saved_buyers", "name": "Prequalified Vendors", "icon": "fa-bookmark", "desc": "Prequalified vendor pipeline, notes, and assignments"},
         {"key": "inquiries", "name": "Buyer Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
         {"key": "export_reports", "name": "Export Reports", "icon": "fa-download", "desc": "CSV downloads & catalog matrix exports"},
         {"key": "matching_parameters", "name": "Matching Parameters", "icon": "fa-sliders", "desc": "AI matching score criteria & rules"},
@@ -671,14 +671,29 @@ def seller_roles_web_view(request):
     })
 
 
+SELLER_MODULES_CONFIG = [
+    {"key": "products", "name": "Products", "icon": "fa-box-open", "desc": "Product catalog, items, specifications & MOQ"},
+    {"key": "find_buyers", "name": "Find vendors", "icon": "fa-crosshairs", "desc": "AI vendor discovery & targeted web scraping"},
+    {"key": "leads", "name": "Vendor list", "icon": "fa-users-viewfinder", "desc": "Discovered enterprise vendors & fit scoring"},
+    {"key": "saved_buyers", "name": "Prequalified Vendors", "icon": "fa-bookmark", "desc": "Prequalified vendor pipeline, notes, and assignments"},
+    {"key": "inquiries", "name": "Buyer Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
+    {"key": "export_reports", "name": "Export Reports", "icon": "fa-download", "desc": "CSV downloads & catalog matrix exports"},
+    {"key": "matching_parameters", "name": "Matching Parameters", "icon": "fa-sliders", "desc": "AI matching score criteria & rules"},
+    {"key": "team", "name": "User Management", "icon": "fa-users-gear", "desc": "Employee management & user assignments"},
+    {"key": "billing", "name": "Subscription & Credits", "icon": "fa-coins", "desc": "Plan status and AI credits allocation"},
+    {"key": "requirements", "name": "Requirements", "icon": "fa-clipboard-list", "desc": "Procurement requisitions & requests"},
+    {"key": "find_suppliers", "name": "Find Suppliers", "icon": "fa-magnifying-glass-chart", "desc": "Supplier discovery & search"},
+    {"key": "saved_suppliers", "name": "Saved Suppliers", "icon": "fa-bookmark", "desc": "Shortlisted supplier vendors"},
+]
+
+
 @login_required
 def seller_role_create_view(request):
     """
     Creates a new custom role with matrix permissions.
+    GET: Renders dedicated full-page role creation form.
+    POST: Validates and saves role with configured module permissions.
     """
-    if request.method != "POST":
-        return redirect("seller-roles-web")
-
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
@@ -687,16 +702,38 @@ def seller_role_create_view(request):
         messages.error(request, "Access restricted: Company administrator privileges required.")
         return redirect("seller-roles-web")
 
+    if request.method == "GET":
+        modules_with_perms = []
+        for mod in SELLER_MODULES_CONFIG:
+            m_copy = dict(mod)
+            m_copy.update({
+                "can_read": False,
+                "can_write": False,
+                "can_edit": False,
+                "can_delete": False,
+                "can_admin": False,
+            })
+            modules_with_perms.append(m_copy)
+
+        return render(request, "company/role_form.html", {
+            "company": company,
+            "rbac": rbac,
+            "modules": modules_with_perms,
+            "is_edit": False,
+            "role": None,
+            "page_title": "Add New Role",
+        })
+
     name = request.POST.get("name", "").strip()
     description = request.POST.get("description", "").strip()
 
     if not name:
         messages.error(request, "Role name is required.")
-        return redirect("seller-roles-web")
+        return redirect("seller-role-create")
 
     if CompanyRole.objects.filter(company=company, name__iexact=name).exists():
         messages.error(request, f"A role named '{name}' already exists in your company.")
-        return redirect("seller-roles-web")
+        return redirect("seller-role-create")
 
     role = CompanyRole.objects.create(
         company=company,
@@ -733,10 +770,9 @@ def seller_role_create_view(request):
 def seller_role_edit_view(request, role_id):
     """
     Updates role name, description, and module permissions.
+    GET: Renders dedicated full-page role edit form with pre-populated permissions.
+    POST: Updates role identity and saves modified permissions.
     """
-    if request.method != "POST":
-        return redirect("seller-roles-web")
-
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
@@ -747,6 +783,33 @@ def seller_role_edit_view(request, role_id):
 
     role = get_object_or_404(CompanyRole, id=role_id, company=company)
 
+    if request.method == "GET":
+        perms_map = {
+            mp.module: mp
+            for mp in role.module_permissions.all()
+        }
+        modules_with_perms = []
+        for mod in SELLER_MODULES_CONFIG:
+            m_copy = dict(mod)
+            mp = perms_map.get(mod["key"])
+            m_copy.update({
+                "can_read": mp.can_read if mp else False,
+                "can_write": mp.can_write if mp else False,
+                "can_edit": mp.can_edit if mp else False,
+                "can_delete": mp.can_delete if mp else False,
+                "can_admin": mp.can_admin if mp else False,
+            })
+            modules_with_perms.append(m_copy)
+
+        return render(request, "company/role_form.html", {
+            "company": company,
+            "rbac": rbac,
+            "modules": modules_with_perms,
+            "is_edit": True,
+            "role": role,
+            "page_title": f"Edit Role: {role.name}",
+        })
+
     new_name = request.POST.get("name", "").strip()
     description = request.POST.get("description", "").strip()
 
@@ -754,7 +817,7 @@ def seller_role_edit_view(request, role_id):
         # Check duplicate name
         if CompanyRole.objects.filter(company=company, name__iexact=new_name).exclude(id=role.id).exists():
             messages.error(request, f"Another role named '{new_name}' already exists.")
-            return redirect("seller-roles-web")
+            return redirect("seller-role-edit", role_id=role.id)
         role.name = new_name
 
     role.description = description

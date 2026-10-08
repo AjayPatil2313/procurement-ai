@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}My Products Catalog — AI Sales Platform{% endblock %}
+{% block title %}Products Catalog — AI Sales Platform{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -13,7 +13,7 @@
         <span>Products Catalog</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
-        Manage products and services your company manufactures or distributes to match with verified B2B buyers
+        Manage products and services your company manufactures or distributes to match with verified B2B vendors
       </p>
     </div>
     {% if can_create %}
@@ -206,8 +206,8 @@
             <!-- Actions -->
             <td class="py-3.5 px-4 text-right whitespace-nowrap">
               <div class="flex items-center justify-end space-x-1.5">
-                <!-- Find Buyers AI -->
-                <a href="{% url 'find-buyers' %}?product_id={{ p.id }}" class="p-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg border border-orange-200 transition" title="Find Buyers (AI Matching)">
+                <!-- Find Vendors AI -->
+                <a href="{% url 'find-buyers' %}?product_id={{ p.id }}" class="p-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg border border-orange-200 transition" title="Find Vendors (AI Matching)">
                   <i class="fa-solid fa-crosshairs text-xs"></i>
                 </a>
 

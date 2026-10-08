@@ -2,7 +2,7 @@ import csv
 import json
 from datetime import timedelta
 from decimal import Decimal
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Avg
 from django.db.models.functions import Lower
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -478,6 +478,8 @@ def send_rfq_view(request, result_id):
             except Exception:
                 pass
 
+        uploaded_attachment = request.FILES.get("attachment")
+
         inquiry = Inquiry.objects.create(
             company=company,
             search_result=result,
@@ -487,6 +489,8 @@ def send_rfq_view(request, result_id):
             status=Inquiry.Status.SENT,
             quoted_price=quoted_price,
             delivery_terms=delivery_terms,
+            attachment=uploaded_attachment,
+            attachment_name=uploaded_attachment.name if uploaded_attachment else "",
         )
 
         # Log initial outbound message in conversation thread
@@ -497,10 +501,16 @@ def send_rfq_view(request, result_id):
             message_type=InquiryMessage.MessageType.OUTBOUND,
             subject=subject,
             body=message,
+            attachment=inquiry.attachment,
+            attachment_name=inquiry.attachment_name,
         )
 
         # Dispatch real email
-        sent_ok, email_msg = send_inquiry_email(inquiry, user=request.user)
+        sent_ok, email_msg = send_inquiry_email(
+            inquiry,
+            user=request.user,
+            attachment_file=uploaded_attachment,
+        )
         if not sent_ok:
             inquiry.status = Inquiry.Status.FAILED
             inquiry.save(update_fields=["status"])
@@ -751,15 +761,19 @@ def add_inquiry_message_view(request, pk):
         sender_name = request.POST.get("sender_name", "").strip() or (request.user.get_full_name() or request.user.email)
         new_status = request.POST.get("new_status", "").strip()
         send_email_copy = "send_email_copy" in request.POST
+        uploaded_attachment = request.FILES.get("attachment")
 
-        if body:
-            InquiryMessage.objects.create(
+        if body or uploaded_attachment:
+            message_content = body or "(Commercial Document Attached)"
+            inquiry_msg = InquiryMessage.objects.create(
                 inquiry=inquiry,
                 sender=request.user,
                 sender_name=sender_name,
                 message_type=msg_type,
                 subject=f"Re: {inquiry.subject}",
-                body=body,
+                body=message_content,
+                attachment=uploaded_attachment,
+                attachment_name=uploaded_attachment.name if uploaded_attachment else "",
             )
 
             if new_status and new_status in [s[0] for s in Inquiry.Status.choices]:
@@ -769,7 +783,12 @@ def add_inquiry_message_view(request, pk):
             inquiry.save(update_fields=["status", "updated_at"])
 
             if send_email_copy:
-                send_inquiry_email(inquiry, user=request.user)
+                send_inquiry_email(
+                    inquiry,
+                    user=request.user,
+                    custom_body=message_content,
+                    attachment_file=uploaded_attachment,
+                )
 
             messages.success(request, "Message logged to inquiry thread successfully.")
 
@@ -1081,103 +1100,91 @@ def export_reports_view(request):
     q_search = request.GET.get("q", "").strip()
 
     # Filtered QuerySets based on active controls
-    leads_filtered = leads_base.select_related("external_company", "search_job", "search_job__product", "search_job__product__category")
-    inquiries_filtered = inquiries_base.select_related("search_result", "search_result__external_company", "search_result__search_job__product")
-
-    if selected_product:
-        leads_filtered = leads_filtered.filter(search_job__product=selected_product)
-        inquiries_filtered = inquiries_filtered.filter(search_result__search_job__product=selected_product)
-
-    if date_cutoff:
-        leads_filtered = leads_filtered.filter(created_at__gte=date_cutoff)
-        inquiries_filtered = inquiries_filtered.filter(sent_at__gte=date_cutoff)
-
-    if min_score > 0:
-        leads_filtered = leads_filtered.filter(match_score__gte=min_score)
-
-    if status_filter and status_filter != "all":
-        inquiries_filtered = inquiries_filtered.filter(status=status_filter)
-
-    if q_search:
-        leads_filtered = leads_filtered.filter(
-            Q(external_company__name__icontains=q_search)
-            | Q(external_company__city__icontains=q_search)
-            | Q(external_company__email__icontains=q_search)
-            | Q(product_title__icontains=q_search)
-            | Q(need_signal__icontains=q_search)
+    if not selected_product:
+        leads_filtered = leads_base.none()
+        inquiries_filtered = inquiries_base.none()
+        kpi_leads_count = 0
+        kpi_inquiries_count = 0
+        kpi_high_fit_count = 0
+        kpi_high_fit_pct = 0.0
+        kpi_contact_verified_pct = 0.0
+        verified_leads = 0
+        inq_replied_count = 0
+        inq_discussion_count = 0
+        inq_won_count = 0
+        kpi_inquiry_response_rate = 0.0
+        kpi_inquiry_won_rate = 0.0
+        avg_match_score = 0.0
+        preview_records = []
+    else:
+        leads_filtered = leads_base.filter(search_job__product=selected_product).select_related(
+            "external_company", "search_job", "search_job__product", "search_job__product__category"
         )
-        inquiries_filtered = inquiries_filtered.filter(
-            Q(search_result__external_company__name__icontains=q_search)
-            | Q(sent_to_email__icontains=q_search)
-            | Q(subject__icontains=q_search)
+        inquiries_filtered = inquiries_base.filter(search_result__search_job__product=selected_product).select_related(
+            "search_result", "search_result__external_company", "search_result__search_job__product"
         )
 
-    # Dynamic KPI Calculations for current scope
-    kpi_leads_count = leads_filtered.count()
-    kpi_inquiries_count = inquiries_filtered.count()
+        avg_res = leads_filtered.aggregate(avg_score=Avg("match_score"))
+        avg_match_score = round(float(avg_res["avg_score"]), 1) if avg_res["avg_score"] is not None else 0.0
 
-    # Leads KPIs
-    kpi_high_fit_count = leads_filtered.filter(match_score__gte=80).count()
-    kpi_high_fit_pct = round((kpi_high_fit_count / kpi_leads_count * 100), 1) if kpi_leads_count else 0.0
-    verified_leads = leads_filtered.filter(Q(external_company__email__isnull=False) | Q(external_company__phone__isnull=False)).exclude(external_company__email="").count()
-    kpi_contact_verified_pct = round((verified_leads / kpi_leads_count * 100), 1) if kpi_leads_count else 0.0
+        if date_cutoff:
+            leads_filtered = leads_filtered.filter(created_at__gte=date_cutoff)
+            inquiries_filtered = inquiries_filtered.filter(sent_at__gte=date_cutoff)
 
-    # Inquiries KPIs
-    inq_replied_count = inquiries_filtered.filter(status=Inquiry.Status.REPLIED).count()
-    inq_discussion_count = inquiries_filtered.filter(status=Inquiry.Status.IN_DISCUSSION).count()
-    inq_won_count = inquiries_filtered.filter(status=Inquiry.Status.WON).count()
-    kpi_inquiry_response_rate = round(((inq_replied_count + inq_won_count) / kpi_inquiries_count * 100), 1) if kpi_inquiries_count else 0.0
-    kpi_inquiry_won_rate = round((inq_won_count / kpi_inquiries_count * 100), 1) if kpi_inquiries_count else 0.0
+        if min_score > 0:
+            leads_filtered = leads_filtered.filter(match_score__gte=min_score)
 
-    prod_slug = selected_product.name.replace(" ", "_") if selected_product else "All_Products"
+        if status_filter and status_filter != "all":
+            inquiries_filtered = inquiries_filtered.filter(status=status_filter)
 
-    # HANDLE EXPORT DOWNLOADS (CSV, JSON, or PRINT)
+        if q_search:
+            leads_filtered = leads_filtered.filter(
+                Q(external_company__name__icontains=q_search)
+                | Q(external_company__city__icontains=q_search)
+                | Q(external_company__email__icontains=q_search)
+                | Q(product_title__icontains=q_search)
+                | Q(need_signal__icontains=q_search)
+            )
+            inquiries_filtered = inquiries_filtered.filter(
+                Q(search_result__external_company__name__icontains=q_search)
+                | Q(sent_to_email__icontains=q_search)
+                | Q(subject__icontains=q_search)
+            )
+
+        kpi_leads_count = leads_filtered.count()
+        kpi_inquiries_count = inquiries_filtered.count()
+
+        kpi_high_fit_count = leads_filtered.filter(match_score__gte=80).count()
+        kpi_high_fit_pct = round((kpi_high_fit_count / kpi_leads_count * 100), 1) if kpi_leads_count else 0.0
+        verified_leads = leads_filtered.filter(
+            Q(external_company__email__isnull=False) | Q(external_company__phone__isnull=False)
+        ).exclude(external_company__email="").count()
+        kpi_contact_verified_pct = round((verified_leads / kpi_leads_count * 100), 1) if kpi_leads_count else 0.0
+
+        inq_replied_count = inquiries_filtered.filter(status=Inquiry.Status.REPLIED).count()
+        inq_discussion_count = inquiries_filtered.filter(status=Inquiry.Status.IN_DISCUSSION).count()
+        inq_won_count = inquiries_filtered.filter(status=Inquiry.Status.WON).count()
+        kpi_inquiry_response_rate = round(((inq_replied_count + inq_won_count) / kpi_inquiries_count * 100), 1) if kpi_inquiries_count else 0.0
+        kpi_inquiry_won_rate = round((inq_won_count / kpi_inquiries_count * 100), 1) if kpi_inquiries_count else 0.0
+
+        if report_type == "leads":
+            preview_records = list(leads_filtered.order_by("-match_score", "-created_at")[:100])
+        else:
+            preview_records = list(inquiries_filtered.order_by("-sent_at")[:100])
+
+    prod_slug = selected_product.name.replace(" ", "_") if selected_product else "Selected_Product"
+
+    # HANDLE EXPORT DOWNLOADS (CSV)
     if request.GET.get("download") == "1":
-        export_format = request.GET.get("format", "csv").lower()
+        if not selected_product:
+            messages.warning(request, "Please select a product first to generate and download the export.")
+            return redirect(f"{request.path}?report_type={report_type}")
 
-        # 1. JSON Export
-        if export_format == "json":
-            json_data = []
-            if report_type == "leads":
-                for item in leads_filtered.order_by("-match_score", "-created_at")[:500]:
-                    json_data.append({
-                        "company_name": item.external_company.name,
-                        "industry": item.external_company.industry or "",
-                        "city": item.external_company.city or "",
-                        "country": item.external_company.country or "India",
-                        "website": item.external_company.website or "",
-                        "email": item.external_company.email or "",
-                        "phone": item.external_company.phone or "",
-                        "target_product": item.search_job.product.name if (item.search_job and item.search_job.product) else item.product_title,
-                        "fit_score": item.match_score,
-                        "fit_reason": item.match_reason or "",
-                        "intent_signal": item.need_signal or "",
-                        "discovered_at": item.created_at.isoformat(),
-                    })
-            else:  # inquiries
-                for inq in inquiries_filtered.order_by("-sent_at")[:500]:
-                    json_data.append({
-                        "inquiry_id": inq.id,
-                        "recipient_company": inq.search_result.external_company.name if inq.search_result else "",
-                        "recipient_email": inq.sent_to_email,
-                        "subject": inq.subject,
-                        "status": inq.status,
-                        "quoted_price": str(inq.quoted_price) if inq.quoted_price else "",
-                        "quoted_currency": inq.quoted_currency or "INR",
-                        "delivery_terms": inq.delivery_terms or "",
-                        "sent_at": inq.sent_at.isoformat() if inq.sent_at else "",
-                    })
-
-            response = HttpResponse(json.dumps(json_data, indent=2), content_type="application/json")
-            response["Content-Disposition"] = f'attachment; filename="Report_{report_type}_{prod_slug}.json"'
-            return response
-
-        # 2. CSV Export
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         writer = csv.writer(response)
 
         if report_type == "leads":
-            response["Content-Disposition"] = f'attachment; filename="Buyer_Leads_{prod_slug}.csv"'
+            response["Content-Disposition"] = f'attachment; filename="Vendor_Report_{prod_slug}.csv"'
             writer.writerow(["Company Name", "Industry", "City", "Country", "Website", "Email", "Phone", "Target Product", "Category", "Fit Score (%)", "Fit Reason", "Intent Signal", "Discovered At"])
             for item in leads_filtered.order_by("-match_score", "-created_at")[:1000]:
                 writer.writerow([
@@ -1215,12 +1222,6 @@ def export_reports_view(request):
                 ])
             return response
 
-    # BUILD LIVE PREVIEW RECORDS FOR ON-SCREEN DISPLAY
-    if report_type == "leads":
-        preview_records = list(leads_filtered.order_by("-match_score", "-created_at")[:40])
-    else:  # inquiries
-        preview_records = list(inquiries_filtered.order_by("-sent_at")[:40])
-
     return render(request, "leads/export_reports.html", {
         "products": products,
         "selected_product": selected_product,
@@ -1240,6 +1241,9 @@ def export_reports_view(request):
         "inq_won_count": inq_won_count,
         "kpi_inquiry_response_rate": kpi_inquiry_response_rate,
         "kpi_inquiry_won_rate": kpi_inquiry_won_rate,
+        "avg_match_score": avg_match_score,
+        "current_timestamp": timezone.now(),
+        "report_ref": f"REP-{selected_product.id:04d}-{timezone.now().strftime('%Y%m%d%H%M')}" if selected_product else "",
         "date_range": date_range,
         "min_score": min_score,
         "status_filter": status_filter,
@@ -1249,7 +1253,7 @@ def export_reports_view(request):
         "company": company,
         "rbac": rbac,
         "page_title": (
-            (f"Buyer Leads - {selected_product.name}" if selected_product else "Buyer Leads Discovery Report")
+            (f"Vendor Report - {selected_product.name}" if selected_product else "Vendor Report & Analytics")
             if report_type == "leads" else
             (f"Inquiries Audit - {selected_product.name}" if selected_product else "Inquiries & Outreach Audit Report")
         ),

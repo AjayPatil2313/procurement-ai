@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Saved Buyers — AI Sales{% endblock %}
+{% block title %}Prequalified Vendors — AI Sales{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,28 +11,28 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'find-buyers' %}" class="hover:text-blue-600 transition">Buyer Discovery</a>
+        <a href="{% url 'find-buyers' %}" class="hover:text-blue-600 transition">Vendor Discovery</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">Saved Buyers</span>
+        <span class="text-slate-600 font-semibold">Prequalified Vendors</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-bookmark"></i>
         </span>
-        <span>Saved Buyers</span>
+        <span>Prequalified Vendors</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
-        Track shortlisted buyer deals, assign team reps, update pipeline stages, and manage notes product-by-product.
+        Track prequalified vendors, assign team reps, update pipeline stages, and manage notes product-by-product.
       </p>
     </div>
     <div class="flex items-center gap-2.5">
       <a href="{% url 'leads-list' %}{% if selected_product %}?product_id={{ selected_product.id }}{% endif %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm">
         <i class="fa-solid fa-users-viewfinder text-orange-500"></i>
-        <span>Discovered Leads</span>
+        <span>Vendor List</span>
       </a>
       <a href="{% url 'find-buyers' %}{% if selected_product %}?product_id={{ selected_product.id }}{% endif %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
         <i class="fa-solid fa-wand-magic-sparkles"></i>
-        <span>Find More Buyers</span>
+        <span>Find More Vendors</span>
       </a>
     </div>
   </div>
@@ -318,7 +318,7 @@
       <div class="flex items-center gap-2 shrink-0">
         <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
-          <span>Find More Buyers</span>
+          <span>Find More Vendors</span>
         </a>
         <a href="{% url 'saved-leads' %}" class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
           View All Products
@@ -426,12 +426,12 @@
                 <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mx-auto mb-3">
                   <i class="fa-regular fa-bookmark text-lg"></i>
                 </div>
-                <p class="font-bold text-slate-700 text-sm">No saved buyers for this product</p>
-                <p class="text-xs text-slate-400 mt-1">Discover buyers and click "Save Lead" to add them to your saved buyers.</p>
+                <p class="font-bold text-slate-700 text-sm">No prequalified vendors for this product</p>
+                <p class="text-xs text-slate-400 mt-1">Discover vendors and click "Save Lead" to add them to your prequalified vendors.</p>
                 {% if selected_product %}
                 <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="inline-flex items-center gap-1.5 mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
                   <i class="fa-solid fa-wand-magic-sparkles"></i>
-                  <span>Find Buyers for "{{ selected_product.name }}"</span>
+                  <span>Find Vendors for "{{ selected_product.name }}"</span>
                 </a>
                 {% endif %}
               </td>
@@ -442,10 +442,54 @@
       </div>
     </div>
 
-  <!-- VIEW 2: ALL PRODUCTS GROUPED -->
+  <!-- VIEW 2: NO PRODUCT SELECTED PROMPT CARD -->
   {% else %}
+  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+    <div class="max-w-2xl mx-auto space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
+        <i class="fa-regular fa-bookmark"></i>
+      </div>
+      <div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 mb-2">
+          <i class="fa-solid fa-tags text-[11px]"></i> Prequalified Vendor Pipeline
+        </span>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to Access Prequalified Vendors</h2>
+        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+          The Prequalified Vendors pipeline manages shortlisted suppliers and commercial buyers across qualification stages (New, Contacted, Negotiating, Won, Lost) with team assignments and internal correspondence notes. <strong>Please select a product from the filter above or choose one below to view its prequalified pipeline.</strong>
+        </p>
+      </div>
 
-    {% if product_groups or unassigned_group %}
+      <!-- Quick 1-click product selector cards -->
+      {% if products %}
+      <div class="pt-4 border-t border-slate-100 text-left">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 text-center">
+          Available Catalog Products:
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {% for p in products %}
+          <a 
+            href="{% url 'saved-leads' %}?product_id={{ p.id }}" 
+            class="block text-left p-3.5 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 transition group cursor-pointer bg-slate-50/50"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-800 group-hover:text-amber-700 transition truncate">{{ p.name }}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold {% if p.saved_count > 0 %}bg-amber-100 text-amber-800 border border-amber-200{% else %}bg-slate-200 text-slate-600{% endif %}">
+                {{ p.saved_count }} Saved
+              </span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+              <span>{{ p.category.name|default:"General" }}</span>
+              <span class="text-amber-600 font-semibold group-hover:underline">Manage Pipeline &rarr;</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if False %}
       <div class="space-y-6">
         {% for group in product_groups %}
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -491,7 +535,7 @@
             <table class="w-full text-left text-xs min-w-[880px]">
               <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
                 <tr>
-                  <th class="py-2.5 px-4 min-w-[200px] w-64">Buyer Company</th>
+                  <th class="py-2.5 px-4 min-w-[200px] w-64">Vendor Company</th>
                   <th class="py-2.5 px-4 w-28 whitespace-nowrap">Fit Score</th>
                   <th class="py-2.5 px-4 w-36 whitespace-nowrap">Stage</th>
                   <th class="py-2.5 px-4 w-40 whitespace-nowrap">Assigned Rep</th>
@@ -588,7 +632,7 @@
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
                 <tr>
-                  <th class="py-2.5 px-4">Buyer Company</th>
+                  <th class="py-2.5 px-4">Vendor Company</th>
                   <th class="py-2.5 px-4">Fit Score</th>
                   <th class="py-2.5 px-4 min-w-[130px]">Stage</th>
                   <th class="py-2.5 px-4 min-w-[140px]">Assigned Rep</th>
@@ -670,13 +714,13 @@
         <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-4 border border-orange-100">
           <i class="fa-regular fa-bookmark"></i>
         </div>
-        <h3 class="text-base font-bold text-slate-800 mb-1">No Saved Leads in Pipeline Yet</h3>
+        <h3 class="text-base font-bold text-slate-800 mb-1">No Prequalified Vendors Yet</h3>
         <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
-          Shortlist buyer companies from Discovered Leads to manage negotiations, assign sales reps, and record deal notes product-by-product.
+          Shortlist vendor companies from Vendor List to manage negotiations, assign reps, and record notes product-by-product.
         </p>
         <a href="{% url 'leads-list' %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-orange-500/20">
           <i class="fa-solid fa-users-viewfinder"></i>
-          <span>Browse Discovered Buyer Leads</span>
+          <span>Browse Vendor List</span>
         </a>
       </div>
     {% endif %}
@@ -703,7 +747,7 @@
       </button>
     </div>
 
-    <form id="sendProposalForm" method="POST" action="">
+    <form id="sendProposalForm" method="POST" action="" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="p-5 space-y-4 text-xs">
         <div>
@@ -737,9 +781,25 @@
                     class="w-full rounded-xl border border-slate-300 p-3 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 text-slate-800 text-xs leading-relaxed"></textarea>
         </div>
 
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Attach Quotation / Specsheet</span>
+            <span class="text-[10px] text-slate-400 font-normal">PDF, DOCX, XLSX, Images (Max 15MB)</span>
+          </label>
+          <div class="relative flex items-center">
+            <input type="file" name="attachment" id="proposalAttachment"
+                   accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp"
+                   class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 border border-slate-200 rounded-xl bg-slate-50 cursor-pointer focus:outline-none">
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+            <i class="fa-solid fa-paperclip text-slate-400"></i>
+            Physical document will be delivered to recipient's email inbox and stored in your inquiry thread.
+          </p>
+        </div>
+
         <div class="p-3 bg-orange-50/60 rounded-xl border border-orange-100 flex items-center gap-2 text-orange-900">
           <i class="fa-solid fa-circle-info text-orange-600"></i>
-          <span class="text-[11px] leading-snug">Dispatches email to buyer and automatically initializes an active discussion thread in <strong>Buyer Inquiries</strong>.</span>
+          <span class="text-[11px] leading-snug">Dispatches live email to recipient and automatically initializes an active discussion thread in <strong>Inquiries</strong>.</span>
         </div>
       </div>
 

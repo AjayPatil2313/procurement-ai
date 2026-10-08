@@ -29,7 +29,7 @@
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         {% if is_seller_context %}
-          Audit log, delivery tracker, conversation threads, and commercial quote correspondence for buyer leads organized product-by-product.
+          Audit log, delivery tracker, conversation threads, and commercial quote correspondence for vendor leads organized product-by-product.
         {% else %}
           Audit log, delivery tracker, conversation threads, and supplier quotation capture for procurement requests organized product-by-product.
         {% endif %}
@@ -43,11 +43,11 @@
       </a>
       <a href="{% url 'saved-leads' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
         <i class="fa-solid fa-bookmark text-orange-500"></i>
-        <span>Saved Buyers</span>
+        <span>Prequalified Vendors</span>
       </a>
       <a href="{% url 'find-buyers' %}{% if selected_product_id %}?product_id={{ selected_product_id }}{% endif %}" class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm shadow-orange-500/20">
         <i class="fa-solid fa-crosshairs"></i>
-        <span>Find New Buyers</span>
+        <span>Find New Vendors</span>
       </a>
       {% else %}
       <a href="{% url 'export-reports' %}{% if selected_product_id %}?product_id={{ selected_product_id }}{% endif %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
@@ -441,7 +441,7 @@
         {% if is_seller_context %}
         <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
-          <span>Find More Buyers</span>
+          <span>Find More Vendors</span>
         </a>
         <a href="{% url 'sales-inquiries-list' %}" class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
           View All Products
@@ -492,7 +492,14 @@
                 </div>
               </td>
               <td class="py-3.5 px-4">
-                <div class="font-bold text-slate-800 truncate max-w-xs">{{ inq.subject }}</div>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-800 truncate max-w-xs">{{ inq.subject }}</span>
+                  {% if inq.attachment %}
+                  <span class="inline-flex items-center text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100" title="Attached: {{ inq.get_attachment_filename }}">
+                    <i class="fa-solid fa-paperclip"></i>
+                  </span>
+                  {% endif %}
+                </div>
                 <div class="text-[11px] text-slate-500 truncate max-w-xs">
                   Scope: {{ inq.search_result.product_title }}
                 </div>
@@ -569,9 +576,54 @@
       </div>
     </div>
 
-  <!-- VIEW 2: ALL PRODUCTS GROUPED -->
+  <!-- VIEW 2: NO PRODUCT SELECTED PROMPT CARD -->
   {% else %}
+  {% if is_seller_context %}
+  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+    <div class="max-w-2xl mx-auto space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
+        <i class="fa-solid fa-paper-plane"></i>
+      </div>
+      <div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 mb-2">
+          <i class="fa-solid fa-envelope-open-text text-[11px]"></i> Inquiries & Commercial Correspondence
+        </span>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to Manage Inquiries & Quotes</h2>
+        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+          The Inquiries tracking module monitors outbound commercial proposals, formal price quotations, delivery terms, and live conversation threads product-by-product. <strong>Please select a product from the filter above or choose one below to view its correspondence history.</strong>
+        </p>
+      </div>
 
+      <!-- Quick 1-click product selector cards -->
+      {% if products %}
+      <div class="pt-4 border-t border-slate-100 text-left">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 text-center">
+          Available Catalog Products:
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {% for p in products %}
+          <a 
+            href="{% url 'sales-inquiries-list' %}?product_id={{ p.id }}" 
+            class="block text-left p-3.5 rounded-xl border border-slate-200 hover:border-orange-500 hover:bg-orange-50/50 transition group cursor-pointer bg-slate-50/50"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">{{ p.name }}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold {% if p.inquiry_count > 0 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-slate-200 text-slate-600{% endif %}">
+                {{ p.inquiry_count }} Inquiries
+              </span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+              <span>{{ p.category.name|default:"General" }}</span>
+              <span class="text-orange-600 font-semibold group-hover:underline">Track Inquiries &rarr;</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
     {% if product_groups or unassigned_group %}
       <div class="space-y-6">
         {% for group in product_groups %}
@@ -639,7 +691,14 @@
                     <div class="text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{{ inq.sent_to_email }}</div>
                   </td>
                   <td class="py-3 px-4">
-                    <div class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</span>
+                      {% if inq.attachment %}
+                      <span class="inline-flex items-center text-[10px] text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100" title="Attached: {{ inq.get_attachment_filename }}">
+                        <i class="fa-solid fa-paperclip"></i>
+                      </span>
+                      {% endif %}
+                    </div>
                     <div class="text-[10px] text-slate-400">{{ inq.messages.count }} thread messages</div>
                   </td>
                   <td class="py-3 px-4 whitespace-nowrap">
@@ -728,7 +787,14 @@
                     <div class="text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{{ inq.sent_to_email }}</div>
                   </td>
                   <td class="py-3 px-4">
-                    <div class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</div>
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</span>
+                      {% if inq.attachment %}
+                      <span class="inline-flex items-center text-[10px] text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100" title="Attached: {{ inq.get_attachment_filename }}">
+                        <i class="fa-solid fa-paperclip"></i>
+                      </span>
+                      {% endif %}
+                    </div>
                   </td>
                   <td class="py-3 px-4 whitespace-nowrap">
                     {% if inq.quoted_price %}
@@ -784,6 +850,7 @@
       </div>
     {% endif %}
 
+  {% endif %}
   {% endif %}
 
 </div>

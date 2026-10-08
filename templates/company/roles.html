@@ -27,14 +27,13 @@
     </div>
 
     <div class="flex items-center gap-2.5">
-      <button 
-        type="button" 
-        onclick="openAddRoleModal()" 
+      <a 
+        href="{% url 'seller-role-create' %}" 
         class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20"
       >
         <i class="fa-solid fa-plus"></i>
         <span>Add New Role</span>
-      </button>
+      </a>
     </div>
   </div>
 
@@ -189,14 +188,13 @@
 
             <!-- ACTIONS -->
             <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1">
-              <button 
-                type="button" 
-                onclick="openEditRoleModal('{{ r.role.id }}')"
-                class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+              <a 
+                href="{% url 'seller-role-edit' r.role.id %}"
+                class="inline-block p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                 title="Edit Role & Permissions"
               >
                 <i class="fa-solid fa-pen-to-square text-xs"></i>
-              </button>
+              </a>
 
               {% if not r.role.is_system %}
               <form method="POST" action="{% url 'seller-role-delete' r.role.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete role {{ r.role.name|escapejs }}?');">

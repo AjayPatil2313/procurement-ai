@@ -216,7 +216,7 @@
       </button>
     </div>
 
-    <form id="rfqForm" method="POST" action="">
+    <form id="rfqForm" method="POST" action="" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="p-5 space-y-4 text-xs">
         <div>
@@ -241,6 +241,22 @@
           </label>
           <textarea id="rfq_message" name="message" rows="5" required
                     class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800 leading-relaxed"></textarea>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Attach Specs / Purchase Order (Optional)</span>
+            <span class="text-[10px] text-slate-400 font-normal">PDF, DOCX, XLSX (Max 15MB)</span>
+          </label>
+          <div class="relative flex items-center">
+            <input type="file" name="attachment" id="rfqAttachment"
+                   accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp"
+                   class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-slate-200 rounded-xl bg-slate-50 cursor-pointer focus:outline-none">
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+            <i class="fa-solid fa-paperclip text-slate-400"></i>
+            Attached specsheet or PO document will be delivered to supplier's email inbox.
+          </p>
         </div>
       </div>
 

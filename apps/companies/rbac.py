@@ -326,10 +326,10 @@ def get_user_rbac_context(user, company_id=None):
     elif is_seller_only:
         seller_mods = [
             {"name": "Seller Dashboard", "url": "/dashboard/", "icon": "fa-house"},
-            {"name": "My Products", "url": "/sales/products/", "icon": "fa-box-open"},
-            {"name": "Find Buyers", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
-            {"name": "Buyer Leads", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
-            {"name": "Saved Buyers", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
+            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open"},
+            {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
+            {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
+            {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
             {"name": "Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane"},
         ]
         if is_company_admin or is_super_admin:
@@ -340,10 +340,10 @@ def get_user_rbac_context(user, company_id=None):
         }
     else:  # BOTH or Super Admin
         seller_mods = [
-            {"name": "My Products", "url": "/sales/products/", "icon": "fa-box-open"},
-            {"name": "Find Buyers", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
-            {"name": "Buyer Leads", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
-            {"name": "Saved Buyers", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
+            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open"},
+            {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
+            {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
+            {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
             {"name": "Buyer Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane"},
         ]
         if is_company_admin or is_super_admin:

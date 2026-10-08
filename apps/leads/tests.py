@@ -2,11 +2,13 @@ from decimal import Decimal
 import json
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from apps.companies.models import Company, CompanyMember
 from apps.catalog.models import Product, Category
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany
 from apps.leads.models import Inquiry, InquiryMessage, SavedItem
+from apps.leads.services.email_service import send_inquiry_email
 
 User = get_user_model()
 
@@ -95,6 +97,14 @@ class DynamicInquiriesAndReportsTestCase(TestCase):
         self.assertGreaterEqual(messages.count(), 1)
         self.assertEqual(messages.first().message_type, InquiryMessage.MessageType.OUTBOUND)
 
+        # Verify real email was dispatched via email backend
+        from django.core import mail
+        self.assertGreaterEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[-1]
+        self.assertEqual(sent_email.to, ["procurement@globalmfg.com"])
+        self.assertIn("Commercial Proposal", sent_email.body)
+        self.assertIn("850,000.00", sent_email.body)
+
     def test_inquiry_message_and_thread(self):
         """Test appending follow-up messages to the inquiry stream."""
         inquiry = Inquiry.objects.create(
@@ -172,69 +182,188 @@ class DynamicInquiriesAndReportsTestCase(TestCase):
         self.assertEqual(inquiry.delivery_terms, "CIF Mumbai, 10 Days Delivery")
 
     def test_export_reports_view_and_preview(self):
-        """Test dynamic export reports dashboard returns preview records."""
+        """Test dynamic export reports dashboard gates data by product and returns preview records."""
         url = reverse("sales-export-reports")
+        
+        # 1. Without product selection: displays product selection prompt card and empty preview
         response = self.client.get(url, {"report_type": "leads"})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Global Manufacturing Corp")
-        self.assertContains(response, "Download CSV")
-        self.assertNotContains(response, "Export JSON")
-        self.assertIn("preview_records", response.context)
-        self.assertGreaterEqual(len(response.context["preview_records"]), 1)
+        self.assertContains(response, "Select a Product to Generate Intelligence")
+        self.assertEqual(len(response.context["preview_records"]), 0)
 
-        # Fallback test: 'saved' or 'consolidated' defaults to 'leads'
-        fallback_res = self.client.get(url, {"report_type": "saved"})
-        self.assertEqual(fallback_res.status_code, 200)
-        self.assertEqual(fallback_res.context["report_type"], "leads")
+        # 2. With product selection: loads product dossier, metrics, and preview records
+        response_prod = self.client.get(url, {"report_type": "leads", "product_id": self.product.id})
+        self.assertEqual(response_prod.status_code, 200)
+        self.assertContains(response_prod, "Global Manufacturing Corp")
+        self.assertContains(response_prod, "Download CSV")
+        self.assertContains(response_prod, "Print Report")
+        self.assertNotContains(response_prod, "Export JSON")
+        self.assertIn("preview_records", response_prod.context)
+        self.assertGreaterEqual(len(response_prod.context["preview_records"]), 1)
 
-        # Inquiries report type preview
-        inq_res = self.client.get(url, {"report_type": "inquiries"})
+        # 3. Inquiries report type preview with product selected
+        inq_res = self.client.get(url, {"report_type": "inquiries", "product_id": self.product.id})
         self.assertEqual(inq_res.status_code, 200)
         self.assertEqual(inq_res.context["report_type"], "inquiries")
         self.assertIn("preview_records", inq_res.context)
 
     def test_export_reports_csv_and_json(self):
-        """Test multi-format export downloads for CSV and JSON."""
+        """Test product-scoped CSV download and redirection when no product is chosen."""
         url = reverse("sales-export-reports")
 
-        # 1. CSV Download (leads)
+        # 1. Download attempt without product_id redirects with prompt
+        unselected_res = self.client.get(url, {
+            "download": "1",
+            "format": "csv",
+            "report_type": "leads",
+        })
+        self.assertEqual(unselected_res.status_code, 302)
+
+        # 2. CSV Download with product_id (leads)
         csv_response = self.client.get(url, {
             "download": "1",
             "format": "csv",
             "report_type": "leads",
+            "product_id": self.product.id,
         })
         self.assertEqual(csv_response.status_code, 200)
         self.assertEqual(csv_response["Content-Type"], "text/csv; charset=utf-8")
         self.assertIn("attachment; filename=", csv_response["Content-Disposition"])
         self.assertIn("Global Manufacturing Corp", csv_response.content.decode("utf-8"))
 
-        # 2. JSON Export (leads)
-        json_response = self.client.get(url, {
-            "download": "1",
-            "format": "json",
-            "report_type": "leads",
-        })
-        self.assertEqual(json_response.status_code, 200)
-        self.assertEqual(json_response["Content-Type"], "application/json")
-        data = json.loads(json_response.content.decode("utf-8"))
-        self.assertIsInstance(data, list)
-        self.assertEqual(data[0]["company_name"], "Global Manufacturing Corp")
-
-        # 3. CSV Download (inquiries)
+        # 3. CSV Download with product_id (inquiries)
         csv_inq_res = self.client.get(url, {
             "download": "1",
             "format": "csv",
             "report_type": "inquiries",
+            "product_id": self.product.id,
         })
         self.assertEqual(csv_inq_res.status_code, 200)
         self.assertEqual(csv_inq_res["Content-Type"], "text/csv; charset=utf-8")
         self.assertIn("Inquiries_Audit", csv_inq_res["Content-Disposition"])
 
-        # 4. JSON Export (inquiries)
-        json_inq_res = self.client.get(url, {
-            "download": "1",
-            "format": "json",
-            "report_type": "inquiries",
+    def test_send_proposal_with_file_attachment(self):
+        """Test dispatching commercial proposal with uploaded quotation PDF document."""
+        from django.core import mail
+        mail.outbox.clear()
+
+        fake_pdf = SimpleUploadedFile(
+            "formal_quotation_2026.pdf",
+            b"%PDF-1.4 sample commercial quotation binary bytes",
+            content_type="application/pdf",
+        )
+
+        url = reverse("sales-send-inquiry", kwargs={"result_id": self.search_result.id})
+        response = self.client.post(url, {
+            "subject": "Commercial Offer & Quotation Attachment",
+            "message": "Please review the attached formal quotation and technical data sheet.",
+            "sent_to_email": "purchasing@globalmfg.com",
+            "target_price": "920000.00",
+            "delivery_terms": "Ex-Factory, 14 Days",
+            "attachment": fake_pdf,
         })
-        self.assertEqual(json_inq_res.status_code, 200)
-        self.assertEqual(json_inq_res["Content-Type"], "application/json")
+        self.assertEqual(response.status_code, 302)
+
+        inquiry = Inquiry.objects.filter(sent_to_email="purchasing@globalmfg.com").first()
+        self.assertIsNotNone(inquiry)
+        self.assertTrue(bool(inquiry.attachment))
+        self.assertEqual(inquiry.attachment_name, "formal_quotation_2026.pdf")
+        self.assertEqual(inquiry.get_attachment_extension(), "pdf")
+        self.assertTrue("formal_quotation_2026.pdf" in inquiry.get_attachment_filename())
+
+        # Thread initial message also has attachment
+        initial_msg = inquiry.messages.first()
+        self.assertIsNotNone(initial_msg)
+        self.assertTrue(bool(initial_msg.attachment))
+        self.assertEqual(initial_msg.attachment_name, "formal_quotation_2026.pdf")
+
+        # Verify email was dispatched with physical attachment
+        self.assertGreaterEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[-1]
+        self.assertEqual(sent_email.to, ["purchasing@globalmfg.com"])
+        self.assertIn("formal_quotation_2026.pdf", sent_email.body)
+        self.assertEqual(len(sent_email.attachments), 1)
+        att_filename, att_content, att_mimetype = sent_email.attachments[0]
+        self.assertEqual(att_filename, "formal_quotation_2026.pdf")
+        self.assertEqual(att_content, b"%PDF-1.4 sample commercial quotation binary bytes")
+
+    def test_add_reply_message_with_attachment(self):
+        """Test appending follow-up reply with revision attachment and email copy."""
+        from django.core import mail
+        mail.outbox.clear()
+
+        inquiry = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result,
+            subject="Negotiation Phase",
+            message="Initial terms",
+            sent_to_email="procurement@globalmfg.com",
+            status=Inquiry.Status.IN_DISCUSSION,
+        )
+
+        fake_excel = SimpleUploadedFile(
+            "revised_pricing_matrix.xlsx",
+            b"fake excel matrix binary content",
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        url = reverse("sales-inquiry-add-message", kwargs={"pk": inquiry.id})
+        response = self.client.post(url, {
+            "message_body": "Enclosed is our revised volume tiered pricing breakdown.",
+            "message_type": "outbound",
+            "send_email_copy": "1",
+            "attachment": fake_excel,
+        })
+        self.assertEqual(response.status_code, 302)
+
+        last_msg = inquiry.messages.last()
+        self.assertIsNotNone(last_msg)
+        self.assertTrue(bool(last_msg.attachment))
+        self.assertEqual(last_msg.attachment_name, "revised_pricing_matrix.xlsx")
+        self.assertEqual(last_msg.get_attachment_extension(), "xlsx")
+
+        # Verify email copy included the attachment
+        self.assertGreaterEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[-1]
+        self.assertEqual(len(sent_email.attachments), 1)
+        att_filename, att_content, _ = sent_email.attachments[0]
+        self.assertEqual(att_filename, "revised_pricing_matrix.xlsx")
+        self.assertEqual(att_content, b"fake excel matrix binary content")
+
+    def test_email_service_direct_dispatch_with_attachment(self):
+        """Test send_inquiry_email service function directly with attachment."""
+        from django.core import mail
+        mail.outbox.clear()
+
+        inquiry = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result,
+            subject="Direct Service Dispatch",
+            message="Direct dispatch test body",
+            sent_to_email="direct@vendor.com",
+            quoted_price=Decimal("450000.00"),
+            quoted_currency="INR",
+            delivery_terms="Door Delivery, 5 Days",
+        )
+
+        fake_doc = SimpleUploadedFile(
+            "technical_specs.pdf",
+            b"%PDF specs binary bytes",
+            content_type="application/pdf",
+        )
+
+        success, note = send_inquiry_email(
+            inquiry,
+            user=self.user,
+            attachment_file=fake_doc,
+        )
+        self.assertTrue(success)
+        self.assertEqual(note, "Email successfully dispatched to recipient.")
+
+        self.assertGreaterEqual(len(mail.outbox), 1)
+        dispatched = mail.outbox[-1]
+        self.assertEqual(dispatched.to, ["direct@vendor.com"])
+        self.assertEqual(dispatched.reply_to, [self.user.email])
+        self.assertEqual(len(dispatched.attachments), 1)
+        self.assertEqual(dispatched.attachments[0][0], "technical_specs.pdf")
+

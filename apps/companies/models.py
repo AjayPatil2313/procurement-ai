@@ -308,9 +308,9 @@ class RolePermission(models.Model):
     """
     MODULE_TITLES = {
         "products": "Products",
-        "find_buyers": "Find Buyers",
-        "leads": "Buyer Leads",
-        "saved_buyers": "Saved Buyers",
+        "find_buyers": "Find vendors",
+        "leads": "Vendor list",
+        "saved_buyers": "Prequalified Vendors",
         "inquiries": "Buyer Inquiries",
         "export_reports": "Export Reports",
         "matching_parameters": "Matching Parameters",

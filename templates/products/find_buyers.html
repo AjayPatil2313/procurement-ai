@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Find Buyers — AI Sales Leads{% endblock %}
+{% block title %}Find Vendors — AI Vendor Discovery{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -13,22 +13,22 @@
         <span>&bull;</span>
         <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Products</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">AI Buyer Leads</span>
+        <span class="text-slate-600 font-semibold">AI Find Vendors</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-crosshairs"></i>
         </span>
-        <span>AI Buyer Leads</span>
+        <span>AI Find Vendors</span>
       </h1>
-      <p class="text-xs text-slate-500 mt-1">Real-time Web Search & Scraper extracting verified buyer contacts, procurement signals, and RFQ intent.</p>
+      <p class="text-xs text-slate-500 mt-1">Real-time Web Search & Scraper extracting verified vendor contacts, procurement signals, and RFQ intent.</p>
     </div>
     <div class="flex items-center gap-2">
       <a href="{% url 'matching-parameters' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
         <i class="fa-solid fa-sliders mr-1.5 text-blue-600"></i> Matching Criteria (⚙)
       </a>
       <a href="{% url 'saved-leads' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
-        <i class="fa-solid fa-bookmark mr-1.5 text-orange-500"></i> Saved Buyers
+        <i class="fa-solid fa-bookmark mr-1.5 text-orange-500"></i> Prequalified Vendors
       </a>
       <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
         <i class="fa-solid fa-signal mr-1.5 text-emerald-600"></i> Live Scraper Active
@@ -47,7 +47,7 @@
         <label for="product_search_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
           <span class="flex items-center gap-1.5">
             <i class="fa-solid fa-boxes-stacked text-orange-500"></i>
-            <span>Select Product to Find Buyers</span>
+            <span>Select Product to Find Vendors</span>
           </span>
           <span class="text-[11px] text-slate-400 font-medium normal-case">
             {{ products|length }} Products &bull; Alphabetical A-Z
@@ -135,7 +135,7 @@
       <div class="flex items-center gap-2 w-full md:w-auto md:mt-5 shrink-0">
         <button type="submit" id="launch_search_btn" class="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
-          <span>Launch AI Buyer Search</span>
+          <span>Launch AI Vendor Search</span>
         </button>
 
         {% if selected_product_id %}
@@ -147,14 +147,57 @@
     </form>
   </div>
 
+  {% if not selected_product %}
+  <!-- MODULE FUNCTIONALITY PROMPT CARD: NO PRODUCT SELECTED -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+    <div class="max-w-2xl mx-auto space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
+        <i class="fa-solid fa-crosshairs"></i>
+      </div>
+      <div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 mb-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i> AI Find Vendors Engine
+        </span>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to Launch AI Vendor Discovery</h2>
+        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+          AI Vendor Discovery searches real-time commercial directories, company web pages, and B2B portals to discover verified vendor contacts, match technical specifications, and evaluate buying intent signals. <strong>Please select a product from the dropdown above or click one below to discover qualified vendors.</strong>
+        </p>
+      </div>
+
+      <!-- Quick 1-click product selector chips -->
+      {% if products %}
+      <div class="pt-4 border-t border-slate-100 text-left">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 text-center">
+          Or select an active product from your catalog:
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {% for p in products %}
+          <a 
+            href="{% url 'find-buyers' %}?product_id={{ p.id }}" 
+            class="block text-left p-3.5 rounded-xl border border-slate-200 hover:border-orange-500 hover:bg-orange-50/50 transition group cursor-pointer bg-slate-50/50"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition truncate">{{ p.name }}</span>
+              <i class="fa-solid fa-arrow-right text-[10px] text-slate-300 group-hover:text-orange-500 transition ml-2"></i>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+              <span>{{ p.category.name|default:"General" }}</span>
+              <span>MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }}</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% else %}
+
   <!-- Active Results Count and Feedback -->
   <div class="flex items-center justify-between text-xs text-slate-500 px-1">
     <div>
-      {% if selected_product %}
-        Showing leads for product: <strong class="text-slate-800">{{ selected_product.name }}</strong> ({{ leads|length }} candidates)
-      {% else %}
-        Showing all qualified buyer leads across catalog ({{ leads|length }} discovered)
-      {% endif %}
+      Showing vendors for product: <strong class="text-slate-800">{{ selected_product.name }}</strong> ({{ leads|length }} discovered)
     </div>
   </div>
 
@@ -297,9 +340,9 @@
       <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-4 border border-orange-100">
         <i class="fa-solid fa-crosshairs"></i>
       </div>
-      <h3 class="text-base font-bold text-slate-800 mb-1">No Buyer Leads Discovered Yet</h3>
+      <h3 class="text-base font-bold text-slate-800 mb-1">No Vendors Discovered Yet</h3>
       <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
-        Select a product from the dropdown above and click <strong>"Launch AI Buyer Search"</strong>. Our automated web scraper will query commercial sources, parse company sites, and extract buyer contacts.
+        Select a product from the dropdown above and click <strong>"Launch AI Vendor Search"</strong>. Our automated web scraper will query commercial sources, parse company sites, and extract vendor contacts.
       </p>
       {% if products.first %}
       <form method="POST" action="{% url 'find-buyers' %}" class="inline-block">
@@ -308,7 +351,7 @@
         <input type="hidden" name="product_id" value="{{ products.first.id }}">
         <button type="submit" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition inline-flex items-center gap-2">
           <i class="fa-solid fa-bolt"></i>
-          <span>Search Buyers for "{{ products.first.name }}"</span>
+          <span>Search Vendors for "{{ products.first.name }}"</span>
         </button>
       </form>
       {% else %}
@@ -319,6 +362,7 @@
     </div>
     {% endfor %}
   </div>
+  {% endif %}
 
 </div>
 
@@ -340,7 +384,7 @@
       </button>
     </div>
 
-    <form id="sendProposalForm" method="POST" action="">
+    <form id="sendProposalForm" method="POST" action="" enctype="multipart/form-data">
       {% csrf_token %}
       <div class="p-5 space-y-4 text-xs">
         <div>
@@ -374,9 +418,25 @@
                     class="w-full rounded-xl border border-slate-300 p-3 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 text-slate-800 text-xs leading-relaxed"></textarea>
         </div>
 
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Attach Quotation / Specsheet</span>
+            <span class="text-[10px] text-slate-400 font-normal">PDF, DOCX, XLSX, Images (Max 15MB)</span>
+          </label>
+          <div class="relative flex items-center">
+            <input type="file" name="attachment" id="proposalAttachment"
+                   accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp"
+                   class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 border border-slate-200 rounded-xl bg-slate-50 cursor-pointer focus:outline-none">
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+            <i class="fa-solid fa-paperclip text-slate-400"></i>
+            Physical document will be delivered to recipient's email inbox and stored in your inquiry thread.
+          </p>
+        </div>
+
         <div class="p-3 bg-orange-50/60 rounded-xl border border-orange-100 flex items-center gap-2 text-orange-900">
           <i class="fa-solid fa-circle-info text-orange-600"></i>
-          <span class="text-[11px] leading-snug">Dispatches email to buyer and automatically initializes an active discussion thread in <strong>Buyer Inquiries</strong>.</span>
+          <span class="text-[11px] leading-snug">Dispatches live email to recipient and automatically initializes an active discussion thread in <strong>Inquiries</strong>.</span>
         </div>
       </div>
 
