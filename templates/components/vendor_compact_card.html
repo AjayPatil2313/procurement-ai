@@ -95,20 +95,22 @@
     {% endif %}
 
     <div class="flex items-center gap-1.5">
-      {% if lead.id in saved_result_ids %}
-      <a href="{% url 'saved-leads' %}" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition" title="In Pipeline">
-        <i class="fa-solid fa-check text-[9px]"></i>
-        <span>Saved</span>
-      </a>
-      {% else %}
-      <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
-        {% csrf_token %}
-        <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] px-2 py-1 rounded-lg border border-slate-300 flex items-center gap-1 transition" title="Save to Pipeline">
-          <i class="fa-regular fa-bookmark text-[9px]"></i>
-          <span>Save</span>
-        </button>
-      </form>
-      {% endif %}
+      <div class="card-save-slot inline-block">
+        {% if lead.id in saved_result_ids %}
+        <a href="{% url 'saved-leads' %}" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition" title="In Pipeline">
+          <i class="fa-solid fa-check text-[9px]"></i>
+          <span>Saved</span>
+        </a>
+        {% else %}
+        <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="card-save-form inline">
+          {% csrf_token %}
+          <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] px-2 py-1 rounded-lg border border-slate-300 flex items-center gap-1 transition cursor-pointer" title="Save to Pipeline">
+            <i class="fa-regular fa-bookmark text-[9px]"></i>
+            <span>Save</span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
 
       <button type="button" onclick="event.stopPropagation(); openSendProposalModal('{{ lead.id }}', '{{ lead.external_company.name|escapejs }}', '{{ lead.external_company.email|default:''|escapejs }}', '{{ lead.product_title|escapejs }}')" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg shadow-sm transition flex items-center gap-1">
         <i class="fa-solid fa-envelope text-[9px]"></i>

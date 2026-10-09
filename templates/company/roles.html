@@ -27,17 +27,26 @@
     </div>
 
     <div class="flex items-center gap-2.5">
-      <a 
-        href="{% url 'seller-role-create' %}" 
-        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20"
+      <button 
+        type="button" 
+        onclick="openAddRoleModal()"
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20 cursor-pointer"
       >
         <i class="fa-solid fa-plus"></i>
         <span>Add New Role</span>
+      </button>
+      <a 
+        href="{% url 'seller-role-create' %}" 
+        class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs px-3.5 py-2.5 rounded-xl transition shadow-2xs"
+        title="Open Full-Page Role Designer Form"
+      >
+        <i class="fa-solid fa-up-right-from-square text-[11px] text-slate-400"></i>
+        <span class="hidden md:inline">Full-Page Form</span>
       </a>
     </div>
   </div>
 
-  <!-- Summary Cards -->
+  <!-- Summary KPI Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
       <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
@@ -80,13 +89,57 @@
     </div>
   </div>
 
+  <!-- Role Filter Tabs -->
+  <div class="flex flex-wrap items-center gap-2 pt-1">
+    <button 
+      type="button" 
+      onclick="setRoleFilter('all')" 
+      id="tab_all" 
+      class="role-filter-tab px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-slate-900 text-white shadow-xs cursor-pointer"
+    >
+      All Roles ({{ roles|length }})
+    </button>
+    <button 
+      type="button" 
+      onclick="setRoleFilter('system')" 
+      id="tab_system" 
+      class="role-filter-tab px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 cursor-pointer"
+    >
+      System Protected ({{ system_role_count|default:"1" }})
+    </button>
+    <button 
+      type="button" 
+      onclick="setRoleFilter('custom')" 
+      id="tab_custom" 
+      class="role-filter-tab px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 cursor-pointer"
+    >
+      Custom Roles ({{ custom_role_count|default:"0" }})
+    </button>
+    <button 
+      type="button" 
+      onclick="setRoleFilter('assigned')" 
+      id="tab_assigned" 
+      class="role-filter-tab px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 cursor-pointer"
+    >
+      Assigned In-Use
+    </button>
+    <button 
+      type="button" 
+      onclick="setRoleFilter('unassigned')" 
+      id="tab_unassigned" 
+      class="role-filter-tab px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 cursor-pointer"
+    >
+      Unassigned
+    </button>
+  </div>
+
   <!-- Role Management Table Container -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     
     <!-- Table Toolbar -->
     <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
       <div class="flex items-center gap-2">
-        <span class="text-xs font-bold text-slate-700">All Defined Roles</span>
+        <span class="text-xs font-bold text-slate-700">Configured Roles</span>
         <span id="roleCountBadge" class="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-200 text-slate-700">{{ roles|length }}</span>
       </div>
 
@@ -115,14 +168,15 @@
 
     <!-- Table -->
     <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs min-w-[760px]" id="rolesTable">
+      <table class="w-full text-left text-xs min-w-[820px]" id="rolesTable">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
             <th class="py-3 px-4 w-14 text-center whitespace-nowrap">SR NO</th>
-            <th class="py-3 px-4 w-60 min-w-[200px] whitespace-nowrap">ROLE NAME</th>
-            <th class="py-3 px-4 min-w-[340px]">MODULE PERMISSIONS</th>
-            <th class="py-3 px-4 w-44 min-w-[140px] whitespace-nowrap">CREATE DATE</th>
-            <th class="py-3 px-4 text-right w-28 whitespace-nowrap">ACTIONS</th>
+            <th class="py-3 px-4 w-52 min-w-[180px] whitespace-nowrap">ROLE NAME</th>
+            <th class="py-3 px-4 w-40 min-w-[140px] whitespace-nowrap">ASSIGNED USERS</th>
+            <th class="py-3 px-4 min-w-[320px]">MODULE PERMISSIONS</th>
+            <th class="py-3 px-4 w-40 min-w-[130px] whitespace-nowrap">CREATE DATE</th>
+            <th class="py-3 px-4 text-right w-32 whitespace-nowrap">ACTIONS</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -134,9 +188,11 @@
               data-role-name="{{ r.role.name|escape }}"
               data-role-desc="{{ r.role.description|default:''|escape }}"
               data-is-system="{% if r.role.is_system %}1{% else %}0{% endif %}"
+              data-member-count="{{ r.member_count }}"
               data-search="{{ r.role.name|lower }} {{ r.role.description|default:''|lower }} {% for perm in r.summary %}{{ perm.module_name|lower }} {{ perm.action_codes|lower }} {{ perm.actions|lower }} {% endfor %}">
             
             <script type="application/json" id="role-perms-{{ r.role.id }}">{{ r.perms_json|safe }}</script>
+            <script type="application/json" id="role-members-{{ r.role.id }}">{{ r.members_json|safe }}</script>
 
             <!-- SR NO -->
             <td class="py-3.5 px-4 text-center font-bold text-slate-400 whitespace-nowrap">
@@ -160,23 +216,70 @@
               {% endif %}
             </td>
 
+            <!-- ASSIGNED USERS -->
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              {% if r.member_count > 0 %}
+                <button 
+                  type="button" 
+                  onclick="openMembersModal('{{ r.role.id }}', '{{ r.role.name|escapejs }}')"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/80 transition shadow-2xs group cursor-pointer"
+                  title="Click to view assigned team members"
+                >
+                  <i class="fa-solid fa-users text-[11px] text-blue-500"></i>
+                  <span>{{ r.member_count }} Member{{ r.member_count|pluralize }}</span>
+                  <i class="fa-solid fa-arrow-up-right-from-square text-[9px] opacity-60 group-hover:opacity-100 transition"></i>
+                </button>
+              {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-100">
+                  <i class="fa-regular fa-user text-[10px]"></i> Unassigned
+                </span>
+              {% endif %}
+            </td>
+
             <!-- MODULE PERMISSIONS -->
             <td class="py-3.5 px-4">
               {% if r.role.is_system or r.is_full_admin %}
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  <i class="fa-solid fa-circle-check text-emerald-600"></i>
-                  <span>Full Administrative Access</span>
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                    <span>Full Administrative Access</span>
+                  </span>
+                  <button 
+                    type="button" 
+                    onclick="openMatrixViewModal('{{ r.role.id }}', '{{ r.role.name|escapejs }}')"
+                    class="p-1 text-slate-400 hover:text-emerald-700 transition cursor-pointer"
+                    title="Inspect matrix grid"
+                  >
+                    <i class="fa-solid fa-table-cells text-xs"></i>
+                  </button>
+                </div>
               {% else %}
-                <div class="flex flex-wrap gap-1.5 max-w-2xl">
-                  {% for perm in r.summary %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold {% cycle 'bg-rose-50 text-rose-700 border border-rose-200' 'bg-blue-50 text-blue-700 border border-blue-200' 'bg-purple-50 text-purple-700 border border-purple-200' 'bg-amber-50 text-amber-700 border border-amber-200' 'bg-emerald-50 text-emerald-700 border border-emerald-200' 'bg-indigo-50 text-indigo-700 border border-indigo-200' %}">
-                      <span class="font-bold">{{ perm.module_name }}</span>
-                      <span class="font-bold text-[10px] opacity-90 ml-1">({{ perm.action_codes|default:perm.actions }})</span>
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                      <i class="fa-solid fa-shield-halved text-[10px] text-blue-600"></i>
+                      <span>{{ r.summary|length }} of 12 Modules Authorized</span>
                     </span>
-                  {% empty %}
-                    <span class="text-slate-400 italic text-[11px]">No module permissions configured</span>
-                  {% endfor %}
+                    <button 
+                      type="button" 
+                      onclick="openMatrixViewModal('{{ r.role.id }}', '{{ r.role.name|escapejs }}')"
+                      class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline transition cursor-pointer"
+                    >
+                      <i class="fa-solid fa-table-cells text-[10px]"></i>
+                      <span>View Matrix</span>
+                    </button>
+                  </div>
+                  <div class="flex flex-wrap gap-1 max-w-xl">
+                    {% for perm in r.summary|slice:":4" %}
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">
+                        <span class="font-bold">{{ perm.module_name }}</span>
+                        <span class="text-blue-600 font-bold ml-1">({{ perm.action_codes|default:perm.actions }})</span>
+                      </span>
+                    {% endfor %}
+                    {% if r.summary|length > 4 %}
+                      <span class="text-[10px] text-slate-400 font-bold self-center">+{{ r.summary|length|add:"-4" }} more</span>
+                    {% endif %}
+                  </div>
                 </div>
               {% endif %}
             </td>
@@ -188,18 +291,29 @@
 
             <!-- ACTIONS -->
             <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1">
+              <!-- Quick Modal Edit -->
+              <button 
+                type="button" 
+                onclick="openEditRoleModal('{{ r.role.id }}')"
+                class="inline-block p-1.5 text-slate-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition cursor-pointer"
+                title="Quick Edit Permissions Matrix"
+              >
+                <i class="fa-solid fa-pen-to-square text-xs"></i>
+              </button>
+
+              <!-- Dedicated Full-Page Edit (preserves test assertion) -->
               <a 
                 href="{% url 'seller-role-edit' r.role.id %}"
                 class="inline-block p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                title="Edit Role & Permissions"
+                title="Full-Page Edit Form"
               >
-                <i class="fa-solid fa-pen-to-square text-xs"></i>
+                <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
               </a>
 
               {% if not r.role.is_system %}
               <button 
                 type="button" 
-                onclick="openDeleteRoleModal('{{ r.role.id }}', '{{ r.role.name|escapejs }}')"
+                onclick="openDeleteRoleModal('{{ r.role.id }}', '{{ r.role.name|escapejs }}', {{ r.member_count }})"
                 class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                 title="Delete Role"
               >
@@ -214,7 +328,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="py-12 text-center text-slate-400">
+            <td colspan="6" class="py-12 text-center text-slate-400">
               <div class="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl mx-auto mb-3">
                 <i class="fa-solid fa-user-shield"></i>
               </div>
@@ -226,7 +340,7 @@
 
           <!-- No Match Empty State Row -->
           <tr id="noRolesMatchRow" class="hidden">
-            <td colspan="5" class="py-10 text-center text-slate-400">
+            <td colspan="6" class="py-10 text-center text-slate-400">
               <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-base mx-auto mb-2">
                 <i class="fa-solid fa-magnifying-glass"></i>
               </div>
@@ -251,7 +365,7 @@
 
 
 <!-- ============================================================ -->
-<!-- MODAL: ADD NEW ROLE (Refer Image 2) -->
+<!-- MODAL 1: ADD NEW ROLE (INLINE FAST DESIGNER) -->
 <!-- ============================================================ -->
 <div id="addRoleModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -267,9 +381,18 @@
           <p class="text-[11px] text-slate-500 font-medium">Create a new organizational role with customizable module permissions.</p>
         </div>
       </div>
-      <button type="button" onclick="closeAddRoleModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
-        <i class="fa-solid fa-xmark text-sm"></i>
-      </button>
+      <div class="flex items-center gap-2">
+        <a 
+          href="{% url 'seller-role-create' %}" 
+          class="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline px-2 py-1"
+          title="Open dedicated full page creation form"
+        >
+          <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Full-Page View
+        </a>
+        <button type="button" onclick="closeAddRoleModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Modal Form -->
@@ -308,16 +431,18 @@
         >
       </div>
 
-      <!-- Permissions Matrix (Refer Image 2) -->
+      <!-- Permissions Matrix -->
       <div>
         <div class="flex items-center justify-between mb-2">
           <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
             Module Permissions Matrix
           </label>
           <div class="flex items-center gap-2">
-            <button type="button" onclick="toggleAllMatrix('add', true)" class="text-[10px] font-bold text-blue-600 hover:underline">Select All</button>
+            <button type="button" onclick="toggleAllMatrix('add', true)" class="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer">Grant All</button>
             <span class="text-slate-300">&bull;</span>
-            <button type="button" onclick="toggleAllMatrix('add', false)" class="text-[10px] font-bold text-slate-500 hover:underline">Clear All</button>
+            <button type="button" onclick="toggleReadOnlyMatrix('add')" class="text-[10px] font-bold text-slate-700 hover:underline cursor-pointer">Read-Only All</button>
+            <span class="text-slate-300">&bull;</span>
+            <button type="button" onclick="toggleAllMatrix('add', false)" class="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer">Clear All</button>
           </div>
         </div>
 
@@ -327,34 +452,34 @@
               <tr>
                 <th class="py-2.5 px-4">MODULE NAME</th>
                 <th class="py-2.5 px-3 text-center">
-                  <label class="cursor-pointer inline-flex items-center gap-1">
+                  <button type="button" onclick="toggleColumnBatch('add', 'read')" class="hover:text-blue-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Read column">
                     <span>READ</span>
-                    <input type="checkbox" onchange="toggleColumn('add', 'read', this.checked)" class="w-3 h-3 text-blue-600 rounded">
-                  </label>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
                 </th>
                 <th class="py-2.5 px-3 text-center">
-                  <label class="cursor-pointer inline-flex items-center gap-1">
+                  <button type="button" onclick="toggleColumnBatch('add', 'write')" class="hover:text-amber-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Write column">
                     <span>WRITE</span>
-                    <input type="checkbox" onchange="toggleColumn('add', 'write', this.checked)" class="w-3 h-3 text-blue-600 rounded">
-                  </label>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
                 </th>
                 <th class="py-2.5 px-3 text-center">
-                  <label class="cursor-pointer inline-flex items-center gap-1">
+                  <button type="button" onclick="toggleColumnBatch('add', 'edit')" class="hover:text-indigo-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Edit column">
                     <span>EDIT</span>
-                    <input type="checkbox" onchange="toggleColumn('add', 'edit', this.checked)" class="w-3 h-3 text-blue-600 rounded">
-                  </label>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
                 </th>
                 <th class="py-2.5 px-3 text-center">
-                  <label class="cursor-pointer inline-flex items-center gap-1">
+                  <button type="button" onclick="toggleColumnBatch('add', 'delete')" class="hover:text-rose-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Delete column">
                     <span>DELETE</span>
-                    <input type="checkbox" onchange="toggleColumn('add', 'delete', this.checked)" class="w-3 h-3 text-blue-600 rounded">
-                  </label>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
                 </th>
-                <th class="py-2.5 px-3 text-center">
-                  <label class="cursor-pointer inline-flex items-center gap-1">
+                <th class="py-2.5 px-3 text-center bg-purple-50/50">
+                  <button type="button" onclick="toggleColumnBatch('add', 'admin')" class="text-purple-900 hover:text-purple-700 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Admin column">
                     <span>ADMIN</span>
-                    <input type="checkbox" onchange="toggleColumn('add', 'admin', this.checked)" class="w-3 h-3 text-blue-600 rounded">
-                  </label>
+                    <i class="fa-solid fa-crown text-[9px] text-amber-500"></i>
+                  </button>
                 </th>
               </tr>
             </thead>
@@ -373,19 +498,19 @@
                   </div>
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" name="perm_{{ mod.key }}_read" value="1" class="add-cb add-read w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                  <input type="checkbox" name="perm_{{ mod.key }}_read" value="1" class="add-cb add-read w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer">
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" name="perm_{{ mod.key }}_write" value="1" class="add-cb add-write w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                  <input type="checkbox" name="perm_{{ mod.key }}_write" value="1" class="add-cb add-write w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer">
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" name="perm_{{ mod.key }}_edit" value="1" class="add-cb add-edit w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                  <input type="checkbox" name="perm_{{ mod.key }}_edit" value="1" class="add-cb add-edit w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer">
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" name="perm_{{ mod.key }}_delete" value="1" class="add-cb add-delete w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                  <input type="checkbox" name="perm_{{ mod.key }}_delete" value="1" class="add-cb add-delete w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer">
                 </td>
-                <td class="py-3 px-3 text-center">
-                  <input type="checkbox" name="perm_{{ mod.key }}_admin" value="1" onchange="handleAdminRowToggle('add', '{{ mod.key }}', this.checked)" class="add-cb add-admin w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500">
+                <td class="py-3 px-3 text-center bg-purple-50/30">
+                  <input type="checkbox" name="perm_{{ mod.key }}_admin" value="1" onchange="handleAdminRowToggle('add', '{{ mod.key }}', this.checked)" class="add-cb add-admin w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500 cursor-pointer">
                 </td>
               </tr>
               {% endfor %}
@@ -399,13 +524,13 @@
         <button 
           type="button" 
           onclick="closeAddRoleModal()" 
-          class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs"
+          class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer"
         >
           Cancel
         </button>
         <button 
           type="submit" 
-          class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2 transition text-xs"
+          class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2 transition text-xs cursor-pointer"
         >
           <i class="fa-solid fa-check"></i>
           <span>Save Role</span>
@@ -417,7 +542,7 @@
 
 
 <!-- ============================================================ -->
-<!-- MODAL: EDIT ROLE & PERMISSIONS -->
+<!-- MODAL 2: EDIT ROLE & PERMISSIONS (INLINE FAST EDITOR) -->
 <!-- ============================================================ -->
 <div id="editRoleModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -433,9 +558,19 @@
           <p class="text-[11px] text-slate-500 font-medium">Update role details and module permission matrix.</p>
         </div>
       </div>
-      <button type="button" onclick="closeEditRoleModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
-        <i class="fa-solid fa-xmark text-sm"></i>
-      </button>
+      <div class="flex items-center gap-2">
+        <a 
+          id="editModalFullPageLink"
+          href="#" 
+          class="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline px-2 py-1"
+          title="Open full page dedicated editor"
+        >
+          <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Full-Page View
+        </a>
+        <button type="button" onclick="closeEditRoleModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Modal Form -->
@@ -476,9 +611,11 @@
             Module Permissions Matrix
           </label>
           <div class="flex items-center gap-2">
-            <button type="button" onclick="toggleAllMatrix('edit', true)" class="text-[10px] font-bold text-orange-600 hover:underline">Select All</button>
+            <button type="button" onclick="toggleAllMatrix('edit', true)" class="text-[10px] font-bold text-orange-600 hover:underline cursor-pointer">Grant All</button>
             <span class="text-slate-300">&bull;</span>
-            <button type="button" onclick="toggleAllMatrix('edit', false)" class="text-[10px] font-bold text-slate-500 hover:underline">Clear All</button>
+            <button type="button" onclick="toggleReadOnlyMatrix('edit')" class="text-[10px] font-bold text-slate-700 hover:underline cursor-pointer">Read-Only All</button>
+            <span class="text-slate-300">&bull;</span>
+            <button type="button" onclick="toggleAllMatrix('edit', false)" class="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer">Clear All</button>
           </div>
         </div>
 
@@ -487,11 +624,36 @@
             <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
               <tr>
                 <th class="py-2.5 px-4">MODULE NAME</th>
-                <th class="py-2.5 px-3 text-center">READ</th>
-                <th class="py-2.5 px-3 text-center">WRITE</th>
-                <th class="py-2.5 px-3 text-center">EDIT</th>
-                <th class="py-2.5 px-3 text-center">DELETE</th>
-                <th class="py-2.5 px-3 text-center">ADMIN</th>
+                <th class="py-2.5 px-3 text-center">
+                  <button type="button" onclick="toggleColumnBatch('edit', 'read')" class="hover:text-blue-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Read column">
+                    <span>READ</span>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
+                </th>
+                <th class="py-2.5 px-3 text-center">
+                  <button type="button" onclick="toggleColumnBatch('edit', 'write')" class="hover:text-amber-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Write column">
+                    <span>WRITE</span>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
+                </th>
+                <th class="py-2.5 px-3 text-center">
+                  <button type="button" onclick="toggleColumnBatch('edit', 'edit')" class="hover:text-indigo-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Edit column">
+                    <span>EDIT</span>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
+                </th>
+                <th class="py-2.5 px-3 text-center">
+                  <button type="button" onclick="toggleColumnBatch('edit', 'delete')" class="hover:text-rose-600 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Delete column">
+                    <span>DELETE</span>
+                    <i class="fa-solid fa-arrows-rotate text-[9px] opacity-60"></i>
+                  </button>
+                </th>
+                <th class="py-2.5 px-3 text-center bg-purple-50/50">
+                  <button type="button" onclick="toggleColumnBatch('edit', 'admin')" class="text-purple-900 hover:text-purple-700 transition cursor-pointer font-bold inline-flex items-center gap-1" title="Toggle entire Admin column">
+                    <span>ADMIN</span>
+                    <i class="fa-solid fa-crown text-[9px] text-amber-500"></i>
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 font-medium">
@@ -509,19 +671,19 @@
                   </div>
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" id="edit_cb_{{ mod.key }}_read" name="perm_{{ mod.key }}_read" value="1" class="edit-cb edit-read w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_read" name="perm_{{ mod.key }}_read" value="1" class="edit-cb edit-read w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500 cursor-pointer">
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" id="edit_cb_{{ mod.key }}_write" name="perm_{{ mod.key }}_write" value="1" class="edit-cb edit-write w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_write" name="perm_{{ mod.key }}_write" value="1" class="edit-cb edit-write w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500 cursor-pointer">
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" id="edit_cb_{{ mod.key }}_edit" name="perm_{{ mod.key }}_edit" value="1" class="edit-cb edit-edit w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_edit" name="perm_{{ mod.key }}_edit" value="1" class="edit-cb edit-edit w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500 cursor-pointer">
                 </td>
                 <td class="py-3 px-3 text-center">
-                  <input type="checkbox" id="edit_cb_{{ mod.key }}_delete" name="perm_{{ mod.key }}_delete" value="1" class="edit-cb edit-delete w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_delete" name="perm_{{ mod.key }}_delete" value="1" class="edit-cb edit-delete w-4 h-4 rounded text-orange-600 border-slate-300 focus:ring-orange-500 cursor-pointer">
                 </td>
-                <td class="py-3 px-3 text-center">
-                  <input type="checkbox" id="edit_cb_{{ mod.key }}_admin" name="perm_{{ mod.key }}_admin" value="1" onchange="handleAdminRowToggle('edit', '{{ mod.key }}', this.checked)" class="edit-cb edit-admin w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500">
+                <td class="py-3 px-3 text-center bg-purple-50/30">
+                  <input type="checkbox" id="edit_cb_{{ mod.key }}_admin" name="perm_{{ mod.key }}_admin" value="1" onchange="handleAdminRowToggle('edit', '{{ mod.key }}', this.checked)" class="edit-cb edit-admin w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500 cursor-pointer">
                 </td>
               </tr>
               {% endfor %}
@@ -535,13 +697,13 @@
         <button 
           type="button" 
           onclick="closeEditRoleModal()" 
-          class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs"
+          class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer"
         >
           Cancel
         </button>
         <button 
           type="submit" 
-          class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 transition text-xs"
+          class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 transition text-xs cursor-pointer"
         >
           <i class="fa-solid fa-floppy-disk"></i>
           <span>Save Changes</span>
@@ -551,11 +713,212 @@
   </div>
 </div>
 
+
+<!-- ============================================================ -->
+<!-- MODAL 3: INSPECT ASSIGNED TEAM MEMBERS -->
+<!-- ============================================================ -->
+<div id="inspectMembersModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-users"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-900">Assigned Team Members</h3>
+          <p class="text-[11px] text-slate-500 font-medium">Role: <span id="inspectModalRoleName" class="font-bold text-blue-600"></span></p>
+        </div>
+      </div>
+      <button type="button" onclick="closeMembersModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="p-6 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar" id="inspectMembersList">
+      <!-- Injected dynamically via JS -->
+    </div>
+
+    <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+      <a 
+        href="{% url 'company-team-web' %}" 
+        class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 transition"
+      >
+        <i class="fa-solid fa-users-gear text-[11px]"></i>
+        <span>Manage All Users in Team</span>
+      </a>
+      <button 
+        type="button" 
+        onclick="closeMembersModal()" 
+        class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- MODAL 4: VIEW PERMISSIONS MATRIX BREAKDOWN (GRID MODAL) -->
+<!-- ============================================================ -->
+<div id="viewMatrixModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-table-cells"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-900">Permission Matrix Breakdown</h3>
+          <p class="text-[11px] text-slate-500 font-medium">Role: <span id="viewMatrixRoleName" class="font-bold text-purple-700"></span></p>
+        </div>
+      </div>
+      <button type="button" onclick="closeMatrixViewModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="p-5 overflow-y-auto flex-1 custom-scrollbar">
+      <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200 text-[10px]">
+            <tr>
+              <th class="py-2.5 px-4">Functional Module</th>
+              <th class="py-2.5 px-2 text-center w-14">Read</th>
+              <th class="py-2.5 px-2 text-center w-14">Write</th>
+              <th class="py-2.5 px-2 text-center w-14">Edit</th>
+              <th class="py-2.5 px-2 text-center w-14">Delete</th>
+              <th class="py-2.5 px-2 text-center w-16 bg-purple-50/50">Admin</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100" id="matrixModalGridBody">
+            <!-- Injected via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+      <button 
+        type="button" 
+        id="matrixModalEditBtn"
+        onclick="" 
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition cursor-pointer"
+      >
+        <i class="fa-solid fa-pen-to-square text-[11px]"></i>
+        <span>Modify This Matrix</span>
+      </button>
+      <button 
+        type="button" 
+        onclick="closeMatrixViewModal()" 
+        class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- MODAL 5: SECURE DELETE CUSTOM ROLE (WITH SAFE REASSIGNMENT) -->
+<!-- ============================================================ -->
+<div id="deleteRoleModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4">
+        <i class="fa-solid fa-trash-can"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900">Delete Custom Role?</h3>
+      <p class="text-xs text-slate-500 mt-1">
+        Are you sure you want to delete role <strong id="deleteRoleNameText" class="text-slate-800">this role</strong>?
+      </p>
+
+      <!-- Warning for assigned members -->
+      <div id="deleteRoleAssignedWarning" class="hidden mt-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-left text-xs text-amber-800 space-y-2">
+        <div class="flex items-start gap-2 font-bold">
+          <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>
+          <span>Active Users Warning:</span>
+        </div>
+        <p class="text-[11px] text-amber-700 leading-relaxed">
+          This role is currently assigned to <strong id="deleteAssignedCountBadge">0</strong> team member(s). Select an alternative role to reassign them to, or leave unassigned as standard users.
+        </p>
+      </div>
+
+      <form id="deleteRoleForm" method="POST" action="" class="mt-4 space-y-4 text-left">
+        {% csrf_token %}
+        
+        <div>
+          <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+            Reassign Assigned Users To:
+          </label>
+          <select 
+            name="fallback_role_id" 
+            id="deleteFallbackRoleSelect"
+            class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition text-slate-800"
+          >
+            <option value="">-- Leave Unassigned (Standard Users, No Admin) --</option>
+            {% for o in roles %}
+              {% if not o.is_system %}
+              <option value="{{ o.id }}" class="del-opt-role del-opt-{{ o.id }}">{{ o.name }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">
+            Reassigned members retain platform access with updated role permissions. Users are never escalated to Admin.
+          </p>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-2">
+          <button 
+            type="button" 
+            onclick="closeDeleteRoleModal()" 
+            class="w-1/2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer text-center"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            class="w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <i class="fa-solid fa-trash-can"></i>
+            <span>Confirm Delete</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-// Search Filter on Roles Table
+// Registered module list from server
+const SYSTEM_MODULES = [
+  {% for mod in modules %}
+  { key: "{{ mod.key }}", name: "{{ mod.name|escapejs }}", icon: "{{ mod.icon }}" },
+  {% endfor %}
+];
+
+let currentFilterTab = 'all';
+
+// Tab Filter
+function setRoleFilter(filterType) {
+  currentFilterTab = filterType;
+  document.querySelectorAll('.role-filter-tab').forEach(btn => {
+    btn.classList.remove('bg-slate-900', 'text-white', 'shadow-xs');
+    btn.classList.add('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+  });
+  const activeBtn = document.getElementById(`tab_${filterType}`);
+  if (activeBtn) {
+    activeBtn.classList.remove('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-xs');
+  }
+  filterRolesTable(document.getElementById('roleTableSearch')?.value || '');
+}
+
+// Search & Tab Filter on Roles Table
 function filterRolesTable(val) {
   const query = (val || '').trim().toLowerCase();
   const rows = document.querySelectorAll('#rolesTable .role-row');
@@ -563,30 +926,36 @@ function filterRolesTable(val) {
   let matchCount = 0;
 
   rows.forEach(row => {
+    const isSystem = row.getAttribute('data-is-system') === '1';
+    const memberCount = parseInt(row.getAttribute('data-member-count') || '0', 10);
     const searchData = (row.getAttribute('data-search') || row.textContent).toLowerCase();
-    const isMatch = !query || searchData.includes(query);
-    row.style.display = isMatch ? '' : 'none';
-    if (isMatch) matchCount++;
+
+    // Check tab condition
+    let tabMatch = true;
+    if (currentFilterTab === 'system') tabMatch = isSystem;
+    else if (currentFilterTab === 'custom') tabMatch = !isSystem;
+    else if (currentFilterTab === 'assigned') tabMatch = memberCount > 0;
+    else if (currentFilterTab === 'unassigned') tabMatch = memberCount === 0;
+
+    const queryMatch = !query || searchData.includes(query);
+    const isVisible = tabMatch && queryMatch;
+
+    row.style.display = isVisible ? '' : 'none';
+    if (isVisible) matchCount++;
   });
 
   const clearBtn = document.getElementById('clearRoleSearchBtn');
-  if (clearBtn) {
-    clearBtn.classList.toggle('hidden', !query);
-  }
+  if (clearBtn) clearBtn.classList.toggle('hidden', !query);
 
   const noMatchRow = document.getElementById('noRolesMatchRow');
-  if (noMatchRow) {
-    noMatchRow.classList.toggle('hidden', matchCount > 0);
-  }
+  if (noMatchRow) noMatchRow.classList.toggle('hidden', matchCount > 0);
 
   const badge = document.getElementById('roleCountBadge');
-  if (badge) {
-    badge.textContent = query ? `${matchCount} of ${totalCount}` : totalCount;
-  }
+  if (badge) badge.textContent = `${matchCount} of ${totalCount}`;
 
   const footerCount = document.getElementById('roleFooterCount');
   if (footerCount) {
-    footerCount.textContent = query 
+    footerCount.textContent = (query || currentFilterTab !== 'all')
       ? `Showing ${matchCount} of ${totalCount} entries (filtered)` 
       : `Showing 1 to ${totalCount} of ${totalCount} entries`;
   }
@@ -600,10 +969,6 @@ function clearRoleSearch() {
     input.focus();
   }
 }
-
-document.getElementById('roleTableSearch')?.addEventListener('input', function() {
-  filterRolesTable(this.value);
-});
 
 // Add Role Modal Handlers
 function openAddRoleModal() {
@@ -626,6 +991,9 @@ function openEditRoleModal(roleId) {
   const form = document.getElementById('editRoleForm');
   form.action = `/sales/roles/${roleId}/edit/`;
 
+  const fullPageLink = document.getElementById('editModalFullPageLink');
+  if (fullPageLink) fullPageLink.href = `/sales/roles/${roleId}/edit/`;
+
   const nameInput = document.getElementById('editRoleName');
   nameInput.value = roleName;
   nameInput.readOnly = isSystem;
@@ -638,7 +1006,6 @@ function openEditRoleModal(roleId) {
   document.getElementById('editRoleDescription').value = roleDesc;
   document.getElementById('editModalTitle').textContent = `Edit Role: ${roleName}`;
 
-  // Reset all edit checkboxes
   document.querySelectorAll('.edit-cb').forEach(cb => cb.checked = false);
 
   const dataScript = document.getElementById(`role-perms-${roleId}`);
@@ -651,7 +1018,6 @@ function openEditRoleModal(roleId) {
     }
   }
 
-  // Populate from permsMap
   if (permsMap && typeof permsMap === 'object') {
     Object.keys(permsMap).forEach(mod => {
       const p = permsMap[mod];
@@ -676,13 +1042,123 @@ function closeEditRoleModal() {
   document.getElementById('editRoleModal').classList.add('hidden');
 }
 
+// Inspect Assigned Members Modal
+function openMembersModal(roleId, roleName) {
+  document.getElementById('inspectModalRoleName').textContent = roleName;
+  const listEl = document.getElementById('inspectMembersList');
+  listEl.innerHTML = '';
+
+  const script = document.getElementById(`role-members-${roleId}`);
+  let members = [];
+  if (script) {
+    try { members = JSON.parse(script.textContent); } catch (e) {}
+  }
+
+  if (!members || members.length === 0) {
+    listEl.innerHTML = `
+      <div class="py-8 text-center text-slate-400">
+        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+          <i class="fa-solid fa-user-xmark"></i>
+        </div>
+        <p class="text-xs font-bold text-slate-700">No members assigned</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Assign team members to this role from User Management.</p>
+      </div>
+    `;
+  } else {
+    members.forEach(m => {
+      const initials = (m.name || m.email).substring(0, 2).toUpperCase();
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-white transition';
+      row.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+            ${initials}
+          </span>
+          <div>
+            <div class="text-xs font-bold text-slate-900">${m.name}</div>
+            <div class="text-[10px] text-slate-400">${m.email}</div>
+          </div>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${m.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}">
+            ${m.is_active ? 'Active' : 'Inactive'}
+          </span>
+          <div class="text-[10px] text-slate-400 mt-1">${m.joined_at ? 'Joined ' + m.joined_at : ''}</div>
+        </div>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('inspectMembersModal').classList.remove('hidden');
+}
+
+function closeMembersModal() {
+  document.getElementById('inspectMembersModal').classList.add('hidden');
+}
+
+// Matrix View Grid Modal
+function openMatrixViewModal(roleId, roleName) {
+  document.getElementById('viewMatrixRoleName').textContent = roleName;
+  const tbody = document.getElementById('matrixModalGridBody');
+  tbody.innerHTML = '';
+
+  const editBtn = document.getElementById('matrixModalEditBtn');
+  if (editBtn) {
+    editBtn.onclick = function() {
+      closeMatrixViewModal();
+      openEditRoleModal(roleId);
+    };
+  }
+
+  const script = document.getElementById(`role-perms-${roleId}`);
+  let permsMap = {};
+  if (script) {
+    try { permsMap = JSON.parse(script.textContent); } catch (e) {}
+  }
+
+  const rowEl = document.getElementById(`role-row-${roleId}`);
+  const isSystem = rowEl && rowEl.getAttribute('data-is-system') === '1';
+
+  SYSTEM_MODULES.forEach(mod => {
+    const p = permsMap[mod.key] || {};
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50/70 transition';
+
+    const checkIcon = `<span class="text-emerald-600 font-bold"><i class="fa-solid fa-check"></i></span>`;
+    const dashIcon = `<span class="text-slate-300 font-bold">&mdash;</span>`;
+
+    const canRead = isSystem || !!p.can_read || !!p.can_admin;
+    const canWrite = isSystem || !!p.can_write || !!p.can_admin;
+    const canEdit = isSystem || !!p.can_edit || !!p.can_admin;
+    const canDelete = isSystem || !!p.can_delete || !!p.can_admin;
+    const canAdmin = isSystem || !!p.can_admin;
+
+    tr.innerHTML = `
+      <td class="py-2.5 px-4 font-bold text-slate-800 flex items-center gap-2">
+        <span class="w-5 h-5 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center text-[9px]">
+          <i class="fa-solid ${mod.icon}"></i>
+        </span>
+        <span>${mod.name}</span>
+      </td>
+      <td class="py-2.5 px-2 text-center">${canRead ? checkIcon : dashIcon}</td>
+      <td class="py-2.5 px-2 text-center">${canWrite ? checkIcon : dashIcon}</td>
+      <td class="py-2.5 px-2 text-center">${canEdit ? checkIcon : dashIcon}</td>
+      <td class="py-2.5 px-2 text-center">${canDelete ? checkIcon : dashIcon}</td>
+      <td class="py-2.5 px-2 text-center bg-purple-50/20">${canAdmin ? `<span class="text-purple-700 font-bold"><i class="fa-solid fa-crown text-[10px]"></i></span>` : dashIcon}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('viewMatrixModal').classList.remove('hidden');
+}
+
+function closeMatrixViewModal() {
+  document.getElementById('viewMatrixModal').classList.add('hidden');
+}
+
 // Admin Checkbox Row Auto-Toggle
 function handleAdminRowToggle(prefix, modKey, isChecked) {
-  const readCb = document.querySelector(`input[name="perm_${modKey}_read"]`);
-  const writeCb = document.querySelector(`input[name="perm_${modKey}_write"]`);
-  const editCb = document.querySelector(`input[name="perm_${modKey}_edit"]`);
-  const delCb = document.querySelector(`input[name="perm_${modKey}_delete"]`);
-  
   if (isChecked) {
     if (prefix === 'add') {
       const row = document.getElementById(`add_row_${modKey}`);
@@ -705,25 +1181,62 @@ function handleAdminRowToggle(prefix, modKey, isChecked) {
   }
 }
 
-// Column Header Select All Toggle
-function toggleColumn(prefix, action, isChecked) {
+// Column Header Toggle Batch
+function toggleColumnBatch(prefix, action) {
   const cbs = document.querySelectorAll(`.${prefix}-${action}`);
-  cbs.forEach(cb => cb.checked = isChecked);
+  if (!cbs.length) return;
+  const anyUnchecked = Array.from(cbs).some(cb => !cb.checked);
+  cbs.forEach(cb => {
+    cb.checked = anyUnchecked;
+    if (action === 'admin' && anyUnchecked) {
+      const row = cb.closest('tr');
+      if (row) {
+        row.querySelectorAll(`.${prefix}-cb`).forEach(c => c.checked = true);
+      }
+    }
+  });
 }
 
 // Toggle Entire Matrix
 function toggleAllMatrix(prefix, isChecked) {
-  const cbs = document.querySelectorAll(`.${prefix}-cb`);
-  cbs.forEach(cb => cb.checked = isChecked);
+  document.querySelectorAll(`.${prefix}-cb`).forEach(cb => cb.checked = isChecked);
+}
+
+// Toggle Read-Only for Entire Matrix
+function toggleReadOnlyMatrix(prefix) {
+  document.querySelectorAll(`.${prefix}-cb`).forEach(cb => {
+    if (cb.classList.contains(`${prefix}-read`)) {
+      cb.checked = true;
+    } else {
+      cb.checked = false;
+    }
+  });
 }
 
 // Delete Role Modal
-function openDeleteRoleModal(id, name) {
+function openDeleteRoleModal(id, name, memberCount) {
   const form = document.getElementById('deleteRoleForm');
   const nameEl = document.getElementById('deleteRoleNameText');
+  const warnEl = document.getElementById('deleteRoleAssignedWarning');
+  const countBadge = document.getElementById('deleteAssignedCountBadge');
   const modal = document.getElementById('deleteRoleModal');
+
   if (form) form.action = `/sales/roles/${id}/delete/`;
   if (nameEl) nameEl.textContent = name;
+
+  // Hide the role being deleted from the fallback select
+  document.querySelectorAll('.del-opt-role').forEach(opt => opt.classList.remove('hidden'));
+  const currentOpt = document.querySelector(`.del-opt-${id}`);
+  if (currentOpt) currentOpt.classList.add('hidden');
+
+  const count = parseInt(memberCount || '0', 10);
+  if (count > 0) {
+    if (countBadge) countBadge.textContent = count;
+    if (warnEl) warnEl.classList.remove('hidden');
+  } else {
+    if (warnEl) warnEl.classList.add('hidden');
+  }
+
   if (modal) modal.classList.remove('hidden');
 }
 
@@ -732,8 +1245,8 @@ function closeDeleteRoleModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-// Close modals on background click or Esc
-['addRoleModal', 'editRoleModal', 'deleteRoleModal'].forEach(id => {
+// Close modals on background click or Escape
+['addRoleModal', 'editRoleModal', 'deleteRoleModal', 'inspectMembersModal', 'viewMatrixModal'].forEach(id => {
   const modal = document.getElementById(id);
   modal?.addEventListener('click', function(e) {
     if (e.target === this) {
@@ -747,33 +1260,9 @@ document.addEventListener('keydown', function(e) {
     closeAddRoleModal();
     closeEditRoleModal();
     closeDeleteRoleModal();
+    closeMembersModal();
+    closeMatrixViewModal();
   }
 });
 </script>
-
-<!-- Delete Custom Role Modal -->
-<div id="deleteRoleModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-    <div class="p-6 text-center">
-      <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4">
-        <i class="fa-solid fa-trash-can"></i>
-      </div>
-      <h3 class="text-base font-bold text-slate-900">Delete Custom Role?</h3>
-      <p class="text-xs text-slate-500 mt-1">
-        Are you sure you want to delete role <strong id="deleteRoleNameText" class="text-slate-800">this role</strong>? Any users assigned to this role will lose their custom permissions matrix.
-      </p>
-
-      <form id="deleteRoleForm" method="POST" action="" class="mt-5 flex items-center justify-end gap-2.5">
-        {% csrf_token %}
-        <button type="button" onclick="closeDeleteRoleModal()" class="w-1/2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
-          Cancel
-        </button>
-        <button type="submit" class="w-1/2 py-2 px-3 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
-          <i class="fa-solid fa-trash-can"></i>
-          <span>Confirm Delete</span>
-        </button>
-      </form>
-    </div>
-  </div>
-</div>
 {% endblock %}

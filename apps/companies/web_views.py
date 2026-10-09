@@ -1,9 +1,11 @@
 import json
+from datetime import timedelta
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.utils import timezone
 from apps.companies.models import (
     Company,
     CompanyMember,
@@ -352,6 +354,14 @@ def company_team_web_view(request):
                 return redirect("company-team-web")
 
             new_status = not (member.is_active and member.user.is_active)
+            if not new_status and member.role == CompanyMember.Role.ADMIN:
+                active_admins = CompanyMember.objects.filter(
+                    company=company, role=CompanyMember.Role.ADMIN, is_active=True
+                ).count()
+                if active_admins <= 1:
+                    messages.error(request, "Action blocked: Cannot deactivate the only active Administrator for this company.")
+                    return redirect("company-team-web")
+
             member.is_active = new_status
             member.user.is_active = new_status
             member.user.save()
@@ -369,6 +379,14 @@ def company_team_web_view(request):
             if member.user_id == request.user.id:
                 messages.error(request, "You cannot delete your own account.")
                 return redirect("company-team-web")
+
+            if member.role == CompanyMember.Role.ADMIN:
+                admin_count = CompanyMember.objects.filter(
+                    company=company, role=CompanyMember.Role.ADMIN
+                ).count()
+                if admin_count <= 1:
+                    messages.error(request, "Action blocked: Cannot delete the only Administrator of this company.")
+                    return redirect("company-team-web")
 
             user_email = member.user.email
             user_to_delete = member.user
@@ -569,7 +587,8 @@ def subscription_billing_web_view(request):
             company=company,
             plan=Subscription.Plan.PRO,
             credits_total=500,
-            credits_used=180,
+            credits_used=0,
+            valid_till=timezone.now().date() + timedelta(days=30),
         )
 
     if request.method == "POST":
@@ -621,7 +640,7 @@ def seller_roles_web_view(request):
 
     ensure_company_default_roles(company)
 
-    roles = list(CompanyRole.objects.filter(company=company).prefetch_related("module_permissions").order_by("-is_system", "name"))
+    roles = list(CompanyRole.objects.filter(company=company).prefetch_related("module_permissions", "members__user").order_by("-is_system", "name"))
 
     roles_data = []
     for r in roles:
@@ -636,12 +655,24 @@ def seller_roles_web_view(request):
                 "can_admin": mp.can_admin,
             }
         is_full_admin = bool(r.is_system)
+        assigned_members = [
+            {
+                "id": m.id,
+                "email": m.user.email,
+                "name": m.user.get_full_name() or m.user.email.split("@")[0],
+                "joined_at": m.joined_at.strftime("%d %b %Y") if m.joined_at else "",
+                "is_active": bool(m.is_active and m.user.is_active),
+            }
+            for m in r.members.all()
+        ]
         roles_data.append({
             "role": r,
             "summary": summary,
             "perms_json": json.dumps(perms_map),
             "is_full_admin": is_full_admin,
-            "member_count": r.members.count(),
+            "member_count": len(assigned_members),
+            "members": assigned_members,
+            "members_json": json.dumps(assigned_members),
         })
 
     modules = [
@@ -877,13 +908,22 @@ def seller_role_delete_view(request, role_id):
         return redirect("seller-roles-web")
 
     role_name = role.name
-    # Fallback any assigned members to default admin or user
-    default_role = CompanyRole.objects.filter(company=company, is_system=True).first()
+    fallback_role_id = request.POST.get("fallback_role_id")
+    fallback_role = None
+    if fallback_role_id:
+        fallback_role = CompanyRole.objects.filter(company=company, id=fallback_role_id).exclude(id=role.id).first()
+
     for m in role.members.all():
-        m.custom_role = default_role
-        m.save(update_fields=["custom_role"])
-        if default_role:
-            sync_member_permissions_from_role(m, default_role)
+        if fallback_role:
+            m.custom_role = fallback_role
+            m.save(update_fields=["custom_role"])
+            sync_member_permissions_from_role(m, fallback_role)
+        else:
+            # Safe default: Unassign custom role and revert to standard USER, never escalate to Admin!
+            m.custom_role = None
+            m.role = CompanyMember.Role.USER
+            m.save(update_fields=["role", "custom_role"])
+            MemberPermission.objects.filter(member=m).delete()
 
     role.delete()
     messages.success(request, f"Role '{role_name}' deleted successfully.")

@@ -406,6 +406,14 @@
           Search
         </button>
       </form>
+
+      <!-- Export Inquiries CSV Button -->
+      <a href="{% if is_seller_context %}{% url 'sales-export-inquiries-csv' %}{% else %}{% url 'export-inquiries-csv' %}{% endif %}?{% if selected_product_id %}product_id={{ selected_product_id }}&{% endif %}{% if current_status %}status={{ current_status }}&{% endif %}{% if current_date_range %}date_range={{ current_date_range }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
+         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition shrink-0 shadow-2xs"
+         title="Download CSV report of inquiries list">
+        <i class="fa-solid fa-file-csv text-emerald-600"></i>
+        <span class="hidden sm:inline">Export CSV</span>
+      </a>
     </div>
 
   </div>
@@ -437,7 +445,12 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex items-center gap-2 shrink-0 flex-wrap">
+        <a href="{% if is_seller_context %}{% url 'sales-export-inquiries-csv' %}{% else %}{% url 'export-inquiries-csv' %}{% endif %}?product_id={{ selected_product.id }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_date_range %}&date_range={{ current_date_range }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition shadow-2xs">
+          <i class="fa-solid fa-file-csv text-emerald-600"></i>
+          <span>Export Inquiries CSV</span>
+        </a>
         {% if is_seller_context %}
         <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -460,9 +473,23 @@
     {% endif %}
 
     <!-- Filtered Inquiries Table -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" id="inquiries_table_container">
+      <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="relative flex-1 max-w-sm">
+          <i class="fa-solid fa-filter absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="text" id="inquiry_table_quick_filter" placeholder="Quick filter loaded rows (vendor, email, terms)..."
+                 class="w-full pl-8 pr-8 py-1.5 rounded-xl border border-slate-200 bg-white text-xs focus:ring-2 {% if is_seller_context %}focus:ring-orange-500{% else %}focus:ring-blue-500{% endif %} transition text-slate-800">
+          <button type="button" id="clear_inquiry_quick_filter_btn" class="hidden absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="text-[11px] font-semibold text-slate-500 flex items-center gap-2">
+          <span>Showing <strong id="visible_inquiry_count" class="text-slate-900">{{ inquiries|length }}</strong> of {{ inquiries|length }} inquiries</span>
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs min-w-[840px]">
+        <table class="w-full text-left text-xs min-w-[840px]" id="inquiries_table">
           <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
             <tr>
               <th class="py-3 px-4 min-w-[200px] w-60">Contact / Recipient</th>
@@ -473,9 +500,16 @@
               <th class="py-3 px-4 text-right w-36 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-slate-100" id="inquiries_table_body">
             {% for inq in inquiries %}
-            <tr class="hover:bg-slate-50/70 transition" id="inquiry-row-{{ inq.id }}">
+            <tr class="inquiry-table-row hover:bg-slate-50/70 transition" id="inquiry-row-{{ inq.id }}"
+                data-inquiry-id="{{ inq.id }}"
+                data-company="{{ inq.search_result.external_company.name|lower }}"
+                data-email="{{ inq.sent_to_email|lower }}"
+                data-subject="{{ inq.subject|lower }}"
+                data-terms="{{ inq.delivery_terms|default:''|lower }}"
+                data-price="{{ inq.quoted_price|default:'' }}"
+                data-status="{{ inq.status }}">
               <td class="py-3.5 px-4 font-bold text-slate-900">
                 <div class="flex items-center">
                   <span class="w-8 h-8 rounded-xl {% if is_seller_context %}bg-orange-50 text-orange-600 border-orange-100{% else %}bg-blue-50 text-blue-600 border-blue-100{% endif %} border flex items-center justify-center mr-3 font-semibold text-xs shrink-0">
@@ -504,22 +538,22 @@
                   Scope: {{ inq.search_result.product_title }}
                 </div>
               </td>
-              <td class="py-3.5 px-4 whitespace-nowrap">
+              <td class="py-3.5 px-4 whitespace-nowrap commercial-terms-cell">
                 {% if inq.quoted_price %}
                 <div>
-                  <span class="font-black text-slate-900 text-xs">{{ inq.quoted_currency|default:"INR" }} {{ inq.quoted_price }}</span>
+                  <span class="font-black text-slate-900 text-xs quotation-amount-display">{{ inq.quoted_currency|default:"INR" }} {{ inq.quoted_price }}</span>
                   {% if inq.delivery_terms %}
-                  <div class="text-[10px] text-slate-500 font-normal truncate max-w-[150px]" title="{{ inq.delivery_terms }}">{{ inq.delivery_terms }}</div>
+                  <div class="text-[10px] text-slate-500 font-normal truncate max-w-[150px] quotation-terms-display" title="{{ inq.delivery_terms }}">{{ inq.delivery_terms }}</div>
                   {% endif %}
                 </div>
                 {% else %}
-                <span class="text-slate-400 italic text-[11px]">No quote logged</span>
+                <span class="text-slate-400 italic text-[11px] quotation-pending-display">No quote logged</span>
                 {% endif %}
               </td>
               <td class="py-3.5 px-4 whitespace-nowrap text-slate-600">
                 <div>{{ inq.sent_at|date:"M d, Y" }}</div>
-                <div class="text-[10px] text-slate-400">
-                  <i class="fa-solid fa-comments mr-1"></i>{{ inq.messages.count }} messages
+                <div class="text-[10px] text-slate-400 inquiry-msg-counter" data-count="{{ inq.messages_count|default:inq.messages.count }}">
+                  <i class="fa-solid fa-comments mr-1"></i>{{ inq.messages_count|default:inq.messages.count }} messages
                 </div>
               </td>
               <td class="py-3.5 px-4 whitespace-nowrap">
@@ -549,10 +583,10 @@
                 <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
                   Dossier
                 </a>
-                <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
+                <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition cursor-pointer">
                   Quote
                 </button>
-                <button type="button" onclick="openQuickFollowupModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.subject|escapejs }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg transition" title="Add follow-up message">
+                <button type="button" onclick="openQuickFollowupModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.subject|escapejs }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg transition cursor-pointer" title="Add follow-up message">
                   <i class="fa-solid fa-reply"></i>
                 </button>
                 <button type="button" onclick="openDeleteInquiryListModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{% if is_seller_context %}{% url 'sales-delete-inquiry' inq.id %}{% else %}{% url 'delete-inquiry' inq.id %}{% endif %}')" class="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer" title="Delete Inquiry">
@@ -571,255 +605,49 @@
           </tbody>
         </table>
       </div>
+
+      <!-- No Matching Inquiries Real-time Filter Placeholder -->
+      <div id="no_matching_inquiries_filter_placeholder" class="hidden p-10 text-center text-slate-400 border-t border-slate-100">
+        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-sm mx-auto mb-2">
+          <i class="fa-solid fa-filter"></i>
+        </div>
+        <p class="text-xs font-bold text-slate-700">No inquiries match your quick filter</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Try clearing your search query above.</p>
+      </div>
     </div>
 
-  <!-- VIEW 2: NO PRODUCT SELECTED PROMPT CARD -->
+  <!-- VIEW 2: NO PRODUCT SELECTED PROMPT CARD & PRODUCT GROUPS -->
   {% else %}
-  {% if is_seller_context %}
-  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
-    <div class="max-w-2xl mx-auto space-y-4">
-      <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
-        <i class="fa-solid fa-envelope"></i>
-      </div>
-      <div>
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 mb-2">
-          <i class="fa-solid fa-envelope-open-text text-[11px]"></i> Inquiries & Commercial Correspondence
-        </span>
-        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to Manage Inquiries & Quotes</h2>
-        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
-          The Inquiries tracking module monitors outbound commercial proposals, formal price quotations, delivery terms, and live conversation threads product-by-product. <strong>Please select a product from the filter above to view its correspondence history.</strong>
-        </p>
-      </div>
-    </div>
-  </div>
-  {% else %}
-    {% if product_groups or unassigned_group %}
-      <div class="space-y-6">
-        {% for group in product_groups %}
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          
-          <div class="bg-gradient-to-r {% if is_seller_context %}from-slate-50 via-white to-orange-50/40{% else %}from-slate-50 via-white to-blue-50/40{% endif %} p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div class="flex items-center space-x-3">
-              <span class="w-9 h-9 rounded-xl {% if is_seller_context %}bg-orange-500 shadow-orange-500/20{% else %}bg-blue-600 shadow-blue-600/20{% endif %} text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
-                <i class="fa-solid fa-box"></i>
-              </span>
-              <div>
-                <div class="flex items-center gap-2">
-                  <h2 class="text-sm font-extrabold text-slate-900">{{ group.product.name }}</h2>
-                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-                    {{ group.product.category.name|default:"General" }}
-                  </span>
-                </div>
-                <div class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
-                  <span>MOQ: {{ group.product.minimum_order_quantity|default:group.product.moq|default:"1" }} {{ group.product.unit|default:"pcs" }}</span>
-                  <span>&bull;</span>
-                  <span class="text-emerald-700 font-bold">{{ group.count }} Inquiries</span>
-                  <span class="text-slate-400">({{ group.replied_count }} Quoted, {{ group.discussion_count }} Discussing, {{ group.won_count }} Won)</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <a href="?product_id={{ group.product.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-orange-600 transition shadow-sm">
-                <span>Filter This Product</span>
-                <i class="fa-solid fa-arrow-right text-[10px]"></i>
-              </a>
-              {% if is_seller_context %}
-              <a href="{% url 'find-buyers' %}?product_id={{ group.product.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition shadow-sm">
-                <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-                <span>Outreach</span>
-              </a>
-              {% else %}
-              <a href="{% url 'find-suppliers' %}?product_id={{ group.product.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-sm">
-                <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
-                <span>Find Suppliers</span>
-              </a>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs min-w-[840px]">
-              <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-                <tr>
-                  <th class="py-2.5 px-4 min-w-[200px] w-60">Recipient Company</th>
-                  <th class="py-2.5 px-4 min-w-[200px]">Subject</th>
-                  <th class="py-2.5 px-4 w-36 whitespace-nowrap">Commercial Terms</th>
-                  <th class="py-2.5 px-4 w-32 whitespace-nowrap">Date Sent</th>
-                  <th class="py-2.5 px-4 w-40 whitespace-nowrap">Status</th>
-                  <th class="py-2.5 px-4 text-right w-36 whitespace-nowrap">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                {% for inq in group.inquiries %}
-                <tr class="hover:bg-slate-50 transition" id="inquiry-row-{{ inq.id }}">
-                  <td class="py-3 px-4 font-bold text-slate-900">
-                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="hover:text-blue-600 truncate max-w-[200px] block">
-                      {{ inq.search_result.external_company.name }}
-                    </a>
-                    <div class="text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{{ inq.sent_to_email }}</div>
-                  </td>
-                  <td class="py-3 px-4">
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</span>
-                      {% if inq.attachment %}
-                      <span class="inline-flex items-center text-[10px] text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100" title="Attached: {{ inq.get_attachment_filename }}">
-                        <i class="fa-solid fa-paperclip"></i>
-                      </span>
-                      {% endif %}
-                    </div>
-                    <div class="text-[10px] text-slate-400">{{ inq.messages.count }} thread messages</div>
-                  </td>
-                  <td class="py-3 px-4 whitespace-nowrap">
-                    {% if inq.quoted_price %}
-                    <span class="font-bold text-slate-800 text-[11px]">{{ inq.quoted_currency|default:"INR" }} {{ inq.quoted_price }}</span>
-                    {% else %}
-                    <span class="text-slate-400 italic text-[10px]">Pending Quote</span>
-                    {% endif %}
-                  </td>
-                  <td class="py-3 px-4 text-slate-600 whitespace-nowrap">{{ inq.sent_at|date:"M d, Y" }}</td>
-                  <td class="py-3 px-4 whitespace-nowrap">
-                    <!-- Inline status dropdown -->
-                    <div class="flex items-center gap-1.5">
-                      <select 
-                        class="inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer 
-                        {% if inq.status == 'sent' %}bg-amber-50 text-amber-800 border-amber-300
-                        {% elif inq.status == 'in_discussion' %}bg-blue-50 text-blue-800 border-blue-300
-                        {% elif inq.status == 'replied' %}bg-purple-50 text-purple-800 border-purple-300
-                        {% elif inq.status == 'won' %}bg-emerald-50 text-emerald-800 border-emerald-300
-                        {% elif inq.status == 'lost' %}bg-rose-50 text-rose-800 border-rose-300
-                        {% else %}bg-slate-100 text-slate-700 border-slate-300{% endif %}"
-                        data-id="{{ inq.id }}"
-                        onchange="updateInquiryStatus('{{ inq.id }}', this.value, this)"
-                      >
-                        {% for code, label in status_choices %}
-                        <option value="{{ code }}" {% if inq.status == code %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                      </select>
-                      <span id="status-spinner-{{ inq.id }}" class="hidden text-slate-400 text-xs animate-spin">
-                        <i class="fa-solid fa-circle-notch"></i>
-                      </span>
-                    </div>
-                  </td>
-                  <td class="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
-                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
-                      Dossier
-                    </a>
-                    <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
-                      Quote
-                    </button>
-                    <button type="button" onclick="openQuickFollowupModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.subject|escapejs }}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg transition" title="Add follow-up">
-                      <i class="fa-solid fa-reply"></i>
-                    </button>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {% endfor %}
-
-        {% if unassigned_group %}
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="bg-slate-50 p-4 border-b border-slate-200 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">
-                <i class="fa-solid fa-envelope"></i>
-              </span>
-              <div>
-                <h2 class="text-sm font-bold text-slate-800">{{ unassigned_group.title }}</h2>
-                <div class="text-[10px] text-slate-400">{{ unassigned_group.count }} Inquiries</div>
-              </div>
-            </div>
-            <a href="?product_id=unassigned" class="text-xs font-bold text-blue-600 hover:underline">Filter This &rarr;</a>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs min-w-[840px]">
-              <thead class="bg-slate-50/70 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-                <tr>
-                  <th class="py-2.5 px-4 min-w-[200px] w-60">Recipient Company</th>
-                  <th class="py-2.5 px-4 min-w-[200px]">Subject</th>
-                  <th class="py-2.5 px-4 w-36 whitespace-nowrap">Commercial Terms</th>
-                  <th class="py-2.5 px-4 w-32 whitespace-nowrap">Date Sent</th>
-                  <th class="py-2.5 px-4 w-40 whitespace-nowrap">Status</th>
-                  <th class="py-2.5 px-4 text-right w-36 whitespace-nowrap">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                {% for inq in unassigned_group.inquiries %}
-                <tr class="hover:bg-slate-50 transition" id="inquiry-row-{{ inq.id }}">
-                  <td class="py-3 px-4 font-bold text-slate-900">
-                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="hover:text-blue-600 truncate max-w-[200px] block">
-                      {{ inq.search_result.external_company.name }}
-                    </a>
-                    <div class="text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{{ inq.sent_to_email }}</div>
-                  </td>
-                  <td class="py-3 px-4">
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-medium text-slate-800 truncate max-w-sm">{{ inq.subject }}</span>
-                      {% if inq.attachment %}
-                      <span class="inline-flex items-center text-[10px] text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100" title="Attached: {{ inq.get_attachment_filename }}">
-                        <i class="fa-solid fa-paperclip"></i>
-                      </span>
-                      {% endif %}
-                    </div>
-                  </td>
-                  <td class="py-3 px-4 whitespace-nowrap">
-                    {% if inq.quoted_price %}
-                    <span class="font-bold text-slate-800 text-[11px]">{{ inq.quoted_currency|default:"INR" }} {{ inq.quoted_price }}</span>
-                    {% else %}
-                    <span class="text-slate-400 italic text-[10px]">Pending Quote</span>
-                    {% endif %}
-                  </td>
-                  <td class="py-3 px-4 text-slate-600 whitespace-nowrap">{{ inq.sent_at|date:"M d, Y" }}</td>
-                  <td class="py-3 px-4 whitespace-nowrap">
-                    <select 
-                      class="inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer 
-                      {% if inq.status == 'sent' %}bg-amber-50 text-amber-800 border-amber-300
-                      {% elif inq.status == 'in_discussion' %}bg-blue-50 text-blue-800 border-blue-300
-                      {% elif inq.status == 'replied' %}bg-purple-50 text-purple-800 border-purple-300
-                      {% elif inq.status == 'won' %}bg-emerald-50 text-emerald-800 border-emerald-300
-                      {% elif inq.status == 'lost' %}bg-rose-50 text-rose-800 border-rose-300
-                      {% else %}bg-slate-100 text-slate-700 border-slate-300{% endif %}"
-                      data-id="{{ inq.id }}"
-                      onchange="updateInquiryStatus('{{ inq.id }}', this.value, this)"
-                    >
-                      {% for code, label in status_choices %}
-                      <option value="{{ code }}" {% if inq.status == code %}selected{% endif %}>{{ label }}</option>
-                      {% endfor %}
-                    </select>
-                  </td>
-                  <td class="py-3 px-4 text-right whitespace-nowrap space-x-1.5">
-                    <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
-                      Dossier
-                    </a>
-                    <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition">
-                      Quote
-                    </button>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {% endif %}
-      </div>
-
-    {% else %}
-      <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 shadow-sm">
-        <div class="w-16 h-16 rounded-2xl {% if is_seller_context %}bg-orange-50 text-orange-500 border-orange-100{% else %}bg-blue-50 text-blue-500 border-blue-100{% endif %} flex items-center justify-center text-2xl mx-auto mb-4 border">
+  <div class="space-y-6">
+    {% if is_seller_context %}
+    <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+      <div class="max-w-2xl mx-auto space-y-4">
+        <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
           <i class="fa-solid fa-envelope"></i>
         </div>
-        <h3 class="text-base font-bold text-slate-800 mb-1">No Inquiries Found</h3>
-        <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
-          Inquiries are automatically organized by product. Dispatch commercial inquiries to see them tracked in your pipeline.
-        </p>
+        <div>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200 mb-2">
+            <i class="fa-solid fa-envelope-open-text text-[11px]"></i> Inquiries & Commercial Correspondence
+          </span>
+          <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to Manage Inquiries & Quotes</h2>
+          <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+            The Inquiries tracking module monitors outbound commercial proposals, formal price quotations, delivery terms, and live conversation threads product-by-product. <strong>Please select a product from the filter above to view its correspondence history.</strong>
+          </p>
+        </div>
       </div>
+    </div>
     {% endif %}
 
-  {% endif %}
+    {% if is_seller_context %}
+    <div class="text-center pt-2">
+      <a href="{% url 'sales-export-inquiries-csv' %}{% if current_status %}?status={{ current_status }}{% endif %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition shadow-2xs">
+        <i class="fa-solid fa-file-csv text-emerald-600"></i>
+        <span>Export All Inquiries CSV</span>
+      </a>
+    </div>
+    {% endif %}
+
+  </div>
   {% endif %}
 
 </div>
@@ -963,6 +791,47 @@ function getCsrfToken() {
   return tokenInput ? tokenInput.value : '';
 }
 
+// Toast notification helper for Inquiries module
+let inquiriesToastTimeout = null;
+function showInquiriesToast(message, isSuccess = true) {
+  const toast = document.getElementById('inquiriesToast');
+  const toastMsg = document.getElementById('inquiriesToastMessage');
+  const toastIcon = document.getElementById('inquiriesToastIcon');
+  if (!toast || !toastMsg) return;
+
+  toastMsg.textContent = message;
+  if (isSuccess) {
+    toastIcon.className = "w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs shrink-0";
+    toastIcon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+  } else {
+    toastIcon.className = "w-6 h-6 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center text-xs shrink-0";
+    toastIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+  }
+
+  toast.classList.remove('hidden');
+  if (inquiriesToastTimeout) clearTimeout(inquiriesToastTimeout);
+  inquiriesToastTimeout = setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 3200);
+}
+
+function updateStatusBadgeClass(selectElement, newStatus) {
+  selectElement.className = 'inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer ';
+  if (newStatus === 'sent') {
+    selectElement.className += 'bg-amber-50 text-amber-800 border-amber-300';
+  } else if (newStatus === 'in_discussion') {
+    selectElement.className += 'bg-blue-50 text-blue-800 border-blue-300';
+  } else if (newStatus === 'replied') {
+    selectElement.className += 'bg-purple-50 text-purple-800 border-purple-300';
+  } else if (newStatus === 'won') {
+    selectElement.className += 'bg-emerald-50 text-emerald-800 border-emerald-300';
+  } else if (newStatus === 'lost') {
+    selectElement.className += 'bg-rose-50 text-rose-800 border-rose-300';
+  } else {
+    selectElement.className += 'bg-slate-100 text-slate-700 border-slate-300';
+  }
+}
+
 // Inline AJAX Status Update
 async function updateInquiryStatus(inquiryId, newStatus, selectElement) {
   const spinner = document.getElementById(`status-spinner-${inquiryId}`);
@@ -987,27 +856,16 @@ async function updateInquiryStatus(inquiryId, newStatus, selectElement) {
 
     const data = await res.json();
     if (data.success) {
-      // Update select element badge colors
-      selectElement.className = 'inquiry-status-selector text-[11px] font-bold rounded-lg border px-2 py-1 transition cursor-pointer ';
-      if (newStatus === 'sent') {
-        selectElement.className += 'bg-amber-50 text-amber-800 border-amber-300';
-      } else if (newStatus === 'in_discussion') {
-        selectElement.className += 'bg-blue-50 text-blue-800 border-blue-300';
-      } else if (newStatus === 'replied') {
-        selectElement.className += 'bg-purple-50 text-purple-800 border-purple-300';
-      } else if (newStatus === 'won') {
-        selectElement.className += 'bg-emerald-50 text-emerald-800 border-emerald-300';
-      } else if (newStatus === 'lost') {
-        selectElement.className += 'bg-rose-50 text-rose-800 border-rose-300';
-      } else {
-        selectElement.className += 'bg-slate-100 text-slate-700 border-slate-300';
-      }
+      updateStatusBadgeClass(selectElement, newStatus);
+      const row = document.getElementById(`inquiry-row-${inquiryId}`);
+      if (row) row.setAttribute('data-status', newStatus);
+      showInquiriesToast(`Status updated to ${data.status_display || newStatus}!`);
     } else {
-      alert('Could not update status: ' + (data.error || 'Server error'));
+      showInquiriesToast('Could not update status: ' + (data.error || 'Server error'), false);
     }
   } catch (err) {
     console.error('Status update failed:', err);
-    alert('Network error while updating status.');
+    showInquiriesToast('Network error while updating status.', false);
   } finally {
     if (spinner) spinner.classList.add('hidden');
   }
@@ -1024,6 +882,8 @@ function openQuickQuoteModal(inquiryId, companyName, currentPrice, currentCurren
   form.action = IS_SELLER_CONTEXT 
     ? `/sales/inquiries/${inquiryId}/quote/` 
     : `/procurement/inquiries/${inquiryId}/quote/`;
+
+  form.setAttribute('data-active-inquiry-id', inquiryId);
 
   subtitle.textContent = `Company: ${companyName}`;
   if (priceInput) priceInput.value = currentPrice || '';
@@ -1046,6 +906,8 @@ function openQuickFollowupModal(inquiryId, companyName, subject) {
     ? `/sales/inquiries/${inquiryId}/message/` 
     : `/procurement/inquiries/${inquiryId}/message/`;
 
+  form.setAttribute('data-active-inquiry-id', inquiryId);
+
   subtitle.textContent = `${companyName} (${subject})`;
   document.getElementById('quickFollowupModal').classList.remove('hidden');
 }
@@ -1060,6 +922,127 @@ document.getElementById('quickQuoteModal')?.addEventListener('click', function(e
 
 document.getElementById('quickFollowupModal')?.addEventListener('click', function(e) {
   if (e.target === this) closeQuickFollowupModal();
+});
+
+// AJAX Handler for Quick Quote Modal Form
+document.getElementById('quickQuoteForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const form = this;
+  const submitBtn = form.querySelector('button[type=submit]');
+  const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin"></i> Saving...';
+  }
+
+  try {
+    const formData = new FormData(form);
+    const res = await fetch(form.action, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
+    });
+    const data = await res.json();
+    if (data.success) {
+      const inquiryId = form.getAttribute('data-active-inquiry-id');
+      const row = document.getElementById(`inquiry-row-${inquiryId}`);
+      if (row) {
+        const priceCell = row.querySelector('.commercial-terms-cell');
+        const cur = formData.get('currency') || 'INR';
+        const pr = formData.get('quoted_price') || '';
+        const terms = formData.get('delivery_terms') || '';
+
+        if (priceCell) {
+          priceCell.innerHTML = `<div>
+            <span class="font-black text-slate-900 text-xs quotation-amount-display">${cur} ${pr}</span>
+            ${terms ? `<div class="text-[10px] text-slate-500 font-normal truncate max-w-[150px] quotation-terms-display" title="${terms}">${terms}</div>` : ''}
+          </div>`;
+        }
+
+        row.setAttribute('data-price', pr);
+        row.setAttribute('data-terms', (terms || '').toLowerCase());
+
+        const statusSelect = row.querySelector('.inquiry-status-selector');
+        if (statusSelect && data.status) {
+          statusSelect.value = data.status;
+          updateStatusBadgeClass(statusSelect, data.status);
+          row.setAttribute('data-status', data.status);
+        }
+      }
+      closeQuickQuoteModal();
+      showInquiriesToast('Commercial quotation terms saved successfully!');
+    } else {
+      form.submit();
+    }
+  } catch (err) {
+    console.warn('AJAX submit failed, falling back to standard submit', err);
+    form.submit();
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHtml;
+    }
+  }
+});
+
+// AJAX Handler for Quick Follow-up Modal Form
+document.getElementById('quickFollowupForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const form = this;
+  const submitBtn = form.querySelector('button[type=submit]');
+  const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin"></i> Saving...';
+  }
+
+  try {
+    const formData = new FormData(form);
+    const res = await fetch(form.action, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
+    });
+    const data = await res.json();
+    if (data.success) {
+      const inquiryId = form.getAttribute('data-active-inquiry-id');
+      const row = document.getElementById(`inquiry-row-${inquiryId}`);
+      if (row) {
+        const counterEl = row.querySelector('.inquiry-msg-counter');
+        if (counterEl) {
+          const currentCount = parseInt(counterEl.getAttribute('data-count') || '0', 10);
+          const newCount = currentCount + 1;
+          counterEl.setAttribute('data-count', newCount);
+          counterEl.innerHTML = `<i class="fa-solid fa-comments mr-1"></i>${newCount} messages`;
+        }
+        if (data.status) {
+          const statusSelect = row.querySelector('.inquiry-status-selector');
+          if (statusSelect) {
+            statusSelect.value = data.status;
+            updateStatusBadgeClass(statusSelect, data.status);
+            row.setAttribute('data-status', data.status);
+          }
+        }
+      }
+      closeQuickFollowupModal();
+      form.reset();
+      showInquiriesToast(data.message || 'Follow-up message logged to conversation thread!');
+    } else {
+      form.submit();
+    }
+  } catch (err) {
+    console.warn('AJAX submit failed, falling back to standard submit', err);
+    form.submit();
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHtml;
+    }
+  }
 });
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1146,6 +1129,65 @@ document.addEventListener('DOMContentLoaded', function() {
       closeDropdown();
     }
   });
+
+  // Real-Time Instant Client-Side Table Filter
+  const quickFilterInput = document.getElementById('inquiry_table_quick_filter');
+  const clearQuickFilterBtn = document.getElementById('clear_inquiry_quick_filter_btn');
+  const tableRows = document.querySelectorAll('.inquiry-table-row');
+  const visibleCounter = document.getElementById('visible_inquiry_count');
+  const noMatchPlaceholder = document.getElementById('no_matching_inquiries_filter_placeholder');
+
+  function applyQuickTableFilter() {
+    const q = (quickFilterInput?.value || '').trim().toLowerCase();
+    let visible = 0;
+
+    tableRows.forEach(row => {
+      const company = row.getAttribute('data-company') || '';
+      const email = row.getAttribute('data-email') || '';
+      const subject = row.getAttribute('data-subject') || '';
+      const terms = row.getAttribute('data-terms') || '';
+      const price = row.getAttribute('data-price') || '';
+
+      const match = !q || company.includes(q) || email.includes(q) || subject.includes(q) || terms.includes(q) || price.includes(q);
+      if (match) {
+        row.style.display = '';
+        visible++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (visibleCounter) visibleCounter.textContent = visible;
+    if (noMatchPlaceholder) {
+      if (visible === 0 && tableRows.length > 0) {
+        noMatchPlaceholder.classList.remove('hidden');
+      } else {
+        noMatchPlaceholder.classList.add('hidden');
+      }
+    }
+  }
+
+  if (quickFilterInput) {
+    quickFilterInput.addEventListener('input', function() {
+      const val = this.value.trim();
+      if (clearQuickFilterBtn) {
+        if (val) clearQuickFilterBtn.classList.remove('hidden');
+        else clearQuickFilterBtn.classList.add('hidden');
+      }
+      applyQuickTableFilter();
+    });
+  }
+
+  if (clearQuickFilterBtn) {
+    clearQuickFilterBtn.addEventListener('click', function() {
+      if (quickFilterInput) {
+        quickFilterInput.value = '';
+        clearQuickFilterBtn.classList.add('hidden');
+        applyQuickTableFilter();
+        quickFilterInput.focus();
+      }
+    });
+  }
 });
 
 // Modal: Delete Inquiry
@@ -1188,5 +1230,13 @@ function closeDeleteInquiryListModal() {
       </form>
     </div>
   </div>
+</div>
+
+<!-- Inquiries Module Floating Toast Feedback -->
+<div id="inquiriesToast" class="fixed bottom-6 right-6 z-50 hidden max-w-sm w-full bg-slate-900/95 backdrop-blur-md text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center space-x-3 transition-all duration-200">
+  <div id="inquiriesToastIcon" class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+    <i class="fa-solid fa-circle-check"></i>
+  </div>
+  <div id="inquiriesToastMessage" class="flex-1 truncate">Notification</div>
 </div>
 {% endblock %}

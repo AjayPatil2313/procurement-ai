@@ -2565,6 +2565,69 @@ class SellerRolesAndTeamManagementTestCase(TestCase):
         self.assertEqual(del_resp.status_code, 302)
         self.assertFalse(CompanyMember.objects.filter(id=member.id).exists())
 
+    def test_role_safe_deletion_and_assigned_members_visibility(self):
+        """Test safe role deletion prevents privilege escalation and assigned members are displayed"""
+        from apps.companies.models import CompanyRole, CompanyMember
+        self.client.login(email="admin@apexdynamics.com", password="Password@123")
+
+        # Create two custom roles
+        support_role = CompanyRole.objects.create(
+            company=self.company,
+            name="Customer Support",
+            description="Tier 1 Support",
+            is_system=False,
+        )
+        ops_role = CompanyRole.objects.create(
+            company=self.company,
+            name="Operations Specialist",
+            description="Logistics & Ops",
+            is_system=False,
+        )
+
+        # Create user with support role
+        support_user = User.objects.create_user(
+            email="support_agent@apexdynamics.com",
+            password="Password@123",
+            first_name="Pooja",
+            last_name="Sharma",
+        )
+        support_member = CompanyMember.objects.create(
+            company=self.company,
+            user=support_user,
+            role=CompanyMember.Role.USER,
+            custom_role=support_role,
+            is_active=True,
+        )
+
+        # 1. Access seller roles page - verify filter tabs, assigned users badge, and modals
+        resp = self.client.get(reverse("seller-roles-web"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Customer Support")
+        self.assertContains(resp, "Operations Specialist")
+        self.assertContains(resp, "1 Member")
+        self.assertContains(resp, "tab_all")
+        self.assertContains(resp, "tab_system")
+        self.assertContains(resp, "tab_custom")
+        self.assertContains(resp, "inspectMembersModal")
+        self.assertContains(resp, "viewMatrixModal")
+
+        # 2. Delete role with explicit fallback role - member safely reassigns to fallback
+        del_resp = self.client.post(reverse("seller-role-delete", args=[support_role.id]), data={
+            "fallback_role_id": ops_role.id,
+        })
+        self.assertEqual(del_resp.status_code, 302)
+        support_member.refresh_from_db()
+        self.assertEqual(support_member.custom_role, ops_role)
+        self.assertEqual(support_member.role, CompanyMember.Role.USER)  # NEVER escalated to ADMIN!
+
+        # 3. Delete ops role without fallback - member safely reverts to standard user without admin escalation
+        del_resp2 = self.client.post(reverse("seller-role-delete", args=[ops_role.id]))
+        self.assertEqual(del_resp2.status_code, 302)
+        support_member.refresh_from_db()
+        self.assertIsNone(support_member.custom_role)
+        self.assertEqual(support_member.role, CompanyMember.Role.USER)  # NOT admin!
+
+
 
 class HelpSupportTestCase(TestCase):
     def setUp(self):

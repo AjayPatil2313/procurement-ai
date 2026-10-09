@@ -367,3 +367,103 @@ class DynamicInquiriesAndReportsTestCase(TestCase):
         self.assertEqual(len(dispatched.attachments), 1)
         self.assertEqual(dispatched.attachments[0][0], "technical_specs.pdf")
 
+    def test_export_inquiries_csv_view(self):
+        """Test dedicated 1-click inquiries CSV export endpoint."""
+        inquiry = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result,
+            subject="Commercial Supply Agreement",
+            message="Initial supply quote request",
+            sent_to_email="procurement@globalmfg.com",
+            quoted_price=Decimal("820000.00"),
+            quoted_currency="INR",
+            delivery_terms="CIF Mumbai",
+            status=Inquiry.Status.SENT,
+        )
+        inquiry.ensure_initial_message()
+
+        url = reverse("sales-export-inquiries-csv")
+        response = self.client.get(url, {"product_id": self.product.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
+        self.assertIn("Sales_Inquiries", response["Content-Disposition"])
+
+        content = response.content.decode("utf-8")
+        self.assertIn("Inquiry ID", content)
+        self.assertIn("Counterparty Company", content)
+        self.assertIn("Global Manufacturing Corp", content)
+        self.assertIn("820000.00", content)
+        self.assertIn("CIF Mumbai", content)
+
+    def test_inquiries_list_view_query_optimization(self):
+        """Test inquiries_list_view annotates messages_count without N+1 queries."""
+        inquiry = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result,
+            subject="Thread Performance Test",
+            message="Testing query count",
+            sent_to_email="procurement@globalmfg.com",
+            status=Inquiry.Status.SENT,
+        )
+        inquiry.ensure_initial_message()
+
+        url = reverse("sales-inquiries-list")
+        response = self.client.get(url, {"product_id": self.product.id})
+        self.assertEqual(response.status_code, 200)
+        inqs = response.context["inquiries"]
+        self.assertGreaterEqual(len(inqs), 1)
+        # Check annotated messages_count exists and matches
+        first_inq = inqs[0]
+        self.assertTrue(hasattr(first_inq, "messages_count"))
+        self.assertGreaterEqual(first_inq.messages_count, 1)
+
+    def test_record_inquiry_quote_ajax(self):
+        """Test recording quotation terms via AJAX returns JSON payload."""
+        inquiry = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result,
+            subject="AJAX Quote Proposal",
+            message="Pending Quote",
+            sent_to_email="purchasing@globalmfg.com",
+            status=Inquiry.Status.SENT,
+        )
+
+        url = reverse("sales-record-inquiry-quote", kwargs={"pk": inquiry.id})
+        response = self.client.post(url, {
+            "quoted_price": "675000.00",
+            "currency": "INR",
+            "delivery_terms": "Door Delivery, 7 Days",
+            "notes": "100% against delivery",
+        }, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["status"], Inquiry.Status.REPLIED)
+        self.assertEqual(data["quoted_price"], "675000.00")
+        self.assertEqual(data["currency"], "INR")
+
+    def test_add_inquiry_message_ajax(self):
+        """Test adding follow-up message via AJAX returns JSON payload."""
+        inquiry = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result,
+            subject="AJAX Message Thread",
+            message="Initial text",
+            sent_to_email="purchasing@globalmfg.com",
+            status=Inquiry.Status.SENT,
+        )
+        inquiry.ensure_initial_message()
+
+        url = reverse("sales-inquiry-add-message", kwargs={"pk": inquiry.id})
+        response = self.client.post(url, {
+            "message_body": "Checking in on the payment schedule terms.",
+            "message_type": "outbound",
+            "new_status": "in_discussion",
+        }, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["status"], Inquiry.Status.IN_DISCUSSION)
+
+

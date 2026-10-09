@@ -1,4 +1,6 @@
 from datetime import timedelta
+from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, Sum
@@ -337,6 +339,9 @@ def demo_login_as_view(request, role_name):
     - 'seller': Priya Patel (Company User - Sales permissions)
     - 'superadmin': System SuperAdmin (Platform Super Admin)
     """
+    if not getattr(settings, "DEBUG", False):
+        raise PermissionDenied("1-Click demo authentication switching is disabled in production environments.")
+
     role_email_map = {
         "admin": "ajay@abctrading.com",
         "buyer": "rahul@abctrading.com",

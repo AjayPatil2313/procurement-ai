@@ -242,7 +242,7 @@ def forgot_password_view(request):
         return render(request, "auth/forgot_password.html", {
             "email_sent": email_sent,
             "email": email,
-            "reset_url": reset_url,
+            "reset_url": reset_url if getattr(settings, "DEBUG", False) else None,
         })
 
     return render(request, "auth/forgot_password.html")

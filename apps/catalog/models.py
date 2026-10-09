@@ -52,6 +52,13 @@ class Product(models.Model):
         default=ItemType.PRODUCT,
     )
     name = models.CharField(max_length=255)
+    sku = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Stock Keeping Unit or internal Catalog/Part Code",
+    )
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,

@@ -400,17 +400,116 @@
           <i class="fa-solid fa-wand-magic-sparkles"></i>
           <span>Find More Vendors</span>
         </a>
+        <a 
+          href="{% url 'export-saved-leads-csv' %}?product_id={{ selected_product.id }}" 
+          class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
+          title="Export prequalified pipeline to CSV"
+        >
+          <i class="fa-solid fa-file-csv text-emerald-600"></i>
+          <span>Export Pipeline CSV</span>
+        </a>
         <a href="{% url 'saved-leads' %}" class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm">
           View All Products
         </a>
       </div>
     </div>
+
+    <!-- Executive Pipeline KPI Strip -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total in Pipeline</div>
+        <div class="text-lg font-black text-slate-900 mt-0.5 flex items-center justify-between">
+          <span id="kpi_total_pipeline">{{ total_pipeline_count }}</span>
+          <span class="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-bookmark"></i>
+          </span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-1 font-medium">Shortlisted vendors</div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Deal Win Rate</div>
+        <div class="text-lg font-black text-emerald-700 mt-0.5 flex items-center justify-between">
+          <span id="kpi_win_rate">{{ win_rate_pct }}%</span>
+          <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-trophy"></i>
+          </span>
+        </div>
+        <div class="text-[11px] text-emerald-600 mt-1 font-medium"><span id="kpi_won_count">{{ stage_counts.won }}</span> Won deals closed</div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Velocity</div>
+        <div class="text-lg font-black text-purple-700 mt-0.5 flex items-center justify-between">
+          <span id="kpi_active_velocity">{{ active_velocity_count }}</span>
+          <span class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-comments"></i>
+          </span>
+        </div>
+        <div class="text-[11px] text-purple-600 mt-1 font-medium">Contacted &amp; Negotiating</div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rep Coverage</div>
+        <div class="text-lg font-black text-blue-700 mt-0.5 flex items-center justify-between">
+          <span id="kpi_rep_coverage">{{ assigned_coverage_pct }}%</span>
+          <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-user-check"></i>
+          </span>
+        </div>
+        <div class="text-[11px] text-blue-600 mt-1 font-medium">Assigned to sales reps</div>
+      </div>
+    </div>
     {% endif %}
 
+    <!-- Real-Time Search & Quick Filter Toolbar -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div class="flex-1 relative max-w-md">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <i class="fa-solid fa-magnifying-glass text-xs"></i>
+        </div>
+        <input 
+          type="text" 
+          id="saved_lead_search_input" 
+          placeholder="Filter pipeline by company, city, contact, rep or notes..." 
+          class="w-full pl-9 pr-8 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
+        >
+        <button 
+          type="button" 
+          id="clear_saved_search_btn" 
+          class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+          title="Clear search"
+        >
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-1.5" id="saved_filter_chips_container">
+        <button type="button" class="saved-filter-chip active text-xs font-bold px-3 py-1.5 rounded-xl border border-orange-500 bg-orange-500 text-white transition shadow-xs cursor-pointer" data-filter="all">
+          All (<span id="visible_saved_leads_count">{{ saved_items|length }}</span>)
+        </button>
+        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="active">
+          Active Pipeline
+        </button>
+        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="won">
+          Won Deals
+        </button>
+        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="new">
+          New Leads
+        </button>
+        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="unassigned_rep">
+          Unassigned Rep
+        </button>
+        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="has_contact">
+          Verified Contact
+        </button>
+      </div>
+    </div>
+
     <!-- Filtered Saved Leads Table -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" id="saved_leads_table_container">
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs min-w-[880px]">
+        <table class="w-full text-left text-xs min-w-[880px]" id="saved_leads_table">
           <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
             <tr>
               <th class="py-3 px-4 min-w-[200px] w-64">Company & Contact</th>
@@ -421,29 +520,39 @@
               <th class="py-3 px-4 text-right w-36 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-slate-100" id="saved_leads_tbody">
             {% for item in saved_items %}
-            <tr class="hover:bg-slate-50/70 transition">
+            <tr 
+              class="saved-lead-row hover:bg-slate-50/70 transition"
+              id="saved_row_{{ item.id }}"
+              data-id="{{ item.id }}"
+              data-company-name="{{ item.search_result.external_company.name|lower }}"
+              data-city="{{ item.search_result.external_company.city|default:''|lower }}"
+              data-status="{{ item.status }}"
+              data-rep="{% if item.assigned_to_id %}{{ item.assigned_to_id }}{% else %}unassigned{% endif %}"
+              data-has-contact="{% if item.search_result.external_company.email or item.search_result.external_company.phone %}true{% else %}false{% endif %}"
+              data-notes="{{ item.notes|lower }}"
+            >
               <td class="py-3.5 px-4 font-bold text-slate-900">
                 <div class="flex items-start">
                   <span class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center mr-3 font-semibold text-xs border border-orange-100 shrink-0 mt-0.5">
                     <i class="fa-solid fa-industry"></i>
                   </span>
                   <div>
-                    <div class="font-bold text-slate-900 leading-tight">{{ item.search_result.external_company.name }}</div>
-                    <div class="text-[11px] text-slate-500 font-normal mt-0.5">
+                    <div class="font-bold text-slate-900 leading-tight company-title">{{ item.search_result.external_company.name }}</div>
+                    <div class="text-[11px] text-slate-500 font-normal mt-0.5 company-location">
                       {{ item.search_result.external_company.city|default:"India" }}
                     </div>
                     {% if item.search_result.external_company.email %}
                     <div class="text-[11px] text-blue-600 font-semibold mt-0.5">
                       <a href="mailto:{{ item.search_result.external_company.email }}" class="hover:underline">
-                        <i class="fa-solid fa-envelope mr-1 text-slate-400"></i>{{ item.search_result.external_company.email }}
+                        <i class="fa-solid fa-envelope mr-1 text-slate-400"></i><span class="company-email">{{ item.search_result.external_company.email }}</span>
                       </a>
                     </div>
                     {% endif %}
                     {% if item.search_result.external_company.phone %}
                     <div class="text-[11px] text-slate-600 font-medium mt-0.5">
-                      <i class="fa-solid fa-phone mr-1 text-slate-400"></i>{{ item.search_result.external_company.phone }}
+                      <i class="fa-solid fa-phone mr-1 text-slate-400"></i><span class="company-phone">{{ item.search_result.external_company.phone }}</span>
                     </div>
                     {% endif %}
                   </div>
@@ -457,34 +566,36 @@
 
               <!-- Inline Update Form -->
               <td colspan="3" class="py-3.5 px-4">
-                <form method="POST" action="{% url 'update-saved-lead' item.id %}" class="flex flex-col lg:flex-row items-center gap-2.5">
+                <form id="row_form_{{ item.id }}" onsubmit="submitLeadFormInline(event, '{{ item.id }}')" method="POST" action="{% url 'update-saved-lead' item.id %}" class="flex flex-col lg:flex-row items-center gap-2.5">
                   {% csrf_token %}
-                  <div class="w-full lg:w-44 flex items-center gap-1.5">
-                    <select name="status" class="w-full text-xs font-bold rounded-xl border border-slate-300 p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
+                  <div class="w-full lg:w-44 flex items-center gap-1.5" id="stage_controls_{{ item.id }}">
+                    <select name="status" id="status_select_{{ item.id }}" onchange="saveLeadRowInline('{{ item.id }}')" class="w-full text-xs font-bold rounded-xl border border-slate-300 p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
                       {% for s_code, s_label in status_choices %}
                       <option value="{{ s_code }}" {% if item.status == s_code %}selected{% endif %}>{{ s_label }}</option>
                       {% endfor %}
                     </select>
-                    {% if item.status == 'new' %}
-                    <button type="button" onclick="quickAdvanceLeadStage('{{ item.id }}', 'contacted')" class="px-2 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold rounded-xl border border-amber-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Contacted">
-                      <i class="fa-solid fa-forward-step text-[9px] mr-1"></i>Contacted
-                    </button>
-                    {% elif item.status == 'contacted' %}
-                    <button type="button" onclick="quickAdvanceLeadStage('{{ item.id }}', 'negotiating')" class="px-2 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[10px] font-bold rounded-xl border border-purple-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Negotiating">
-                      <i class="fa-solid fa-forward-step text-[9px] mr-1"></i>Negotiate
-                    </button>
-                    {% elif item.status == 'negotiating' %}
-                    <button type="button" onclick="quickAdvanceLeadStage('{{ item.id }}', 'won')" class="px-2 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Won">
-                      <i class="fa-solid fa-trophy text-[9px] mr-1"></i>Won
-                    </button>
-                    {% elif item.status == 'won' %}
-                    <span class="px-2 py-2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-xl border border-emerald-200 shrink-0" title="Won Deal">
-                      <i class="fa-solid fa-circle-check text-[9px]"></i> Won
+                    <span id="advance_btn_slot_{{ item.id }}" class="shrink-0">
+                      {% if item.status == 'new' %}
+                      <button type="button" onclick="quickAdvanceLeadStage('{{ item.id }}', 'contacted')" class="px-2 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold rounded-xl border border-amber-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Contacted">
+                        <i class="fa-solid fa-forward-step text-[9px] mr-1"></i>Contacted
+                      </button>
+                      {% elif item.status == 'contacted' %}
+                      <button type="button" onclick="quickAdvanceLeadStage('{{ item.id }}', 'negotiating')" class="px-2 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[10px] font-bold rounded-xl border border-purple-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Negotiating">
+                        <i class="fa-solid fa-forward-step text-[9px] mr-1"></i>Negotiate
+                      </button>
+                      {% elif item.status == 'negotiating' %}
+                      <button type="button" onclick="quickAdvanceLeadStage('{{ item.id }}', 'won')" class="px-2 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Won">
+                        <i class="fa-solid fa-trophy text-[9px] mr-1"></i>Won
+                      </button>
+                      {% elif item.status == 'won' %}
+                      <span class="px-2 py-2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-xl border border-emerald-200 shrink-0" title="Won Deal">
+                        <i class="fa-solid fa-circle-check text-[9px]"></i> Won
+                      </span>
+                      {% endif %}
                     </span>
-                    {% endif %}
                   </div>
                   <div class="w-full lg:w-40">
-                    <select name="assigned_to_id" class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
+                    <select name="assigned_to_id" id="rep_select_{{ item.id }}" onchange="saveLeadRowInline('{{ item.id }}')" class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
                       <option value="">Unassigned Rep</option>
                       {% for m in team_members %}
                       <option value="{{ m.user.id }}" {% if item.assigned_to_id == m.user.id %}selected{% endif %}>{{ m.user.get_full_name|default:m.user.email }}</option>
@@ -492,8 +603,8 @@
                     </select>
                   </div>
                   <div class="flex-1 w-full flex items-center gap-1.5">
-                    <input type="text" name="notes" value="{{ item.notes }}" placeholder="Add private deal notes..." class="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
-                    <button type="submit" class="p-2 bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold rounded-xl border border-orange-200 transition" title="Save changes">
+                    <input type="text" name="notes" id="notes_input_{{ item.id }}" value="{{ item.notes }}" placeholder="Add private deal notes..." onchange="saveLeadRowInline('{{ item.id }}')" class="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition">
+                    <button type="submit" id="save_btn_{{ item.id }}" class="p-2 bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold rounded-xl border border-orange-200 transition shrink-0 cursor-pointer" title="Save changes">
                       <i class="fa-solid fa-floppy-disk"></i>
                     </button>
                   </div>
@@ -501,7 +612,7 @@
               </td>
 
               <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5">
-                <button type="button" onclick="openSendProposalModal('{{ item.search_result.id }}', '{{ item.search_result.external_company.name|escapejs }}', '{{ item.search_result.external_company.email|default:''|escapejs }}', '{{ item.search_result.product_title|escapejs }}')" class="p-1.5 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition" title="Send Commercial Proposal / Inquire">
+                <button type="button" onclick="openSendProposalModal('{{ item.search_result.id }}', '{{ item.search_result.external_company.name|escapejs }}', '{{ item.search_result.external_company.email|default:''|escapejs }}', '{{ item.search_result.product_title|escapejs }}')" class="p-1.5 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition cursor-pointer" title="Send Commercial Proposal / Inquire">
                   <i class="fa-solid fa-envelope text-xs"></i>
                 </button>
                 {% if item.search_result.external_company.website %}
@@ -536,6 +647,20 @@
       </div>
     </div>
 
+    <!-- No Matching Saved Leads Filter Placeholder -->
+    <div id="no_matching_saved_leads_placeholder" class="hidden bg-white rounded-2xl p-10 text-center text-slate-400 border border-slate-200">
+      <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-lg mx-auto mb-2">
+        <i class="fa-solid fa-filter"></i>
+      </div>
+      <h4 class="text-sm font-bold text-slate-800">No prequalified vendors match your active filter</h4>
+      <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+        Try clearing your search query or choosing a different filter chip above.
+      </p>
+      <button type="button" id="clear_saved_filters_btn" class="mt-3 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg border border-orange-200 transition cursor-pointer">
+        Reset Filters
+      </button>
+    </div>
+
   <!-- VIEW 2: NO PRODUCT SELECTED PROMPT CARD -->
   {% else %}
   <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
@@ -554,9 +679,16 @@
       </div>
     </div>
   </div>
-
   {% endif %}
 
+</div>
+
+<!-- Floating Toast Notification for Pipeline Updates -->
+<div id="savedLeadsToast" class="fixed bottom-6 right-6 z-50 hidden max-w-sm bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+  <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs shrink-0" id="savedToastIcon">
+    <i class="fa-solid fa-circle-check"></i>
+  </span>
+  <span id="savedToastMessage" class="font-medium">Pipeline updated</span>
 </div>
 
 <!-- Send Commercial Proposal Modal -->
@@ -752,49 +884,365 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  document.addEventListener('click', function(e) {
-    if (comboboxWrapper && !comboboxWrapper.contains(e.target)) {
-      closeDropdown();
+  // Helper: Get CSRF Token
+  function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+  }
+
+  // Toast notification helper
+  let toastTimeout = null;
+  function showPipelineToast(message, isSuccess = true) {
+    const toast = document.getElementById('savedLeadsToast');
+    const toastMsg = document.getElementById('savedToastMessage');
+    const toastIcon = document.getElementById('savedToastIcon');
+    if (!toast || !toastMsg) return;
+
+    toastMsg.textContent = message;
+    if (isSuccess) {
+      toastIcon.className = "w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs shrink-0";
+      toastIcon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+    } else {
+      toastIcon.className = "w-6 h-6 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center text-xs shrink-0";
+      toastIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
     }
+
+    toast.classList.remove('hidden');
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 3200);
+  }
+
+  // Real-Time Table Search & Filter Chips
+  let activeFilterChip = 'all';
+
+  function applySavedLeadFilters() {
+    const searchInput = document.getElementById('saved_lead_search_input');
+    const q = (searchInput?.value || '').trim().toLowerCase();
+    const rows = document.querySelectorAll('.saved-lead-row');
+    const tableContainer = document.getElementById('saved_leads_table_container');
+    const noMatchPlaceholder = document.getElementById('no_matching_saved_leads_placeholder');
+    const visibleCounter = document.getElementById('visible_saved_leads_count');
+
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const name = row.getAttribute('data-company-name') || '';
+      const city = row.getAttribute('data-city') || '';
+      const status = row.getAttribute('data-status') || '';
+      const rep = row.getAttribute('data-rep') || '';
+      const hasContact = row.getAttribute('data-has-contact') === 'true';
+      const notes = row.getAttribute('data-notes') || '';
+
+      // Text query match
+      const matchesSearch = !q || name.includes(q) || city.includes(q) || notes.includes(q);
+
+      // Filter chip match
+      let matchesChip = true;
+      if (activeFilterChip === 'active') {
+        matchesChip = ['contacted', 'negotiating', 'interested'].includes(status);
+      } else if (activeFilterChip === 'won') {
+        matchesChip = (status === 'won');
+      } else if (activeFilterChip === 'new') {
+        matchesChip = (status === 'new');
+      } else if (activeFilterChip === 'unassigned_rep') {
+        matchesChip = (rep === 'unassigned' || rep === '');
+      } else if (activeFilterChip === 'has_contact') {
+        matchesChip = hasContact;
+      }
+
+      if (matchesSearch && matchesChip) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (visibleCounter) {
+      visibleCounter.textContent = visibleCount;
+    }
+
+    if (noMatchPlaceholder && tableContainer) {
+      if (visibleCount === 0 && rows.length > 0) {
+        noMatchPlaceholder.classList.remove('hidden');
+      } else {
+        noMatchPlaceholder.classList.add('hidden');
+      }
+    }
+  }
+
+  // Setup Search Input Listeners
+  const leadSearchInput = document.getElementById('saved_lead_search_input');
+  const clearLeadSearchBtn = document.getElementById('clear_saved_search_btn');
+
+  if (leadSearchInput) {
+    leadSearchInput.addEventListener('input', function() {
+      const val = this.value.trim();
+      if (clearLeadSearchBtn) {
+        if (val) clearLeadSearchBtn.classList.remove('hidden');
+        else clearLeadSearchBtn.classList.add('hidden');
+      }
+      applySavedLeadFilters();
+    });
+  }
+
+  if (clearLeadSearchBtn) {
+    clearLeadSearchBtn.addEventListener('click', function() {
+      if (leadSearchInput) {
+        leadSearchInput.value = '';
+        clearLeadSearchBtn.classList.add('hidden');
+        applySavedLeadFilters();
+        leadSearchInput.focus();
+      }
+    });
+  }
+
+  // Filter Chips Listeners
+  const filterChips = document.querySelectorAll('.saved-filter-chip');
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', function() {
+      filterChips.forEach(c => {
+        c.classList.remove('active', 'bg-orange-500', 'text-white', 'border-orange-500', 'shadow-xs');
+        c.classList.add('bg-white', 'text-slate-700', 'border-slate-200');
+      });
+      this.classList.add('active', 'bg-orange-500', 'text-white', 'border-orange-500', 'shadow-xs');
+      this.classList.remove('bg-white', 'text-slate-700', 'border-slate-200');
+
+      activeFilterChip = this.getAttribute('data-filter') || 'all';
+      applySavedLeadFilters();
+    });
+  });
+
+  // Reset Filters Button
+  document.getElementById('clear_saved_filters_btn')?.addEventListener('click', function() {
+    if (leadSearchInput) leadSearchInput.value = '';
+    if (clearLeadSearchBtn) clearLeadSearchBtn.classList.add('hidden');
+    activeFilterChip = 'all';
+
+    filterChips.forEach(c => {
+      if (c.getAttribute('data-filter') === 'all') {
+        c.classList.add('active', 'bg-orange-500', 'text-white', 'border-orange-500', 'shadow-xs');
+        c.classList.remove('bg-white', 'text-slate-700', 'border-slate-200');
+      } else {
+        c.classList.remove('active', 'bg-orange-500', 'text-white', 'border-orange-500', 'shadow-xs');
+        c.classList.add('bg-white', 'text-slate-700', 'border-slate-200');
+      }
+    });
+
+    applySavedLeadFilters();
+  });
+
+  // Expose global functions for row form submission and AJAX actions
+  window.submitLeadFormInline = function(event, id) {
+    if (event) event.preventDefault();
+    saveLeadRowInline(id);
+  };
+
+  window.saveLeadRowInline = function(id) {
+    const statusSelect = document.getElementById(`status_select_${id}`);
+    const repSelect = document.getElementById(`rep_select_${id}`);
+    const notesInput = document.getElementById(`notes_input_${id}`);
+    const saveBtn = document.getElementById(`save_btn_${id}`);
+    const row = document.getElementById(`saved_row_${id}`);
+
+    if (!statusSelect) return;
+
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', getCsrfToken());
+    formData.append('status', statusSelect.value);
+    formData.append('assigned_to_id', repSelect ? repSelect.value : '');
+    formData.append('notes', notesInput ? notesInput.value : '');
+
+    if (saveBtn) {
+      saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-orange-500"></i>';
+    }
+
+    fetch(`/sales/saved-leads/${id}/update/`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        if (row) {
+          row.setAttribute('data-status', data.status);
+          row.setAttribute('data-rep', data.assigned_to_id ? String(data.assigned_to_id) : 'unassigned');
+          row.setAttribute('data-notes', (data.notes || '').toLowerCase());
+        }
+
+        // Render updated advance stage button
+        updateAdvanceButtonSlot(id, data.status);
+
+        if (saveBtn) {
+          saveBtn.innerHTML = '<i class="fa-solid fa-check text-emerald-600"></i>';
+          setTimeout(() => {
+            saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>';
+          }, 1800);
+        }
+
+        showPipelineToast(data.message || 'Pipeline updated successfully!');
+        applySavedLeadFilters();
+      } else {
+        if (saveBtn) saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>';
+        showPipelineToast('Update failed. Please retry.', false);
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      if (saveBtn) saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>';
+      showPipelineToast('Error updating lead.', false);
+    });
+  };
+
+  // 1-Click Quick Advance Stage via AJAX (Zero Page Reload)
+  window.quickAdvanceLeadStage = function(id, nextStage) {
+    const statusSelect = document.getElementById(`status_select_${id}`);
+    const repSelect = document.getElementById(`rep_select_${id}`);
+    const notesInput = document.getElementById(`notes_input_${id}`);
+    const slot = document.getElementById(`advance_btn_slot_${id}`);
+    const row = document.getElementById(`saved_row_${id}`);
+
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', getCsrfToken());
+    formData.append('status', nextStage);
+    if (repSelect) formData.append('assigned_to_id', repSelect.value);
+    if (notesInput) formData.append('notes', notesInput.value);
+
+    if (slot) {
+      slot.innerHTML = '<span class="px-2 py-2 text-slate-400 text-[10px]"><i class="fa-solid fa-spinner fa-spin"></i></span>';
+    }
+
+    fetch(`/sales/saved-leads/${id}/update/`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        if (statusSelect) statusSelect.value = data.status;
+        if (row) {
+          row.setAttribute('data-status', data.status);
+        }
+
+        updateAdvanceButtonSlot(id, data.status);
+        showPipelineToast(`Lead stage advanced to ${data.status_display}!`);
+        applySavedLeadFilters();
+      } else {
+        updateAdvanceButtonSlot(id, statusSelect ? statusSelect.value : nextStage);
+        showPipelineToast('Could not advance stage.', false);
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      updateAdvanceButtonSlot(id, statusSelect ? statusSelect.value : nextStage);
+      showPipelineToast('Error advancing stage.', false);
+    });
+  };
+
+  function updateAdvanceButtonSlot(id, currentStatus) {
+    const slot = document.getElementById(`advance_btn_slot_${id}`);
+    if (!slot) return;
+
+    if (currentStatus === 'new') {
+      slot.innerHTML = `
+        <button type="button" onclick="quickAdvanceLeadStage('${id}', 'contacted')" class="px-2 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold rounded-xl border border-amber-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Contacted">
+          <i class="fa-solid fa-forward-step text-[9px] mr-1"></i>Contacted
+        </button>
+      `;
+    } else if (currentStatus === 'contacted') {
+      slot.innerHTML = `
+        <button type="button" onclick="quickAdvanceLeadStage('${id}', 'negotiating')" class="px-2 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[10px] font-bold rounded-xl border border-purple-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Negotiating">
+          <i class="fa-solid fa-forward-step text-[9px] mr-1"></i>Negotiate
+        </button>
+      `;
+    } else if (currentStatus === 'negotiating') {
+      slot.innerHTML = `
+        <button type="button" onclick="quickAdvanceLeadStage('${id}', 'won')" class="px-2 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-200 transition shrink-0 cursor-pointer" title="Quick Advance: Mark as Won">
+          <i class="fa-solid fa-trophy text-[9px] mr-1"></i>Won
+        </button>
+      `;
+    } else if (currentStatus === 'won') {
+      slot.innerHTML = `
+        <span class="px-2 py-2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-xl border border-emerald-200 shrink-0" title="Won Deal">
+          <i class="fa-solid fa-circle-check text-[9px]"></i> Won
+        </span>
+      `;
+    } else {
+      slot.innerHTML = '';
+    }
+  }
+
+  // Modal: Delete Saved Lead (AJAX Deletion)
+  window.openDeleteSavedLeadModal = function(id, name) {
+    const form = document.getElementById('deleteSavedLeadForm');
+    const nameEl = document.getElementById('deleteLeadNameText');
+    const modal = document.getElementById('deleteSavedLeadModal');
+    if (form) {
+      form.action = `/sales/saved-leads/${id}/delete/`;
+      form.setAttribute('data-target-id', id);
+    }
+    if (nameEl) nameEl.textContent = name;
+    if (modal) modal.classList.remove('hidden');
+  };
+
+  window.closeDeleteSavedLeadModal = function() {
+    const modal = document.getElementById('deleteSavedLeadModal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  document.getElementById('deleteSavedLeadForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const actionUrl = this.action;
+    const targetId = this.getAttribute('data-target-id');
+    const row = document.getElementById(`saved_row_${targetId}`);
+
+    const formData = new FormData(this);
+
+    fetch(actionUrl, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
+    })
+    .then(res => res.json())
+    .then(data => {
+      closeDeleteSavedLeadModal();
+      if (data.success) {
+        if (row) {
+          row.style.transition = 'all 0.35s ease';
+          row.style.opacity = '0';
+          row.style.transform = 'scale(0.96)';
+          setTimeout(() => {
+            row.remove();
+            applySavedLeadFilters();
+            // Decrement total counter
+            const totalKpi = document.getElementById('kpi_total_pipeline');
+            if (totalKpi) {
+              const cur = parseInt(totalKpi.textContent, 10);
+              if (!isNaN(cur) && cur > 0) totalKpi.textContent = cur - 1;
+            }
+          }, 350);
+        }
+        showPipelineToast(data.message || 'Lead removed from pipeline');
+      } else {
+        showPipelineToast('Could not remove lead.', false);
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      closeDeleteSavedLeadModal();
+      showPipelineToast('Error removing lead.', false);
+    });
   });
 });
-
-// Quick Advance Lead Stage (1-Click)
-function quickAdvanceLeadStage(id, nextStage) {
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = `/sales/saved-leads/${id}/update/`;
-  
-  const csrf = document.createElement('input');
-  csrf.type = 'hidden';
-  csrf.name = 'csrfmiddlewaretoken';
-  csrf.value = '{{ csrf_token }}';
-  form.appendChild(csrf);
-
-  const statusInput = document.createElement('input');
-  statusInput.type = 'hidden';
-  statusInput.name = 'status';
-  statusInput.value = nextStage;
-  form.appendChild(statusInput);
-
-  document.body.appendChild(form);
-  form.submit();
-}
-
-// Modal: Delete Saved Lead
-function openDeleteSavedLeadModal(id, name) {
-  const form = document.getElementById('deleteSavedLeadForm');
-  const nameEl = document.getElementById('deleteLeadNameText');
-  const modal = document.getElementById('deleteSavedLeadModal');
-  if (form) form.action = `/sales/saved-leads/${id}/delete/`;
-  if (nameEl) nameEl.textContent = name;
-  if (modal) modal.classList.remove('hidden');
-}
-
-function closeDeleteSavedLeadModal() {
-  const modal = document.getElementById('deleteSavedLeadModal');
-  if (modal) modal.classList.add('hidden');
-}
 </script>
 
 <!-- Delete Saved Lead Confirmation Modal -->

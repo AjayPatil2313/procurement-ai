@@ -279,11 +279,62 @@
           <span>Find More Vendors</span>
         </a>
         <a 
+          href="{% url 'export-discovered-vendors-csv' %}?product_id={{ selected_product.id }}" 
+          class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
+          title="Export discovered vendor directory to CSV"
+        >
+          <i class="fa-solid fa-file-csv text-emerald-600"></i>
+          <span>Export CSV</span>
+        </a>
+        <a 
           href="{% url 'leads-list' %}" 
           class="bg-white hover:bg-slate-50 text-slate-600 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-sm inline-flex items-center gap-1"
         >
           <span>View All Products</span>
         </a>
+      </div>
+    </div>
+
+    <!-- Executive KPI Metrics Summary Strip -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+          <i class="fa-solid fa-industry text-orange-500"></i> Total Vendors
+        </div>
+        <div class="text-lg font-black text-slate-900 leading-tight">
+          {{ total_vendors_count }}
+        </div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Deduplicated companies</div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+          <i class="fa-solid fa-star text-amber-500"></i> Top-Tier Matches
+        </div>
+        <div class="text-lg font-black text-emerald-600 leading-tight">
+          {{ high_fit_count }}
+        </div>
+        <div class="text-[10px] text-slate-400 mt-0.5">&ge; 85% technical fit</div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+          <i class="fa-solid fa-address-book text-blue-500"></i> Reachability Rate
+        </div>
+        <div class="text-lg font-black text-blue-600 leading-tight">
+          {{ contact_coverage_pct }}%
+        </div>
+        <div class="text-[10px] text-slate-400 mt-0.5">{{ verified_contact_count }} of {{ total_vendors_count }} with email/phone</div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+          <i class="fa-solid fa-bookmark text-emerald-500"></i> In Pipeline
+        </div>
+        <div class="text-lg font-black text-slate-900 leading-tight">
+          {{ saved_in_pipeline_count }}
+        </div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Prequalified shortlists</div>
       </div>
     </div>
     {% elif is_unassigned_view %}
@@ -298,35 +349,79 @@
     </div>
     {% endif %}
 
-    <!-- Layout Toggle Switcher Bar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-      <div class="text-xs text-slate-500 font-medium">
-        Showing <strong>{{ leads|length }}</strong> enterprise vendors
+    <!-- Layout Toggle & Filter Control Toolbar -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs space-y-3">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-600 font-medium">
+            Showing <strong id="visible_vendors_count" class="text-slate-900">{{ leads|length }}</strong> of {{ leads|length }} enterprise vendors
+          </span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Quick search within results -->
+          <div class="relative w-full sm:w-60">
+            <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+              <i class="fa-solid fa-magnifying-glass text-[11px]"></i>
+            </div>
+            <input 
+              type="text" 
+              id="vendor_search_input" 
+              placeholder="Search company, city, industry..." 
+              class="w-full pl-7 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-1 focus:ring-orange-500 text-slate-800 placeholder-slate-400 transition"
+            >
+          </div>
+
+          <!-- Layout Toggle: Compact Cards (Default) vs Table View -->
+          <div class="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+            <button 
+              type="button" 
+              onclick="switchVendorLayout('cards')" 
+              id="viewBtnCards" 
+              class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-orange-600 shadow-xs cursor-pointer"
+              title="Compact Cards View"
+            >
+              <i class="fa-solid fa-grip"></i>
+              <span>Cards</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="switchVendorLayout('table')" 
+              id="viewBtnTable" 
+              class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
+              title="Spreadsheet Table View"
+            >
+              <i class="fa-solid fa-table-list"></i>
+              <span>Table</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Layout Toggle: Compact Cards (Default) vs Table View -->
-      <div class="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
-        <button 
-          type="button" 
-          onclick="switchVendorLayout('cards')" 
-          id="viewBtnCards" 
-          class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-orange-600 shadow-xs cursor-pointer"
-          title="Compact Cards View"
-        >
-          <i class="fa-solid fa-grip"></i>
-          <span>Compact Cards</span>
+      <!-- Filter Chips -->
+      {% if leads %}
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 pt-2 border-t border-slate-100 text-xs scrollbar-thin">
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Filter:</span>
+        <button type="button" class="vendor-filter-chip px-2.5 py-1 rounded-lg text-xs font-bold transition bg-orange-600 text-white shadow-xs cursor-pointer" data-filter="all">
+          All ({{ leads|length }})
         </button>
-        <button 
-          type="button" 
-          onclick="switchVendorLayout('table')" 
-          id="viewBtnTable" 
-          class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
-          title="Spreadsheet Table View"
-        >
-          <i class="fa-solid fa-table-list"></i>
-          <span>Table View</span>
+        <button type="button" class="vendor-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="fit_90">
+          <i class="fa-solid fa-star text-amber-500 text-[10px] mr-1"></i> 90%+ Fit
+        </button>
+        <button type="button" class="vendor-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="fit_80">
+          80%+ Fit
+        </button>
+        <button type="button" class="vendor-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="has_contact">
+          <i class="fa-solid fa-address-book text-blue-500 text-[10px] mr-1"></i> Verified Contact
+        </button>
+        <button type="button" class="vendor-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="unsaved">
+          Unsaved
+        </button>
+        <button type="button" class="vendor-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="saved">
+          <i class="fa-solid fa-bookmark text-emerald-600 text-[10px] mr-1"></i> In Pipeline
         </button>
       </div>
+      {% endif %}
     </div>
 
     <!-- Filtered Leads Compact Cards Grid (Default View) -->
@@ -462,18 +557,20 @@
                   <span>Dossier</span>
                 </button>
 
-                {% if lead.id in saved_result_ids %}
-                <a href="{% url 'saved-leads' %}" class="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg" title="Already in Pipeline">
-                  <i class="fa-solid fa-check text-[10px] mr-1"></i> Saved
-                </a>
-                {% else %}
-                <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="inline">
-                  {% csrf_token %}
-                  <button type="submit" class="inline-flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 transition" title="Save Vendor to Pipeline">
-                    <i class="fa-regular fa-bookmark text-[10px] mr-1"></i> Save
-                  </button>
-                </form>
-                {% endif %}
+                <div class="card-save-slot inline-block">
+                  {% if lead.id in saved_result_ids %}
+                  <a href="{% url 'saved-leads' %}" class="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg" title="Already in Pipeline">
+                    <i class="fa-solid fa-check text-[10px] mr-1"></i> Saved
+                  </a>
+                  {% else %}
+                  <form method="POST" action="{% url 'save-lead-toggle' lead.id %}" class="card-save-form inline">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 transition cursor-pointer" title="Save Vendor to Pipeline">
+                      <i class="fa-regular fa-bookmark text-[10px] mr-1"></i> Save
+                    </button>
+                  </form>
+                  {% endif %}
+                </div>
 
                 {% if lead.external_company.website %}
                 <a href="{{ lead.external_company.website }}" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-blue-600 transition p-1.5 inline-block" title="Visit Website">
@@ -511,6 +608,20 @@
       </div>
     </div>
 
+    <!-- No Filtered Vendors Found Placeholder -->
+    <div id="no_matching_vendors_placeholder" class="hidden bg-white rounded-2xl p-10 text-center text-slate-400 border border-slate-200">
+      <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-lg mx-auto mb-2">
+        <i class="fa-solid fa-filter"></i>
+      </div>
+      <h4 class="text-sm font-bold text-slate-800">No vendors match your active filter</h4>
+      <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+        Try clearing your search query or choosing a different filter chip above.
+      </p>
+      <button type="button" id="clear_vendor_filters_btn" class="mt-3 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg border border-orange-200 transition cursor-pointer">
+        Reset Filters
+      </button>
+    </div>
+
   <!-- VIEW 2: NO PRODUCT SELECTED PROMPT CARD -->
   {% else %}
   <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
@@ -529,7 +640,6 @@
       </div>
     </div>
   </div>
-
   {% endif %}
 
 </div>
@@ -774,6 +884,195 @@ document.addEventListener('DOMContentLoaded', function() {
     if (comboboxWrapper && !comboboxWrapper.contains(e.target)) {
       closeDropdown();
     }
+  });
+
+  // ==========================================
+  // Dual-View Interactive Filtering & Instant Search
+  // ==========================================
+  const vendorSearchInput = document.getElementById('vendor_search_input');
+  const vendorFilterChips = document.querySelectorAll('.vendor-filter-chip');
+  const vendorCards = Array.from(document.querySelectorAll('.vendor-compact-card'));
+  const vendorRows = Array.from(document.querySelectorAll('.vendor-view-table tbody tr'));
+  const visibleVendorsCount = document.getElementById('visible_vendors_count');
+  const noMatchingPlaceholder = document.getElementById('no_matching_vendors_placeholder');
+  const clearVendorFiltersBtn = document.getElementById('clear_vendor_filters_btn');
+
+  let activeVendorFilter = 'all';
+
+  function applyVendorFilters() {
+    const query = (vendorSearchInput ? vendorSearchInput.value : '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    // Filter Cards
+    vendorCards.forEach(card => {
+      const name = (card.getAttribute('data-company-name') || '').toLowerCase();
+      const location = (card.getAttribute('data-company-location') || '').toLowerCase();
+      const industry = (card.getAttribute('data-company-industry') || '').toLowerCase();
+      const score = parseInt(card.getAttribute('data-match-score') || '0', 10);
+      const email = (card.getAttribute('data-company-email') || '').trim();
+      const phone = (card.getAttribute('data-company-phone') || '').trim();
+      const isSaved = card.getAttribute('data-is-saved') === 'true';
+
+      const matchesQuery = !query || name.includes(query) || location.includes(query) || industry.includes(query);
+      let matchesChip = true;
+      if (activeVendorFilter === 'fit_90') matchesChip = score >= 90;
+      else if (activeVendorFilter === 'fit_80') matchesChip = score >= 80;
+      else if (activeVendorFilter === 'has_contact') matchesChip = Boolean(email || phone);
+      else if (activeVendorFilter === 'unsaved') matchesChip = !isSaved;
+      else if (activeVendorFilter === 'saved') matchesChip = isSaved;
+
+      if (matchesQuery && matchesChip) {
+        card.classList.remove('hidden');
+        visibleCount++;
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+
+    // Filter Table Rows
+    vendorRows.forEach(row => {
+      const name = (row.getAttribute('data-company-name') || '').toLowerCase();
+      const location = (row.getAttribute('data-company-location') || '').toLowerCase();
+      const industry = (row.getAttribute('data-company-industry') || '').toLowerCase();
+      const score = parseInt(row.getAttribute('data-match-score') || '0', 10);
+      const email = (row.getAttribute('data-company-email') || '').trim();
+      const phone = (row.getAttribute('data-company-phone') || '').trim();
+      const isSaved = row.getAttribute('data-is-saved') === 'true';
+
+      const matchesQuery = !query || name.includes(query) || location.includes(query) || industry.includes(query);
+      let matchesChip = true;
+      if (activeVendorFilter === 'fit_90') matchesChip = score >= 90;
+      else if (activeVendorFilter === 'fit_80') matchesChip = score >= 80;
+      else if (activeVendorFilter === 'has_contact') matchesChip = Boolean(email || phone);
+      else if (activeVendorFilter === 'unsaved') matchesChip = !isSaved;
+      else if (activeVendorFilter === 'saved') matchesChip = isSaved;
+
+      if (matchesQuery && matchesChip) {
+        row.classList.remove('hidden');
+      } else {
+        row.classList.add('hidden');
+      }
+    });
+
+    if (visibleVendorsCount) {
+      visibleVendorsCount.textContent = visibleCount;
+    }
+
+    if (noMatchingPlaceholder) {
+      const totalItems = vendorCards.length || vendorRows.length;
+      if (visibleCount === 0 && totalItems > 0) {
+        noMatchingPlaceholder.classList.remove('hidden');
+      } else {
+        noMatchingPlaceholder.classList.add('hidden');
+      }
+    }
+  }
+
+  if (vendorSearchInput) {
+    vendorSearchInput.addEventListener('input', applyVendorFilters);
+  }
+
+  vendorFilterChips.forEach(chip => {
+    chip.addEventListener('click', function(e) {
+      e.preventDefault();
+      vendorFilterChips.forEach(c => {
+        c.classList.remove('bg-orange-600', 'text-white', 'shadow-xs', 'font-bold');
+        c.classList.add('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'font-semibold');
+      });
+      this.classList.remove('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'font-semibold');
+      this.classList.add('bg-orange-600', 'text-white', 'shadow-xs', 'font-bold');
+
+      activeVendorFilter = this.getAttribute('data-filter') || 'all';
+      applyVendorFilters();
+    });
+  });
+
+  if (clearVendorFiltersBtn) {
+    clearVendorFiltersBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (vendorSearchInput) vendorSearchInput.value = '';
+      const allChip = document.querySelector('.vendor-filter-chip[data-filter="all"]');
+      if (allChip) allChip.click();
+      else {
+        activeVendorFilter = 'all';
+        applyVendorFilters();
+      }
+    });
+  }
+
+  // ==========================================
+  // Unified 1-Click AJAX Lead Bookmarking (Cards & Table)
+  // ==========================================
+  document.addEventListener('submit', function(e) {
+    const saveForm = e.target.closest('.card-save-form');
+    if (!saveForm) return;
+
+    e.preventDefault();
+    const btn = saveForm.querySelector('button[type="submit"]');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[9px]"></i>';
+    }
+
+    const card = saveForm.closest('.vendor-compact-card');
+    const row = saveForm.closest('tr');
+    const slot = saveForm.closest('.card-save-slot');
+    const leadId = (card ? card.getAttribute('data-lead-id') : null) || (row ? row.getAttribute('data-lead-id') : null);
+
+    fetch(saveForm.action, {
+      method: 'POST',
+      body: new FormData(saveForm),
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        if (card) card.setAttribute('data-is-saved', 'true');
+        if (row) row.setAttribute('data-is-saved', 'true');
+        
+        // Also sync any other card or row representing the same lead
+        if (leadId) {
+          document.querySelectorAll(`[data-lead-id="${leadId}"]`).forEach(el => {
+            el.setAttribute('data-is-saved', 'true');
+            const otherSlot = el.querySelector('.card-save-slot');
+            if (otherSlot) {
+              otherSlot.innerHTML = `
+                <a href="/sales/saved-leads/" class="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg" title="Already in Pipeline">
+                  <i class="fa-solid fa-check text-[10px] mr-1"></i> Saved
+                </a>
+              `;
+            }
+          });
+        }
+
+        if (slot) {
+          slot.innerHTML = `
+            <a href="/sales/saved-leads/" class="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs px-2.5 py-1.5 rounded-lg animate-in zoom-in-95 duration-150" title="Already in Pipeline">
+              <i class="fa-solid fa-check text-[10px] mr-1"></i> Saved
+            </a>
+          `;
+        }
+
+        if (activeVendorFilter === 'unsaved') {
+          applyVendorFilters();
+        }
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalBtnHtml;
+        }
+      }
+    })
+    .catch(err => {
+      console.error('AJAX save error:', err);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+      }
+    });
   });
 });
 </script>

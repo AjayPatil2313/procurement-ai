@@ -27,6 +27,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "company",
             "company_name",
             "name",
+            "sku",
             "category",
             "category_name",
             "description",

@@ -131,29 +131,39 @@
             <tr>
               <th class="py-3 px-5 w-64">Functional Module</th>
               <th class="py-3 px-3 text-center w-24">
-                <span class="inline-flex items-center gap-1">
-                  <i class="fa-regular fa-eye text-blue-600"></i> Read
-                </span>
+                <button type="button" onclick="toggleColumnBatch('read')" class="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 transition cursor-pointer" title="Click to toggle entire Read column">
+                  <i class="fa-regular fa-eye text-blue-600"></i>
+                  <span>Read</span>
+                  <i class="fa-solid fa-arrows-rotate text-[8px] opacity-60"></i>
+                </button>
               </th>
               <th class="py-3 px-3 text-center w-24">
-                <span class="inline-flex items-center gap-1">
-                  <i class="fa-solid fa-pen text-amber-600"></i> Write
-                </span>
+                <button type="button" onclick="toggleColumnBatch('write')" class="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-amber-600 transition cursor-pointer" title="Click to toggle entire Write column">
+                  <i class="fa-solid fa-pen text-amber-600"></i>
+                  <span>Write</span>
+                  <i class="fa-solid fa-arrows-rotate text-[8px] opacity-60"></i>
+                </button>
               </th>
               <th class="py-3 px-3 text-center w-24">
-                <span class="inline-flex items-center gap-1">
-                  <i class="fa-solid fa-pencil text-indigo-600"></i> Edit
-                </span>
+                <button type="button" onclick="toggleColumnBatch('edit')" class="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-indigo-600 transition cursor-pointer" title="Click to toggle entire Edit column">
+                  <i class="fa-solid fa-pencil text-indigo-600"></i>
+                  <span>Edit</span>
+                  <i class="fa-solid fa-arrows-rotate text-[8px] opacity-60"></i>
+                </button>
               </th>
               <th class="py-3 px-3 text-center w-24">
-                <span class="inline-flex items-center gap-1">
-                  <i class="fa-solid fa-trash-can text-rose-600"></i> Delete
-                </span>
+                <button type="button" onclick="toggleColumnBatch('delete')" class="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-rose-600 transition cursor-pointer" title="Click to toggle entire Delete column">
+                  <i class="fa-solid fa-trash-can text-rose-600"></i>
+                  <span>Delete</span>
+                  <i class="fa-solid fa-arrows-rotate text-[8px] opacity-60"></i>
+                </button>
               </th>
               <th class="py-3 px-3 text-center w-28 bg-blue-50/50">
-                <span class="inline-flex items-center gap-1 text-blue-900">
-                  <i class="fa-solid fa-crown text-amber-500"></i> Admin
-                </span>
+                <button type="button" onclick="toggleColumnBatch('admin')" class="inline-flex items-center gap-1 font-bold text-blue-900 hover:text-purple-700 transition cursor-pointer" title="Click to toggle entire Admin column">
+                  <i class="fa-solid fa-crown text-amber-500"></i>
+                  <span>Admin</span>
+                  <i class="fa-solid fa-arrows-rotate text-[8px] opacity-60"></i>
+                </button>
               </th>
               <th class="py-3 px-4 text-right w-24">Row Action</th>
             </tr>
@@ -328,6 +338,21 @@ function setAllReadOnly() {
       chk.checked = true;
     } else {
       chk.checked = false;
+    }
+  });
+}
+
+function toggleColumnBatch(action) {
+  const cbs = document.querySelectorAll(`.perm-${action}`);
+  if (!cbs.length) return;
+  const anyUnchecked = Array.from(cbs).some(cb => !cb.checked);
+  cbs.forEach(cb => {
+    cb.checked = anyUnchecked;
+    if (action === 'admin' && anyUnchecked) {
+      const row = cb.closest('tr');
+      if (row) {
+        row.querySelectorAll('.perm-checkbox').forEach(c => c.checked = true);
+      }
     }
   });
 }

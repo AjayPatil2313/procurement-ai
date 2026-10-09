@@ -20,6 +20,11 @@
           <i class="fa-solid fa-box"></i>
         </span>
         <span>{{ product.name }}</span>
+        {% if product.sku %}
+          <span class="px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+            SKU: {{ product.sku }}
+          </span>
+        {% endif %}
       </h1>
       <p class="text-xs text-slate-500 mt-1 flex items-center gap-2">
         <span>Company: <strong class="text-slate-700">{{ company.name }}</strong></span>
@@ -32,6 +37,11 @@
     <div class="flex flex-wrap items-center gap-2">
       <a href="{% url 'find-buyers' %}?product_id={{ product.id }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center shadow-md shadow-orange-500/20 transition">
         <i class="fa-solid fa-crosshairs mr-2"></i> Find Vendors (AI)
+      </a>
+
+      <!-- 1-Click Duplicate / Clone -->
+      <a href="{% url 'products-create' %}?duplicate_id={{ product.id }}" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs px-3.5 py-2.5 rounded-xl flex items-center transition" title="Duplicate this product with pre-filled specs">
+        <i class="fa-solid fa-clone mr-1.5"></i> Duplicate
       </a>
 
       {% if can_edit %}
@@ -78,6 +88,14 @@
         <h3 class="font-bold text-slate-900 uppercase tracking-wider text-[11px] border-b border-slate-100 pb-2">
           Commercial Terms
         </h3>
+
+        {% if product.sku %}
+        <!-- SKU -->
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500 font-medium">SKU / Item Code</span>
+          <span class="font-mono font-bold text-slate-800">{{ product.sku }}</span>
+        </div>
+        {% endif %}
 
         <!-- MOQ -->
         <div class="flex items-center justify-between">

@@ -243,8 +243,12 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
         job.save(update_fields=["progress_percent"])
 
         saved_results = 0
+        seen_ext_company_ids = set()
         for cand, scraped, fit in processed_items:
             ext_company = _save_or_update_external_company(cand, scraped, default_role="end_user")
+            if ext_company.id in seen_ext_company_ids:
+                continue
+            seen_ext_company_ids.add(ext_company.id)
 
             combined_raw = {
                 **scraped,
@@ -373,8 +377,12 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
         job.save(update_fields=["progress_percent"])
 
         saved_results = 0
+        seen_ext_company_ids = set()
         for cand, scraped, fit in processed_items:
             ext_company = _save_or_update_external_company(cand, scraped, default_role="supplier")
+            if ext_company.id in seen_ext_company_ids:
+                continue
+            seen_ext_company_ids.add(ext_company.id)
 
             SearchResult.objects.create(
                 search_job=job,

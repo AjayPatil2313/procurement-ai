@@ -189,6 +189,24 @@
         </div>
       </div>
 
+      <!-- Live Search Progress Indicator (Hidden until launch) -->
+      <div id="search_loading_overlay" class="hidden p-3.5 rounded-xl border border-orange-200 bg-orange-50/80 animate-pulse text-xs transition-all">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <i class="fa-solid fa-circle-notch fa-spin text-sm"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-orange-950 flex items-center gap-2">
+              <span>AI Vendor Discovery in Progress...</span>
+              <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-orange-200 text-orange-900">Live Web Scraping</span>
+            </div>
+            <p class="text-[11px] text-orange-900/80 mt-0.5 leading-snug">
+              Searching commercial directories, scraping candidate sites, and calculating technical parameter fit with AI. Please wait 3-6 seconds...
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Collapsible Criteria Configuration Box -->
       <div id="criteria_config_box" class="hidden border border-slate-200 bg-slate-50/80 rounded-2xl p-5 mt-3 space-y-5 transition-all">
         
@@ -235,64 +253,8 @@
           </div>
         </div>
 
-        <!-- Section 1: Static Criteria Fields (Pre-configured Enterprise Standards) -->
-        <div>
-          <div class="flex items-center justify-between mb-2.5">
-            <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <i class="fa-solid fa-shield-halved text-orange-500"></i>
-              <span>Standard Enterprise Criteria (Pre-Configured)</span>
-            </div>
-            <span class="text-[11px] text-slate-400">
-              Checkbox enables criteria &bull; Target values editable
-            </span>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="static_criteria_grid">
-            {% for item in static_criteria_list %}
-            <div class="static-criteria-card bg-white rounded-xl border border-slate-200 p-3.5 hover:border-orange-300 transition shadow-xs flex flex-col justify-between group">
-              <div>
-                <div class="flex items-start justify-between gap-2 mb-1.5">
-                  <label for="crit_{{ item.key }}" class="flex items-center gap-2 cursor-pointer select-none">
-                    <input 
-                      type="checkbox" 
-                      name="static_criteria" 
-                      value="{{ item.key }}" 
-                      id="crit_{{ item.key }}" 
-                      {% if item.is_active %}checked{% endif %}
-                      class="static-criteria-checkbox w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 cursor-pointer"
-                    >
-                    <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition flex items-center gap-1.5">
-                      <i class="fa-solid {{ item.icon }} text-[11px] text-slate-400 group-hover:text-orange-500 transition"></i>
-                      <span>{{ item.name }}</span>
-                    </span>
-                  </label>
-                  <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
-                    {{ item.key }}
-                  </span>
-                </div>
-                <p class="text-[11px] text-slate-500 leading-snug mb-2 pl-6">
-                  {{ item.description }}
-                </p>
-              </div>
-              <div class="pl-6 pt-1">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-[10px] text-slate-400 font-semibold shrink-0">Target:</span>
-                  <input 
-                    type="text" 
-                    name="static_val_{{ item.key }}" 
-                    value="{{ item.criteria_value }}" 
-                    placeholder="Target criteria specification..." 
-                    class="w-full text-[11px] font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition"
-                  >
-                </div>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- Section 2: Custom Dynamic Criteria (2-Col Key & Value Rows) -->
-        <div class="pt-2 border-t border-slate-200">
+        <!-- Section 1 (TOP): Custom Dynamic Criteria (2-Col Key & Value Rows) -->
+        <div class="pb-4 border-b border-slate-200">
           <div class="flex items-center justify-between mb-2.5">
             <div>
               <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -307,7 +269,7 @@
             <button 
               type="button" 
               id="add_criteria_btn_bottom" 
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition shadow-xs"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold transition shadow-xs cursor-pointer"
             >
               <i class="fa-solid fa-plus text-[11px]"></i>
               <span>+ Add Criteria</span>
@@ -371,6 +333,62 @@
           </div>
         </div>
 
+        <!-- Section 2: Static Criteria Fields (Pre-configured Enterprise Standards) -->
+        <div>
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-shield-halved text-orange-500"></i>
+              <span>Standard Enterprise Criteria (Pre-Configured)</span>
+            </div>
+            <span class="text-[11px] text-slate-400">
+              Checkbox enables criteria &bull; Target values editable
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="static_criteria_grid">
+            {% for item in static_criteria_list %}
+            <div class="static-criteria-card bg-white rounded-xl border border-slate-200 p-3.5 hover:border-orange-300 transition shadow-xs flex flex-col justify-between group">
+              <div>
+                <div class="flex items-start justify-between gap-2 mb-1.5">
+                  <label for="crit_{{ item.key }}" class="flex items-center gap-2 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      name="static_criteria" 
+                      value="{{ item.key }}" 
+                      id="crit_{{ item.key }}" 
+                      {% if item.is_active %}checked{% endif %}
+                      class="static-criteria-checkbox w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 cursor-pointer"
+                    >
+                    <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition flex items-center gap-1.5">
+                      <i class="fa-solid {{ item.icon }} text-[11px] text-slate-400 group-hover:text-orange-500 transition"></i>
+                      <span>{{ item.name }}</span>
+                    </span>
+                  </label>
+                  <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
+                    {{ item.key }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-snug mb-2 pl-6">
+                  {{ item.description }}
+                </p>
+              </div>
+              <div class="pl-6 pt-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-slate-400 font-semibold shrink-0">Target:</span>
+                  <input 
+                    type="text" 
+                    name="static_val_{{ item.key }}" 
+                    value="{{ item.criteria_value }}" 
+                    placeholder="Target criteria specification..." 
+                    class="w-full text-[11px] font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:bg-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition"
+                  >
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
         <!-- Criteria Drawer Footer -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
           <div class="flex items-center gap-2 text-xs text-slate-600">
@@ -424,15 +442,83 @@
 
   {% else %}
 
-  <!-- Active Results Count and Feedback -->
-  <div class="flex items-center justify-between text-xs text-slate-500 px-1">
-    <div>
-      Showing vendors for product: <strong class="text-slate-800">{{ selected_product.name }}</strong> ({{ leads|length }} discovered)
+  <!-- Active Results Toolbar with Filters, Search and CSV Export -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <!-- Title & Live Counter -->
+      <div class="flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold shrink-0">
+          <i class="fa-solid fa-users-viewfinder"></i>
+        </span>
+        <div>
+          <div class="text-xs font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+            <span>Discovered Vendors for <span class="text-orange-600 font-extrabold">"{{ selected_product.name }}"</span></span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-100 text-orange-800" id="visible_leads_counter">
+              {{ leads|length }} Qualified
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-0.5">
+            Showing <strong id="visible_count_num" class="text-slate-800">{{ leads|length }}</strong> of {{ leads|length }} discovered vendor companies
+          </p>
+        </div>
+      </div>
+
+      <!-- Actions: Search within results & CSV Export -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Quick search within results -->
+        <div class="relative w-full sm:w-56">
+          <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-[11px]"></i>
+          </div>
+          <input 
+            type="text" 
+            id="lead_filter_query" 
+            placeholder="Search company, city..." 
+            class="w-full pl-7 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-1 focus:ring-orange-500 text-slate-800 placeholder-slate-400 transition"
+          >
+        </div>
+
+        {% if leads %}
+        <a 
+          href="{% url 'export-discovered-vendors-csv' %}?product_id={{ selected_product.id }}" 
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-bold text-xs transition shadow-xs shrink-0 cursor-pointer"
+          title="Export discovered vendor leads to CSV"
+        >
+          <i class="fa-solid fa-file-csv text-emerald-600"></i>
+          <span>Export CSV</span>
+        </a>
+        {% endif %}
+      </div>
     </div>
+
+    <!-- Quick Filter Chips -->
+    {% if leads %}
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 pt-2 border-t border-slate-100 text-xs">
+      <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Filter:</span>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-bold transition bg-orange-600 text-white shadow-xs cursor-pointer" data-filter="all">
+        All ({{ leads|length }})
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="fit_90">
+        <i class="fa-solid fa-star text-amber-500 text-[10px] mr-1"></i> 90%+ Fit
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="fit_80">
+        80%+ Fit
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="has_contact">
+        <i class="fa-solid fa-address-book text-blue-500 text-[10px] mr-1"></i> Verified Contact
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="unsaved">
+        Unsaved
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="saved">
+        <i class="fa-solid fa-bookmark text-emerald-600 text-[10px] mr-1"></i> In Pipeline
+      </button>
+    </div>
+    {% endif %}
   </div>
 
   <!-- Results Grid (Compact Cards) -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="leads_grid_container">
     {% for lead in leads %}
       {% include "components/vendor_compact_card.html" with lead=lead %}
     {% empty %}
@@ -461,6 +547,20 @@
       {% endif %}
     </div>
     {% endfor %}
+  </div>
+
+  <!-- No Matching Filtered Leads Placeholder -->
+  <div id="no_filtered_leads_placeholder" class="hidden bg-white rounded-2xl p-10 text-center text-slate-400 border border-slate-200">
+    <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-lg mx-auto mb-2">
+      <i class="fa-solid fa-filter"></i>
+    </div>
+    <h4 class="text-sm font-bold text-slate-800">No vendors match your active filter</h4>
+    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+      Try clearing your search query or selecting a different filter chip above.
+    </p>
+    <button type="button" id="clear_lead_filters_btn" class="mt-3 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg border border-orange-200 transition cursor-pointer">
+      Reset Filters
+    </button>
   </div>
   {% endif %}
 
@@ -776,7 +876,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Form submit validation
+  // Form submit validation & Live Loading Feedback
   if (form) {
     form.addEventListener('submit', function(e) {
       if (!hiddenInput.value) {
@@ -791,7 +891,18 @@ document.addEventListener('DOMContentLoaded', function() {
             searchInput.classList.remove('ring-2', 'ring-rose-500', 'border-rose-500');
           }, 2000);
           openDropdown();
+          return;
         }
+      }
+
+      // Valid product selected: activate loading UI
+      const launchBtn = document.getElementById('launch_search_btn');
+      const loadingOverlay = document.getElementById('search_loading_overlay');
+      if (loadingOverlay) loadingOverlay.classList.remove('hidden');
+      if (launchBtn) {
+        launchBtn.disabled = true;
+        launchBtn.classList.add('opacity-80', 'cursor-not-allowed');
+        launchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span>Searching & Evaluating Fit...</span>';
       }
     });
   }
@@ -894,10 +1005,14 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     `;
 
-    customCriteriaContainer.appendChild(row);
+    // Prepend row at the very top (above other rows)
+    customCriteriaContainer.prepend(row);
 
     const keyInput = row.querySelector('input[name="custom_criteria_key[]"]');
-    if (keyInput) keyInput.focus();
+    if (keyInput) {
+      keyInput.focus();
+      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 
     updateCriteriaCount();
   }
@@ -951,12 +1066,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Reset static
+  // Reset static (uncheck all)
   if (resetStaticBtn) {
     resetStaticBtn.addEventListener('click', function(e) {
       e.preventDefault();
       document.querySelectorAll('.static-criteria-checkbox').forEach(cb => {
-        cb.checked = true;
+        cb.checked = false;
       });
       updateCriteriaCount();
     });
@@ -1004,6 +1119,158 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
+
+  // ==========================================
+  // Discovered Leads In-Page Filtering & Instant Search
+  // ==========================================
+  const leadFilterInput = document.getElementById('lead_filter_query');
+  const leadFilterChips = document.querySelectorAll('.lead-filter-chip');
+  const leadCards = Array.from(document.querySelectorAll('.vendor-compact-card'));
+  const visibleCountNum = document.getElementById('visible_count_num');
+  const visibleLeadsCounter = document.getElementById('visible_leads_counter');
+  const noFilteredLeadsPlaceholder = document.getElementById('no_filtered_leads_placeholder');
+  const clearLeadFiltersBtn = document.getElementById('clear_lead_filters_btn');
+
+  let activeFilterChip = 'all';
+
+  function applyLeadFilters() {
+    if (leadCards.length === 0) return;
+    const query = (leadFilterInput ? leadFilterInput.value : '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    leadCards.forEach(card => {
+      const name = (card.getAttribute('data-company-name') || '').toLowerCase();
+      const location = (card.getAttribute('data-company-location') || '').toLowerCase();
+      const industry = (card.getAttribute('data-company-industry') || '').toLowerCase();
+      const score = parseInt(card.getAttribute('data-match-score') || '0', 10);
+      const email = (card.getAttribute('data-company-email') || '').trim();
+      const phone = (card.getAttribute('data-company-phone') || '').trim();
+      const isSaved = card.getAttribute('data-is-saved') === 'true';
+
+      // 1. Check text query match
+      const matchesQuery = !query || name.includes(query) || location.includes(query) || industry.includes(query);
+
+      // 2. Check chip filter match
+      let matchesChip = true;
+      if (activeFilterChip === 'fit_90') {
+        matchesChip = score >= 90;
+      } else if (activeFilterChip === 'fit_80') {
+        matchesChip = score >= 80;
+      } else if (activeFilterChip === 'has_contact') {
+        matchesChip = Boolean(email || phone);
+      } else if (activeFilterChip === 'unsaved') {
+        matchesChip = !isSaved;
+      } else if (activeFilterChip === 'saved') {
+        matchesChip = isSaved;
+      }
+
+      if (matchesQuery && matchesChip) {
+        card.classList.remove('hidden');
+        visibleCount++;
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+
+    if (visibleCountNum) visibleCountNum.textContent = visibleCount;
+    if (visibleLeadsCounter) visibleLeadsCounter.textContent = `${visibleCount} Qualified`;
+
+    if (noFilteredLeadsPlaceholder) {
+      if (visibleCount === 0 && leadCards.length > 0) {
+        noFilteredLeadsPlaceholder.classList.remove('hidden');
+      } else {
+        noFilteredLeadsPlaceholder.classList.add('hidden');
+      }
+    }
+  }
+
+  if (leadFilterInput) {
+    leadFilterInput.addEventListener('input', applyLeadFilters);
+  }
+
+  leadFilterChips.forEach(chip => {
+    chip.addEventListener('click', function(e) {
+      e.preventDefault();
+      leadFilterChips.forEach(c => {
+        c.classList.remove('bg-orange-600', 'text-white', 'shadow-xs', 'font-bold');
+        c.classList.add('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'font-semibold');
+      });
+      this.classList.remove('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'font-semibold');
+      this.classList.add('bg-orange-600', 'text-white', 'shadow-xs', 'font-bold');
+
+      activeFilterChip = this.getAttribute('data-filter') || 'all';
+      applyLeadFilters();
+    });
+  });
+
+  if (clearLeadFiltersBtn) {
+    clearLeadFiltersBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (leadFilterInput) leadFilterInput.value = '';
+      const allChip = document.querySelector('.lead-filter-chip[data-filter="all"]');
+      if (allChip) allChip.click();
+      else {
+        activeFilterChip = 'all';
+        applyLeadFilters();
+      }
+    });
+  }
+
+  // ==========================================
+  // 1-Click AJAX Lead Bookmarking (Zero Page Reload)
+  // ==========================================
+  document.addEventListener('submit', function(e) {
+    const saveForm = e.target.closest('.card-save-form');
+    if (!saveForm) return;
+
+    e.preventDefault();
+    const btn = saveForm.querySelector('button[type="submit"]');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[9px]"></i>';
+    }
+
+    const card = saveForm.closest('.vendor-compact-card');
+    const slot = saveForm.closest('.card-save-slot');
+
+    fetch(saveForm.action, {
+      method: 'POST',
+      body: new FormData(saveForm),
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        if (card) card.setAttribute('data-is-saved', 'true');
+        if (slot) {
+          slot.innerHTML = `
+            <a href="/sales/saved-leads/" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition animate-in zoom-in-95 duration-150" title="In Pipeline">
+              <i class="fa-solid fa-check text-[9px]"></i>
+              <span>Saved</span>
+            </a>
+          `;
+        }
+        if (activeFilterChip === 'unsaved') {
+          applyLeadFilters();
+        }
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalBtnHtml;
+        }
+      }
+    })
+    .catch(err => {
+      console.error('AJAX save error:', err);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+      }
+    });
+  });
 });
 </script>
 {% endblock %}

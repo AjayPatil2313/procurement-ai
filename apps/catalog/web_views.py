@@ -4,6 +4,7 @@ import re
 from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.db.models.functions import Lower
@@ -87,14 +88,27 @@ def products_list_view(request):
         or ("general:IMPORT" in rbac["permissions"])
     )
 
-    # Scoped query: ABC company will ONLY see ABC products; soft-deleted excluded
-    queryset = Product.objects.filter(company=company, is_deleted=False).select_related("category", "created_by").prefetch_related("images")
+    # Scoped query: ABC company will ONLY see ABC products
+    status_filter = request.GET.get("status", "active").strip().lower()
+    is_archived_view = status_filter == "archived"
+
+    if is_archived_view:
+        queryset = Product.objects.filter(company=company, is_deleted=True).select_related("category", "created_by").prefetch_related("images")
+    else:
+        queryset = Product.objects.filter(company=company, is_deleted=False).select_related("category", "created_by").prefetch_related("images")
+
+    # Metrics
+    active_count = Product.objects.filter(company=company, is_deleted=False).count()
+    archived_count = Product.objects.filter(company=company, is_deleted=True).count()
+    in_stock_count = Product.objects.filter(company=company, is_deleted=False, availability=Product.Availability.IN_STOCK).count()
+    made_to_order_count = Product.objects.filter(company=company, is_deleted=False, availability=Product.Availability.MADE_TO_ORDER).count()
 
     # Filters
     q = request.GET.get("q", "").strip()
     if q:
         queryset = queryset.filter(
             Q(name__icontains=q)
+            | Q(sku__icontains=q)
             | Q(description__icontains=q)
             | Q(specifications__icontains=q)
             | Q(location__icontains=q)
@@ -109,16 +123,22 @@ def products_list_view(request):
     if availability_val:
         queryset = queryset.filter(availability=availability_val)
 
-    products = list(queryset.order_by("-created_at"))
+    total_count = queryset.count()
     categories = Category.objects.all().order_by("name")
 
-    # Metrics
-    total_count = len(products)
-    in_stock_count = sum(1 for p in products if p.availability == Product.Availability.IN_STOCK)
-    made_to_order_count = sum(1 for p in products if p.availability == Product.Availability.MADE_TO_ORDER)
+    # Server-side pagination (20 items per page)
+    paginator = Paginator(queryset.order_by("-created_at"), 20)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
 
     return render(request, "products/list.html", {
-        "products": products,
+        "products": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "status_filter": status_filter,
+        "is_archived_view": is_archived_view,
+        "active_count": active_count,
+        "archived_count": archived_count,
         "categories": categories,
         "company": company,
         "rbac": rbac,
@@ -134,7 +154,7 @@ def products_list_view(request):
         "selected_category": category_id,
         "selected_availability": availability_val,
         "availability_choices": Product.Availability.choices,
-        "page_title": "Products Catalog",
+        "page_title": "Archived Products" if is_archived_view else "Products Catalog",
     })
 
 
@@ -165,9 +185,29 @@ def product_create_view(request):
         return redirect("products-list")
 
     categories = Category.objects.all().order_by("name")
+    form_data = {}
+    duplicate_id = request.GET.get("duplicate_id", "").strip()
+    if request.method == "GET" and duplicate_id:
+        orig = Product.objects.filter(pk=duplicate_id, company=company, is_deleted=False).first()
+        if orig:
+            primary_img = orig.images.filter(is_primary=True).first()
+            form_data = {
+                "name": f"[Copy] {orig.name}",
+                "sku": f"{orig.sku}-COPY" if orig.sku else "",
+                "category_id": str(orig.category_id) if orig.category_id else "",
+                "description": orig.description,
+                "specifications": orig.specifications,
+                "price": str(orig.price) if orig.price else "",
+                "currency": orig.currency,
+                "location": orig.location,
+                "search_scope": orig.search_scope,
+                "image_url": primary_img.image_url if primary_img else "",
+            }
+            messages.info(request, f"Pre-filled form based on existing product '{orig.name}'. Customize details and save as a new item.")
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
+        sku = request.POST.get("sku", "").strip()
         cat_id = request.POST.get("category_id")
         description = request.POST.get("description", "").strip()
         specifications = request.POST.get("specifications", "").strip()
@@ -193,6 +233,8 @@ def product_create_view(request):
         if price_str:
             try:
                 price = Decimal(price_str)
+                if price < 0:
+                    price = None
             except Exception:
                 price = None
 
@@ -203,9 +245,12 @@ def product_create_view(request):
             except Exception:
                 moq = Decimal(1)
 
+        duplicate_exists = Product.objects.filter(company=company, name__iexact=name, is_deleted=False).exists()
+
         product = Product.objects.create(
             company=company,
             name=name,
+            sku=sku,
             category_id=cat_id if cat_id else None,
             description=description,
             specifications=specifications,
@@ -221,20 +266,31 @@ def product_create_view(request):
             created_by=request.user,
         )
 
-        if image_url:
+        uploaded_img = request.FILES.get("image_file")
+        if uploaded_img:
+            ProductImage.objects.create(
+                product=product,
+                image=uploaded_img,
+                is_primary=True,
+            )
+        elif image_url:
             ProductImage.objects.create(
                 product=product,
                 image_url=image_url,
                 is_primary=True,
             )
 
-        messages.success(request, f"Product '{name}' was created successfully!")
+        if duplicate_exists:
+            messages.warning(request, f"Product '{name}' created. Note: Another product with this exact name already exists in your catalog.")
+        else:
+            messages.success(request, f"Product '{name}' was created successfully!")
         return redirect("product-detail", pk=product.pk)
 
     return render(request, "products/create.html", {
         "categories": categories,
         "company": company,
         "rbac": rbac,
+        "form_data": form_data,
         "availability_choices": Product.Availability.choices,
         "page_title": "Add Product",
     })
@@ -340,14 +396,15 @@ def product_edit_view(request, pk):
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
+        sku = request.POST.get("sku", "").strip()
         cat_id = request.POST.get("category_id")
         description = request.POST.get("description", "").strip()
         specifications = request.POST.get("specifications", "").strip()
         price_str = request.POST.get("price", "").strip()
         currency = request.POST.get("currency", "INR").strip().upper()
         moq_str = request.POST.get("minimum_order_quantity", "").strip() or request.POST.get("moq", "").strip()
-        unit = request.POST.get("unit", "pcs").strip()
-        availability = request.POST.get("availability", product.availability).strip()
+        unit = request.POST.get("unit", product.unit).strip() or product.unit
+        availability = request.POST.get("availability", product.availability).strip() or product.availability
         location = request.POST.get("location", "").strip()
         image_url = request.POST.get("image_url", "").strip()
         search_scope = request.POST.get("search_scope", product.search_scope).strip()
@@ -363,34 +420,48 @@ def product_edit_view(request, pk):
             })
 
         product.name = name
+        product.sku = sku
         product.category_id = cat_id if cat_id else None
         product.description = description
         product.specifications = specifications
         product.currency = currency or "INR"
-        product.unit = unit or "pcs"
-        product.availability = availability
-        product.location = location
-        product.search_scope = search_scope
-
-        if price_str:
-            try:
-                product.price = Decimal(price_str)
-                product.price_min = product.price
-            except Exception:
-                pass
-        else:
-            product.price = None
-
+        product.unit = unit or product.unit or "pcs"
+        product.availability = availability or product.availability or Product.Availability.IN_STOCK
         if moq_str:
             try:
                 product.minimum_order_quantity = Decimal(moq_str)
                 product.moq = product.minimum_order_quantity
             except Exception:
                 pass
+        product.location = location
+        product.search_scope = search_scope
+
+        if price_str:
+            try:
+                p_val = Decimal(price_str)
+                product.price = p_val if p_val >= 0 else None
+                product.price_min = product.price
+            except Exception:
+                pass
+        else:
+            product.price = None
 
         product.save()
 
-        if image_url:
+        uploaded_img = request.FILES.get("image_file")
+        if uploaded_img:
+            primary_img = product.images.filter(is_primary=True).first()
+            if primary_img:
+                primary_img.image = uploaded_img
+                primary_img.image_url = ""
+                primary_img.save()
+            else:
+                ProductImage.objects.create(
+                    product=product,
+                    image=uploaded_img,
+                    is_primary=True,
+                )
+        elif image_url:
             primary_img = product.images.filter(is_primary=True).first()
             if primary_img:
                 primary_img.image_url = image_url
@@ -458,6 +529,47 @@ def product_delete_view(request, pk):
         return redirect("products-list")
 
     return redirect("product-detail", pk=pk)
+
+
+@login_required
+def product_restore_view(request, pk):
+    """
+    1-Click Restore Soft-Deleted Product:
+    Restores is_deleted=False, deleted_at=None and returns product to active catalog.
+    Enforces UPDATE/DELETE RBAC permission and company data isolation.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not rbac["can_view_seller"]:
+        messages.error(request, "Access restricted: Sales module permission required.")
+        return redirect("dashboard")
+
+    can_restore = (
+        rbac["is_super_admin"]
+        or rbac["is_company_admin"]
+        or ("UPDATE" in rbac["permissions"])
+        or ("DELETE" in rbac["permissions"])
+        or ("products:UPDATE" in rbac["permissions"])
+        or ("products:DELETE" in rbac["permissions"])
+        or ("general:UPDATE" in rbac["permissions"])
+    )
+    if not can_restore:
+        messages.error(request, "Permission denied: You do not have permission to restore products.")
+        return redirect("products-list")
+
+    if rbac["is_super_admin"] and not company:
+        product = get_object_or_404(Product, pk=pk, is_deleted=True)
+    else:
+        product = get_object_or_404(Product, pk=pk, company=company, is_deleted=True)
+
+    if request.method == "POST":
+        product.restore()
+        messages.success(request, f"Product '{product.name}' was successfully restored to your active catalog.")
+        return redirect(f"{reverse('products-list')}?status=active")
+
+    return redirect(f"{reverse('products-list')}?status=archived")
 
 
 STATIC_CRITERIA_METADATA = [
@@ -689,11 +801,22 @@ def find_buyers_view(request):
     ).select_related("external_company", "search_job", "search_job__product").order_by("-match_score", "-created_at")
 
     selected_product = None
+    leads = []
     if product_id and product_id.isdigit():
         leads_qs = leads_qs.filter(search_job__product_id=product_id)
         selected_product = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
+        if selected_product:
+            seen_company_ids = set()
+            for lead in leads_qs:
+                cid = lead.external_company_id
+                if cid and cid in seen_company_ids:
+                    continue
+                if cid:
+                    seen_company_ids.add(cid)
+                leads.append(lead)
+                if len(leads) >= 40:
+                    break
 
-    leads = list(leads_qs[:30]) if selected_product else []
     saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
     # Load and organize criteria for this company
@@ -730,6 +853,95 @@ def find_buyers_view(request):
         "active_criteria_count": active_criteria_count,
         "page_title": "Find Buyers (AI Lead Engine)",
     })
+
+
+@login_required
+def export_discovered_vendors_csv_view(request):
+    """
+    Export Discovered Vendors (CSV):
+    Downloads a structured CSV containing qualified leads discovered for the selected product.
+    Includes Company Name, Role, Industry, Website, Email, Phone, Address, City, State, Country,
+    Match Score, Match Reason, Need Signal, and Pipeline status.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not rbac["can_view_seller"]:
+        messages.error(request, "Access restricted: Sales module permission required.")
+        return redirect("dashboard")
+
+    product_id = request.GET.get("product_id")
+    selected_product = None
+    leads_qs = SearchResult.objects.filter(
+        search_job__company=company,
+        result_type=SearchResult.ResultType.LEAD,
+    ).select_related("external_company", "search_job", "search_job__product").order_by("-match_score", "-created_at")
+
+    if product_id and product_id.isdigit():
+        selected_product = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
+        if selected_product:
+            leads_qs = leads_qs.filter(search_job__product_id=selected_product.id)
+
+    saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
+
+    seen_company_ids = set()
+    leads = []
+    for lead in leads_qs:
+        cid = lead.external_company_id
+        if cid and cid in seen_company_ids:
+            continue
+        if cid:
+            seen_company_ids.add(cid)
+        leads.append(lead)
+
+    response = HttpResponse(content_type="text/csv")
+    safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", selected_product.name.lower()) if selected_product else "all"
+    response["Content-Disposition"] = f'attachment; filename="discovered_vendors_{safe_name}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        "Product Name",
+        "Company Name",
+        "Company Role",
+        "Industry",
+        "Website",
+        "Email",
+        "Phone",
+        "Address",
+        "City",
+        "State",
+        "Country",
+        "Match Score (%)",
+        "Match Reason",
+        "Need Signal",
+        "Saved in Pipeline",
+        "Discovered Date",
+    ])
+
+    for l in leads:
+        ext = l.external_company
+        is_saved = "Yes" if l.id in saved_result_ids else "No"
+        writer.writerow([
+            l.product_title or (selected_product.name if selected_product else ""),
+            ext.name if ext else "",
+            ext.get_company_role_display() if ext else "Vendor",
+            ext.industry if ext else "",
+            ext.website or l.source_url if ext else l.source_url,
+            ext.email if ext else "",
+            ext.phone if ext else "",
+            ext.address if ext else "",
+            ext.city if ext else "",
+            ext.state if ext else "",
+            ext.country if ext else "India",
+            l.match_score,
+            l.match_reason or "",
+            l.need_signal or "",
+            is_saved,
+            l.created_at.strftime("%Y-%m-%d %H:%M") if l.created_at else "",
+        ])
+
+    return response
 
 
 @login_required
@@ -826,6 +1038,7 @@ def products_export_csv_view(request):
     writer = csv.writer(response)
     writer.writerow([
         "Product Name",
+        "SKU",
         "Category",
         "Type",
         "Price",
@@ -843,6 +1056,7 @@ def products_export_csv_view(request):
     for p in products:
         writer.writerow([
             p.name,
+            p.sku or "",
             p.category.name if p.category else "General",
             p.get_type_display(),
             p.price or "",
@@ -871,6 +1085,7 @@ def products_import_template_view(request):
     writer = csv.writer(response)
     writer.writerow([
         "Product Name",
+        "SKU",
         "Category",
         "Price",
         "Currency",
@@ -884,6 +1099,7 @@ def products_import_template_view(request):
     ])
     writer.writerow([
         "Industrial SS Gate Valve 2-inch",
+        "VLV-SS-002",
         "Industrial Machinery",
         "14500.00",
         "INR",
@@ -897,6 +1113,7 @@ def products_import_template_view(request):
     ])
     writer.writerow([
         "High-Grade Aluminum Casting Rods",
+        "AL-ROD-6061",
         "Metals & Alloys",
         "320.00",
         "INR",
@@ -965,6 +1182,7 @@ def products_import_csv_view(request):
             messages.error(request, "CSV must contain a 'Product Name' or 'Name' column.")
             return redirect("products-list")
 
+        sku_col = next((field_map[k] for k in ["sku", "product code", "item code", "part number", "part no"] if k in field_map), None)
         cat_col = next((field_map[k] for k in ["category", "category name"] if k in field_map), None)
         price_col = next((field_map[k] for k in ["price", "unit price"] if k in field_map), None)
         curr_col = next((field_map[k] for k in ["currency"] if k in field_map), None)
@@ -978,13 +1196,19 @@ def products_import_csv_view(request):
 
         imported_count = 0
         skipped_count = 0
+        skip_reasons = []
+        row_idx = 1
 
         with transaction.atomic():
             for row in reader:
+                row_idx += 1
                 raw_name = row.get(name_col, "").strip()
                 if not raw_name:
                     skipped_count += 1
+                    skip_reasons.append(f"Row {row_idx}: Missing product name")
                     continue
+
+                raw_sku = row.get(sku_col, "").strip() if sku_col else ""
 
                 category_obj = None
                 if cat_col and row.get(cat_col, "").strip():
@@ -994,14 +1218,16 @@ def products_import_csv_view(request):
                 price = None
                 if price_col and row.get(price_col, "").strip():
                     try:
-                        price = Decimal(row[price_col].strip().replace(",", ""))
+                        p_val = Decimal(row[price_col].strip().replace(",", ""))
+                        price = p_val if p_val >= 0 else None
                     except Exception:
                         price = None
 
                 moq = Decimal(1)
                 if moq_col and row.get(moq_col, "").strip():
                     try:
-                        moq = Decimal(row[moq_col].strip().replace(",", ""))
+                        m_val = Decimal(row[moq_col].strip().replace(",", ""))
+                        moq = m_val if m_val > 0 else Decimal(1)
                     except Exception:
                         moq = Decimal(1)
 
@@ -1033,6 +1259,7 @@ def products_import_csv_view(request):
                 Product.objects.create(
                     company=company,
                     name=raw_name,
+                    sku=raw_sku,
                     category=category_obj,
                     price=price,
                     price_min=price,
@@ -1050,9 +1277,17 @@ def products_import_csv_view(request):
                 imported_count += 1
 
         if imported_count > 0:
-            messages.success(request, f"Successfully imported {imported_count} products into your catalog! ({skipped_count} empty rows skipped)")
+            success_msg = f"Successfully imported {imported_count} products into your catalog!"
+            if skipped_count > 0:
+                preview_reasons = "; ".join(skip_reasons[:3])
+                if len(skip_reasons) > 3:
+                    preview_reasons += f" (and {len(skip_reasons) - 3} more)"
+                messages.warning(request, f"{success_msg} Note: {skipped_count} row(s) were skipped ({preview_reasons}).")
+            else:
+                messages.success(request, success_msg)
         else:
-            messages.warning(request, "No products could be imported from the CSV file. Please check row data.")
+            reason_text = f" ({'; '.join(skip_reasons[:3])})" if skip_reasons else ""
+            messages.warning(request, f"No products could be imported from the CSV file. Please check row data{reason_text}.")
 
     except Exception as e:
         messages.error(request, f"Error processing CSV file: {str(e)}")

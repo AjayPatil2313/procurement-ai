@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import json
 from datetime import timedelta
 from decimal import Decimal
@@ -80,6 +81,37 @@ def save_lead_toggle_view(request, result_id):
     return redirect(redirect_to)
 
 
+def deduplicate_saved_items(items):
+    """
+    Deduplicates SavedItem records by search_result__external_company_id,
+    retaining the record with the most advanced qualification stage and newest timestamp.
+    """
+    stage_priority = {
+        SavedItem.Status.WON: 6,
+        SavedItem.Status.NEGOTIATING: 5,
+        SavedItem.Status.INTERESTED: 4,
+        SavedItem.Status.CONTACTED: 3,
+        SavedItem.Status.NEW: 2,
+        SavedItem.Status.LOST: 1,
+    }
+    seen = {}
+    for item in items:
+        cid = item.search_result.external_company_id if item.search_result else None
+        if not cid:
+            seen[f"item_{item.id}"] = item
+            continue
+        if cid not in seen:
+            seen[cid] = item
+        else:
+            prev = seen[cid]
+            if stage_priority.get(item.status, 0) > stage_priority.get(prev.status, 0):
+                seen[cid] = item
+            elif stage_priority.get(item.status, 0) == stage_priority.get(prev.status, 0):
+                if item.created_at and prev.created_at and item.created_at > prev.created_at:
+                    seen[cid] = item
+    return list(seen.values())
+
+
 @login_required
 def saved_leads_view(request):
     """
@@ -128,19 +160,27 @@ def saved_leads_view(request):
         elif assigned_filter.isdigit():
             base_qs = base_qs.filter(assigned_to_id=int(assigned_filter))
 
-    # Calculate saved lead counts per product
+    # Calculate saved lead counts per product (deduplicated by external company)
     product_saved_counts = (
         base_qs
+        .order_by()
         .filter(search_result__search_job__product__isnull=False)
         .values("search_result__search_job__product_id")
-        .annotate(total=Count("id"))
+        .annotate(total=Count("search_result__external_company_id", distinct=True))
     )
     counts_map = {item["search_result__search_job__product_id"]: item["total"] for item in product_saved_counts}
     for p in products:
         p.saved_count = counts_map.get(p.id, 0)
 
-    total_saved_count = base_qs.count()
-    unassigned_count = base_qs.filter(search_result__search_job__product__isnull=True).count()
+    unassigned_count = (
+        base_qs
+        .order_by()
+        .filter(search_result__search_job__product__isnull=True)
+        .values("search_result__external_company_id")
+        .distinct()
+        .count()
+    )
+    total_saved_count = sum(p.saved_count for p in products) + unassigned_count
 
     product_id_str = request.GET.get("product_id", "").strip()
     selected_product = None
@@ -154,42 +194,56 @@ def saved_leads_view(request):
         selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
         if selected_product:
             is_single_product = True
-            saved_items = list(base_qs.filter(search_result__search_job__product=selected_product))
+            raw_items = list(base_qs.filter(search_result__search_job__product=selected_product))
+            saved_items = deduplicate_saved_items(raw_items)
     elif product_id_str == "unassigned":
         is_unassigned_view = True
         is_single_product = True
-        saved_items = list(base_qs.filter(search_result__search_job__product__isnull=True))
+        raw_items = list(base_qs.filter(search_result__search_job__product__isnull=True))
+        saved_items = deduplicate_saved_items(raw_items)
     else:
         # Group by product so it is NOT "all-in-one"
         for p in products:
             if p.saved_count > 0:
-                p_items = list(base_qs.filter(search_result__search_job__product=p))
+                raw_p_items = list(base_qs.filter(search_result__search_job__product=p))
+                p_items = deduplicate_saved_items(raw_p_items)
                 product_groups.append({
                     "product": p,
                     "items": p_items,
                     "count": len(p_items),
-                    "new_count": sum(1 for i in p_items if i.status == "new"),
-                    "contacted_count": sum(1 for i in p_items if i.status == "contacted"),
-                    "negotiating_count": sum(1 for i in p_items if i.status == "negotiating"),
-                    "won_count": sum(1 for i in p_items if i.status == "won"),
+                    "new_count": sum(1 for i in p_items if i.status == SavedItem.Status.NEW),
+                    "contacted_count": sum(1 for i in p_items if i.status == SavedItem.Status.CONTACTED),
+                    "negotiating_count": sum(1 for i in p_items if i.status == SavedItem.Status.NEGOTIATING),
+                    "interested_count": sum(1 for i in p_items if i.status == SavedItem.Status.INTERESTED),
+                    "won_count": sum(1 for i in p_items if i.status == SavedItem.Status.WON),
+                    "lost_count": sum(1 for i in p_items if i.status == SavedItem.Status.LOST),
                 })
         if unassigned_count > 0:
-            unassigned_items = list(base_qs.filter(search_result__search_job__product__isnull=True))
+            raw_unassigned = list(base_qs.filter(search_result__search_job__product__isnull=True))
+            unassigned_items = deduplicate_saved_items(raw_unassigned)
             unassigned_group = {
-                "title": "Other Saved Leads",
+                "title": "Other Prequalified Vendors",
                 "items": unassigned_items,
                 "count": len(unassigned_items),
             }
 
-    active_items = saved_items if is_single_product else list(base_qs)
+    active_items = saved_items if is_single_product else deduplicate_saved_items(list(base_qs))
     stage_counts = {
-        "new": sum(1 for i in active_items if i.status == "new"),
-        "contacted": sum(1 for i in active_items if i.status == "contacted"),
-        "negotiating": sum(1 for i in active_items if i.status == "negotiating"),
-        "interested": sum(1 for i in active_items if i.status == "interested"),
-        "won": sum(1 for i in active_items if i.status == "won"),
-        "lost": sum(1 for i in active_items if i.status == "lost"),
+        "new": sum(1 for i in active_items if i.status == SavedItem.Status.NEW),
+        "contacted": sum(1 for i in active_items if i.status == SavedItem.Status.CONTACTED),
+        "negotiating": sum(1 for i in active_items if i.status == SavedItem.Status.NEGOTIATING),
+        "interested": sum(1 for i in active_items if i.status == SavedItem.Status.INTERESTED),
+        "won": sum(1 for i in active_items if i.status == SavedItem.Status.WON),
+        "lost": sum(1 for i in active_items if i.status == SavedItem.Status.LOST),
     }
+
+    # Executive Pipeline KPIs
+    total_pipeline_count = len(active_items)
+    won_count = stage_counts["won"]
+    win_rate_pct = round((won_count / total_pipeline_count * 100)) if total_pipeline_count > 0 else 0
+    active_velocity_count = stage_counts["contacted"] + stage_counts["negotiating"] + stage_counts["interested"]
+    assigned_count = sum(1 for i in active_items if i.assigned_to_id is not None)
+    assigned_coverage_pct = round((assigned_count / total_pipeline_count * 100)) if total_pipeline_count > 0 else 0
 
     team_members = company.members.filter(is_active=True).select_related("user") if company else []
 
@@ -205,6 +259,10 @@ def saved_leads_view(request):
         "total_saved_count": total_saved_count,
         "saved_items": saved_items,
         "stage_counts": stage_counts,
+        "total_pipeline_count": total_pipeline_count,
+        "win_rate_pct": win_rate_pct,
+        "active_velocity_count": active_velocity_count,
+        "assigned_coverage_pct": assigned_coverage_pct,
         "company": company,
         "rbac": rbac,
         "team_members": team_members,
@@ -219,6 +277,7 @@ def saved_leads_view(request):
 def update_saved_lead_view(request, item_id):
     """
     Updates status pipeline, private notes, or assigned team member for a saved lead.
+    Supports both instant AJAX calls and safe standard HTTP POST with referer preservation.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -232,20 +291,20 @@ def update_saved_lead_view(request, item_id):
 
     if request.method == "POST":
         status_val = request.POST.get("status")
-        notes = request.POST.get("notes", "").strip()
+        notes = request.POST.get("notes")
         assigned_to_id = request.POST.get("assigned_to_id")
 
         if status_val in [s[0] for s in SavedItem.Status.choices]:
             item.status = status_val
 
-        if "notes" in request.POST:
-            item.notes = notes
+        if notes is not None:
+            item.notes = notes.strip()
 
         if assigned_to_id is not None:
             if assigned_to_id == "":
                 item.assigned_to = None
-            else:
-                item.assigned_to_id = assigned_to_id
+            elif assigned_to_id.isdigit():
+                item.assigned_to_id = int(assigned_to_id)
 
         item.save()
 
@@ -254,18 +313,23 @@ def update_saved_lead_view(request, item_id):
                 "success": True,
                 "status": item.status,
                 "status_display": item.get_status_display(),
+                "assigned_to_id": item.assigned_to_id,
+                "assigned_to_name": item.assigned_to.get_full_name() or item.assigned_to.email if item.assigned_to else "Unassigned Rep",
                 "notes": item.notes,
+                "message": f"Lead '{item.search_result.external_company.name}' updated successfully.",
             })
 
         messages.success(request, f"Lead '{item.search_result.external_company.name}' updated successfully.")
 
-    return redirect("saved-leads")
+    redirect_to = request.META.get("HTTP_REFERER") or reverse("saved-leads")
+    return redirect(redirect_to)
 
 
 @login_required
 def delete_saved_lead_view(request, item_id):
     """
     Removes lead from the saved pipeline.
+    Supports instant AJAX removals and safe HTTP referer redirects.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -279,8 +343,114 @@ def delete_saved_lead_view(request, item_id):
     lead_name = item.search_result.external_company.name
     item.delete()
 
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "success": True,
+            "message": f"Lead '{lead_name}' removed from your pipeline.",
+        })
+
     messages.success(request, f"Lead '{lead_name}' removed from your pipeline.")
-    return redirect("saved-leads")
+    redirect_to = request.META.get("HTTP_REFERER") or reverse("saved-leads")
+    return redirect(redirect_to)
+
+
+@login_required
+def export_saved_leads_csv_view(request):
+    """
+    1-Click CSV Export for Prequalified Vendors Pipeline:
+    Exports all bookmarked leads (product-scoped or company-wide) with qualification status,
+    assigned sales rep, deal notes, and verified contact signals.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Sales module permission required.")
+        return redirect("dashboard")
+
+    product_id_str = request.GET.get("product_id", "").strip()
+    selected_product = None
+    qs = SavedItem.objects.filter(
+        company=company,
+        search_result__result_type=SearchResult.ResultType.LEAD,
+    ).filter(
+        Q(search_result__search_job__product__is_deleted=False) | Q(search_result__search_job__product__isnull=True)
+    ).select_related(
+        "search_result",
+        "search_result__external_company",
+        "search_result__search_job",
+        "search_result__search_job__product",
+        "search_result__search_job__product__category",
+        "assigned_to",
+    ).order_by("-created_at")
+
+    if product_id_str and product_id_str.isdigit():
+        selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
+        if selected_product:
+            qs = qs.filter(search_result__search_job__product=selected_product)
+    elif product_id_str == "unassigned":
+        qs = qs.filter(search_result__search_job__product__isnull=True)
+
+    status_filter = request.GET.get("status", "").strip().lower()
+    if status_filter and status_filter in dict(SavedItem.Status.choices):
+        qs = qs.filter(status=status_filter)
+
+    assigned_filter = request.GET.get("assigned_to", "").strip()
+    if assigned_filter == "unassigned":
+        qs = qs.filter(assigned_to__isnull=True)
+    elif assigned_filter.isdigit():
+        qs = qs.filter(assigned_to_id=int(assigned_filter))
+
+    raw_items = list(qs)
+    items = deduplicate_saved_items(raw_items)
+
+    prod_slug = selected_product.name.replace(" ", "_") if selected_product else "All_Products"
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="Prequalified_Vendors_{prod_slug}.csv"'
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "Company Name",
+        "Industry",
+        "City",
+        "Country",
+        "Website",
+        "Email",
+        "Phone",
+        "Target Product",
+        "Category",
+        "Fit Score (%)",
+        "Pipeline Stage",
+        "Assigned Rep",
+        "Deal Notes",
+        "Date Saved",
+    ])
+
+    for item in items:
+        ext = item.search_result.external_company if item.search_result else None
+        prod_obj = item.search_result.search_job.product if (item.search_result and item.search_result.search_job) else None
+        prod_name = prod_obj.name if prod_obj else (item.search_result.product_title if item.search_result else "General")
+        cat_name = prod_obj.category.name if (prod_obj and prod_obj.category) else "General"
+        rep_name = item.assigned_to.get_full_name() or item.assigned_to.email if item.assigned_to else "Unassigned Rep"
+        writer.writerow([
+            ext.name if ext else "Unknown",
+            ext.industry or "" if ext else "",
+            ext.city or "" if ext else "",
+            ext.country or "India" if ext else "India",
+            ext.website or "" if ext else "",
+            ext.email or "" if ext else "",
+            ext.phone or "" if ext else "",
+            prod_name,
+            cat_name,
+            item.search_result.match_score if item.search_result else "",
+            item.get_status_display(),
+            rep_name,
+            item.notes or "",
+            item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",
+        ])
+
+    return response
 
 
 @login_required
@@ -317,19 +487,27 @@ def leads_list_view(request):
         "search_job__product__category",
     ).order_by("-match_score", "-created_at")
 
-    # Lead counts by product
+    # Lead counts by product (deduplicated by external company)
     lead_counts = (
         base_leads_qs
+        .order_by()
         .filter(search_job__product__isnull=False)
         .values("search_job__product_id")
-        .annotate(total=Count("id"))
+        .annotate(total=Count("external_company_id", distinct=True))
     )
     counts_map = {item["search_job__product_id"]: item["total"] for item in lead_counts}
     for p in products:
         p.lead_count = counts_map.get(p.id, 0)
 
-    unassigned_count = base_leads_qs.filter(search_job__product__isnull=True).count()
-    total_leads_count = base_leads_qs.count()
+    unassigned_count = (
+        base_leads_qs
+        .order_by()
+        .filter(search_job__product__isnull=True)
+        .values("external_company_id")
+        .distinct()
+        .count()
+    )
+    total_leads_count = sum(p.lead_count for p in products) + unassigned_count
 
     product_id_str = request.GET.get("product_id", "").strip()
     selected_product = None
@@ -343,16 +521,42 @@ def leads_list_view(request):
         selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
         if selected_product:
             is_single_product = True
-            leads = list(base_leads_qs.filter(search_job__product=selected_product))
+            raw_leads = list(base_leads_qs.filter(search_job__product=selected_product))
+            seen_cids = set()
+            for l in raw_leads:
+                cid = l.external_company_id
+                if cid and cid in seen_cids:
+                    continue
+                if cid:
+                    seen_cids.add(cid)
+                leads.append(l)
     elif product_id_str == "unassigned":
         is_unassigned_view = True
         is_single_product = True
-        leads = list(base_leads_qs.filter(search_job__product__isnull=True))
+        raw_leads = list(base_leads_qs.filter(search_job__product__isnull=True))
+        seen_cids = set()
+        for l in raw_leads:
+            cid = l.external_company_id
+            if cid and cid in seen_cids:
+                continue
+            if cid:
+                seen_cids.add(cid)
+            leads.append(l)
     else:
         # Group by product so it is NOT "all-in-one"
         for p in products:
             if p.lead_count > 0:
-                p_leads = list(base_leads_qs.filter(search_job__product=p))
+                raw_leads = list(base_leads_qs.filter(search_job__product=p))
+                seen_cids = set()
+                p_leads = []
+                for l in raw_leads:
+                    cid = l.external_company_id
+                    if cid and cid in seen_cids:
+                        continue
+                    if cid:
+                        seen_cids.add(cid)
+                    p_leads.append(l)
+
                 product_groups.append({
                     "product": p,
                     "leads": p_leads,
@@ -360,7 +564,17 @@ def leads_list_view(request):
                 })
 
         if unassigned_count > 0:
-            unassigned_leads = list(base_leads_qs.filter(search_job__product__isnull=True))
+            raw_leads = list(base_leads_qs.filter(search_job__product__isnull=True))
+            seen_cids = set()
+            unassigned_leads = []
+            for l in raw_leads:
+                cid = l.external_company_id
+                if cid and cid in seen_cids:
+                    continue
+                if cid:
+                    seen_cids.add(cid)
+                unassigned_leads.append(l)
+
             unassigned_group = {
                 "title": "Other / Custom Search Leads",
                 "leads": unassigned_leads,
@@ -368,6 +582,16 @@ def leads_list_view(request):
             }
 
     saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
+
+    # Executive KPI metrics calculation for current product view
+    total_vendors_count = len(leads)
+    high_fit_count = sum(1 for l in leads if l.match_score >= 85)
+    verified_contact_count = sum(1 for l in leads if (l.external_company and (l.external_company.email or l.external_company.phone)))
+    contact_coverage_pct = round((verified_contact_count / total_vendors_count * 100)) if total_vendors_count > 0 else 0
+    saved_in_pipeline_count = sum(1 for l in leads if l.id in saved_result_ids)
+
+    # Products with active leads for landing view summary cards
+    products_with_leads = [p for p in products if getattr(p, "lead_count", 0) > 0]
 
     return render(request, "leads/leads_list.html", {
         "products": products,
@@ -381,6 +605,12 @@ def leads_list_view(request):
         "total_leads_count": total_leads_count,
         "leads": leads,
         "saved_result_ids": saved_result_ids,
+        "total_vendors_count": total_vendors_count,
+        "high_fit_count": high_fit_count,
+        "verified_contact_count": verified_contact_count,
+        "contact_coverage_pct": contact_coverage_pct,
+        "saved_in_pipeline_count": saved_in_pipeline_count,
+        "products_with_leads": products_with_leads,
         "company": company,
         "rbac": rbac,
         "page_title": f"Vendor List - {selected_product.name}" if selected_product else "Vendor List (Product-Wise)",
@@ -624,7 +854,7 @@ def inquiries_list_view(request):
         "search_result__search_job",
         "search_result__search_job__product",
         "search_result__search_job__product__category",
-    )
+    ).annotate(messages_count=Count("messages"))
 
     # Filter by date range
     date_range = request.GET.get("date_range", "all").strip().lower()
@@ -652,9 +882,10 @@ def inquiries_list_view(request):
     if status_filter and status_filter in [s[0] for s in Inquiry.Status.choices]:
         base_qs = base_qs.filter(status=status_filter)
 
-    # Count inquiries per product
+    # Count inquiries per product (order_by() clears ordering for reliable SQL GROUP BY)
     inquiry_counts = (
         base_qs
+        .order_by()
         .filter(search_result__search_job__product__isnull=False)
         .values("search_result__search_job__product_id")
         .annotate(total=Count("id"))
@@ -1083,6 +1314,117 @@ def delete_inquiry_view(request, pk):
     return redirect(redirect_target)
 
 
+@login_required
+def export_inquiries_csv_view(request):
+    """
+    Dedicated 1-Click CSV Export for Commercial Inquiries & Quotes:
+    Respects current company isolation, active product selection, date range, and status filters.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_buyer"] or rbac["can_view_seller"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Inquiries module permission required.")
+        return redirect("dashboard")
+
+    is_seller_context = request.path.startswith("/sales/") or (rbac["can_view_seller"] and not rbac["can_view_buyer"])
+
+    qs = Inquiry.objects.filter(company=company).select_related(
+        "search_result",
+        "search_result__external_company",
+        "search_result__search_job",
+        "search_result__search_job__product",
+        "search_result__search_job__product__category",
+    ).annotate(messages_count=Count("messages")).order_by("-sent_at")
+
+    # Filter by product
+    product_id_str = request.GET.get("product_id", "").strip()
+    selected_product = None
+    if product_id_str.isdigit():
+        selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
+        if selected_product:
+            qs = qs.filter(search_result__search_job__product=selected_product)
+    elif product_id_str == "unassigned":
+        qs = qs.filter(search_result__search_job__product__isnull=True)
+
+    # Filter by date range
+    date_range = request.GET.get("date_range", "all").strip().lower()
+    now = timezone.now()
+    if date_range == "7d":
+        qs = qs.filter(sent_at__gte=now - timedelta(days=7))
+    elif date_range == "30d":
+        qs = qs.filter(sent_at__gte=now - timedelta(days=30))
+    elif date_range == "this_month":
+        qs = qs.filter(sent_at__year=now.year, sent_at__month=now.month)
+
+    # Filter by status
+    status_filter = request.GET.get("status", "").strip()
+    if status_filter and status_filter in dict(Inquiry.Status.choices):
+        qs = qs.filter(status=status_filter)
+
+    # Filter by search term
+    q = request.GET.get("q", "").strip()
+    if q:
+        qs = qs.filter(
+            Q(subject__icontains=q)
+            | Q(sent_to_email__icontains=q)
+            | Q(search_result__product_title__icontains=q)
+            | Q(search_result__external_company__name__icontains=q)
+            | Q(message__icontains=q)
+        )
+
+    prod_slug = selected_product.name.replace(" ", "_") if selected_product else "All_Products"
+    context_prefix = "Sales_Inquiries" if is_seller_context else "Procurement_Inquiries"
+    timestamp = now.strftime("%Y%m%d_%H%M")
+    filename = f"{context_prefix}_{prod_slug}_{timestamp}.csv"
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "Inquiry ID",
+        "Counterparty Company",
+        "Contact Email",
+        "Catalog / Target Product",
+        "Category",
+        "Inquiry Subject",
+        "Pipeline Status",
+        "Quoted Price Amount",
+        "Currency",
+        "Commercial Delivery Terms",
+        "Thread Messages Count",
+        "Has Attachment",
+        "Dispatched Date",
+        "Last Updated",
+    ])
+
+    for inq in qs:
+        ext = inq.search_result.external_company if inq.search_result else None
+        prod_obj = inq.search_result.search_job.product if (inq.search_result and inq.search_result.search_job) else None
+        prod_name = prod_obj.name if prod_obj else (inq.search_result.product_title if inq.search_result else "General")
+        cat_name = prod_obj.category.name if (prod_obj and prod_obj.category) else "General"
+        writer.writerow([
+            inq.id,
+            ext.name if ext else "Unknown",
+            inq.sent_to_email or (ext.email if ext else ""),
+            prod_name,
+            cat_name,
+            inq.subject or "",
+            inq.get_status_display(),
+            str(inq.quoted_price) if inq.quoted_price is not None else "",
+            inq.quoted_currency or "INR",
+            inq.delivery_terms or "",
+            getattr(inq, "messages_count", inq.messages.count()),
+            "Yes" if inq.attachment else "No",
+            inq.sent_at.strftime("%Y-%m-%d %H:%M") if inq.sent_at else "",
+            inq.updated_at.strftime("%Y-%m-%d %H:%M") if inq.updated_at else "",
+        ])
+
+    return response
+
+
 # ============================================================
 # PRICE COMPARISON & DYNAMIC EXPORT REPORTS
 # ============================================================
@@ -1255,6 +1597,8 @@ def export_reports_view(request):
 
         if report_type == "leads":
             preview_records = list(leads_filtered.order_by("-match_score", "-created_at")[:100])
+        elif report_type == "catalog":
+            preview_records = [selected_product] if selected_product else []
         else:
             preview_records = list(inquiries_filtered.order_by("-sent_at")[:100])
 
@@ -1332,6 +1676,9 @@ def export_reports_view(request):
                 ])
             return response
 
+    checksum_seed = f"{company.id if company else 0}-{selected_product.id if selected_product else 0}-{timezone.now().strftime('%Y%m%d')}-{report_type}"
+    report_checksum = hashlib.sha256(checksum_seed.encode("utf-8")).hexdigest()[:16].upper()
+
     return render(request, "leads/export_reports.html", {
         "products": products,
         "selected_product": selected_product,
@@ -1340,6 +1687,7 @@ def export_reports_view(request):
         "preview_records": preview_records,
         "total_leads_count": total_leads_count,
         "total_inquiry_count": total_inquiry_count,
+        "total_catalog_count": len(products),
         "kpi_leads_count": kpi_leads_count,
         "kpi_inquiries_count": kpi_inquiries_count,
         "kpi_high_fit_count": kpi_high_fit_count,
@@ -1354,6 +1702,7 @@ def export_reports_view(request):
         "avg_match_score": avg_match_score,
         "current_timestamp": timezone.now(),
         "report_ref": f"REP-{selected_product.id:04d}-{timezone.now().strftime('%Y%m%d%H%M')}" if selected_product else "",
+        "report_checksum": report_checksum,
         "date_range": date_range,
         "min_score": min_score,
         "status_filter": status_filter,
@@ -1365,6 +1714,8 @@ def export_reports_view(request):
         "page_title": (
             (f"Vendor Report - {selected_product.name}" if selected_product else "Vendor Report & Analytics")
             if report_type == "leads" else
+            (f"Catalog Specifications - {selected_product.name}" if selected_product else "Catalog Specifications Dossier")
+            if report_type == "catalog" else
             (f"Inquiries Audit - {selected_product.name}" if selected_product else "Inquiries & Outreach Audit Report")
         ),
     })
