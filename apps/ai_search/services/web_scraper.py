@@ -43,29 +43,64 @@ EXCLUDED_EMAIL_DOMAINS = [
 ]
 
 
+USER_AGENTS_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:128.0) Gecko/20100101 Firefox/128.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+]
+
+
 class CompanyWebScraper:
     """
     Intelligent Web Scraper for B2B Company websites.
-    Performs multi-page deep crawling:
-      1. Homepage crawling for primary meta, phones, emails, and address.
-      2. Automated discovery of /contact, /contact-us, /about-us subpages.
-      3. Contact subpage crawling to extract real phone numbers, verified emails,
-         and physical facility addresses.
-      4. Fallback search snippet extraction.
-    NEVER returns fake or hardcoded dummy contact information.
+    Features:
+      1. Rotating User-Agent & bot-bypass HTTP headers.
+      2. Connection pooling & automated retries for transient errors.
+      3. Global domain cache via ExternalCompany for instant sub-second lookup.
+      4. Multi-page deep contact crawl with physical address parsing.
+      5. Fallback snippet extraction (Never produces fake placeholder data).
     """
 
     def __init__(self, timeout: float = 3.5):
         self.timeout = timeout
-        self.headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
+
+    def _get_random_headers(self) -> dict:
+        import random
+        ua = random.choice(USER_AGENTS_POOL)
+        return {
+            "User-Agent": ua,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
+            "Sec-Ch-Ua": '"Chromium";v="128", "Not;A=Brand";v="24"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Upgrade-Insecure-Requests": "1",
         }
+
+    def _build_session(self) -> requests.Session:
+        import requests
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+
+        session = requests.Session()
+        session.headers.update(self._get_random_headers())
+        session.verify = False
+
+        retries = Retry(
+            total=2,
+            backoff_factor=0.2,
+            status_forcelist=[429, 500, 502, 503, 504],
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retries, pool_connections=10, pool_maxsize=10)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        return session
 
     def scrape(self, url: str, snippet_title: str = "", snippet_text: str = "") -> dict:
         """
@@ -80,7 +115,7 @@ class CompanyWebScraper:
 
         clean_name = self._derive_name(snippet_title, domain)
 
-        # Baseline structure - Notice NO hardcoded dummy phone or fake email!
+        # Baseline structure
         extracted = {
             "name": clean_name,
             "domain": domain,
@@ -95,6 +130,29 @@ class CompanyWebScraper:
             "company_role": "supplier",
             "industry": "Industrial Manufacturing & Supply",
         }
+
+        # 0. Fast-path: Check database cache for previously crawled domain
+        if domain:
+            try:
+                from apps.ai_search.models import ExternalCompany
+                from django.utils import timezone
+                from datetime import timedelta
+                cached_comp = ExternalCompany.objects.filter(domain=domain).first()
+                if cached_comp and (cached_comp.phone or cached_comp.email or cached_comp.address):
+                    if not cached_comp.last_scraped_at or cached_comp.last_scraped_at >= (timezone.now() - timedelta(days=30)):
+                        extracted["name"] = cached_comp.name or clean_name
+                        extracted["email"] = cached_comp.email or ""
+                        extracted["phone"] = cached_comp.phone or ""
+                        extracted["address"] = cached_comp.address or ""
+                        extracted["city"] = cached_comp.city or ""
+                        extracted["state"] = cached_comp.state or ""
+                        extracted["country"] = cached_comp.country or "India"
+                        extracted["company_role"] = cached_comp.company_role or "supplier"
+                        extracted["industry"] = cached_comp.industry or extracted["industry"]
+                        logger.info("Using cached ExternalCompany profile for domain '%s'", domain)
+                        return extracted
+            except Exception as cache_err:
+                logger.debug("Domain cache lookup exception: %s", cache_err)
 
         # 1. Parse hints from snippet text & title (location, role, any snippet phone/email)
         combined_snippet = f"{snippet_title} {snippet_text}".strip()
@@ -124,15 +182,16 @@ class CompanyWebScraper:
             if snippet_emails:
                 extracted["email"] = snippet_emails[0]
 
-        # 2. Live HTTP Crawl (Homepage + Subpage Contact Crawl)
+        # 2. Resilient HTTP Crawl (Homepage + Subpage Contact Crawl)
         if url and url.startswith("http"):
             try:
-                session = requests.Session()
-                session.headers.update(self.headers)
-                session.verify = False
-
+                session = self._build_session()
                 homepage_resp = session.get(url, timeout=self.timeout, allow_redirects=True)
                 if homepage_resp.status_code == 200:
+                    # Enforce proper charset encoding
+                    if homepage_resp.encoding is None or homepage_resp.encoding == "ISO-8859-1":
+                        homepage_resp.encoding = homepage_resp.apparent_encoding or "utf-8"
+
                     html_text = homepage_resp.text
                     homepage_data = self._parse_html(html_text=html_text, url=url, domain=domain, snippet_title=snippet_title)
                     contact_links = homepage_data.pop("_contact_links", [])
@@ -146,8 +205,10 @@ class CompanyWebScraper:
                     if (not extracted.get("phone") or not extracted.get("email") or not extracted.get("address")) and contact_links:
                         contact_subpage_url = contact_links[0]
                         try:
-                            sub_resp = session.get(contact_subpage_url, timeout=2.8, allow_redirects=True)
+                            sub_resp = session.get(contact_subpage_url, timeout=2.5, allow_redirects=True)
                             if sub_resp.status_code == 200:
+                                if sub_resp.encoding is None or sub_resp.encoding == "ISO-8859-1":
+                                    sub_resp.encoding = sub_resp.apparent_encoding or "utf-8"
                                 sub_data = self._parse_html(html_text=sub_resp.text, url=contact_subpage_url, domain=domain, snippet_title=snippet_title)
                                 sub_data.pop("_contact_links", None)
                                 # Fill missing fields from contact page

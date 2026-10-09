@@ -15,6 +15,7 @@ from apps.billing.models import (
 )
 from apps.dashboard.models import Notification
 from apps.dashboard.services.notification_service import create_notification
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -158,15 +159,23 @@ class CreditWalletService:
     @classmethod
     def get_feature_cost(cls, feature_code):
         """
-        Looks up the active credit cost for an AI feature code.
+        Looks up the active credit cost for an AI feature code with 5-minute caching.
         """
+        cache_key = f"feat_cost:{feature_code}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        cost = 1
         try:
             rule = FeatureCreditCost.objects.filter(feature_code=feature_code, is_active=True).first()
             if rule:
-                return rule.credit_cost
+                cost = rule.credit_cost
         except Exception:
             pass
-        return 1  # Default fallback cost
+
+        cache.set(cache_key, cost, timeout=300)
+        return cost
 
     @classmethod
     def check_balance(cls, company, feature_code, quantity=1):
@@ -505,13 +514,18 @@ class CreditWalletService:
             valid_till__lt=today,
         )
         for sub in active_subs:
-            days_overdue = (today - sub.valid_till).days
-            if days_overdue <= 3:
-                sub.status = Subscription.Status.PAST_DUE
-                summary["past_due"] += 1
-            else:
+            # If auto-renew is disabled, expire immediately
+            if not sub.auto_renew:
                 sub.status = Subscription.Status.EXPIRED
                 summary["expired"] += 1
+            else:
+                days_overdue = (today - sub.valid_till).days
+                if days_overdue <= 3:
+                    sub.status = Subscription.Status.PAST_DUE
+                    summary["past_due"] += 1
+                else:
+                    sub.status = Subscription.Status.EXPIRED
+                    summary["expired"] += 1
             sub.save(update_fields=["status", "updated_at"])
 
             # Broadcast alert to Company Admins
@@ -527,8 +541,8 @@ class CreditWalletService:
                     color="rose",
                 )
 
-        # 2. Advance renewal alerts: 7 days and 1 day prior
-        for days_ahead in [7, 1]:
+        # 2. Advance renewal alerts: 7 days, 5 days, and 1 day prior
+        for days_ahead in [7, 5, 1]:
             target_date = today + timezone.timedelta(days=days_ahead)
             expiring_soon = Subscription.objects.filter(
                 status=Subscription.Status.ACTIVE,
@@ -542,19 +556,73 @@ class CreditWalletService:
                 ).exists()
                 if not recent_alert:
                     summary["advance_notified"] += 1
+                    if days_ahead == 5:
+                        sub.expiry_warning_5d_sent = True
+                        sub.save(update_fields=["expiry_warning_5d_sent", "updated_at"])
                     for member in sub.company.members.filter(is_active=True, role="ADMIN"):
+                        auto_pay_text = "Auto-Pay is ACTIVE and will automatically renew." if sub.auto_renew else "Auto-Pay is OFF. Please renew manually to prevent restriction."
                         create_notification(
                             user=member.user,
                             company=sub.company,
                             notification_type=Notification.NotificationType.SYSTEM,
                             title=f"Subscription Expires in {days_ahead} Day{'s' if days_ahead > 1 else ''}",
-                            message=f"Your {sub.get_plan_display()} plan will renew or expire on {sub.valid_till}. You can renew directly from Billing.",
+                            message=f"Your {sub.get_plan_display()} plan will renew or expire on {sub.valid_till}. {auto_pay_text}",
                             link="/company/billing/",
                             icon="fa-calendar-days",
                             color="amber",
                         )
+                    try:
+                        from apps.billing.services.transactional_email import TransactionalEmailService
+                        TransactionalEmailService.send_subscription_expiry_reminder_email(
+                            company=sub.company,
+                            subscription=sub,
+                            days_left=days_ahead,
+                        )
+                    except Exception:
+                        pass
 
         return summary
+
+    @classmethod
+    def check_and_notify_5day_expiry(cls, company):
+        """
+        Proactively checks if company's subscription expires within 5 days.
+        If not yet notified for this cycle, sends notification to Company Admins.
+        """
+        sub = getattr(company, "subscription", None)
+        if not sub or sub.status != Subscription.Status.ACTIVE or not sub.valid_till:
+            return False
+
+        today = timezone.now().date()
+        valid_till_date = sub.valid_till
+        if hasattr(valid_till_date, "date") and callable(valid_till_date.date):
+            valid_till_date = valid_till_date.date()
+        days_left = (valid_till_date - today).days
+
+        # Trigger if 1 to 5 days left and not already marked
+        if 1 <= days_left <= 5 and not sub.expiry_warning_5d_sent:
+            recent_alert = Notification.objects.filter(
+                company=company,
+                title__icontains="5 Day",
+                created_at__gte=timezone.now() - timezone.timedelta(days=3),
+            ).exists()
+            if not recent_alert:
+                sub.expiry_warning_5d_sent = True
+                sub.save(update_fields=["expiry_warning_5d_sent", "updated_at"])
+                auto_pay_msg = "Auto-Pay is active and will renew your plan." if sub.auto_renew else "Auto-Pay is currently OFF. Please renew or turn on Auto-Pay to prevent service restriction."
+                for member in company.members.filter(is_active=True, role="ADMIN"):
+                    create_notification(
+                        user=member.user,
+                        company=company,
+                        notification_type=Notification.NotificationType.SYSTEM,
+                        title=f"Subscription Expiry Notice ({days_left} Days Remaining)",
+                        message=f"Your {sub.get_plan_display()} subscription expires on {sub.valid_till}. {auto_pay_msg}",
+                        link="/company/billing/",
+                        icon="fa-clock-rotate-left",
+                        color="amber",
+                    )
+                return True
+        return False
 
     @classmethod
     def can_add_team_member(cls, company):

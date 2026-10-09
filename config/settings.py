@@ -150,6 +150,8 @@ DATABASES = {
 
         "PORT": os.getenv("DB_PORT", "3306"),
 
+        "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", 60)),
+
         "OPTIONS": {
             "charset": "utf8mb4",
         },
@@ -290,6 +292,38 @@ EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", 10))
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 LOGOUT_REDIRECT_URL = "/login/"
+
+# ============================================================
+# CACHING & PERFORMANCE
+# ============================================================
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "procurement-ai-cache",
+        "TIMEOUT": 300,
+    }
+}
+
+# ============================================================
+# PAYMENT GATEWAYS (RAZORPAY & STRIPE)
+# ============================================================
+
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
+STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY", "")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+# ============================================================
+# SECURITY HARDENING
+# ============================================================
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
 
 
 

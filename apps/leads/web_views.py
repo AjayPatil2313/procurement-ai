@@ -1227,8 +1227,13 @@ def record_inquiry_quote_view(request, pk):
             body=quote_body,
         )
 
-        # Dispatch real-time in-app notification
+        # Dispatch real-time in-app notification & email
         notify_quote_recorded(inquiry, user=request.user)
+        try:
+            from apps.billing.services.transactional_email import TransactionalEmailService
+            TransactionalEmailService.send_quote_received_email(inquiry)
+        except Exception:
+            pass
 
         messages.success(
             request,

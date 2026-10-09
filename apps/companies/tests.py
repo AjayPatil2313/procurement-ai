@@ -163,14 +163,12 @@ class SuperAdminSuiteTestCase(TestCase):
         self.assertContains(response, "cannot deactivate your own Super Admin account")
 
     def test_api_logs_and_audit_trail_views(self):
-        """Super Admin can view API logs and system audit trail."""
+        """Super Admin can access audit trail; deprecated api-logs redirects to audit trail."""
         self.client.login(email="superadmin@platform.ai", password="Password123!")
 
-        # API Logs View
+        # Deprecated API Logs route redirects to audit trail
         response = self.client.get(reverse("admin-panel-apilogs"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Google Custom Search")
-        self.assertIn("monthly_budget", response.context)
+        self.assertRedirects(response, reverse("admin-panel-auditlogs"))
 
         # Audit Logs View
         response = self.client.get(reverse("admin-panel-auditlogs"))
@@ -243,7 +241,8 @@ class SuperAdminSuiteTestCase(TestCase):
         self.assertContains(response, "All Companies")
         self.assertContains(response, "Add New Company")
         self.assertContains(response, "Plans & Credits")
-        self.assertContains(response, "API Costs")
+        self.assertContains(response, "Audit Trail")
+        self.assertNotIn("API Costs", response.content.decode("utf-8"))
 
         # Should NOT contain Buyer or Seller navigation sections
         content = response.content.decode("utf-8")

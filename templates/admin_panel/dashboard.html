@@ -28,9 +28,7 @@
       <a href="{% url 'admin-panel-plans' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
         <i class="fa-solid fa-credit-card mr-2 text-amber-400"></i> Plans & Credits
       </a>
-      <a href="{% url 'admin-panel-apilogs' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
-        <i class="fa-solid fa-terminal mr-2 text-emerald-400"></i> API Costs
-      </a>
+
       <a href="{% url 'admin-panel-auditlogs' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
         <i class="fa-solid fa-clock-rotate-left mr-2 text-purple-400"></i> Audit Trail
       </a>
@@ -151,19 +149,25 @@
       </div>
     </div>
 
-    <!-- Card 4: External API Cost -->
+    <!-- Card 4: AI Search & Discovery Operations -->
     <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
       <div class="flex items-center justify-between">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total API Expense</span>
-        <span class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
-          <i class="fa-solid fa-receipt"></i>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">AI Search Operations</span>
+        <span class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
         </span>
       </div>
       <div class="mt-3">
-        <div class="text-2xl font-black text-emerald-600">${{ total_api_cost|floatformat:2 }}</div>
+        <div class="text-2xl font-black text-slate-900">{{ total_search_jobs }}</div>
         <div class="flex items-center justify-between mt-2 text-xs text-slate-500">
-          <span>{{ total_api_calls }} calls logged</span>
-          <span class="text-emerald-700 font-semibold">{{ completed_jobs }} jobs OK</span>
+          <span class="text-emerald-700 font-semibold flex items-center">
+            <i class="fa-solid fa-circle-check text-[10px] mr-1"></i> {{ completed_jobs }} completed
+          </span>
+          {% if failed_jobs %}
+          <span class="text-rose-600 font-semibold">{{ failed_jobs }} failed</span>
+          {% else %}
+          <span class="text-slate-400">0 failed</span>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -260,38 +264,44 @@
       </div>
     </div>
 
-    <!-- External API Providers -->
+    <!-- Platform Operations & Support -->
     <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-900 flex items-center">
-          <i class="fa-solid fa-server text-emerald-500 mr-2"></i> API Provider Breakdown
+          <i class="fa-solid fa-headset text-purple-500 mr-2"></i> Platform Operations &amp; Support
         </h3>
-        <a href="{% url 'admin-panel-apilogs' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">API Logs &rarr;</a>
+        <a href="{% url 'admin-panel-auditlogs' %}" class="text-xs font-semibold text-purple-600 hover:text-purple-800">Audit Trail &rarr;</a>
       </div>
 
-      <div class="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-        {% for p in provider_breakdown %}
-        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs">
-          <div>
-            <div class="font-bold text-slate-900">{{ p.provider }}</div>
-            <div class="text-[11px] text-slate-500">{{ p.total_calls }} invocations</div>
-          </div>
-          <div class="text-right">
-            <span class="font-bold text-emerald-600">${{ p.total_cost|floatformat:4 }}</span>
-          </div>
+      <div class="grid grid-cols-2 gap-2 text-center pt-2">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+          <div class="text-slate-900 text-base font-bold">{{ completed_jobs }}</div>
+          <div class="text-[11px] font-semibold text-slate-500 mt-0.5">Jobs Completed</div>
         </div>
-        {% empty %}
-        <div class="p-4 text-center text-slate-400 text-xs">
-          No external API calls logged yet.
+        <div class="p-3 bg-purple-50 rounded-xl border border-purple-100">
+          <div class="text-purple-700 text-base font-bold">{{ open_tickets }}</div>
+          <div class="text-[11px] font-semibold text-purple-800 mt-0.5">Open Tickets</div>
         </div>
-        {% endfor %}
       </div>
 
-      <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
-        <span>Open Support Tickets:</span>
-        <span class="font-bold {% if open_tickets > 0 %}text-rose-600{% else %}text-slate-600{% endif %}">
-          {{ open_tickets }} pending
-        </span>
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-2">
+        <div class="flex items-center justify-between">
+          <span>AI Search Success Rate:</span>
+          <span class="font-bold text-emerald-600">
+            {% if total_search_jobs %}
+              {% widthratio completed_jobs total_search_jobs 100 %}%
+            {% else %}
+              100%
+            {% endif %}
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>System Status:</span>
+          <span class="font-bold {% if platform_maintenance_active %}text-amber-600{% else %}text-emerald-600{% endif %} flex items-center">
+            <span class="w-2 h-2 rounded-full {% if platform_maintenance_active %}bg-amber-500{% else %}bg-emerald-500{% endif %} mr-1.5 animate-pulse"></span>
+            {% if platform_maintenance_active %}Maintenance Mode{% else %}Operational{% endif %}
+          </span>
+        </div>
       </div>
     </div>
 

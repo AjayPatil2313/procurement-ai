@@ -12,8 +12,10 @@ from apps.accounts.models import User
 from apps.accounts.utils import generate_password_reset_token, verify_password_reset_token
 from apps.companies.models import Company, CompanyMember
 from apps.billing.models import Subscription
+from apps.dashboard.ratelimit import rate_limit
 
 
+@rate_limit(rate=20, period=60, key_type="ip")
 def login_view(request):
     if request.user.is_authenticated:
         if request.user.is_superuser or request.user.is_staff:
@@ -185,6 +187,7 @@ def logout_view(request):
     })
 
 
+@rate_limit(rate=10, period=60, key_type="ip")
 def forgot_password_view(request):
     """
     Renders forgot password form and sends password reset link to user's email.

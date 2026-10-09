@@ -24,7 +24,7 @@ from apps.billing.models import (
     Invoice,
 )
 from apps.billing.services.wallet import CreditWalletService
-from apps.ai_search.models import APILog, SearchJob
+from apps.ai_search.models import SearchJob
 from apps.dashboard.models import ActivityLog, SupportTicket, PlatformSetting
 from apps.leads.models import Inquiry
 from apps.catalog.models import Product
@@ -76,14 +76,7 @@ def admin_panel_dashboard_view(request):
     completed_jobs = SearchJob.objects.filter(status=SearchJob.Status.COMPLETED).count()
     failed_jobs = SearchJob.objects.filter(status=SearchJob.Status.FAILED).count()
 
-    total_api_calls = APILog.objects.count()
-    total_api_cost = APILog.objects.aggregate(total=Sum("cost"))["total"] or 0.0
 
-    provider_breakdown = list(
-        APILog.objects.values("provider")
-        .annotate(total_calls=Count("id"), total_cost=Sum("cost"))
-        .order_by("-total_calls")
-    )
 
     # 5. Deal & Support Metrics
     total_inquiries = Inquiry.objects.count()
@@ -124,9 +117,7 @@ def admin_panel_dashboard_view(request):
         "total_search_jobs": total_search_jobs,
         "completed_jobs": completed_jobs,
         "failed_jobs": failed_jobs,
-        "total_api_calls": total_api_calls,
-        "total_api_cost": total_api_cost,
-        "provider_breakdown": provider_breakdown,
+
         "total_inquiries": total_inquiries,
         "deals_won": deals_won,
         "open_tickets": open_tickets,
@@ -820,6 +811,8 @@ def admin_panel_feature_cost_update_view(request):
             rule.is_active = is_active
             rule.updated_by = request.user
             rule.save()
+            from django.core.cache import cache
+            cache.delete(f"feat_cost:{feature_code}")
             messages.success(request, f"Credit rate for '{rule.display_name}' updated to {cost} credits.")
         else:
             messages.error(request, f"Feature rule '{feature_code}' not found.")
@@ -901,56 +894,9 @@ def admin_panel_toggle_user_active_view(request, pk):
 @superadmin_required
 def admin_panel_apilogs_view(request):
     """
-    API Logs & External Provider Costs monitor.
-    Dynamically tracks real costs, API provider calls, status codes,
-    and search jobs.
+    Deprecated API Logs endpoint - safely redirects to system audit trail.
     """
-    logs = APILog.objects.select_related("search_job__company").order_by("-created_at")
-
-    provider_filter = request.GET.get("provider", "all")
-    status_filter = request.GET.get("status", "all")
-    q = request.GET.get("q", "").strip()
-
-    if q:
-        logs = logs.filter(
-            Q(endpoint__icontains=q)
-            | Q(provider__icontains=q)
-            | Q(search_job__company__name__icontains=q)
-        )
-
-    if provider_filter != "all":
-        logs = logs.filter(provider=provider_filter)
-
-    if status_filter == "200":
-        logs = logs.filter(status_code=200)
-    elif status_filter == "error":
-        logs = logs.exclude(status_code=200)
-
-    # Real calculated statistics
-    total_calls = APILog.objects.count()
-    total_cost = APILog.objects.aggregate(total=Sum("cost"))["total"] or 0.00
-    monthly_budget = 250.00
-
-    provider_stats = list(
-        APILog.objects.values("provider")
-        .annotate(calls=Count("id"), cost=Sum("cost"))
-        .order_by("-calls")
-    )
-
-    available_providers = APILog.objects.values_list("provider", flat=True).distinct()
-
-    return render(request, "admin_panel/api_logs.html", {
-        "logs": logs[:100],
-        "page_title": "API Logs & External Provider Costs",
-        "total_calls": total_calls,
-        "total_cost": total_cost,
-        "monthly_budget": monthly_budget,
-        "provider_stats": provider_stats,
-        "available_providers": available_providers,
-        "provider_filter": provider_filter,
-        "status_filter": status_filter,
-        "q": q,
-    })
+    return redirect("admin-panel-auditlogs")
 
 
 @login_required

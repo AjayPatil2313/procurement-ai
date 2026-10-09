@@ -41,6 +41,9 @@ class SavedItem(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["company", "status", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.search_result.product_title} - {self.status}"
@@ -108,6 +111,9 @@ class Inquiry(models.Model):
     class Meta:
         verbose_name_plural = "Inquiries"
         ordering = ["-sent_at"]
+        indexes = [
+            models.Index(fields=["company", "status", "-sent_at"]),
+        ]
 
     def __str__(self):
         return f"Inquiry to {self.sent_to_email}: {self.subject}"

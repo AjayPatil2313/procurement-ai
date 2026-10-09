@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.http import HttpResponse, JsonResponse
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
@@ -724,7 +724,12 @@ def subscription_billing_web_view(request):
             )
 
             CreditWalletService.allocate_plan_credits(company, target_plan, is_renewal=False)
-            messages.success(request, f"Plan successfully changed to {target_plan.name}! {target_plan.included_credits} credits allocated (Invoice generated with 18% GST).")
+            subscription.refresh_from_db()
+            subscription.auto_renew = True
+            subscription.cancelled_at = None
+            subscription.expiry_warning_5d_sent = False
+            subscription.save(update_fields=["auto_renew", "cancelled_at", "expiry_warning_5d_sent", "updated_at"])
+            messages.success(request, f"Plan successfully changed to {target_plan.name}! {target_plan.included_credits} credits allocated (Invoice generated with 18% GST). Auto-Pay is active.")
             return redirect("subscription-billing-web")
 
         # 2. TOP-UP / BUY CREDITS (with 18% GST calculation)
@@ -776,7 +781,12 @@ def subscription_billing_web_view(request):
 
         # 3. RENEW PLAN (with 18% GST calculation)
         elif action == "renew_plan":
-            current_tier = subscription.plan_tier or SubscriptionPlan.objects.filter(code="pro").first()
+            target_plan_code = request.POST.get("plan_code", "").strip()
+            current_tier = None
+            if target_plan_code:
+                current_tier = SubscriptionPlan.objects.filter(code=target_plan_code, status=SubscriptionPlan.PlanStatus.ACTIVE).first()
+            if not current_tier:
+                current_tier = subscription.plan_tier or SubscriptionPlan.objects.filter(code="pro").first()
             if current_tier:
                 subtotal, tax, total_amount = CreditWalletService.calculate_gst_breakdown(current_tier.price)
 
@@ -805,7 +815,34 @@ def subscription_billing_web_view(request):
                     due_date=timezone.now().date(),
                 )
                 CreditWalletService.allocate_plan_credits(company, current_tier, is_renewal=True)
-                messages.success(request, f"Subscription renewed successfully! {current_tier.included_credits} credits reloaded (Total ₹{total_amount} incl. 18% GST).")
+                subscription.refresh_from_db()
+                subscription.auto_renew = True
+                subscription.cancelled_at = None
+                subscription.expiry_warning_5d_sent = False
+                subscription.save(update_fields=["auto_renew", "cancelled_at", "expiry_warning_5d_sent", "updated_at"])
+                messages.success(request, f"Subscription renewed successfully! {current_tier.included_credits} credits reloaded (Total ₹{total_amount} incl. 18% GST). Auto-Pay is active.")
+            return redirect("subscription-billing-web")
+
+        # 4. TOGGLE AUTO-PAY (Action: toggle_autopay)
+        elif action == "toggle_autopay":
+            auto_pay_val = request.POST.get("auto_pay")
+            if auto_pay_val is not None:
+                enable_autopay = (auto_pay_val.strip().lower() == "true")
+            else:
+                enable_autopay = not subscription.auto_renew
+
+            subscription.auto_renew = enable_autopay
+            if not enable_autopay:
+                subscription.cancelled_at = timezone.now()
+                messages.warning(
+                    request,
+                    f"Auto-Pay has been paused. You will retain full access until your plan expires on "
+                    f"{subscription.valid_till or subscription.renewal_date.date()}. After this date, features will be restricted unless renewed."
+                )
+            else:
+                subscription.cancelled_at = None
+                messages.success(request, "Auto-Pay has been successfully activated! Your plan will renew automatically on the renewal date.")
+            subscription.save(update_fields=["auto_renew", "cancelled_at", "updated_at"])
             return redirect("subscription-billing-web")
 
     # Read data based on role
@@ -869,11 +906,70 @@ def subscription_billing_web_view(request):
             CreditTransaction.objects.filter(company=company, user=request.user).order_by("-created_at")[:20]
         )
 
+    # Check proactive 5-day expiry alert
+    CreditWalletService.check_and_notify_5day_expiry(company)
+
+    # Dynamic 3-Plan Tier State Calculation (Points 1 - 4)
+    is_expired = subscription.is_expired if subscription else False
+    current_tier = subscription.plan_tier if subscription else None
+    has_chosen_paid_plan = bool(current_tier and current_tier.code != "free" and subscription.plan != "free")
+    current_order = current_tier.order if current_tier else 0
+    current_price = current_tier.price if current_tier else Decimal("0.00")
+
+    annotated_plans = []
+    for p in available_plans:
+        p_is_current = bool(current_tier and p.code == current_tier.code)
+        p_is_higher = p.order > current_order or p.price > current_price
+        p_is_lower = p.order < current_order or p.price < current_price
+
+        if not has_chosen_paid_plan:
+            # Scenario 1: Company is on free tier / has not chosen any paid plan
+            if p.code == "free" or (current_tier and p.code == current_tier.code):
+                button_state = "current"
+                button_label = "Current Plan Active"
+            else:
+                button_state = "choose"
+                button_label = f"Choose {p.name}"
+        elif is_expired:
+            # Scenario 4: Plan expired (e.g. 2 days ago / renewal date passed)
+            if p_is_current:
+                button_state = "renew"
+                button_label = f"Renew {p.name}"
+            elif p_is_higher:
+                button_state = "upgrade"
+                button_label = f"Upgrade to {p.name}"
+            else:
+                button_state = "disabled"
+                button_label = "Downgrade Unavailable"
+        else:
+            # Scenarios 2 & 3: Active plan chosen
+            if p_is_current:
+                button_state = "current"
+                button_label = "Current Plan Active"
+            elif p_is_higher:
+                button_state = "upgrade"
+                button_label = f"Upgrade to {p.name}"
+            else:
+                button_state = "disabled"
+                button_label = "Downgrade Unavailable"
+
+        annotated_plans.append({
+            "plan": p,
+            "is_current": p_is_current,
+            "is_higher": p_is_higher,
+            "is_lower": p_is_lower,
+            "button_state": button_state,
+            "button_label": button_label,
+        })
+
     return render(request, "billing/subscription.html", {
         "company": company,
         "subscription": subscription,
         "wallet": wallet,
         "available_plans": available_plans,
+        "annotated_plans": annotated_plans,
+        "is_expired": is_expired,
+        "has_chosen_paid_plan": has_chosen_paid_plan,
         "team_usage": team_usage,
         "company_transactions": company_transactions_page,
         "invoices": invoices,
@@ -888,6 +984,261 @@ def subscription_billing_web_view(request):
         "rbac": rbac,
         "page_title": "Subscription & Credits",
     })
+
+
+@login_required
+def company_invoices_web_view(request):
+    """
+    Dedicated Company Invoices & Credit Ledger Dashboard:
+    - Official tax invoices with GST breakdown, status, and PDF download.
+    - Company credit ledger & receipts with transaction filtering.
+    - Configurable pagination (default 10 items per page; options: 10, 25, 50, 100).
+    - Bank statement style CSV export modal with custom date ranges.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not company:
+        messages.error(request, "Please switch to an active company to access Invoices & Billing.")
+        return redirect("dashboard")
+
+    wallet = CreditWalletService.get_or_create_wallet(company)
+    subscription = getattr(company, "subscription", None)
+
+    # 1. Invoices Query with configurable pagination (default 10)
+    invoices_qs = Invoice.objects.filter(company=company).order_by("-issue_date", "-created_at")
+    inv_status_filter = request.GET.get("inv_status", "all").strip().lower()
+    if inv_status_filter and inv_status_filter != "all":
+        invoices_qs = invoices_qs.filter(status=inv_status_filter)
+
+    try:
+        inv_page_size = int(request.GET.get("inv_limit", 10))
+        if inv_page_size not in [10, 25, 50, 100]:
+            inv_page_size = 10
+    except (ValueError, TypeError):
+        inv_page_size = 10
+
+    inv_paginator = Paginator(invoices_qs, inv_page_size)
+    inv_page_num = request.GET.get("inv_page", 1)
+    invoices_page = inv_paginator.get_page(inv_page_num)
+
+    # 2. Credit Transactions Ledger with filtering & configurable pagination (default 10)
+    tx_qs = CreditTransaction.objects.filter(company=company).select_related("user")
+    tx_type = request.GET.get("tx_type", "all").strip().lower()
+    date_range = request.GET.get("date_range", "all").strip().lower()
+
+    if tx_type != "all":
+        tx_qs = tx_qs.filter(transaction_type=tx_type)
+
+    if date_range == "7d":
+        tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=7))
+    elif date_range == "30d":
+        tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=30))
+    elif date_range == "90d":
+        tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=90))
+
+    try:
+        ledger_page_size = int(request.GET.get("ledger_limit", 10))
+        if ledger_page_size not in [10, 25, 50, 100]:
+            ledger_page_size = 10
+    except (ValueError, TypeError):
+        ledger_page_size = 10
+
+    ledger_paginator = Paginator(tx_qs.order_by("-created_at"), ledger_page_size)
+    ledger_page_num = request.GET.get("ledger_page", 1)
+    ledger_page = ledger_paginator.get_page(ledger_page_num)
+
+    # Summary statistics
+    total_invoiced = Invoice.objects.filter(company=company, status=Invoice.Status.PAID).aggregate(s=Sum("total_amount"))["s"] or Decimal("0.00")
+    total_credits_inflow = CreditTransaction.objects.filter(company=company, credits__gt=0).aggregate(s=Sum("credits"))["s"] or 0
+    total_credits_consumed = CreditTransaction.objects.filter(company=company, credits__lt=0).aggregate(s=Sum("credits"))["s"] or 0
+    total_credits_consumed = abs(total_credits_consumed)
+
+    return render(request, "billing/invoices.html", {
+        "company": company,
+        "subscription": subscription,
+        "wallet": wallet,
+        "invoices_page": invoices_page,
+        "ledger_page": ledger_page,
+        "inv_limit": inv_page_size,
+        "ledger_limit": ledger_page_size,
+        "inv_status": inv_status_filter,
+        "tx_type": tx_type,
+        "date_range": date_range,
+        "total_invoiced": total_invoiced,
+        "total_credits_inflow": total_credits_inflow,
+        "total_credits_consumed": total_credits_consumed,
+        "rbac": rbac,
+        "page_title": "Invoices & Billing History",
+    })
+
+
+@login_required
+def export_statement_csv_view(request):
+    """
+    Exports official bank-statement style CSV for company audit:
+    - Custom date range filter (start_date, end_date)
+    - Opening and closing credit balances
+    - Summary of credits inflow and outflow
+    - Itemized transaction ledger with receipt IDs, timestamps, and balance after
+    - Itemized invoice ledger
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not company:
+        messages.error(request, "No active company found.")
+        return redirect("dashboard")
+
+    if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+        messages.error(request, "Permission denied: Company administrator privileges required to export account statement.")
+        return redirect("company-invoices")
+
+    # Date range filters
+    start_date_str = request.GET.get("start_date", "").strip()
+    end_date_str = request.GET.get("end_date", "").strip()
+
+    today = timezone.now().date()
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            start_date = today - timedelta(days=30)
+    else:
+        start_date = today - timedelta(days=30)
+
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            end_date = today
+    else:
+        end_date = today
+
+    # End of day datetime for end_date
+    start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+    end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+
+    # Transactions in period
+    tx_qs = CreditTransaction.objects.filter(
+        company=company,
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+    ).select_related("user").order_by("created_at")
+
+    # Invoices in period
+    invoices_qs = Invoice.objects.filter(
+        company=company,
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+    ).order_by("created_at")
+
+    # Balances
+    wallet = getattr(company, "credit_wallet", None)
+    closing_balance = wallet.total_available if wallet else 0
+
+    # Calculate inflows and outflows in period
+    inflow = tx_qs.filter(credits__gt=0).aggregate(s=Sum("credits"))["s"] or 0
+    outflow = abs(tx_qs.filter(credits__lt=0).aggregate(s=Sum("credits"))["s"] or 0)
+
+    # Transactions prior to start_dt to find opening balance
+    prior_tx = CreditTransaction.objects.filter(company=company, created_at__lt=start_dt).order_by("-created_at").first()
+    opening_balance = prior_tx.balance_after if prior_tx else 0
+
+    # Build CSV Response
+    clean_comp_name = company.name.replace(" ", "_").replace("/", "_")
+    filename = f"Account_Statement_{clean_comp_name}_{start_date}_{end_date}.csv"
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+
+    # Bank-Statement Style Headers
+    writer.writerow(["================================================================================="])
+    writer.writerow(["PROCUREMENT AI - OFFICIAL ACCOUNT STATEMENT & AUDIT LEDGER"])
+    writer.writerow(["================================================================================="])
+    writer.writerow(["Company Name:", company.name])
+    writer.writerow(["Company ID:", company.id])
+    writer.writerow(["Statement Period:", f"{start_date.strftime('%d-%b-%Y')} to {end_date.strftime('%d-%b-%Y')}"])
+    writer.writerow(["Statement Generated On:", timezone.now().strftime("%Y-%m-%d %H:%M:%S UTC")])
+    writer.writerow(["Generated By:", request.user.get_full_name() or request.user.email])
+    writer.writerow([])
+    writer.writerow(["---------------------------------------------------------------------------------"])
+    writer.writerow(["EXECUTIVE SUMMARY"])
+    writer.writerow(["---------------------------------------------------------------------------------"])
+    writer.writerow(["Opening Credit Balance:", opening_balance])
+    writer.writerow(["Total Credit Inflows (+):", f"+{inflow}"])
+    writer.writerow(["Total Credit Outflows (-):", f"-{outflow}"])
+    writer.writerow(["Closing Credit Balance:", closing_balance])
+    writer.writerow(["Total Tax Invoices in Period:", invoices_qs.count()])
+    total_inv_amount = invoices_qs.aggregate(s=Sum("total_amount"))["s"] or Decimal("0.00")
+    writer.writerow(["Total Invoiced Amount in Period:", f"INR {total_inv_amount}"])
+    writer.writerow([])
+    writer.writerow(["================================================================================="])
+    writer.writerow(["PART 1: ITEMIZED CREDIT LEDGER TRANSACTIONS"])
+    writer.writerow(["================================================================================="])
+    writer.writerow([
+        "Date & Time",
+        "Receipt Reference",
+        "Transaction Type",
+        "Credits Inflow (+)",
+        "Credits Outflow (-)",
+        "Balance After",
+        "Triggered By",
+        "Notes / Feature Description",
+    ])
+
+    for tx in tx_qs:
+        user_name = tx.user.get_full_name() or tx.user.email if tx.user else "System Engine"
+        credits_in = f"+{tx.credits}" if tx.credits > 0 else ""
+        credits_out = str(tx.credits) if tx.credits < 0 else ""
+        writer.writerow([
+            tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            tx.receipt_number or f"RCP-{tx.id:06d}",
+            tx.get_transaction_type_display(),
+            credits_in,
+            credits_out,
+            tx.balance_after,
+            user_name,
+            tx.notes,
+        ])
+
+    writer.writerow([])
+    writer.writerow(["================================================================================="])
+    writer.writerow(["PART 2: ITEMIZED TAX INVOICES & BILLING IN PERIOD"])
+    writer.writerow(["================================================================================="])
+    writer.writerow([
+        "Invoice Number",
+        "Issue Date",
+        "Billing Period Start",
+        "Billing Period End",
+        "Subtotal (Net)",
+        "GST Tax (18%)",
+        "Total Amount",
+        "Currency",
+        "Status",
+    ])
+
+    for inv in invoices_qs:
+        writer.writerow([
+            inv.invoice_number,
+            inv.issue_date.strftime("%Y-%m-%d"),
+            inv.billing_period_start.strftime("%Y-%m-%d"),
+            inv.billing_period_end.strftime("%Y-%m-%d"),
+            inv.subtotal,
+            inv.tax,
+            inv.total_amount,
+            inv.currency,
+            inv.get_status_display(),
+        ])
+
+    writer.writerow([])
+    writer.writerow(["================================================================================="])
+    writer.writerow(["END OF ACCOUNT STATEMENT"])
+    writer.writerow(["================================================================================="])
+
+    return response
 
 
 # ============================================================

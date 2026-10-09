@@ -23,6 +23,7 @@ from apps.ai_search.services.pipeline import run_find_buyers_search
 from apps.catalog.models import Category, Product, ProductImage
 from apps.companies.rbac import get_user_rbac_context
 from apps.leads.models import SavedItem
+from apps.dashboard.ratelimit import rate_limit
 
 
 @login_required
@@ -731,6 +732,7 @@ def _sync_company_matching_criteria(company, post_data):
 
 
 @login_required
+@rate_limit(rate=30, period=60, key_type="company")
 def find_buyers_view(request):
     """
     Find Buyers (AI Matching & Web Scraping):
@@ -845,12 +847,18 @@ def find_buyers_view(request):
     custom_criteria_list = [p for p in company_params if p.parameter_key not in STATIC_CRITERIA_KEYS]
     active_criteria_count = sum(1 for sc in static_criteria_list if sc["is_active"]) + sum(1 for cc in custom_criteria_list if cc.is_active)
 
+    latest_job_qs = SearchJob.objects.filter(company=company, job_type=SearchJob.JobType.FIND_BUYERS)
+    if selected_product:
+        latest_job_qs = latest_job_qs.filter(product=selected_product)
+    current_job = latest_job_qs.order_by("-created_at").first()
+
     return render(request, "products/find_buyers.html", {
         "leads": leads,
         "saved_result_ids": saved_result_ids,
         "products": products,
         "selected_product": selected_product,
         "selected_product_id": int(product_id) if product_id and product_id.isdigit() else None,
+        "current_job": current_job,
         "company": company,
         "subscription": subscription,
         "rbac": rbac,

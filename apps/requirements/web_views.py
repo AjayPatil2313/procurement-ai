@@ -11,6 +11,7 @@ from apps.catalog.models import Category
 from apps.companies.rbac import get_user_rbac_context
 from apps.leads.models import SavedItem
 from apps.requirements.models import Requirement
+from apps.dashboard.ratelimit import rate_limit
 
 
 @login_required
@@ -443,6 +444,7 @@ def requirement_delete_view(request, pk):
 
 
 @login_required
+@rate_limit(rate=30, period=60, key_type="company")
 def find_suppliers_view(request):
     """
     Find Suppliers View (AI Match & Web Scraper):
@@ -505,12 +507,18 @@ def find_suppliers_view(request):
     results = results_qs[:30]
     saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
+    latest_job_qs = SearchJob.objects.filter(company=company, job_type=SearchJob.JobType.FIND_SUPPLIERS)
+    if selected_requirement:
+        latest_job_qs = latest_job_qs.filter(requirement=selected_requirement)
+    current_job = latest_job_qs.order_by("-created_at").first()
+
     return render(request, "requirements/find_suppliers.html", {
         "results": results,
         "saved_result_ids": saved_result_ids,
         "requirements": requirements,
         "selected_requirement": selected_requirement,
         "selected_requirement_id": int(requirement_id) if requirement_id and requirement_id.isdigit() else None,
+        "current_job": current_job,
         "company": company,
         "rbac": rbac,
         "page_title": "Find Suppliers (AI Sourcing)",

@@ -69,6 +69,10 @@ class SearchJob(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["company", "job_type", "-created_at"]),
+            models.Index(fields=["status"]),
+        ]
 
     def __str__(self):
         target = self.requirement.item_name if self.requirement else (self.product.name if self.product else self.search_query or "Job")
@@ -121,6 +125,8 @@ class ExternalCompany(models.Model):
         verbose_name_plural = "External companies"
         indexes = [
             models.Index(fields=["domain"]),
+            models.Index(fields=["name"]),
+            models.Index(fields=["company_role"]),
         ]
 
     def __str__(self):
@@ -188,6 +194,7 @@ class SearchResult(models.Model):
         ordering = ["-match_score", "-created_at"]
         indexes = [
             models.Index(fields=["search_job", "match_score"]),
+            models.Index(fields=["search_job", "result_type", "-match_score"]),
         ]
 
     def __str__(self):

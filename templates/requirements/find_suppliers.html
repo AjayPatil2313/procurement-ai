@@ -72,7 +72,7 @@
   </div>
 
   <!-- Active Results Count and Feedback -->
-  <div class="flex items-center justify-between text-xs text-slate-500 px-1">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500 px-1">
     <div>
       {% if selected_requirement %}
         Showing suppliers for requirement: <strong class="text-slate-800">{{ selected_requirement.item_name }}</strong> ({{ results|length }} candidates)
@@ -80,6 +80,17 @@
         Showing all qualified suppliers across procurement pipeline ({{ results|length }} discovered)
       {% endif %}
     </div>
+    {% if current_job and results %}
+    <a 
+      href="/api/billing/dossier/{{ current_job.id }}/pdf/" 
+      target="_blank"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition shrink-0"
+      title="Generate and download official PDF evaluation dossier"
+    >
+      <i class="fa-solid fa-file-pdf text-rose-400"></i>
+      <span>Download PDF Dossier</span>
+    </a>
+    {% endif %}
   </div>
 
   <!-- Results Grid -->

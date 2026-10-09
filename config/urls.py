@@ -28,6 +28,8 @@ from apps.companies.web_views import (
     company_team_web_view,
     company_rbac_web_view,
     subscription_billing_web_view,
+    company_invoices_web_view,
+    export_statement_csv_view,
     seller_roles_web_view,
     seller_role_create_view,
     seller_role_edit_view,
@@ -141,6 +143,8 @@ urlpatterns = [
     path("company/rbac/", company_rbac_web_view, name="company-rbac-web"),
     path("company/billing/", subscription_billing_web_view, name="subscription-billing-web"),
     path("company/billing/", subscription_billing_web_view, name="company-billing"),
+    path("company/invoices/", company_invoices_web_view, name="company-invoices"),
+    path("company/invoices/export-statement/", export_statement_csv_view, name="export-statement-csv"),
 
     # Buyer / Procurement (Web)
     path("procurement/find-suppliers/", find_suppliers_view, name="find-suppliers"),
@@ -233,6 +237,7 @@ urlpatterns = [
     path("api/requirements/", include("apps.requirements.urls")),
     path("api/catalog/", include("apps.catalog.urls")),
     path("api/leads/", include("apps.leads.urls")),
+    path("api/billing/", include("apps.billing.urls")),
 ]
 
 if settings.DEBUG:

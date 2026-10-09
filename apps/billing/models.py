@@ -95,9 +95,21 @@ class Subscription(models.Model):
     start_date = models.DateTimeField(default=timezone.now)
     renewal_date = models.DateTimeField(null=True, blank=True)
     auto_renew = models.BooleanField(default=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    expiry_warning_5d_sent = models.BooleanField(default=False)
     cancellation_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_expired(self):
+        if self.status == self.Status.EXPIRED:
+            return True
+        if self.renewal_date and timezone.now() > self.renewal_date:
+            return True
+        if self.valid_till and timezone.now().date() > self.valid_till:
+            return True
+        return False
 
     @property
     def credits_remaining(self):
@@ -289,6 +301,11 @@ class CreditTransaction(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Credit Transaction"
         verbose_name_plural = "Credit Transactions"
+        indexes = [
+            models.Index(fields=["company", "-created_at"]),
+            models.Index(fields=["company", "transaction_type"]),
+            models.Index(fields=["receipt_number"]),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.receipt_number:
@@ -352,6 +369,11 @@ class UsageRecord(models.Model):
         ordering = ["-started_at"]
         verbose_name = "Usage Record"
         verbose_name_plural = "Usage Records"
+        indexes = [
+            models.Index(fields=["company", "-started_at"]),
+            models.Index(fields=["company", "user", "-started_at"]),
+            models.Index(fields=["feature_code", "status"]),
+        ]
 
     def __str__(self):
         return f"{self.company.name} - {self.user} - {self.feature_code} ({self.credits_charged} credits) [{self.status}]"
@@ -396,6 +418,10 @@ class Payment(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Payment"
         verbose_name_plural = "Payments"
+        indexes = [
+            models.Index(fields=["company", "status", "-created_at"]),
+            models.Index(fields=["provider_reference"]),
+        ]
 
     def __str__(self):
         return f"Payment #{self.id} - {self.company.name} - {self.currency} {self.amount} ({self.status})"
@@ -456,6 +482,10 @@ class Invoice(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Invoice"
         verbose_name_plural = "Invoices"
+        indexes = [
+            models.Index(fields=["company", "status", "-created_at"]),
+            models.Index(fields=["invoice_number"]),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.invoice_number:

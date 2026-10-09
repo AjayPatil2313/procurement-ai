@@ -32,7 +32,7 @@
     </div>
 
     <!-- Quick Action Buttons -->
-    <div class="flex items-center gap-2.5">
+    <div class="flex items-center gap-2.5 flex-wrap">
       {% if rbac.is_company_admin or rbac.is_super_admin %}
         <button 
           type="button" 
@@ -43,18 +43,24 @@
           <span>Buy Credits</span>
         </button>
 
-        <form method="POST" class="inline">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="renew_plan">
-          <button 
-            type="submit" 
-            onclick="return confirm('Confirm renewal of your {{ subscription.get_plan_display }} plan for the next billing cycle?')"
-            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-black text-white transition shadow-sm cursor-pointer"
-          >
-            <i class="fa-solid fa-arrows-rotate"></i>
-            <span>Renew Plan</span>
-          </button>
-        </form>
+        <button 
+          type="button" 
+          onclick="openAutopayModal()"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold {% if subscription.auto_renew %}bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100{% else %}bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100{% endif %} transition shadow-xs cursor-pointer"
+          title="Configure Auto-Pay settings"
+        >
+          <i class="fa-solid {% if subscription.auto_renew %}fa-arrows-rotate text-emerald-600{% else %}fa-pause text-amber-600{% endif %}"></i>
+          <span>Auto-Pay: {% if subscription.auto_renew %}Active{% else %}Paused{% endif %}</span>
+        </button>
+
+        <a 
+          href="{% url 'company-invoices' %}" 
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-black text-white transition shadow-sm cursor-pointer"
+          title="View Invoices, Receipts & Download Statements"
+        >
+          <i class="fa-solid fa-file-invoice-dollar text-emerald-400"></i>
+          <span>Invoices &amp; Statements</span>
+        </a>
       {% else %}
         <button 
           type="button" 
@@ -85,10 +91,23 @@
         </div>
       </div>
       <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px]">
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold {% if subscription.status == 'active' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-700{% endif %}">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {{ subscription.get_status_display }}
-        </span>
-        <span class="text-slate-500">Renews: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"Auto-monthly" }}</strong></span>
+        {% if is_expired %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold bg-rose-100 text-rose-800">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Expired
+          </span>
+          <span class="text-slate-500">Ended: <strong class="text-rose-600">{{ subscription.valid_till|date:"M d, Y" }}</strong></span>
+        {% else %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold {% if subscription.status == 'active' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {{ subscription.get_status_display }}
+          </span>
+          <span class="text-slate-500">
+            {% if subscription.auto_renew %}
+              Renews: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"Auto-monthly" }}</strong>
+            {% else %}
+              Active till: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"N/A" }}</strong>
+            {% endif %}
+          </span>
+        {% endif %}
       </div>
     </div>
 
@@ -155,7 +174,7 @@
       </div>
       <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px] text-slate-500">
         <span>Paid Invoices: <strong>{{ invoices|length }}</strong></span>
-        <a href="#invoices-section" class="text-blue-600 hover:underline font-bold">View Invoices &rarr;</a>
+        <a href="{% url 'company-invoices' %}" class="text-blue-600 hover:underline font-bold">View Invoices &rarr;</a>
       </div>
     </div>
     {% else %}
@@ -310,294 +329,102 @@
     <div class="mb-3 flex items-center justify-between">
       <div>
         <h3 class="text-base font-bold text-slate-900">Available Subscription Tiers</h3>
-        <p class="text-xs text-slate-500">Upgrade or downgrade your organization tier at any time</p>
+        <p class="text-xs text-slate-500">Choose, upgrade, or renew your organization plan</p>
       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-      {% for plan in available_plans %}
-      <div class="bg-white rounded-2xl p-6 border {% if subscription.plan_tier.code == plan.code %}border-2 border-blue-600 shadow-md relative{% else %}border-slate-200 shadow-xs{% endif %} flex flex-col justify-between">
+      {% for item in annotated_plans %}
+      <div class="bg-white rounded-2xl p-6 border {% if item.is_current and not is_expired %}border-2 border-blue-600 shadow-md relative{% else %}border-slate-200 shadow-xs{% endif %} flex flex-col justify-between">
         
-        {% if subscription.plan_tier.code == plan.code %}
+        {% if item.is_current and not is_expired %}
         <span class="absolute -top-3 right-6 bg-blue-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
           Active Plan
+        </span>
+        {% elif item.is_current and is_expired %}
+        <span class="absolute -top-3 right-6 bg-rose-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
+          Expired Plan
         </span>
         {% endif %}
 
         <div>
           <div class="flex items-center justify-between">
-            <h4 class="font-bold text-slate-900 text-base">{{ plan.name }}</h4>
-            <span class="text-[10px] font-mono text-slate-400 uppercase">{{ plan.billing_cycle }}</span>
+            <h4 class="font-bold text-slate-900 text-base">{{ item.plan.name }}</h4>
+            <span class="text-[10px] font-mono text-slate-400 uppercase">{{ item.plan.billing_cycle }}</span>
           </div>
           <div class="mt-2 text-2xl font-black text-slate-900">
-            {{ plan.currency }} {{ plan.price }}
-            <span class="text-xs font-normal text-slate-400">/{{ plan.billing_cycle|slice:":2" }}</span>
+            {{ item.plan.currency }} {{ item.plan.price }}
+            <span class="text-xs font-normal text-slate-400">/{{ item.plan.billing_cycle|slice:":2" }}</span>
           </div>
-          <p class="text-xs text-slate-500 mt-1 line-clamp-2">{{ plan.description }}</p>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">{{ item.plan.description }}</p>
 
           <ul class="mt-4 space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-4">
             <li class="flex items-center gap-2">
               <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
-              <strong>{{ plan.included_credits }}</strong> monthly AI search credits
+              <strong>{{ item.plan.included_credits }}</strong> monthly AI search credits
             </li>
             <li class="flex items-center gap-2">
               <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
-              Up to <strong>{{ plan.max_team_members }}</strong> team members
+              Up to <strong>{{ item.plan.max_team_members }}</strong> team members
             </li>
             <li class="flex items-center gap-2">
               <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
-              <strong>{{ plan.max_products }}</strong> products catalog limit
+              <strong>{{ item.plan.max_products }}</strong> products catalog limit
             </li>
             <li class="flex items-center gap-2">
               <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
-              <strong>{{ plan.max_saved_vendors }}</strong> saved vendors capacity
+              <strong>{{ item.plan.max_saved_vendors }}</strong> saved vendors capacity
             </li>
           </ul>
         </div>
 
         <div class="mt-6">
-          {% if subscription.plan_tier.code == plan.code %}
-            <button disabled class="w-full text-center bg-blue-50 text-blue-700 font-bold text-xs py-2 rounded-xl border border-blue-200">
-              Current Plan Active
+          {% if item.button_state == 'current' %}
+            <button disabled class="w-full text-center bg-blue-50 text-blue-700 font-bold text-xs py-2.5 rounded-xl border border-blue-200 cursor-not-allowed flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-check"></i>
+              <span>{{ item.button_label }}</span>
             </button>
-          {% else %}
+          {% elif item.button_state == 'renew' %}
+            <form method="POST" class="w-full">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="renew_plan">
+              <input type="hidden" name="plan_code" value="{{ item.plan.code }}">
+              <button 
+                type="submit" 
+                onclick="return confirm('Confirm renewal of your {{ item.plan.name }} plan for the next billing cycle? {{ item.plan.included_credits }} credits will reload immediately.')"
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>{{ item.button_label }}</span>
+              </button>
+            </form>
+          {% elif item.button_state == 'upgrade' %}
             <button 
               type="button" 
-              onclick="openUpgradeModal('{{ plan.code }}', '{{ plan.name|escapejs }}', '{{ plan.price }}', '{{ plan.currency }}', '{{ plan.included_credits }}')"
-              class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2 rounded-xl transition shadow cursor-pointer"
+              onclick="openUpgradeModal('{{ item.plan.code }}', '{{ item.plan.name|escapejs }}', '{{ item.plan.price }}', '{{ item.plan.currency }}', '{{ item.plan.included_credits }}', 'upgrade')"
+              class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2.5 rounded-xl transition shadow cursor-pointer flex items-center justify-center gap-1.5"
             >
-              Switch to {{ plan.name }}
+              <i class="fa-solid fa-arrow-up-right-dots"></i>
+              <span>{{ item.button_label }}</span>
+            </button>
+          {% elif item.button_state == 'choose' %}
+            <button 
+              type="button" 
+              onclick="openUpgradeModal('{{ item.plan.code }}', '{{ item.plan.name|escapejs }}', '{{ item.plan.price }}', '{{ item.plan.currency }}', '{{ item.plan.included_credits }}', 'choose')"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <i class="fa-solid fa-cart-shopping"></i>
+              <span>{{ item.button_label }}</span>
+            </button>
+          {% elif item.button_state == 'disabled' %}
+            <button disabled title="Downgrading to a lower plan tier is not available directly. Please contact support." class="w-full text-center bg-slate-100 text-slate-400 font-bold text-xs py-2.5 rounded-xl border border-slate-200 cursor-not-allowed flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-ban"></i>
+              <span>{{ item.button_label }}</span>
             </button>
           {% endif %}
         </div>
       </div>
       {% endfor %}
-    </div>
-  </div>
-
-  <!-- Team Members Usage Breakdown -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-      <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
-        <i class="fa-solid fa-users text-blue-600"></i> Team Member Credit Consumption
-      </h3>
-      <span class="text-[11px] text-slate-500">Track which employee uses AI discovery features</span>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-2.5 px-4">Member</th>
-            <th class="py-2.5 px-3">Email Address</th>
-            <th class="py-2.5 px-3">Total Operations</th>
-            <th class="py-2.5 px-3">Credits Consumed</th>
-            <th class="py-2.5 px-3 text-right">Share of Total</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for member in team_usage %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3 px-4 font-bold text-slate-900">
-              {{ member.user__first_name|default:"" }} {{ member.user__last_name|default:"" }}
-              {% if not member.user__first_name %}{{ member.user__email }}{% endif %}
-            </td>
-            <td class="py-3 px-3 text-slate-500 font-mono text-[11px]">{{ member.user__email }}</td>
-            <td class="py-3 px-3 font-semibold text-slate-700">{{ member.total_jobs }} jobs</td>
-            <td class="py-3 px-3 font-bold text-rose-600">-{{ member.total_credits }} credits</td>
-            <td class="py-3 px-3 text-right text-slate-400">
-              <span class="px-2 py-0.5 rounded bg-slate-100 font-bold text-[10px] text-slate-700">Active Contributor</span>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="5" class="py-8 text-center text-slate-400">No team usage recorded yet.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Credit Transactions Ledger (All Company Transactions) -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-      <div>
-        <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
-          <i class="fa-solid fa-receipt text-amber-500"></i> Company Credit Ledger &amp; Receipts
-        </h3>
-        <span class="text-[11px] text-slate-500">Auditable credit movements &amp; instant receipts</span>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- Date Range Filter -->
-        <form method="GET" class="inline-flex items-center gap-1.5 text-xs">
-          <input type="hidden" name="tx_type" value="{{ tx_type }}">
-          <select 
-            name="date_range" 
-            onchange="this.form.submit()" 
-            class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="all" {% if date_range == 'all' %}selected{% endif %}>All Time</option>
-            <option value="7d" {% if date_range == '7d' %}selected{% endif %}>Last 7 Days</option>
-            <option value="30d" {% if date_range == '30d' %}selected{% endif %}>Last 30 Days</option>
-            <option value="90d" {% if date_range == '90d' %}selected{% endif %}>Last 90 Days</option>
-          </select>
-        </form>
-
-        <!-- CSV Export Button -->
-        <a 
-          href="?export=ledger_csv" 
-          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-          title="Download complete ledger as CSV file"
-        >
-          <i class="fa-solid fa-file-csv text-emerald-600"></i>
-          <span>Export CSV</span>
-        </a>
-      </div>
-    </div>
-
-    <!-- Filter Pills Row -->
-    <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
-      <span class="text-slate-400 font-bold mr-1 uppercase text-[10px]">Filter:</span>
-      <a 
-        href="?tx_type=all&date_range={{ date_range }}" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'all' or not tx_type %}bg-slate-900 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >All Events</a>
-      <a 
-        href="?tx_type=deduction&date_range={{ date_range }}" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'deduction' %}bg-rose-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Deductions</a>
-      <a 
-        href="?tx_type=purchase&date_range={{ date_range }}" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'purchase' %}bg-amber-500 text-slate-950{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Top-Up Packs</a>
-      <a 
-        href="?tx_type=allocation&date_range={{ date_range }}" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'allocation' %}bg-emerald-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Plan Credits</a>
-      <a 
-        href="?tx_type=refund&date_range={{ date_range }}" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'refund' %}bg-blue-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Refunds</a>
-    </div>
-
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-2.5 px-4">Receipt Ref</th>
-            <th class="py-2.5 px-3">Triggered By</th>
-            <th class="py-2.5 px-3">Type</th>
-            <th class="py-2.5 px-3">Credits</th>
-            <th class="py-2.5 px-3">Balance After</th>
-            <th class="py-2.5 px-3">Reason / Feature</th>
-            <th class="py-2.5 px-3 text-right">Timestamp</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for tx in company_transactions %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3 px-4 font-mono font-bold text-blue-700">
-              #{{ tx.receipt_number|default:"RCP-00000" }}
-            </td>
-            <td class="py-3 px-3 text-slate-700 font-medium">
-              {% if tx.user %}{{ tx.user.get_full_name|default:tx.user.email }}{% else %}System Engine{% endif %}
-            </td>
-            <td class="py-3 px-3">
-              {% if tx.transaction_type == 'allocation' or tx.transaction_type == 'purchase' or tx.transaction_type == 'refund' or tx.credits > 0 %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                  <i class="fa-solid fa-plus mr-1 text-[8px]"></i> {{ tx.get_transaction_type_display }}
-                </span>
-              {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
-                  <i class="fa-solid fa-minus mr-1 text-[8px]"></i> {{ tx.get_transaction_type_display }}
-                </span>
-              {% endif %}
-            </td>
-            <td class="py-3 px-3 font-bold {% if tx.credits > 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
-              {% if tx.credits > 0 %}+{% endif %}{{ tx.credits }}
-            </td>
-            <td class="py-3 px-3 font-semibold text-slate-800">{{ tx.balance_after }}</td>
-            <td class="py-3 px-3 text-slate-600">{{ tx.notes }}</td>
-            <td class="py-3 px-3 text-right text-slate-400">{{ tx.created_at|date:"M d, Y H:i" }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="7" class="py-8 text-center text-slate-400">No credit transactions matching criteria.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination Footer -->
-    {% if company_transactions.has_other_pages %}
-    <div class="p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/50">
-      <div>
-        Showing page <strong>{{ company_transactions.number }}</strong> of <strong>{{ company_transactions.paginator.num_pages }}</strong> ({{ company_transactions.paginator.count }} transactions)
-      </div>
-      <div class="flex items-center gap-1.5">
-        {% if company_transactions.has_previous %}
-          <a href="?page={{ company_transactions.previous_page_number }}&tx_type={{ tx_type }}&date_range={{ date_range }}" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">&laquo; Prev</a>
-        {% endif %}
-        <span class="px-2.5 py-1 font-bold text-slate-900 bg-white border border-slate-200 rounded-lg">{{ company_transactions.number }}</span>
-        {% if company_transactions.has_next %}
-          <a href="?page={{ company_transactions.next_page_number }}&tx_type={{ tx_type }}&date_range={{ date_range }}" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">Next &raquo;</a>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- Invoices & Billing History Section -->
-  <div id="invoices-section" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-      <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
-        <i class="fa-solid fa-file-invoice-dollar text-emerald-600"></i> Invoices &amp; Billing History
-      </h3>
-      <span class="text-[11px] text-slate-500">{{ invoices|length }} recorded invoices</span>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-2.5 px-4">Invoice #</th>
-            <th class="py-2.5 px-3">Billing Period</th>
-            <th class="py-2.5 px-3">Amount</th>
-            <th class="py-2.5 px-3">Status</th>
-            <th class="py-2.5 px-3">Date</th>
-            <th class="py-2.5 px-3 text-right">Receipt</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for inv in invoices %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3 px-4 font-mono font-bold text-slate-900">{{ inv.invoice_number }}</td>
-            <td class="py-3 px-3 text-slate-600">{{ inv.billing_period_start|date:"M d" }} &ndash; {{ inv.billing_period_end|date:"M d, Y" }}</td>
-            <td class="py-3 px-3 font-bold text-slate-900">{{ inv.currency }} {{ inv.total_amount }}</td>
-            <td class="py-3 px-3">
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                {{ inv.get_status_display }}
-              </span>
-            </td>
-            <td class="py-3 px-3 text-slate-500">{{ inv.issue_date|date:"M d, Y" }}</td>
-            <td class="py-3 px-3 text-right">
-              <button 
-                type="button" 
-                onclick="openInvoiceModal('{{ inv.invoice_number }}', '{{ inv.subtotal|default:inv.total_amount }}', '{{ inv.tax|default:'0.00' }}', '{{ inv.total_amount }}', '{{ inv.currency }}', '{{ inv.issue_date|date:'M d, Y' }}', '{{ company.name|escapejs }}')"
-                class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition cursor-pointer"
-              >
-                <i class="fa-solid fa-eye text-slate-500 mr-1"></i> View
-              </button>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="py-8 text-center text-slate-400">No invoices generated yet.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
     </div>
   </div>
 
@@ -616,8 +443,8 @@
           <i class="fa-solid fa-arrow-up-right-dots"></i>
         </div>
         <div>
-          <h3 class="text-sm font-bold text-slate-900">Confirm Plan Upgrade</h3>
-          <p class="text-xs text-slate-500">Includes 18% GST with immediate tax invoice receipt</p>
+          <h3 class="text-sm font-bold text-slate-900" id="upgradeModalTitle">Confirm Plan Upgrade</h3>
+          <p class="text-xs text-slate-500" id="upgradeModalSubtitle">Includes 18% GST with immediate tax invoice receipt</p>
         </div>
       </div>
       <button type="button" onclick="closeUpgradeModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
@@ -654,14 +481,14 @@
       </div>
 
       <p class="text-[11px] text-slate-400">
-        By proceeding, an official tax invoice will be generated and credits will be added to your company wallet immediately.
+        By proceeding, an official tax invoice will be generated and credits will be added to your company wallet immediately. Auto-Pay will be active by default.
       </p>
 
       <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
         <button type="button" onclick="closeUpgradeModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
           Cancel
         </button>
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-1.5">
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-1.5" id="upgradeModalSubmitBtn">
           <i class="fa-solid fa-check"></i>
           <span>Confirm &amp; Activate</span>
         </button>
@@ -690,7 +517,7 @@
       </button>
     </div>
 
-    <form method="POST" class="p-5 space-y-4 text-xs">
+    <form method="POST" id="buyCreditsForm" class="p-5 space-y-4 text-xs">
       {% csrf_token %}
       <input type="hidden" name="action" value="buy_credits">
 
@@ -738,12 +565,90 @@
         <button type="button" onclick="closeBuyCreditsModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
           Cancel
         </button>
-        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-1.5">
+        <button type="button" onclick="showConfirmBuyCreditsModal()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-1.5">
           <i class="fa-solid fa-lock"></i>
           <span>Complete Top-Up</span>
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: MODERN BUY CREDITS CONFIRMATION BOX                                -->
+<!-- ========================================================================= -->
+<div id="confirmBuyCreditsModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base border border-amber-200">
+          <i class="fa-solid fa-shield-check"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Confirm Credit Purchase</h3>
+          <p class="text-xs text-slate-500">Review payment &amp; credit allocation summary</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeConfirmBuyCreditsModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="p-5 space-y-4 text-xs">
+      <!-- Itemized Receipt Box -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
+        <div class="flex justify-between items-center">
+          <span class="text-slate-500 font-medium">Top-Up Package:</span>
+          <span class="font-extrabold text-slate-900 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200" id="confirmPackName">500 Search Credits</span>
+        </div>
+        <div class="flex justify-between text-slate-600">
+          <span>AI Search Credits:</span>
+          <span class="font-bold text-blue-600" id="confirmPackCredits">+500 Credits</span>
+        </div>
+        <div class="flex justify-between text-slate-600 border-t border-slate-200/80 pt-2">
+          <span>Base Net Amount:</span>
+          <span class="font-medium text-slate-800" id="confirmPackBase">₹9,999.00</span>
+        </div>
+        <div class="flex justify-between text-slate-600">
+          <span>GST (18% - SAC 998313):</span>
+          <span class="font-medium text-slate-800" id="confirmPackGst">₹1,799.82</span>
+        </div>
+        <div class="flex justify-between border-t border-slate-200 pt-2 text-sm font-black">
+          <span class="text-slate-900">Total Payable Amount:</span>
+          <span class="text-amber-600 font-black text-base" id="confirmPackTotal">₹11,798.82</span>
+        </div>
+      </div>
+
+      <!-- Trust & Policy Notice -->
+      <div class="p-3 rounded-xl bg-blue-50/70 border border-blue-200/70 space-y-1 text-[11px] text-blue-900">
+        <div class="flex items-center gap-1.5 font-bold">
+          <i class="fa-solid fa-circle-check text-blue-600"></i>
+          <span>Instant Allocation &amp; Official Tax Invoice</span>
+        </div>
+        <p class="text-blue-700 leading-relaxed">
+          Purchased credits never expire and carry over billing cycles. An official GST invoice (SAC 998313) will be generated and credits added immediately to your company wallet.
+        </p>
+      </div>
+
+      <!-- Actions -->
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button 
+          type="button" 
+          onclick="backToBuyCreditsModal()" 
+          class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer"
+        >
+          &larr; Back
+        </button>
+        <button 
+          type="button" 
+          onclick="submitBuyCreditsForm()" 
+          class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-2"
+        >
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Confirm &amp; Recharge Now</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -799,63 +704,113 @@
 </div>
 
 <!-- ========================================================================= -->
-<!-- MODAL: INVOICE RECEIPT MODAL (WITH GST BREAKDOWN & SAC 998313)            -->
+<!-- MODAL: AUTO-PAY CONFIGURATION & GRACE PERIOD MANAGER                      -->
 <!-- ========================================================================= -->
-<div id="invoiceModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-    <div class="flex items-center justify-between pb-3 border-b border-slate-200">
-      <div>
-        <div class="font-mono text-blue-600 font-black text-sm" id="modalInvNum">INV-2026-00000</div>
-        <p class="text-[11px] text-slate-400" id="modalInvDate">Date</p>
+<div id="autopayModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl {% if subscription.auto_renew %}bg-emerald-100 text-emerald-700 border border-emerald-200{% else %}bg-amber-100 text-amber-700 border border-amber-200{% endif %} flex items-center justify-center font-bold text-base">
+          <i class="fa-solid {% if subscription.auto_renew %}fa-arrows-rotate{% else %}fa-pause{% endif %}"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Subscription Auto-Pay Settings</h3>
+          <p class="text-xs text-slate-500">Manage billing cycle auto-renewal &amp; grace period</p>
+        </div>
       </div>
-      <button type="button" onclick="closeInvoiceModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer">
-        <i class="fa-solid fa-xmark"></i>
+      <button type="button" onclick="closeAutopayModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
       </button>
     </div>
 
-    <div class="py-4 space-y-2.5 text-xs">
-      <div class="flex justify-between">
-        <span class="text-slate-500">Billed To:</span>
-        <span class="font-bold text-slate-900" id="modalInvCompany">Company Name</span>
-      </div>
-      <div class="flex justify-between">
-        <span class="text-slate-500">Service Category:</span>
-        <span class="font-semibold text-slate-800">B2B AI Procurement SaaS (SAC 998313)</span>
-      </div>
-      <div class="flex justify-between">
-        <span class="text-slate-500">Payment Status:</span>
-        <span class="px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 text-[10px]">PAID</span>
-      </div>
-
-      <div class="border-t border-slate-100 pt-2 space-y-1.5">
-        <div class="flex justify-between text-slate-600">
-          <span>Subtotal (Net):</span>
-          <span class="font-medium" id="modalInvSubtotal">INR 0.00</span>
+    <div class="p-5 space-y-4 text-xs">
+      <!-- Status Box -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
+        <div class="flex justify-between items-center">
+          <span class="text-slate-500">Auto-Pay Billing:</span>
+          {% if subscription.auto_renew %}
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              ENABLED
+            </span>
+          {% else %}
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              PAUSED
+            </span>
+          {% endif %}
         </div>
         <div class="flex justify-between text-slate-600">
-          <span>18% GST (CGST 9% + SGST 9%):</span>
-          <span class="font-medium" id="modalInvTax">INR 0.00</span>
+          <span>Active Plan:</span>
+          <span class="font-bold text-slate-900">{{ subscription.get_plan_display }}</span>
         </div>
-        <div class="flex justify-between border-t border-slate-200 pt-2 text-sm font-black">
-          <span class="text-slate-900">Total Paid:</span>
-          <span class="text-blue-700 font-black" id="modalInvAmount">INR 0.00</span>
+        <div class="flex justify-between text-slate-600">
+          <span>Current Billing Cycle End:</span>
+          <span class="font-bold text-slate-900">{{ subscription.valid_till|date:"M d, Y"|default:"End of Month" }}</span>
         </div>
       </div>
-    </div>
 
-    <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
-      <button type="button" onclick="window.print()" class="text-blue-600 hover:underline text-xs font-bold flex items-center gap-1 cursor-pointer">
-        <i class="fa-solid fa-print"></i> Print Official Receipt
-      </button>
-      <button type="button" onclick="closeInvoiceModal()" class="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">
-        Close
-      </button>
+      <!-- Policy / Grace Period Notice -->
+      <div class="p-3.5 rounded-xl {% if subscription.auto_renew %}bg-emerald-50/70 border border-emerald-200 text-emerald-900{% else %}bg-amber-50/70 border border-amber-200 text-amber-900{% endif %} space-y-1 text-[11px]">
+        <div class="flex items-center gap-1.5 font-bold">
+          <i class="fa-solid {% if subscription.auto_renew %}fa-circle-check text-emerald-600{% else %}fa-triangle-exclamation text-amber-600{% endif %}"></i>
+          <span>{% if subscription.auto_renew %}Automatic Monthly Renewal{% else %}Grace Period Active Until Expiry{% endif %}</span>
+        </div>
+        <p class="leading-relaxed {% if subscription.auto_renew %}text-emerald-700{% else %}text-amber-800{% endif %}">
+          {% if subscription.auto_renew %}
+            Your plan will automatically renew on <strong>{{ subscription.valid_till|date:"M d, Y" }}</strong>. New plan credits will be loaded and an official GST invoice generated seamlessly.
+          {% else %}
+            Auto-Pay is paused. <strong>You will retain 100% full access to all features until {{ subscription.valid_till|date:"M d, Y" }}</strong>. After this date, paid operations will be paused until manually renewed.
+          {% endif %}
+        </p>
+      </div>
+
+      <!-- Action Form -->
+      <form method="POST" class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_autopay">
+        <button 
+          type="button" 
+          onclick="closeAutopayModal()" 
+          class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer"
+        >
+          Close
+        </button>
+        {% if subscription.auto_renew %}
+          <input type="hidden" name="auto_pay" value="false">
+          <button 
+            type="submit" 
+            onclick="return confirm('Are you sure you want to pause Auto-Pay? You will retain access until {{ subscription.valid_till|date:"M d, Y" }}, but won\'t be charged automatically next month.')"
+            class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition shadow-sm cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <i class="fa-solid fa-pause"></i>
+            <span>Pause Auto-Pay</span>
+          </button>
+        {% else %}
+          <input type="hidden" name="auto_pay" value="true">
+          <button 
+            type="submit" 
+            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-sm cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <i class="fa-solid fa-play"></i>
+            <span>Enable Auto-Pay</span>
+          </button>
+        {% endif %}
+      </form>
     </div>
   </div>
 </div>
 
 <script>
-function openUpgradeModal(code, name, price, currency, credits) {
+function openAutopayModal() {
+  document.getElementById('autopayModal').classList.remove('hidden');
+}
+
+function closeAutopayModal() {
+  document.getElementById('autopayModal').classList.add('hidden');
+}
+
+function openUpgradeModal(code, name, price, currency, credits, mode) {
   var base = parseFloat(price) || 0;
   var tax = Math.round(base * 0.18 * 100) / 100;
   var total = Math.round((base + tax) * 100) / 100;
@@ -866,6 +821,21 @@ function openUpgradeModal(code, name, price, currency, credits) {
   document.getElementById('upgradeModalBasePrice').textContent = currency + ' ' + base.toFixed(2);
   document.getElementById('upgradeModalTax').textContent = currency + ' ' + tax.toFixed(2);
   document.getElementById('upgradeModalPrice').textContent = currency + ' ' + total.toFixed(2);
+
+  var titleEl = document.getElementById('upgradeModalTitle');
+  var subtitleEl = document.getElementById('upgradeModalSubtitle');
+  var submitBtn = document.getElementById('upgradeModalSubmitBtn');
+
+  if (mode === 'choose') {
+    titleEl.textContent = 'Subscribe to ' + name + ' Plan';
+    subtitleEl.textContent = 'Includes 18% GST with immediate tax invoice receipt';
+    submitBtn.innerHTML = '<i class="fa-solid fa-check mr-1.5"></i><span>Confirm &amp; Subscribe</span>';
+  } else {
+    titleEl.textContent = 'Confirm Upgrade to ' + name;
+    subtitleEl.textContent = 'Includes 18% GST with immediate tax invoice receipt';
+    submitBtn.innerHTML = '<i class="fa-solid fa-arrow-up-right-dots mr-1.5"></i><span>Confirm &amp; Upgrade</span>';
+  }
+
   document.getElementById('upgradePlanModal').classList.remove('hidden');
 }
 
@@ -881,26 +851,53 @@ function closeBuyCreditsModal() {
   document.getElementById('buyCreditsModal').classList.add('hidden');
 }
 
+/* Modern Confirmation Modal Handling */
+var packDetailsMap = {
+  '100': { name: '100 Search Credits', credits: '+100 Credits', base: '₹2,499.00', gst: '₹449.82', total: '₹2,948.82' },
+  '500': { name: '500 Search Credits', credits: '+500 Credits', base: '₹9,999.00', gst: '₹1,799.82', total: '₹11,798.82' },
+  '1000': { name: '1,000 Search Credits', credits: '+1,000 Credits', base: '₹17,999.00', gst: '₹3,239.82', total: '₹21,238.82' }
+};
+
+function showConfirmBuyCreditsModal() {
+  var selectedPack = '500';
+  var radios = document.getElementsByName('credits_pack');
+  for (var i = 0; i < radios.length; i++) {
+    if (radios[i].checked) {
+      selectedPack = radios[i].value;
+      break;
+    }
+  }
+
+  var pack = packDetailsMap[selectedPack] || packDetailsMap['500'];
+  document.getElementById('confirmPackName').textContent = pack.name;
+  document.getElementById('confirmPackCredits').textContent = pack.credits;
+  document.getElementById('confirmPackBase').textContent = pack.base;
+  document.getElementById('confirmPackGst').textContent = pack.gst;
+  document.getElementById('confirmPackTotal').textContent = pack.total;
+
+  document.getElementById('buyCreditsModal').classList.add('hidden');
+  document.getElementById('confirmBuyCreditsModal').classList.remove('hidden');
+}
+
+function closeConfirmBuyCreditsModal() {
+  document.getElementById('confirmBuyCreditsModal').classList.add('hidden');
+}
+
+function backToBuyCreditsModal() {
+  document.getElementById('confirmBuyCreditsModal').classList.add('hidden');
+  document.getElementById('buyCreditsModal').classList.remove('hidden');
+}
+
+function submitBuyCreditsForm() {
+  document.getElementById('buyCreditsForm').submit();
+}
+
 function openRequestTopupModal() {
   document.getElementById('requestTopupModal').classList.remove('hidden');
 }
 
 function closeRequestTopupModal() {
   document.getElementById('requestTopupModal').classList.add('hidden');
-}
-
-function openInvoiceModal(invNum, subtotal, tax, totalAmount, currency, date, company) {
-  document.getElementById('modalInvNum').textContent = invNum;
-  document.getElementById('modalInvSubtotal').textContent = currency + ' ' + subtotal;
-  document.getElementById('modalInvTax').textContent = currency + ' ' + tax;
-  document.getElementById('modalInvAmount').textContent = currency + ' ' + totalAmount;
-  document.getElementById('modalInvDate').textContent = date;
-  document.getElementById('modalInvCompany').textContent = company;
-  document.getElementById('invoiceModal').classList.remove('hidden');
-}
-
-function closeInvoiceModal() {
-  document.getElementById('invoiceModal').classList.add('hidden');
 }
 </script>
 {% endblock %}

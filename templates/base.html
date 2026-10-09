@@ -193,7 +193,14 @@
 
             <a href="{% url 'subscription-billing-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/billing/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-coins w-5 text-center mr-2.5 text-xs"></i> Subscription & Credits
+                <i class="fa-solid fa-coins w-5 text-center mr-2.5 text-xs text-amber-400"></i> Subscription &amp; Credits
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
+
+            <a href="{% url 'company-invoices' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/invoices/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-file-invoice-dollar w-5 text-center mr-2.5 text-xs text-emerald-400"></i> Invoices &amp; Billing
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -233,12 +240,7 @@
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
-            <a href="{% url 'admin-panel-apilogs' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/api-logs/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-terminal w-5 text-center mr-2.5 text-xs text-emerald-400"></i> API Costs
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
-            </a>
+
             <a href="{% url 'admin-panel-auditlogs' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/audit-logs/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-clock-rotate-left w-5 text-center mr-2.5 text-xs text-purple-400"></i> Audit Trail
@@ -562,21 +564,6 @@
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-amber-400 transition"></i>
                 </a>
 
-                <a 
-                  href="{% url 'admin-panel-apilogs' %}" 
-                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/admin-panel/api-logs/' %}bg-emerald-600/20 border border-emerald-500/30{% endif %}"
-                >
-                  <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-emerald-500 group-hover:text-white transition">
-                      <i class="fa-solid fa-terminal"></i>
-                    </div>
-                    <div>
-                      <div class="text-xs font-bold text-white leading-tight">API Invocations &amp; Costs</div>
-                      <div class="text-[10px] text-slate-400 leading-tight">Monitor scraper endpoints &amp; expenses</div>
-                    </div>
-                  </div>
-                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-emerald-400 transition"></i>
-                </a>
 
                 <a 
                   href="{% url 'admin-panel-auditlogs' %}" 
@@ -741,6 +728,23 @@
                     </div>
                   </div>
                   <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition"></i>
+                </a>
+
+                <!-- Invoices & Billing -->
+                <a 
+                  href="{% url 'company-invoices' %}" 
+                  class="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 transition group {% if request.path == '/company/invoices/' %}bg-blue-600/20 border border-blue-500/30{% endif %}"
+                >
+                  <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xs group-hover:bg-emerald-500 group-hover:text-white transition">
+                      <i class="fa-solid fa-file-invoice-dollar"></i>
+                    </div>
+                    <div>
+                      <div class="text-xs font-bold text-white leading-tight">Invoices &amp; Billing</div>
+                      <div class="text-[10px] text-slate-400 leading-tight">Tax invoices &amp; credit ledger receipts</div>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition"></i>
                 </a>
 
                 <!-- Help & Support -->
