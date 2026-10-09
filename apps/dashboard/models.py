@@ -139,6 +139,11 @@ class Notification(models.Model):
         DEAL_WON = "deal_won", "Deal Won"
         DEAL_LOST = "deal_lost", "Deal Lost"
         TICKET_UPDATE = "ticket_update", "Support Ticket Update"
+        LOW_CREDITS = "low_credits", "Low Credits Warning"
+        CREDITS_EXHAUSTED = "credits_exhausted", "Credits Exhausted"
+        PLAN_UPGRADED = "plan_upgraded", "Subscription Plan Updated"
+        PAYMENT_SUCCESS = "payment_success", "Payment Received"
+        INVOICE_GENERATED = "invoice_generated", "Invoice Generated"
         SYSTEM = "system", "System Notification"
 
     user = models.ForeignKey(

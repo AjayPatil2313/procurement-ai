@@ -1,6 +1,8 @@
+import csv
 import json
 from datetime import timedelta
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
+from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -14,9 +16,21 @@ from apps.companies.models import (
     CompanyRole,
     RolePermission,
 )
+from decimal import Decimal
+from django.db.models import Sum, Count, Q
 from apps.companies.rbac import get_user_rbac_context, company_admin_required, ensure_default_permissions
 from apps.accounts.models import User
-from apps.billing.models import Subscription, CreditTransaction
+from apps.billing.models import (
+    Subscription,
+    SubscriptionPlan,
+    CompanyCreditWallet,
+    FeatureCreditCost,
+    CreditTransaction,
+    UsageRecord,
+    Payment,
+    Invoice,
+)
+from apps.billing.services.wallet import CreditWalletService
 
 
 def ensure_company_default_roles(company):
@@ -228,6 +242,11 @@ def company_team_web_view(request):
         
         # 1. Add new user
         if action == "add_member":
+            can_add, current_count, max_limit = CreditWalletService.can_add_team_member(company)
+            if not can_add:
+                messages.error(request, f"Cannot add team member: Plan limit reached ({current_count}/{max_limit} seats). Please upgrade your subscription plan.")
+                return redirect("company-team-web")
+
             email = request.POST.get("email", "").strip().lower()
             password = request.POST.get("password", "").strip() or "User@12345"
             first_name = request.POST.get("first_name", "").strip()
@@ -577,40 +596,295 @@ def company_rbac_web_view(request):
 
 @login_required
 def subscription_billing_web_view(request):
+    """
+    Unified Subscription & Credits Dashboard:
+    - Company Admin: Full billing controls, wallet breakdown, dynamic plans, upgrade/top-up, team usage, invoices.
+    - Company User: Personal usage metrics, searches/matching counts, personal ledger, read-only plan info.
+    - Super Admin: Directed to admin overview or full management.
+    """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
+    CreditWalletService.ensure_default_plans_and_costs()
+
+    if not company:
+        if rbac["is_super_admin"]:
+            return redirect("admin-panel-plans")
+        messages.error(request, "Please switch to an active company to access Subscription & Credits.")
+        return redirect("dashboard")
+
+    wallet = CreditWalletService.get_or_create_wallet(company)
     subscription = getattr(company, "subscription", None)
     if not subscription:
+        default_plan = SubscriptionPlan.objects.filter(code="pro").first()
         subscription = Subscription.objects.create(
             company=company,
-            plan=Subscription.Plan.PRO,
-            credits_total=500,
+            plan_tier=default_plan,
+            plan=default_plan.code if default_plan else "pro",
+            credits_total=default_plan.included_credits if default_plan else 500,
             credits_used=0,
+            status=Subscription.Status.ACTIVE,
             valid_till=timezone.now().date() + timedelta(days=30),
+            renewal_date=timezone.now() + timedelta(days=30),
         )
+    elif not subscription.plan_tier:
+        matched_plan = SubscriptionPlan.objects.filter(code=subscription.plan).first()
+        if not matched_plan:
+            matched_plan = SubscriptionPlan.objects.filter(code="pro").first()
+        if matched_plan:
+            subscription.plan_tier = matched_plan
+            subscription.save(update_fields=["plan_tier"])
+
+    available_plans = SubscriptionPlan.objects.filter(
+        status=SubscriptionPlan.PlanStatus.ACTIVE,
+        is_public=True,
+    ).order_by("order", "price")
+
+    # Check CSV export request
+    if request.GET.get("export") == "ledger_csv":
+        if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+            messages.error(request, "Permission denied: Company administrator privileges required to export ledger.")
+            return redirect("subscription-billing-web")
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        clean_comp_name = company.name.replace(" ", "_").replace("/", "_")
+        response["Content-Disposition"] = f'attachment; filename="Credit_Ledger_{clean_comp_name}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["Receipt Number", "Triggered By", "Transaction Type", "Credits", "Balance After", "Reason / Notes", "Date Time"])
+
+        for tx in CreditTransaction.objects.filter(company=company).select_related("user").order_by("-created_at"):
+            user_str = tx.user.get_full_name() or tx.user.email if tx.user else "System Engine"
+            writer.writerow([
+                tx.receipt_number or f"RCP-{tx.id:06d}",
+                user_str,
+                tx.get_transaction_type_display(),
+                f"+{tx.credits}" if tx.credits > 0 else tx.credits,
+                tx.balance_after,
+                tx.notes,
+                tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ])
+        return response
 
     if request.method == "POST":
-        if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
-            messages.error(request, "Only Company Admin can upgrade subscriptions.")
+        action = request.POST.get("action")
+
+        # 0. REQUEST TOP-UP (Accessible by Company Users & Team Members)
+        if action == "request_topup":
+            pack_raw = request.POST.get("credits_pack", "500").strip()
+            note = request.POST.get("note", "").strip()
+            notified_count = CreditWalletService.request_credit_topup(
+                company=company,
+                user=request.user,
+                requested_pack=pack_raw,
+                note=note,
+            )
+            messages.success(request, f"Credit top-up request for {pack_raw} credits sent to {notified_count} company administrator(s).")
             return redirect("subscription-billing-web")
 
-        action = request.POST.get("action")
-        if action == "upgrade_plan":
-            new_plan = request.POST.get("plan", "pro")
-            subscription.plan = new_plan
-            if new_plan == "enterprise":
-                subscription.credits_total += 2000
-            elif new_plan == "pro":
-                subscription.credits_total += 500
-            subscription.save()
-            messages.success(request, f"Plan upgraded to {subscription.get_plan_display()}!")
+        # Admin-only operations below
+        if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+            messages.error(request, "Only Company Admin has permission to modify subscription plans or purchase credits.")
             return redirect("subscription-billing-web")
+
+        # 1. UPGRADE / CHANGE PLAN (with 18% GST calculation)
+        if action == "upgrade_plan":
+            target_plan_code = request.POST.get("plan_code", "").strip()
+            target_plan = SubscriptionPlan.objects.filter(code=target_plan_code, status=SubscriptionPlan.PlanStatus.ACTIVE).first()
+            if not target_plan:
+                messages.error(request, "Selected subscription plan is not currently available.")
+                return redirect("subscription-billing-web")
+
+            subtotal, tax, total_amount = CreditWalletService.calculate_gst_breakdown(target_plan.price)
+
+            payment = Payment.objects.create(
+                company=company,
+                subscription=subscription,
+                amount=total_amount,
+                currency=target_plan.currency,
+                provider="Development Gateway / Instant Activation",
+                provider_reference=f"PAY-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                status=Payment.Status.SUCCESS,
+                payment_date=timezone.now(),
+            )
+
+            Invoice.objects.create(
+                company=company,
+                subscription=subscription,
+                payment=payment,
+                billing_period_start=timezone.now().date(),
+                billing_period_end=timezone.now().date() + timedelta(days=30 if target_plan.billing_cycle == "monthly" else 365),
+                subtotal=subtotal,
+                tax=tax,
+                total_amount=total_amount,
+                currency=target_plan.currency,
+                status=Invoice.Status.PAID,
+                issue_date=timezone.now().date(),
+                due_date=timezone.now().date(),
+            )
+
+            CreditWalletService.allocate_plan_credits(company, target_plan, is_renewal=False)
+            messages.success(request, f"Plan successfully changed to {target_plan.name}! {target_plan.included_credits} credits allocated (Invoice generated with 18% GST).")
+            return redirect("subscription-billing-web")
+
+        # 2. TOP-UP / BUY CREDITS (with 18% GST calculation)
+        elif action == "buy_credits":
+            credits_pack_raw = request.POST.get("credits_pack", "100").strip()
+            try:
+                credits_pack = int(credits_pack_raw)
+            except ValueError:
+                credits_pack = 100
+
+            price_map = {100: Decimal("2499.00"), 500: Decimal("9999.00"), 1000: Decimal("17999.00")}
+            pack_base_price = price_map.get(credits_pack, Decimal(credits_pack * 25))
+            subtotal, tax, total_amount = CreditWalletService.calculate_gst_breakdown(pack_base_price)
+
+            payment = Payment.objects.create(
+                company=company,
+                subscription=subscription,
+                amount=total_amount,
+                currency="INR",
+                provider="Development Gateway / Credit Top-up",
+                provider_reference=f"TOPUP-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                status=Payment.Status.SUCCESS,
+                payment_date=timezone.now(),
+            )
+
+            Invoice.objects.create(
+                company=company,
+                subscription=subscription,
+                payment=payment,
+                billing_period_start=timezone.now().date(),
+                billing_period_end=timezone.now().date() + timedelta(days=365),
+                subtotal=subtotal,
+                tax=tax,
+                total_amount=total_amount,
+                currency="INR",
+                status=Invoice.Status.PAID,
+                issue_date=timezone.now().date(),
+                due_date=timezone.now().date(),
+            )
+
+            CreditWalletService.adjust_credits_admin(
+                company=company,
+                delta=credits_pack,
+                reason=f"Credit Top-Up Pack (+{credits_pack} credits)",
+                admin_user=request.user,
+            )
+            messages.success(request, f"Successfully purchased {credits_pack} credits! Total ₹{total_amount} (incl. 18% GST). Balance updated immediately.")
+            return redirect("subscription-billing-web")
+
+        # 3. RENEW PLAN (with 18% GST calculation)
+        elif action == "renew_plan":
+            current_tier = subscription.plan_tier or SubscriptionPlan.objects.filter(code="pro").first()
+            if current_tier:
+                subtotal, tax, total_amount = CreditWalletService.calculate_gst_breakdown(current_tier.price)
+
+                payment = Payment.objects.create(
+                    company=company,
+                    subscription=subscription,
+                    amount=total_amount,
+                    currency=current_tier.currency,
+                    provider="Development Gateway / Subscription Renewal",
+                    provider_reference=f"REN-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                    status=Payment.Status.SUCCESS,
+                    payment_date=timezone.now(),
+                )
+                Invoice.objects.create(
+                    company=company,
+                    subscription=subscription,
+                    payment=payment,
+                    billing_period_start=timezone.now().date(),
+                    billing_period_end=timezone.now().date() + timedelta(days=30 if current_tier.billing_cycle == "monthly" else 365),
+                    subtotal=subtotal,
+                    tax=tax,
+                    total_amount=total_amount,
+                    currency=current_tier.currency,
+                    status=Invoice.Status.PAID,
+                    issue_date=timezone.now().date(),
+                    due_date=timezone.now().date(),
+                )
+                CreditWalletService.allocate_plan_credits(company, current_tier, is_renewal=True)
+                messages.success(request, f"Subscription renewed successfully! {current_tier.included_credits} credits reloaded (Total ₹{total_amount} incl. 18% GST).")
+            return redirect("subscription-billing-web")
+
+    # Read data based on role
+    team_usage = []
+    company_transactions_page = []
+    invoices = []
+    tx_type = request.GET.get("tx_type", "all").strip().lower()
+    date_range = request.GET.get("date_range", "all").strip().lower()
+
+    if rbac["is_company_admin"] or rbac["is_super_admin"]:
+        team_usage = list(
+            UsageRecord.objects.filter(company=company)
+            .values("user__id", "user__email", "user__first_name", "user__last_name")
+            .annotate(total_credits=Sum("credits_charged"), total_jobs=Count("id"))
+            .order_by("-total_credits")[:15]
+        )
+
+        # Filtered & Paginated Credit Ledger
+        tx_qs = CreditTransaction.objects.filter(company=company).select_related("user")
+        if tx_type != "all":
+            tx_qs = tx_qs.filter(transaction_type=tx_type)
+        if date_range == "7d":
+            tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=7))
+        elif date_range == "30d":
+            tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=30))
+        elif date_range == "90d":
+            tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=90))
+
+        paginator = Paginator(tx_qs.order_by("-created_at"), 20)
+        page_num = request.GET.get("page", 1)
+        company_transactions_page = paginator.get_page(page_num)
+
+        invoices = list(Invoice.objects.filter(company=company).order_by("-issue_date")[:15])
+
+    # Company User personal metrics & tables
+    my_credits_used = 0
+    my_searches_count = 0
+    my_extractions_count = 0
+    my_matching_count = 0
+    my_recent_jobs = []
+    my_transactions = []
+
+    if rbac["is_company_user"]:
+        my_credits_used = (
+            UsageRecord.objects.filter(
+                company=company,
+                user=request.user,
+                status=UsageRecord.ProcessingStatus.COMPLETED,
+            ).aggregate(s=Sum("credits_charged"))["s"]
+            or 0
+        )
+        my_searches_count = UsageRecord.objects.filter(company=company, user=request.user, feature_code="vendor_discovery").count()
+        my_extractions_count = UsageRecord.objects.filter(company=company, user=request.user, feature_code="website_extraction").count()
+        my_matching_count = UsageRecord.objects.filter(company=company, user=request.user, feature_code="ai_matching").count()
+        my_recent_jobs = list(
+            UsageRecord.objects.filter(company=company, user=request.user)
+            .select_related("search_job")
+            .order_by("-started_at")[:15]
+        )
+        my_transactions = list(
+            CreditTransaction.objects.filter(company=company, user=request.user).order_by("-created_at")[:20]
+        )
 
     return render(request, "billing/subscription.html", {
         "company": company,
         "subscription": subscription,
+        "wallet": wallet,
+        "available_plans": available_plans,
+        "team_usage": team_usage,
+        "company_transactions": company_transactions_page,
+        "invoices": invoices,
+        "my_credits_used": my_credits_used,
+        "my_searches_count": my_searches_count,
+        "my_extractions_count": my_extractions_count,
+        "my_matching_count": my_matching_count,
+        "my_recent_jobs": my_recent_jobs,
+        "my_transactions": my_transactions,
+        "tx_type": tx_type,
+        "date_range": date_range,
         "rbac": rbac,
         "page_title": "Subscription & Credits",
     })

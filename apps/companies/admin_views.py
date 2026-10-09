@@ -1,17 +1,29 @@
+import csv
 import datetime
 import random
 import string
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
+from decimal import Decimal
 from apps.companies.models import Company, CompanyMember
 from apps.accounts.models import User
-from apps.billing.models import Subscription, CreditTransaction
+from apps.billing.models import (
+    Subscription,
+    SubscriptionPlan,
+    CompanyCreditWallet,
+    FeatureCreditCost,
+    CreditTransaction,
+    UsageRecord,
+    Payment,
+    Invoice,
+)
+from apps.billing.services.wallet import CreditWalletService
 from apps.ai_search.models import APILog, SearchJob
 from apps.dashboard.models import ActivityLog, SupportTicket, PlatformSetting
 from apps.leads.models import Inquiry
@@ -77,13 +89,14 @@ def admin_panel_dashboard_view(request):
     total_inquiries = Inquiry.objects.count()
     deals_won = Inquiry.objects.filter(status=Inquiry.Status.WON).count()
     open_tickets = SupportTicket.objects.filter(
+        is_deleted=False,
         status__in=[SupportTicket.Status.OPEN, SupportTicket.Status.IN_PROGRESS]
     ).count()
 
     # 6. Recent streams
     recent_companies = Company.objects.select_related("subscription").order_by("-created_at")[:6]
     recent_activities = ActivityLog.objects.select_related("company", "user").order_by("-created_at")[:8]
-    recent_tickets = SupportTicket.objects.select_related("company", "user").order_by("-created_at")[:5]
+    recent_tickets = SupportTicket.objects.filter(is_deleted=False).select_related("company", "user").order_by("-created_at")[:5]
 
     context = {
         "page_title": "Super Admin Executive Dashboard",
@@ -523,50 +536,95 @@ def admin_panel_company_restore_view(request, pk):
 
 @login_required
 @superadmin_required
+@login_required
+@superadmin_required
 def admin_panel_plans_view(request):
     """
     Super Admin Plans & Subscriptions Management.
-    Manage tier plans, adjust search credit pools, and view credit transactions.
+    Manage tier plans catalog, feature credit costs, company credit wallets,
+    platform-wide revenue, and auditable credit transactions.
     """
+    CreditWalletService.ensure_default_plans_and_costs()
+    CreditWalletService.process_subscription_lifecycle()
+
+    # Global Credit Ledger CSV Export
+    if request.GET.get("export") == "global_ledger_csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response["Content-Disposition"] = f'attachment; filename="Global_Credit_Ledger_{today_str}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["Receipt Number", "Company", "Triggered By", "Transaction Type", "Credits", "Balance After", "Reason / Notes", "Date Time"])
+        for tx in CreditTransaction.objects.select_related("company", "user").order_by("-created_at")[:2000]:
+            user_str = tx.user.get_full_name() or tx.user.email if tx.user else "System Engine"
+            writer.writerow([
+                tx.receipt_number or f"RCP-{tx.id:06d}",
+                tx.company.name,
+                user_str,
+                tx.get_transaction_type_display(),
+                f"+{tx.credits}" if tx.credits > 0 else tx.credits,
+                tx.balance_after,
+                tx.notes,
+                tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ])
+        return response
+
     subscriptions = (
-        Subscription.objects.select_related("company")
+        Subscription.objects.select_related("company", "plan_tier")
         .order_by("-updated_at")
     )
 
     q = request.GET.get("q", "").strip()
     plan_filter = request.GET.get("plan", "all")
+    status_filter = request.GET.get("status", "all")
 
     if q:
         subscriptions = subscriptions.filter(
             Q(company__name__icontains=q) | Q(company__country__icontains=q)
         )
 
-    if plan_filter in [Subscription.Plan.FREE, Subscription.Plan.PRO, Subscription.Plan.ENTERPRISE]:
+    if plan_filter != "all":
         subscriptions = subscriptions.filter(plan=plan_filter)
 
-    sub_free = Subscription.objects.filter(plan=Subscription.Plan.FREE).count()
-    sub_pro = Subscription.objects.filter(plan=Subscription.Plan.PRO).count()
-    sub_enterprise = Subscription.objects.filter(plan=Subscription.Plan.ENTERPRISE).count()
+    if status_filter != "all":
+        subscriptions = subscriptions.filter(status=status_filter)
+
+    # Platform overview KPIs
+    total_companies = Company.objects.filter(is_active=True).count()
+    active_subs_count = Subscription.objects.filter(status=Subscription.Status.ACTIVE).count()
+    trial_subs_count = Subscription.objects.filter(status=Subscription.Status.TRIAL).count()
+    suspended_subs_count = Subscription.objects.filter(status=Subscription.Status.SUSPENDED).count()
+
     total_allocated = Subscription.objects.aggregate(t=Sum("credits_total"))["t"] or 0
     total_used = Subscription.objects.aggregate(t=Sum("credits_used"))["t"] or 0
+    total_revenue = Invoice.objects.filter(status=Invoice.Status.PAID).aggregate(s=Sum("total_amount"))["s"] or Decimal("0.00")
+    failed_jobs_count = UsageRecord.objects.filter(status=UsageRecord.ProcessingStatus.FAILED).count()
 
-    recent_transactions = CreditTransaction.objects.select_related("company").order_by("-created_at")[:20]
-
-    all_companies = Company.objects.filter(is_active=True).order_by("name")
+    plans_catalog = list(SubscriptionPlan.objects.all().order_by("order", "price"))
+    feature_costs = list(FeatureCreditCost.objects.all().order_by("feature_code"))
+    recent_transactions = list(CreditTransaction.objects.select_related("company", "user").order_by("-created_at")[:30])
+    recent_invoices = list(Invoice.objects.select_related("company").order_by("-created_at")[:25])
+    all_companies = list(Company.objects.filter(is_active=True).order_by("name"))
 
     return render(request, "admin_panel/plans.html", {
         "page_title": "Plans & Subscription Management",
         "subscriptions": subscriptions,
+        "plans_catalog": plans_catalog,
+        "feature_costs": feature_costs,
         "recent_transactions": recent_transactions,
+        "recent_invoices": recent_invoices,
         "all_companies": all_companies,
         "q": q,
         "plan_filter": plan_filter,
-        "sub_free": sub_free,
-        "sub_pro": sub_pro,
-        "sub_enterprise": sub_enterprise,
+        "status_filter": status_filter,
+        "total_companies": total_companies,
+        "active_subs_count": active_subs_count,
+        "trial_subs_count": trial_subs_count,
+        "suspended_subs_count": suspended_subs_count,
         "total_allocated": total_allocated,
         "total_used": total_used,
         "total_remaining": max(0, total_allocated - total_used),
+        "total_revenue": total_revenue,
+        "failed_jobs_count": failed_jobs_count,
     })
 
 
@@ -574,24 +632,31 @@ def admin_panel_plans_view(request):
 @superadmin_required
 def admin_panel_update_subscription_view(request, company_id):
     """
-    POST action to update a company's subscription plan, credits, and validity.
+    POST action to adjust a company's subscription tier, credit balance, and validity.
     """
     if request.method == "POST":
         company = get_object_or_404(Company, pk=company_id)
         subscription, _ = Subscription.objects.get_or_create(company=company)
 
-        new_plan = request.POST.get("plan")
+        new_plan_code = request.POST.get("plan")
         credits_add_raw = request.POST.get("credits_add", "0").strip()
         valid_till_raw = request.POST.get("valid_till", "").strip()
+        status_val = request.POST.get("status", Subscription.Status.ACTIVE)
         notes = request.POST.get("notes", "Super Admin adjustment").strip()
 
-        old_plan_display = subscription.get_plan_display()
-
         # 1. Update Plan Tier
-        if new_plan in [Subscription.Plan.FREE, Subscription.Plan.PRO, Subscription.Plan.ENTERPRISE]:
-            subscription.plan = new_plan
+        plan_obj = SubscriptionPlan.objects.filter(code=new_plan_code).first()
+        if plan_obj:
+            subscription.plan_tier = plan_obj
+            subscription.plan = plan_obj.code
+        elif new_plan_code in [Subscription.Plan.FREE, Subscription.Plan.PRO, Subscription.Plan.ENTERPRISE]:
+            subscription.plan = new_plan_code
 
-        # 2. Adjust Credits
+        # 2. Update Status
+        if status_val in [s[0] for s in Subscription.Status.choices]:
+            subscription.status = status_val
+
+        # 3. Adjust Credits via CreditWalletService
         credits_delta = 0
         try:
             credits_delta = int(credits_add_raw)
@@ -601,28 +666,25 @@ def admin_panel_update_subscription_view(request, company_id):
         receipt_ref_msg = ""
         if credits_delta != 0:
             subscription.credits_total = max(0, subscription.credits_total + credits_delta)
-            tx = CreditTransaction.objects.create(
+            tx = CreditWalletService.adjust_credits_admin(
                 company=company,
-                transaction_type=(
-                    CreditTransaction.TransactionType.CREDIT
-                    if credits_delta > 0
-                    else CreditTransaction.TransactionType.DEBIT
-                ),
-                credits=abs(credits_delta),
-                notes=notes or f"Super Admin adjustment ({'+' if credits_delta > 0 else ''}{credits_delta} credits)",
+                delta=credits_delta,
+                reason=notes or f"Super Admin adjustment ({'+' if credits_delta > 0 else ''}{credits_delta} credits)",
+                admin_user=request.user,
             )
-            if tx.receipt_number:
+            if tx and tx.receipt_number:
                 receipt_ref_msg = f" Reference Receipt No: #{tx.receipt_number}."
 
-        # 3. Update Valid Till Date
+        # 4. Update Valid Till Date
         if valid_till_raw:
             parsed_date = parse_date(valid_till_raw)
             if parsed_date:
                 subscription.valid_till = parsed_date
+                subscription.renewal_date = timezone.datetime.combine(parsed_date, timezone.datetime.min.time()).replace(tzinfo=timezone.get_current_timezone())
 
         subscription.save()
 
-        # 4. Activity Log
+        # 5. Activity Log
         ActivityLog.objects.create(
             company=company,
             user=request.user,
@@ -633,7 +695,7 @@ def admin_panel_update_subscription_view(request, company_id):
             color="blue",
         )
 
-        # 5. Broadcast in-app notification to company members
+        # 6. Broadcast in-app notification to company members
         create_notification(
             user=None,
             company=company,
@@ -654,6 +716,115 @@ def admin_panel_update_subscription_view(request, company_id):
         if next_url:
             return redirect(next_url)
         return redirect("admin-panel-plans")
+
+
+@login_required
+@superadmin_required
+def admin_panel_plan_save_view(request):
+    """
+    POST action to create or edit a SubscriptionPlan catalog tier.
+    """
+    if request.method == "POST":
+        plan_id = request.POST.get("plan_id", "").strip()
+        code = request.POST.get("code", "").strip().lower()
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
+        billing_cycle = request.POST.get("billing_cycle", "monthly")
+        price_raw = request.POST.get("price", "0").strip()
+        currency = request.POST.get("currency", "INR").strip().upper()
+        included_credits_raw = request.POST.get("included_credits", "500").strip()
+        max_team_members_raw = request.POST.get("max_team_members", "5").strip()
+        search_limit_monthly_raw = request.POST.get("search_limit_monthly", "500").strip()
+        status_val = request.POST.get("status", "active")
+        is_public = bool(request.POST.get("is_public", True))
+
+        try:
+            price = Decimal(price_raw)
+        except Exception:
+            price = Decimal("0.00")
+
+        try:
+            included_credits = max(0, int(included_credits_raw))
+        except ValueError:
+            included_credits = 500
+
+        try:
+            max_team_members = max(1, int(max_team_members_raw))
+        except ValueError:
+            max_team_members = 5
+
+        try:
+            search_limit_monthly = max(0, int(search_limit_monthly_raw))
+        except ValueError:
+            search_limit_monthly = included_credits
+
+        if plan_id:
+            plan = get_object_or_404(SubscriptionPlan, pk=plan_id)
+            plan.name = name
+            plan.description = description
+            plan.billing_cycle = billing_cycle
+            plan.price = price
+            plan.currency = currency
+            plan.included_credits = included_credits
+            plan.max_team_members = max_team_members
+            plan.search_limit_monthly = search_limit_monthly
+            plan.status = status_val
+            plan.is_public = is_public
+            plan.save()
+            messages.success(request, f"Plan '{plan.name}' updated successfully.")
+        else:
+            if not code or not name:
+                messages.error(request, "Plan Code and Plan Name are required.")
+                return redirect("admin-panel-plans")
+            plan, created = SubscriptionPlan.objects.get_or_create(
+                code=code,
+                defaults={
+                    "name": name,
+                    "description": description,
+                    "billing_cycle": billing_cycle,
+                    "price": price,
+                    "currency": currency,
+                    "included_credits": included_credits,
+                    "max_team_members": max_team_members,
+                    "search_limit_monthly": search_limit_monthly,
+                    "status": status_val,
+                    "is_public": is_public,
+                },
+            )
+            messages.success(request, f"Plan '{plan.name}' created successfully.")
+
+    return redirect("admin-panel-plans")
+
+
+@login_required
+@superadmin_required
+def admin_panel_feature_cost_update_view(request):
+    """
+    POST action to configure AI Feature Credit Cost rates.
+    """
+    if request.method == "POST":
+        feature_code = request.POST.get("feature_code", "").strip()
+        cost_raw = request.POST.get("credit_cost", "1").strip()
+        charging_unit = request.POST.get("charging_unit", "per_job").strip()
+        is_active = bool(request.POST.get("is_active", True))
+
+        try:
+            cost = max(1, int(cost_raw))
+        except ValueError:
+            cost = 1
+
+        rule = FeatureCreditCost.objects.filter(feature_code=feature_code).first()
+        if rule:
+            rule.credit_cost = cost
+            rule.charging_unit = charging_unit
+            rule.is_active = is_active
+            rule.updated_by = request.user
+            rule.save()
+            messages.success(request, f"Credit rate for '{rule.display_name}' updated to {cost} credits.")
+        else:
+            messages.error(request, f"Feature rule '{feature_code}' not found.")
+
+    return redirect("admin-panel-plans")
 
 
 @login_required

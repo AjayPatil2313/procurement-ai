@@ -542,12 +542,13 @@ def help_support_view(request):
 
     if is_super_admin:
         tickets_qs = (
-            SupportTicket.objects.select_related("company", "user")
+            SupportTicket.objects.filter(is_deleted=False)
+            .select_related("company", "user")
             .order_by("-created_at")
         )
     elif company:
         tickets_qs = (
-            SupportTicket.objects.filter(company=company)
+            SupportTicket.objects.filter(company=company, is_deleted=False)
             .select_related("company", "user")
             .order_by("-created_at")
         )
@@ -574,9 +575,9 @@ def help_support_view(request):
 
     # Global KPI counts
     all_base_tickets = (
-        SupportTicket.objects.all()
+        SupportTicket.objects.filter(is_deleted=False)
         if is_super_admin
-        else (SupportTicket.objects.filter(company=company) if company else SupportTicket.objects.none())
+        else (SupportTicket.objects.filter(company=company, is_deleted=False) if company else SupportTicket.objects.none())
     )
     total_tickets_count = all_base_tickets.count()
     open_tickets_count = all_base_tickets.filter(status=SupportTicket.Status.OPEN).count()
@@ -612,11 +613,12 @@ def update_support_ticket_view(request, pk):
     Super Admins can update any ticket; Company users can update their company's tickets.
     """
     if request.method == "POST":
-        rbac = get_user_rbac_context(request.user)
+        selected_company_id = request.session.get("active_company_id")
+        rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
         if rbac["is_super_admin"]:
-            ticket = get_object_or_404(SupportTicket, pk=pk)
+            ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
         else:
-            ticket = get_object_or_404(SupportTicket, pk=pk, company=rbac["company"])
+            ticket = get_object_or_404(SupportTicket, pk=pk, company=rbac["company"], is_deleted=False)
 
         new_status = request.POST.get("status")
         resolution = request.POST.get("resolution", "").strip()
@@ -792,9 +794,9 @@ def support_ticket_detail_view(request, pk):
     company = rbac["company"]
 
     if rbac["is_super_admin"]:
-        ticket = get_object_or_404(SupportTicket, pk=pk)
+        ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
     else:
-        ticket = get_object_or_404(SupportTicket, pk=pk, company=company)
+        ticket = get_object_or_404(SupportTicket, pk=pk, company=company, is_deleted=False)
 
     return JsonResponse({
         "success": True,
@@ -802,15 +804,82 @@ def support_ticket_detail_view(request, pk):
         "ticket_number": ticket.ticket_number,
         "subject": ticket.subject,
         "description": ticket.description,
-        "category": ticket.get_category_display(),
-        "priority": ticket.get_priority_display(),
-        "status": ticket.get_status_display(),
+        "category": ticket.category,
+        "category_display": ticket.get_category_display(),
+        "priority": ticket.priority,
+        "priority_display": ticket.get_priority_display(),
+        "status": ticket.status,
+        "status_display": ticket.get_status_display(),
         "contact_email": ticket.contact_email,
         "contact_phone": ticket.contact_phone,
         "resolution": ticket.resolution or "In evaluation by technical operations team.",
         "created_at": ticket.created_at.strftime("%b %d, %Y at %I:%M %p"),
         "updated_at": ticket.updated_at.strftime("%b %d, %Y at %I:%M %p"),
     })
+
+
+@login_required
+def edit_support_ticket_view(request, pk):
+    """
+    Allows user or admin to edit support ticket details (subject, category, priority, contact, description).
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if rbac["is_super_admin"]:
+        ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
+    else:
+        ticket = get_object_or_404(SupportTicket, pk=pk, company=company, is_deleted=False)
+
+    if request.method == "POST":
+        subject = request.POST.get("subject", "").strip()
+        description = request.POST.get("description", "").strip()
+        category = request.POST.get("category", ticket.category).strip()
+        priority = request.POST.get("priority", ticket.priority).strip()
+        contact_email = request.POST.get("contact_email", "").strip() or ticket.contact_email
+        contact_phone = request.POST.get("contact_phone", "").strip()
+
+        if not subject or not description:
+            messages.error(request, "Subject and description are required to update a support ticket.")
+            return redirect("help-support")
+
+        ticket.subject = subject[:255]
+        ticket.description = description
+        if category in [c[0] for c in SupportTicket.Category.choices]:
+            ticket.category = category
+        if priority in [p[0] for p in SupportTicket.Priority.choices]:
+            ticket.priority = priority
+        ticket.contact_email = contact_email
+        ticket.contact_phone = contact_phone[:50]
+        ticket.save()
+
+        messages.success(request, f"Support Ticket #{ticket.ticket_number} updated successfully.")
+
+    return redirect("help-support")
+
+
+@login_required
+def delete_support_ticket_view(request, pk):
+    """
+    Soft-deletes a support ticket (sets is_deleted=True, deleted_at=now).
+    """
+    if request.method == "POST":
+        selected_company_id = request.session.get("active_company_id")
+        rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+        company = rbac["company"]
+
+        if rbac["is_super_admin"]:
+            ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
+        else:
+            ticket = get_object_or_404(SupportTicket, pk=pk, company=company, is_deleted=False)
+
+        ticket_number = ticket.ticket_number
+        ticket.soft_delete()
+        messages.success(request, f"Support Ticket #{ticket_number} has been deleted successfully.")
+
+    return redirect("help-support")
+
 
 
 # ============================================================

@@ -206,6 +206,12 @@ def product_create_view(request):
             messages.info(request, f"Pre-filled form based on existing product '{orig.name}'. Customize details and save as a new item.")
 
     if request.method == "POST":
+        from apps.billing.services.wallet import CreditWalletService
+        can_add, current_count, max_limit = CreditWalletService.can_add_product(company)
+        if not can_add:
+            messages.error(request, f"Cannot add product: Plan catalog limit reached ({current_count}/{max_limit} products). Please upgrade your subscription plan.")
+            return redirect("products-list")
+
         name = request.POST.get("name", "").strip()
         sku = request.POST.get("sku", "").strip()
         cat_id = request.POST.get("category_id")

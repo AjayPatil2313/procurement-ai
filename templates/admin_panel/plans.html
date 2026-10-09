@@ -1,228 +1,573 @@
 {% extends "base.html" %}
 
-{% block title %}Plans & Subscription Management — Super Admin Panel{% endblock %}
+{% block title %}Plans, Subscriptions & Credit Governance — Super Admin Panel{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
   <!-- Header Banner -->
-  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
-      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 mb-2">
-        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-amber-400"></i> Platform Super Admin Control Center
       </div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Plans & Subscription Allocation</h1>
-      <p class="text-xs text-slate-500 mt-0.5">Control company subscription tiers, allocate AI search credits, adjust credit balances, and review credit ledger</p>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Subscription & Credits Governance</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Configure subscription tiers, manage feature credit rate cards, allocate company wallets, and audit billing ledgers across all platform tenants.
+      </p>
     </div>
 
-    <!-- Quick Plan Summary Cards -->
+    <!-- Quick Actions -->
     <div class="flex flex-wrap items-center gap-2">
-      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
-        <span class="text-slate-500">Free:</span> <span class="font-bold text-slate-700">{{ sub_free }}</span>
-      </div>
-      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
-        <span class="text-slate-500">Pro:</span> <span class="font-bold text-blue-600">{{ sub_pro }}</span>
-      </div>
-      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
-        <span class="text-slate-500">Enterprise:</span> <span class="font-bold text-purple-600">{{ sub_enterprise }}</span>
-      </div>
-      <div class="px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl shadow-sm text-xs">
-        <span class="text-amber-700 font-semibold">Active Credits:</span> <span class="font-black text-amber-900">{{ total_remaining }}</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Search & Filter Bar -->
-  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-    <form method="GET" class="flex flex-1 items-center gap-3">
-      <!-- Search -->
-      <div class="relative flex-1 max-w-sm">
-        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
-        <input type="text" name="q" value="{{ q }}" placeholder="Search company name..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-amber-500 outline-none">
-      </div>
-
-      <!-- Plan Filter -->
-      <div class="w-48">
-        <select name="plan" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
-          <option value="all" {% if plan_filter == 'all' %}selected{% endif %}>All Plans</option>
-          <option value="free" {% if plan_filter == 'free' %}selected{% endif %}>Free Plan</option>
-          <option value="pro" {% if plan_filter == 'pro' %}selected{% endif %}>Pro Plan</option>
-          <option value="enterprise" {% if plan_filter == 'enterprise' %}selected{% endif %}>Enterprise Plan</option>
-        </select>
-      </div>
-
-      {% if q or plan_filter != 'all' %}
-      <a href="{% url 'admin-panel-plans' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
-        <i class="fa-solid fa-xmark"></i>
+      <button type="button" onclick="openCreatePlanModal()" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm cursor-pointer">
+        <i class="fa-solid fa-plus mr-1.5"></i> Add Subscription Plan
+      </button>
+      <a href="{% url 'admin-panel-apilogs' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-terminal mr-2 text-emerald-400"></i> API Costs
       </a>
-      {% endif %}
-    </form>
-  </div>
-
-  <!-- Subscriptions Table -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-      <h3 class="text-sm font-bold text-slate-900 flex items-center">
-        <i class="fa-solid fa-credit-card text-amber-500 mr-2"></i> Company Subscriptions & AI Credits Ledger
-      </h3>
-      <span class="text-xs text-slate-500">{{ subscriptions.count }} active company plans</span>
-    </div>
-
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-3 px-4">Company</th>
-            <th class="py-3 px-4">Current Plan</th>
-            <th class="py-3 px-4">Total Pool</th>
-            <th class="py-3 px-4">Credits Remaining</th>
-            <th class="py-3 px-4">Usage %</th>
-            <th class="py-3 px-4">Valid Till</th>
-            <th class="py-3 px-4 text-right">Adjustment Action</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for sub in subscriptions %}
-          <tr class="hover:bg-slate-50/80 transition">
-            <!-- Company -->
-            <td class="py-3.5 px-4 font-bold text-slate-900">
-              <div class="flex items-center">
-                <span class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mr-2.5 flex-shrink-0">
-                  <i class="fa-solid fa-building text-xs"></i>
-                </span>
-                <div>
-                  <a href="{% url 'admin-panel-company-detail' sub.company.id %}" class="font-bold text-slate-900 hover:text-blue-600 hover:underline text-xs flex items-center gap-1 transition">
-                    <span>{{ sub.company.name }}</span>
-                    <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400"></i>
-                  </a>
-                  <div class="text-[11px] font-normal text-slate-500">{{ sub.company.country|default:"Global" }}</div>
-                </div>
-              </div>
-            </td>
-
-            <!-- Plan -->
-            <td class="py-3.5 px-4">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold {% if sub.plan == 'enterprise' %}bg-purple-100 text-purple-800 border border-purple-200{% elif sub.plan == 'pro' %}bg-blue-100 text-blue-800 border border-blue-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
-                <i class="fa-solid fa-shield-halved mr-1 text-[9px]"></i> {{ sub.get_plan_display }}
-              </span>
-            </td>
-
-            <!-- Total Credits -->
-            <td class="py-3.5 px-4 font-semibold text-slate-700">{{ sub.credits_total }} credits</td>
-
-            <!-- Credits Remaining -->
-            <td class="py-3.5 px-4">
-              <div class="flex items-center gap-2">
-                <span class="font-bold {% if sub.credits_remaining > 20 %}text-emerald-600{% elif sub.credits_remaining > 5 %}text-amber-600{% else %}text-rose-600{% endif %}">
-                  {{ sub.credits_remaining }}
-                </span>
-                <span class="text-slate-400">/ {{ sub.credits_total }}</span>
-              </div>
-            </td>
-
-            <!-- Usage Progress Bar -->
-            <td class="py-3.5 px-4 w-36">
-              <div class="flex items-center gap-2">
-                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div class="{% if sub.usage_percentage > 80 %}bg-rose-500{% elif sub.usage_percentage > 50 %}bg-amber-500{% else %}bg-emerald-500{% endif %} h-1.5 rounded-full" style="width: {{ sub.usage_percentage }}%"></div>
-                </div>
-                <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">{{ sub.usage_percentage }}%</span>
-              </div>
-            </td>
-
-            <!-- Valid Till -->
-            <td class="py-3.5 px-4 text-slate-500">
-              {% if sub.valid_till %}
-                {{ sub.valid_till|date:"M d, Y" }}
-              {% else %}
-                <span class="text-slate-400">Lifetime / No Expiry</span>
-              {% endif %}
-            </td>
-
-            <!-- Action Button (Opens adjustment modal) -->
-            <td class="py-3.5 px-4 text-right">
-              <button type="button" onclick="openPlanModal('{{ sub.company.id }}', '{{ sub.company.name|escapejs }}', '{{ sub.plan }}', '{{ sub.credits_total }}', '{{ sub.credits_remaining }}', '{{ sub.valid_till|date:'Y-m-d'|default:'' }}')" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-sm">
-                <i class="fa-solid fa-pen-to-square mr-1.5"></i> Adjust Plan & Credits
-              </button>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="7" class="py-12 text-center text-slate-400">
-              <i class="fa-solid fa-credit-card text-3xl mb-2 text-slate-300 block"></i>
-              No subscriptions found matching query.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <a href="{% url 'admin-panel-auditlogs' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-clock-rotate-left mr-2 text-purple-400"></i> Audit Trail
+      </a>
     </div>
   </div>
 
-  <!-- Recent Credit Transactions Ledger -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-      <h3 class="text-sm font-bold text-slate-900 flex items-center">
-        <i class="fa-solid fa-receipt text-blue-600 mr-2"></i> Recent Credit Transactions Ledger (All Companies)
-      </h3>
-      <span class="text-xs text-slate-500">Last 20 transactions</span>
+  <!-- KPI Overview Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <!-- Total Companies -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
+        <span>Total Companies</span>
+        <i class="fa-solid fa-building text-slate-400 text-sm"></i>
+      </div>
+      <div class="text-2xl font-black text-slate-900">{{ total_companies }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Registered tenant accounts</div>
     </div>
 
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-2.5 px-4">Company</th>
-            <th class="py-2.5 px-3">Receipt / Ref #</th>
-            <th class="py-2.5 px-3">Type</th>
-            <th class="py-2.5 px-3">Credits</th>
-            <th class="py-2.5 px-3">Reason / Description</th>
-            <th class="py-2.5 px-3 text-right">Timestamp</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for tx in recent_transactions %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3 px-4 font-bold text-slate-900">{{ tx.company.name }}</td>
-            <td class="py-3 px-3 font-mono font-bold text-slate-800">
-              {% if tx.receipt_number %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[11px]">
-                  #{{ tx.receipt_number }}
+    <!-- Active Subscriptions -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
+        <span>Active Subscriptions</span>
+        <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
+      </div>
+      <div class="text-2xl font-black text-emerald-600">{{ active_subs_count }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">
+        <span class="text-amber-600 font-semibold">{{ trial_subs_count }} Trial</span> &bull; 
+        <span class="text-rose-600 font-semibold">{{ suspended_subs_count }} Suspended</span>
+      </div>
+    </div>
+
+    <!-- Platform Credit Pool -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
+        <span>Credits in Circulation</span>
+        <i class="fa-solid fa-coins text-amber-500 text-sm"></i>
+      </div>
+      <div class="text-2xl font-black text-amber-600">{{ total_remaining|default:0 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">
+        <span>{{ total_allocated }} allocated / {{ total_used }} consumed</span>
+      </div>
+    </div>
+
+    <!-- Revenue Collected -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
+        <span>Revenue Collected</span>
+        <i class="fa-solid fa-indian-rupee-sign text-blue-500 text-sm"></i>
+      </div>
+      <div class="text-2xl font-black text-slate-900">₹{{ total_revenue|floatformat:2 }}</div>
+      <div class="text-[11px] text-emerald-600 font-semibold mt-1">Settled platform invoices</div>
+    </div>
+
+    <!-- Failed Jobs & Protection -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
+        <span>Failed Jobs / Refunds</span>
+        <i class="fa-solid fa-shield-halved text-rose-500 text-sm"></i>
+      </div>
+      <div class="text-2xl font-black {% if failed_jobs_count > 0 %}text-rose-600{% else %}text-slate-900{% endif %}">
+        {{ failed_jobs_count }}
+      </div>
+      <div class="text-[11px] text-emerald-600 font-medium mt-1">100% auto-refunded to wallets</div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto text-xs font-bold">
+    <button type="button" onclick="switchAdminTab('companies')" id="tabBtn-companies" class="admin-tab-btn active px-4 py-2 rounded-xl transition flex items-center gap-2 bg-slate-900 text-white shadow-sm">
+      <i class="fa-solid fa-building text-amber-400"></i>
+      <span>Company Wallets & Plans ({{ subscriptions.count }})</span>
+    </button>
+    <button type="button" onclick="switchAdminTab('plans')" id="tabBtn-plans" class="admin-tab-btn px-4 py-2 rounded-xl transition flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200">
+      <i class="fa-solid fa-cubes text-blue-500"></i>
+      <span>Subscription Plans Catalog ({{ plans_catalog|length }})</span>
+    </button>
+    <button type="button" onclick="switchAdminTab('rates')" id="tabBtn-rates" class="admin-tab-btn px-4 py-2 rounded-xl transition flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200">
+      <i class="fa-solid fa-tags text-emerald-500"></i>
+      <span>Feature Credit Rate Card ({{ feature_costs|length }})</span>
+    </button>
+    <button type="button" onclick="switchAdminTab('ledger')" id="tabBtn-ledger" class="admin-tab-btn px-4 py-2 rounded-xl transition flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200">
+      <i class="fa-solid fa-receipt text-indigo-500"></i>
+      <span>Global Credit Ledger ({{ recent_transactions|length }})</span>
+    </button>
+    <button type="button" onclick="switchAdminTab('invoices')" id="tabBtn-invoices" class="admin-tab-btn px-4 py-2 rounded-xl transition flex items-center gap-2 bg-white text-slate-700 hover:bg-slate-100 border border-slate-200">
+      <i class="fa-solid fa-file-invoice-dollar text-purple-500"></i>
+      <span>Billing & Invoices ({{ recent_invoices|length }})</span>
+    </button>
+  </div>
+
+  <!-- TAB 1: Company Subscriptions & Wallets -->
+  <div id="tabContent-companies" class="admin-tab-content space-y-4">
+    <!-- Search & Filter Bar -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <form method="GET" class="flex flex-1 items-center gap-3">
+        <!-- Search -->
+        <div class="relative flex-1 max-w-sm">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+          <input type="text" name="q" value="{{ q }}" placeholder="Search company name or country..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-amber-500 outline-none">
+        </div>
+
+        <!-- Plan Filter -->
+        <div class="w-44">
+          <select name="plan" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+            <option value="all" {% if plan_filter == 'all' %}selected{% endif %}>All Plans</option>
+            {% for p in plans_catalog %}
+              <option value="{{ p.code }}" {% if plan_filter == p.code %}selected{% endif %}>{{ p.name }}</option>
+            {% endfor %}
+            <option value="free" {% if plan_filter == 'free' %}selected{% endif %}>Free Plan</option>
+            <option value="pro" {% if plan_filter == 'pro' %}selected{% endif %}>Pro Plan</option>
+            <option value="enterprise" {% if plan_filter == 'enterprise' %}selected{% endif %}>Enterprise Plan</option>
+          </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div class="w-40">
+          <select name="status" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+            <option value="trial" {% if status_filter == 'trial' %}selected{% endif %}>Trial</option>
+            <option value="suspended" {% if status_filter == 'suspended' %}selected{% endif %}>Suspended</option>
+            <option value="past_due" {% if status_filter == 'past_due' %}selected{% endif %}>Past Due</option>
+            <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+          </select>
+        </div>
+
+        {% if q or plan_filter != 'all' or status_filter != 'all' %}
+        <a href="{% url 'admin-panel-plans' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </form>
+    </div>
+
+    <!-- Subscriptions Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-credit-card text-amber-500 mr-2"></i> Company Subscriptions & Wallet Balances
+        </h3>
+        <span class="text-xs text-slate-500">{{ subscriptions.count }} companies listed</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Company</th>
+              <th class="py-3 px-4">Plan Tier</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Total Pool</th>
+              <th class="py-3 px-4">Credits Remaining</th>
+              <th class="py-3 px-4">Usage %</th>
+              <th class="py-3 px-4">Valid Till / Renewal</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for sub in subscriptions %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <!-- Company -->
+              <td class="py-3.5 px-4 font-bold text-slate-900">
+                <div class="flex items-center">
+                  <span class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mr-2.5 flex-shrink-0">
+                    <i class="fa-solid fa-building text-xs"></i>
+                  </span>
+                  <div>
+                    <a href="{% url 'admin-panel-company-detail' sub.company.id %}" class="font-bold text-slate-900 hover:text-blue-600 hover:underline text-xs flex items-center gap-1 transition">
+                      <span>{{ sub.company.name }}</span>
+                      <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400"></i>
+                    </a>
+                    <div class="text-[11px] font-normal text-slate-500">{{ sub.company.country|default:"Global" }}</div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Plan -->
+              <td class="py-3.5 px-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-bold {% if sub.plan == 'enterprise' %}bg-purple-100 text-purple-800 border border-purple-200{% elif sub.plan == 'pro' %}bg-blue-100 text-blue-800 border border-blue-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                  <i class="fa-solid fa-shield-halved mr-1 text-[9px]"></i> 
+                  {% if sub.plan_tier %}{{ sub.plan_tier.name }}{% else %}{{ sub.get_plan_display }}{% endif %}
                 </span>
-              {% else %}
-                <span class="text-slate-400 font-normal">—</span>
-              {% endif %}
-            </td>
-            <td class="py-3 px-3">
-              {% if tx.transaction_type == 'credit' %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                  <i class="fa-solid fa-plus text-[8px] mr-1"></i> Credit
+              </td>
+
+              <!-- Status -->
+              <td class="py-3.5 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold 
+                  {% if sub.status == 'active' %}bg-emerald-100 text-emerald-800 border border-emerald-200
+                  {% elif sub.status == 'trial' %}bg-amber-100 text-amber-800 border border-amber-200
+                  {% elif sub.status == 'suspended' %}bg-rose-100 text-rose-800 border border-rose-200
+                  {% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                  {{ sub.get_status_display }}
                 </span>
-              {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
-                  <i class="fa-solid fa-minus text-[8px] mr-1"></i> Debit
+              </td>
+
+              <!-- Total Credits -->
+              <td class="py-3.5 px-4 font-semibold text-slate-700">{{ sub.credits_total }} credits</td>
+
+              <!-- Credits Remaining -->
+              <td class="py-3.5 px-4">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold {% if sub.credits_remaining > 20 %}text-emerald-600{% elif sub.credits_remaining > 5 %}text-amber-600{% else %}text-rose-600{% endif %}">
+                    {{ sub.credits_remaining }}
+                  </span>
+                  <span class="text-slate-400">/ {{ sub.credits_total }}</span>
+                </div>
+              </td>
+
+              <!-- Usage Progress Bar -->
+              <td class="py-3.5 px-4 w-32">
+                <div class="flex items-center gap-2">
+                  <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div class="{% if sub.usage_percentage > 80 %}bg-rose-500{% elif sub.usage_percentage > 50 %}bg-amber-500{% else %}bg-emerald-500{% endif %} h-1.5 rounded-full" style="width: {{ sub.usage_percentage }}%"></div>
+                  </div>
+                  <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">{{ sub.usage_percentage }}%</span>
+                </div>
+              </td>
+
+              <!-- Valid Till -->
+              <td class="py-3.5 px-4 text-slate-500">
+                {% if sub.valid_till %}
+                  {{ sub.valid_till|date:"M d, Y" }}
+                {% elif sub.renewal_date %}
+                  {{ sub.renewal_date|date:"M d, Y" }}
+                {% else %}
+                  <span class="text-slate-400">Lifetime / No Expiry</span>
+                {% endif %}
+              </td>
+
+              <!-- Action Button -->
+              <td class="py-3.5 px-4 text-right">
+                <button type="button" onclick="openPlanModal('{{ sub.company.id }}', '{{ sub.company.name|escapejs }}', '{{ sub.plan }}', '{{ sub.credits_total }}', '{{ sub.credits_remaining }}', '{{ sub.valid_till|date:'Y-m-d'|default:'' }}', '{{ sub.status }}')" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm cursor-pointer">
+                  <i class="fa-solid fa-pen-to-square mr-1.5"></i> Adjust Plan & Credits
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="py-12 text-center text-slate-400">
+                <i class="fa-solid fa-credit-card text-3xl mb-2 text-slate-300 block"></i>
+                No company subscriptions found matching your query.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Subscription Plans Catalog -->
+  <div id="tabContent-plans" class="admin-tab-content hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-cubes text-blue-600 mr-2"></i> Subscription Plans Catalog
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Define platform tiers, included monthly credits, seat quotas, and pricing.</p>
+        </div>
+        <button type="button" onclick="openCreatePlanModal()" class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm cursor-pointer">
+          <i class="fa-solid fa-plus mr-1"></i> Add New Tier
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Plan Name & Code</th>
+              <th class="py-3 px-4">Billing Cycle</th>
+              <th class="py-3 px-4">Price</th>
+              <th class="py-3 px-4">Included Credits</th>
+              <th class="py-3 px-4">Max Team Members</th>
+              <th class="py-3 px-4">Monthly Search Limit</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Visibility</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for p in plans_catalog %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">
+                <div class="flex items-center gap-2">
+                  <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs uppercase">
+                    {{ p.code|slice:":2" }}
+                  </span>
+                  <div>
+                    <span class="text-slate-900 font-bold block">{{ p.name }}</span>
+                    <span class="text-[11px] font-mono text-slate-400">code: {{ p.code }}</span>
+                  </div>
+                </div>
+              </td>
+              <td class="py-3 px-4 capitalize text-slate-700 font-medium">{{ p.billing_cycle }}</td>
+              <td class="py-3 px-4 font-bold text-slate-900">
+                {% if p.price == 0 %}
+                  <span class="text-emerald-600 font-black">Free</span>
+                {% else %}
+                  {{ p.currency }} {{ p.price }}
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 font-bold text-amber-600">{{ p.included_credits }} credits</td>
+              <td class="py-3 px-4 text-slate-700">{{ p.max_team_members }} users</td>
+              <td class="py-3 px-4 text-slate-700">{{ p.search_limit_monthly }} / mo</td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if p.status == 'active' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-600{% endif %}">
+                  {{ p.status|upper }}
                 </span>
-              {% endif %}
-            </td>
-            <td class="py-3 px-3 font-bold {% if tx.transaction_type == 'credit' %}text-emerald-600{% else %}text-rose-600{% endif %}">
-              {% if tx.transaction_type == 'credit' %}+{% else %}-{% endif %}{{ tx.credits }}
-            </td>
-            <td class="py-3 px-3 text-slate-600">{{ tx.notes|default:"Search Job Query Deduction" }}</td>
-            <td class="py-3 px-3 text-right text-slate-400">{{ tx.created_at|date:"M d, Y H:i" }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="py-6 text-center text-slate-400">No credit transactions recorded yet.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              </td>
+              <td class="py-3 px-4">
+                {% if p.is_public %}
+                  <span class="text-emerald-600 font-bold text-[11px]"><i class="fa-solid fa-eye mr-1"></i> Public</span>
+                {% else %}
+                  <span class="text-slate-400 font-medium text-[11px]"><i class="fa-solid fa-lock mr-1"></i> Private / Custom</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-right">
+                <button type="button" onclick="openEditPlanModal('{{ p.id }}', '{{ p.code }}', '{{ p.name|escapejs }}', '{{ p.description|escapejs }}', '{{ p.billing_cycle }}', '{{ p.price }}', '{{ p.currency }}', '{{ p.included_credits }}', '{{ p.max_team_members }}', '{{ p.search_limit_monthly }}', '{{ p.status }}', {{ p.is_public|yesno:'true,false' }})" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition cursor-pointer">
+                  <i class="fa-solid fa-pen mr-1 text-slate-500"></i> Edit
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="py-8 text-center text-slate-400">No subscription plan tiers defined yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Feature Credit Costs (Rate Card) -->
+  <div id="tabContent-rates" class="admin-tab-content hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-tags text-emerald-600 mr-2"></i> Feature Credit Rate Card
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Control how many credits are deducted per AI search, domain extraction, or vendor enrichment job.</p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Feature Code</th>
+              <th class="py-3 px-4">Display Name</th>
+              <th class="py-3 px-4">Charging Unit</th>
+              <th class="py-3 px-4">Credit Cost</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for fc in feature_costs %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-mono font-bold text-slate-800">{{ fc.feature_code }}</td>
+              <td class="py-3 px-4 font-bold text-slate-900">{{ fc.display_name }}</td>
+              <td class="py-3 px-4 font-mono text-slate-600">{{ fc.charging_unit }}</td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-black bg-amber-100 text-amber-900 border border-amber-200">
+                  <i class="fa-solid fa-coins text-amber-600 mr-1.5 text-[10px]"></i>
+                  {{ fc.credit_cost }} credits
+                </span>
+              </td>
+              <td class="py-3 px-4">
+                {% if fc.is_active %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    <i class="fa-solid fa-circle text-[6px] mr-1"></i> ACTIVE
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                    DISABLED
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-4 text-right">
+                <button type="button" onclick="openEditFeatureCostModal('{{ fc.feature_code }}', '{{ fc.display_name|escapejs }}', '{{ fc.credit_cost }}', '{{ fc.charging_unit }}', {{ fc.is_active|yesno:'true,false' }})" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition cursor-pointer">
+                  <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Rate
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400">No feature rates configured yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: Global Credit Ledger -->
+  <div id="tabContent-ledger" class="admin-tab-content hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-receipt text-indigo-600 mr-2"></i> Global Credit Transactions Ledger (All Companies)
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Real-time platform ledger tracking every allocation, consumption debit, and automated refund.</p>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <a href="?export=global_ledger_csv" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer" title="Download global credit ledger as CSV">
+            <i class="fa-solid fa-file-csv text-emerald-600"></i>
+            <span>Export CSV</span>
+          </a>
+          <span class="text-xs text-slate-500">Showing last {{ recent_transactions|length }} records</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Company</th>
+              <th class="py-3 px-3">Receipt / Ref #</th>
+              <th class="py-3 px-3">User</th>
+              <th class="py-3 px-3">Type</th>
+              <th class="py-3 px-3">Credits</th>
+              <th class="py-3 px-3">Balance After</th>
+              <th class="py-3 px-4">Reason / Notes</th>
+              <th class="py-3 px-4 text-right">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for tx in recent_transactions %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">{{ tx.company.name }}</td>
+              <td class="py-3 px-3 font-mono font-bold text-slate-800">
+                {% if tx.receipt_number %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[11px]">
+                    #{{ tx.receipt_number }}
+                  </span>
+                {% else %}
+                  <span class="text-slate-400 font-normal">—</span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-3 text-slate-600">
+                {% if tx.user %}{{ tx.user.get_full_name|default:tx.user.email }}{% else %}<span class="text-slate-400 italic">System / Admin</span>{% endif %}
+              </td>
+              <td class="py-3 px-3">
+                {% if tx.transaction_type == 'credit' or tx.transaction_type == 'refund' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    <i class="fa-solid fa-plus text-[8px] mr-1"></i> {{ tx.transaction_type|upper }}
+                  </span>
+                {% elif tx.transaction_type == 'reserve' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                    <i class="fa-solid fa-clock text-[8px] mr-1"></i> RESERVE
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                    <i class="fa-solid fa-minus text-[8px] mr-1"></i> DEBIT
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-3 font-black {% if tx.transaction_type == 'credit' or tx.transaction_type == 'refund' %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                {% if tx.transaction_type == 'credit' or tx.transaction_type == 'refund' %}+{% else %}-{% endif %}{{ tx.credits }}
+              </td>
+              <td class="py-3 px-3 font-semibold text-slate-700">{{ tx.balance_after }}</td>
+              <td class="py-3 px-4 text-slate-600 max-w-xs truncate">{{ tx.notes|default:"Feature deduction" }}</td>
+              <td class="py-3 px-4 text-right text-slate-400 whitespace-nowrap">{{ tx.created_at|date:"M d, Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="py-8 text-center text-slate-400">No transactions recorded in the platform ledger yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: Billing & Invoices -->
+  <div id="tabContent-invoices" class="admin-tab-content hidden space-y-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-file-invoice-dollar text-purple-600 mr-2"></i> Platform Invoices & Settlements
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Audit customer subscription renewals, top-up pack purchases, and tax invoices.</p>
+        </div>
+        <div class="text-xs font-bold text-slate-700 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl">
+          Total Settled: <span class="text-purple-900">₹{{ total_revenue|floatformat:2 }}</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Invoice #</th>
+              <th class="py-3 px-4">Company</th>
+              <th class="py-3 px-4">Amount</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Invoice Date</th>
+              <th class="py-3 px-4">Paid At</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for inv in recent_invoices %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-mono font-bold text-blue-600">{{ inv.invoice_number }}</td>
+              <td class="py-3 px-4 font-bold text-slate-900">{{ inv.company.name }}</td>
+              <td class="py-3 px-4 font-black text-slate-900">{{ inv.currency }} {{ inv.total_amount }}</td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if inv.status == 'paid' %}bg-emerald-100 text-emerald-800{% elif inv.status == 'open' %}bg-amber-100 text-amber-800{% else %}bg-rose-100 text-rose-800{% endif %}">
+                  {{ inv.get_status_display|upper }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-slate-600">{{ inv.invoice_date|date:"M d, Y" }}</td>
+              <td class="py-3 px-4 text-slate-600">
+                {% if inv.paid_at %}{{ inv.paid_at|date:"M d, Y H:i" }}{% else %}<span class="text-slate-400">—</span>{% endif %}
+              </td>
+              <td class="py-3 px-4 text-right">
+                <button type="button" onclick="openInvoiceDetailsModal('{{ inv.invoice_number }}', '{{ inv.company.name|escapejs }}', '{{ inv.currency }} {{ inv.total_amount }}', '{{ inv.status|upper }}', '{{ inv.invoice_date|date:'M d, Y' }}', '{{ inv.paid_at|date:'M d, Y'|default:'Pending' }}', '{{ inv.line_items|escapejs }}')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition cursor-pointer">
+                  <i class="fa-solid fa-eye mr-1"></i> Inspect
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="py-8 text-center text-slate-400">No invoices generated yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
 </div>
 
-<!-- Adjustment Modal -->
+<!-- MODAL 1: Adjust Company Subscription & Credits -->
 <div id="planModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">
     <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -244,9 +589,24 @@
       <div>
         <label class="block font-bold text-slate-700 mb-1">Subscription Plan Tier</label>
         <select name="plan" id="modalPlanSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-1 focus:ring-amber-500">
+          {% for p in plans_catalog %}
+            <option value="{{ p.code }}">{{ p.name }} ({{ p.included_credits }} credits included - {{ p.currency }} {{ p.price }})</option>
+          {% endfor %}
           <option value="free">Free Starter Plan (Default 50 credits)</option>
           <option value="pro">Pro Plan (Default 200 credits)</option>
           <option value="enterprise">Enterprise Plan (Unlimited / Custom)</option>
+        </select>
+      </div>
+
+      <!-- Subscription Status -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Subscription Status</label>
+        <select name="status" id="modalStatusSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-1 focus:ring-amber-500">
+          <option value="active">Active</option>
+          <option value="trial">Trial</option>
+          <option value="suspended">Suspended (Restricts AI search actions)</option>
+          <option value="past_due">Past Due</option>
+          <option value="cancelled">Cancelled</option>
         </select>
       </div>
 
@@ -272,10 +632,10 @@
 
       <!-- Submit / Cancel -->
       <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-        <button type="button" onclick="closePlanModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+        <button type="button" onclick="closePlanModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
           Cancel
         </button>
-        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-sm">
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm cursor-pointer">
           <i class="fa-solid fa-check mr-1.5"></i> Save Adjustments
         </button>
       </div>
@@ -283,10 +643,241 @@
   </div>
 </div>
 
+<!-- MODAL 2: Create / Edit Subscription Plan -->
+<div id="planCatalogModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div>
+        <h3 class="text-base font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-cubes text-blue-600 mr-2"></i> <span id="planCatalogModalTitle">Create Subscription Plan</span>
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">Configure commercial pricing and limits for platform users.</p>
+      </div>
+      <button type="button" onclick="closePlanCatalogModal()" class="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'admin-panel-plan-save' %}" class="space-y-4 pt-4 text-xs">
+      {% csrf_token %}
+      <input type="hidden" name="plan_id" id="catalogPlanId" value="">
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Plan Code (Unique)</label>
+          <input type="text" name="code" id="catalogPlanCode" placeholder="e.g. growth" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Plan Name</label>
+          <input type="text" name="name" id="catalogPlanName" placeholder="e.g. Growth Pro" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Description</label>
+        <textarea name="description" id="catalogPlanDesc" rows="2" placeholder="Brief summary of plan inclusions..." class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Billing Cycle</label>
+          <select name="billing_cycle" id="catalogPlanCycle" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none">
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Price</label>
+          <input type="number" step="0.01" name="price" id="catalogPlanPrice" placeholder="0.00" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Currency</label>
+          <input type="text" name="currency" id="catalogPlanCurrency" value="INR" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Included Credits</label>
+          <input type="number" name="included_credits" id="catalogPlanCredits" value="500" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Max Team Seats</label>
+          <input type="number" name="max_team_members" id="catalogPlanSeats" value="5" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500" required>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Monthly Search Limit</label>
+          <input type="number" name="search_limit_monthly" id="catalogPlanSearchLimit" value="500" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 pt-2">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Status</label>
+          <select name="status" id="catalogPlanStatus" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div class="flex items-center mt-6">
+          <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+            <input type="checkbox" name="is_public" id="catalogPlanPublic" value="true" checked class="w-4 h-4 text-blue-600 rounded">
+            <span>Publicly Visible in Pricing</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="closePlanCatalogModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm cursor-pointer">
+          <i class="fa-solid fa-save mr-1.5"></i> Save Plan Tier
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL 3: Edit Feature Credit Cost -->
+<div id="featureCostModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div>
+        <h3 class="text-base font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-tags text-emerald-600 mr-2"></i> Configure Feature Credit Cost
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5" id="featureCostTitle">Feature Rate Rule</p>
+      </div>
+      <button type="button" onclick="closeFeatureCostModal()" class="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'admin-panel-feature-cost-update' %}" class="space-y-4 pt-4 text-xs">
+      {% csrf_token %}
+      <input type="hidden" name="feature_code" id="featureCostCode" value="">
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Feature Name</label>
+        <input type="text" id="featureCostName" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-bold text-slate-800 outline-none">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Credit Cost (Per unit)</label>
+          <input type="number" name="credit_cost" id="featureCostVal" min="1" max="1000" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500" required>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Charging Unit</label>
+          <select name="charging_unit" id="featureCostUnit" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none">
+            <option value="per_job">Per Search Job</option>
+            <option value="per_domain">Per Domain / Website</option>
+            <option value="per_item">Per Item Matched</option>
+            <option value="per_export">Per Export</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center pt-2">
+        <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+          <input type="checkbox" name="is_active" id="featureCostActive" value="true" checked class="w-4 h-4 text-emerald-600 rounded">
+          <span>Rule is Active (credits deducted on operation)</span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="closeFeatureCostModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm cursor-pointer">
+          <i class="fa-solid fa-check mr-1.5"></i> Update Rate
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL 4: Invoice Details Inspector -->
+<div id="invoiceDetailsModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200 text-xs">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div>
+        <h3 class="text-base font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-file-invoice text-purple-600 mr-2"></i> Platform Tax Invoice Details
+        </h3>
+        <p class="text-slate-500 font-mono mt-0.5" id="invModalNumber">INV-0000</p>
+      </div>
+      <button type="button" onclick="closeInvoiceDetailsModal()" class="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="py-4 space-y-3">
+      <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
+        <div>
+          <span class="text-slate-400 block text-[11px]">Billed Tenant</span>
+          <span class="font-bold text-slate-900" id="invModalCompany">—</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block text-[11px]">Total Settled Amount</span>
+          <span class="font-black text-purple-700" id="invModalAmount">—</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block text-[11px]">Invoice Date</span>
+          <span class="font-semibold text-slate-700" id="invModalDate">—</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block text-[11px]">Status</span>
+          <span class="font-bold text-emerald-700" id="invModalStatus">—</span>
+        </div>
+      </div>
+
+      <div>
+        <span class="font-bold text-slate-700 block mb-1">Itemized Line Data:</span>
+        <pre id="invModalItems" class="p-3 bg-slate-900 text-emerald-400 rounded-xl font-mono text-[11px] overflow-x-auto whitespace-pre-wrap"></pre>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end pt-3 border-t border-slate-100">
+      <button type="button" onclick="closeInvoiceDetailsModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 transition cursor-pointer">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
-function openPlanModal(companyId, companyName, currentPlan, totalCredits, remainingCredits, validTill) {
+// Tab Switching Logic
+function switchAdminTab(tabKey) {
+  // Hide all tab contents
+  document.querySelectorAll('.admin-tab-content').forEach(el => {
+    el.classList.add('hidden');
+  });
+  // Reset all buttons
+  document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+    btn.classList.remove('bg-slate-900', 'text-white', 'shadow-sm');
+    btn.classList.add('bg-white', 'text-slate-700', 'hover:bg-slate-100', 'border', 'border-slate-200');
+  });
+
+  // Activate selected
+  const activeContent = document.getElementById('tabContent-' + tabKey);
+  const activeBtn = document.getElementById('tabBtn-' + tabKey);
+
+  if (activeContent) activeContent.classList.remove('hidden');
+  if (activeBtn) {
+    activeBtn.classList.remove('bg-white', 'text-slate-700', 'hover:bg-slate-100', 'border', 'border-slate-200');
+    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-sm');
+  }
+}
+
+// Company Plan Adjustment Modal
+function openPlanModal(companyId, companyName, currentPlan, totalCredits, remainingCredits, validTill, currentStatus) {
   document.getElementById('modalCompanyName').textContent = companyName;
   document.getElementById('modalPlanSelect').value = currentPlan;
+  document.getElementById('modalStatusSelect').value = currentStatus || 'active';
   document.getElementById('modalCreditsAdd').value = "0";
   document.getElementById('modalValidTill').value = validTill || "";
   document.getElementById('planForm').action = "/admin-panel/plans/" + companyId + "/update/";
@@ -295,6 +886,84 @@ function openPlanModal(companyId, companyName, currentPlan, totalCredits, remain
 
 function closePlanModal() {
   document.getElementById('planModal').classList.add('hidden');
+}
+
+// Plan Catalog Modal (Create/Edit)
+function openCreatePlanModal() {
+  document.getElementById('planCatalogModalTitle').textContent = "Create New Subscription Plan";
+  document.getElementById('catalogPlanId').value = "";
+  document.getElementById('catalogPlanCode').value = "";
+  document.getElementById('catalogPlanCode').removeAttribute('readonly');
+  document.getElementById('catalogPlanName').value = "";
+  document.getElementById('catalogPlanDesc').value = "";
+  document.getElementById('catalogPlanCycle').value = "monthly";
+  document.getElementById('catalogPlanPrice').value = "0.00";
+  document.getElementById('catalogPlanCurrency').value = "INR";
+  document.getElementById('catalogPlanCredits').value = "500";
+  document.getElementById('catalogPlanSeats').value = "5";
+  document.getElementById('catalogPlanSearchLimit').value = "500";
+  document.getElementById('catalogPlanStatus').value = "active";
+  document.getElementById('catalogPlanPublic').checked = true;
+  document.getElementById('planCatalogModal').classList.remove('hidden');
+}
+
+function openEditPlanModal(id, code, name, desc, cycle, price, curr, credits, seats, limit, status, isPublic) {
+  document.getElementById('planCatalogModalTitle').textContent = "Edit Plan: " + name;
+  document.getElementById('catalogPlanId').value = id;
+  document.getElementById('catalogPlanCode').value = code;
+  document.getElementById('catalogPlanCode').setAttribute('readonly', 'readonly');
+  document.getElementById('catalogPlanName').value = name;
+  document.getElementById('catalogPlanDesc').value = desc;
+  document.getElementById('catalogPlanCycle').value = cycle;
+  document.getElementById('catalogPlanPrice').value = price;
+  document.getElementById('catalogPlanCurrency').value = curr;
+  document.getElementById('catalogPlanCredits').value = credits;
+  document.getElementById('catalogPlanSeats').value = seats;
+  document.getElementById('catalogPlanSearchLimit').value = limit;
+  document.getElementById('catalogPlanStatus').value = status;
+  document.getElementById('catalogPlanPublic').checked = isPublic;
+  document.getElementById('planCatalogModal').classList.remove('hidden');
+}
+
+function closePlanCatalogModal() {
+  document.getElementById('planCatalogModal').classList.add('hidden');
+}
+
+// Feature Rate Card Modal
+function openEditFeatureCostModal(code, name, cost, unit, isActive) {
+  document.getElementById('featureCostTitle').textContent = name + " (" + code + ")";
+  document.getElementById('featureCostCode').value = code;
+  document.getElementById('featureCostName').value = name;
+  document.getElementById('featureCostVal').value = cost;
+  document.getElementById('featureCostUnit').value = unit;
+  document.getElementById('featureCostActive').checked = isActive;
+  document.getElementById('featureCostModal').classList.remove('hidden');
+}
+
+function closeFeatureCostModal() {
+  document.getElementById('featureCostModal').classList.add('hidden');
+}
+
+// Invoice Details Modal
+function openInvoiceDetailsModal(invNumber, compName, amount, status, date, paidAt, items) {
+  document.getElementById('invModalNumber').textContent = invNumber;
+  document.getElementById('invModalCompany').textContent = compName;
+  document.getElementById('invModalAmount').textContent = amount;
+  document.getElementById('invModalStatus').textContent = status;
+  document.getElementById('invModalDate').textContent = date;
+  
+  let formattedItems = items;
+  try {
+    const parsed = JSON.parse(items);
+    formattedItems = JSON.stringify(parsed, null, 2);
+  } catch(e) {}
+  document.getElementById('invModalItems').textContent = formattedItems || "No extra line items details recorded.";
+
+  document.getElementById('invoiceDetailsModal').classList.remove('hidden');
+}
+
+function closeInvoiceDetailsModal() {
+  document.getElementById('invoiceDetailsModal').classList.add('hidden');
 }
 </script>
 {% endblock %}

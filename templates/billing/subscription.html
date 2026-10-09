@@ -3,108 +3,904 @@
 {% block title %}Subscription & Credits — {{ company.name }}{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-6 max-w-7xl mx-auto">
 
-  <div>
-    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Subscription & AI Credits</h1>
-    <p class="text-xs text-slate-500 mt-1">Manage search quota, billing period, and platform tiers</p>
-  </div>
-
-  <!-- Usage Overview Card -->
-  <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-    <div class="flex items-center space-x-5">
-      <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl border border-amber-100">
-        <i class="fa-solid fa-crown"></i>
-      </div>
-      <div>
-        <div class="flex items-center space-x-2">
-          <h2 class="text-xl font-black text-slate-900">{{ subscription.get_plan_display }}</h2>
-          <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">Active</span>
-        </div>
-        <p class="text-xs text-slate-500 mt-0.5">Next Renewal Date: <strong>{% if subscription.valid_till %}{{ subscription.valid_till|date:"M d, Y" }}{% else %}Auto-renewing monthly{% endif %}</strong></p>
-      </div>
-    </div>
-
-    <div class="w-full md:w-64 space-y-2">
-      <div class="flex justify-between text-xs font-semibold">
-        <span class="text-slate-500">Credits Remaining:</span>
-        <span class="text-slate-900 font-bold">{{ subscription.credits_remaining }} / {{ subscription.credits_total }}</span>
-      </div>
-      <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
-        <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ subscription.usage_percentage }}%"></div>
-      </div>
-      <div class="text-[11px] text-right text-slate-400">{{ subscription.usage_percentage }}% utilized</div>
-    </div>
-  </div>
-
-  <!-- Plans Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-    <!-- Free -->
-    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
-      <div>
-        <h3 class="font-bold text-slate-900 text-base">Free Plan</h3>
-        <div class="mt-2 text-2xl font-black text-slate-900">₹0 <span class="text-xs font-normal text-slate-400">/mo</span></div>
-        <ul class="mt-4 space-y-2 text-xs text-slate-600">
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> 50 monthly search credits</li>
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Domestic suppliers only</li>
-          <li><i class="fa-solid fa-xmark text-slate-300 mr-2"></i> No global cheaper options</li>
-        </ul>
-      </div>
-      <div class="mt-6">
-        <span class="w-full text-center block bg-slate-100 text-slate-400 text-xs font-semibold py-2 rounded-lg">Default</span>
-      </div>
-    </div>
-
-    <!-- Pro Plan (Current) -->
-    <div class="bg-white rounded-2xl p-6 border-2 border-blue-600 shadow-lg relative flex flex-col justify-between">
-      <span class="absolute -top-3 right-6 bg-blue-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider">
-        Current Plan
-      </span>
-      <div>
-        <h3 class="font-bold text-slate-900 text-base">Pro Plan</h3>
-        <div class="mt-2 text-2xl font-black text-slate-900">₹14,999 <span class="text-xs font-normal text-slate-400">/mo</span></div>
-        <ul class="mt-4 space-y-2 text-xs text-slate-600">
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> 500 monthly search credits</li>
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Global suppliers & exporters</li>
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Cheaper option detection</li>
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Excel & PDF exports</li>
-        </ul>
-      </div>
-      <div class="mt-6">
-        <button disabled class="w-full text-center bg-blue-50 text-blue-600 font-bold text-xs py-2 rounded-lg border border-blue-200">
-          Active Plan
-        </button>
-      </div>
-    </div>
-
-    <!-- Enterprise Plan -->
-    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
-      <div>
-        <h3 class="font-bold text-slate-900 text-base">Enterprise Plan</h3>
-        <div class="mt-2 text-2xl font-black text-slate-900">₹49,999 <span class="text-xs font-normal text-slate-400">/mo</span></div>
-        <ul class="mt-4 space-y-2 text-xs text-slate-600">
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Unlimited / 2,500 credits</li>
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Custom crawler integrations</li>
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Dedicated account manager</li>
-          <li><i class="fa-solid fa-check text-emerald-500 mr-2"></i> Priority API throughput</li>
-        </ul>
-      </div>
-      <form method="POST" class="mt-6">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="upgrade_plan">
-        <input type="hidden" name="plan" value="enterprise">
+  <!-- ========================================================================= -->
+  <!-- TOP HEADER & ROLE CONTEXT BANNER                                          -->
+  <!-- ========================================================================= -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Subscription &amp; AI Credits</h1>
         {% if rbac.is_company_admin or rbac.is_super_admin %}
-        <button type="submit" class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2 rounded-lg transition shadow">
-          Upgrade to Enterprise
-        </button>
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+            <i class="fa-solid fa-crown text-[10px]"></i> Company Admin View
+          </span>
         {% else %}
-        <button disabled class="w-full bg-slate-100 text-slate-400 font-semibold text-xs py-2 rounded-lg cursor-not-allowed">
-          Admin Upgrade Only
-        </button>
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+            <i class="fa-solid fa-user-check text-[10px]"></i> Personal Usage View
+          </span>
         {% endif %}
-      </form>
+      </div>
+      <p class="text-xs text-slate-500">
+        {% if rbac.is_company_admin or rbac.is_super_admin %}
+          Manage company subscription tier, AI credit wallet, team quotas, invoices, and top-up packs.
+        {% else %}
+          Monitor your personal AI feature consumption, recent extraction jobs, and company available balance.
+        {% endif %}
+      </p>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="flex items-center gap-2.5">
+      {% if rbac.is_company_admin or rbac.is_super_admin %}
+        <button 
+          type="button" 
+          onclick="openBuyCreditsModal()"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-sm cursor-pointer"
+        >
+          <i class="fa-solid fa-bolt"></i>
+          <span>Buy Credits</span>
+        </button>
+
+        <form method="POST" class="inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="renew_plan">
+          <button 
+            type="submit" 
+            onclick="return confirm('Confirm renewal of your {{ subscription.get_plan_display }} plan for the next billing cycle?')"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-black text-white transition shadow-sm cursor-pointer"
+          >
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Renew Plan</span>
+          </button>
+        </form>
+      {% else %}
+        <button 
+          type="button" 
+          onclick="openRequestTopupModal()"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-sm cursor-pointer"
+        >
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Request Credit Recharge</span>
+        </button>
+      {% endif %}
     </div>
   </div>
+
+  <!-- ========================================================================= -->
+  <!-- 4 PRIMARY KPI SUMMARY CARDS                                               -->
+  <!-- ========================================================================= -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    
+    <!-- 1. Current Plan Card -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Current Plan</span>
+          <h2 class="text-xl font-black text-slate-900">{{ subscription.get_plan_display }}</h2>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg border border-amber-100">
+          <i class="fa-solid fa-crown"></i>
+        </div>
+      </div>
+      <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px]">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold {% if subscription.status == 'active' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {{ subscription.get_status_display }}
+        </span>
+        <span class="text-slate-500">Renews: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"Auto-monthly" }}</strong></span>
+      </div>
+    </div>
+
+    <!-- 2. Available Credit Balance -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Available Credits</span>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl font-black text-blue-600">{{ wallet.total_available }}</span>
+            <span class="text-xs text-slate-400 font-semibold">/ {{ wallet.total_pool }} pool</span>
+          </div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg border border-blue-100">
+          <i class="fa-solid fa-coins"></i>
+        </div>
+      </div>
+      <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Plan: <strong>{{ wallet.subscription_credits }}</strong></span>
+        <span>Top-up: <strong>{{ wallet.purchased_credits }}</strong></span>
+        <span>Hold: <strong>{{ wallet.reserved_credits }}</strong></span>
+      </div>
+    </div>
+
+    <!-- 3. Credit Consumption & Progress -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Company Consumed</span>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl font-black text-slate-800">{{ wallet.credits_consumed }}</span>
+            <span class="text-xs text-slate-400 font-semibold">credits</span>
+          </div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg border border-purple-100">
+          <i class="fa-solid fa-chart-pie"></i>
+        </div>
+      </div>
+      <div class="mt-3 space-y-1">
+        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+          <div class="bg-blue-600 h-2 rounded-full" style="width: {{ wallet.usage_percentage }}%"></div>
+        </div>
+        <div class="flex justify-between text-[10px] text-slate-400">
+          <span>{{ wallet.usage_percentage }}% utilized</span>
+          <span>{{ wallet.total_available }} remaining</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Role-Specific Metric Card -->
+    {% if rbac.is_company_admin or rbac.is_super_admin %}
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Team &amp; Invoices</span>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl font-black text-slate-900">{{ company.members.count }}</span>
+            <span class="text-xs text-slate-400 font-semibold">/ {{ subscription.plan_tier.max_team_members|default:5 }} seats</span>
+          </div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg border border-emerald-100">
+          <i class="fa-solid fa-users"></i>
+        </div>
+      </div>
+      <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Paid Invoices: <strong>{{ invoices|length }}</strong></span>
+        <a href="#invoices-section" class="text-blue-600 hover:underline font-bold">View Invoices &rarr;</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">My Personal Usage</span>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl font-black text-blue-600">{{ my_credits_used }}</span>
+            <span class="text-xs text-slate-400 font-semibold">credits</span>
+          </div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg border border-indigo-100">
+          <i class="fa-solid fa-user-tag"></i>
+        </div>
+      </div>
+      <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Searches: <strong>{{ my_searches_count }}</strong></span>
+        <span>Matching: <strong>{{ my_matching_count }}</strong></span>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Low Credit Alert Banner (if balance <= 50) -->
+  {% if wallet.total_available <= 50 %}
+  <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-base">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div>
+        <h4 class="text-xs font-bold">Low Credit Warning: Only {{ wallet.total_available }} credits remaining</h4>
+        <p class="text-[11px] text-amber-700">Your procurement operations will be restricted when credits reach zero. Please recharge or contact your Company Admin.</p>
+      </div>
+    </div>
+    {% if rbac.is_company_admin or rbac.is_super_admin %}
+    <button type="button" onclick="openBuyCreditsModal()" class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-xs whitespace-nowrap cursor-pointer">
+      Recharge Now
+    </button>
+    {% else %}
+    <button type="button" onclick="openRequestTopupModal()" class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-xs whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5">
+      <i class="fa-solid fa-paper-plane text-xs"></i>
+      <span>Request Top-Up</span>
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ========================================================================= -->
+  <!-- ROLE BRANCH 1: COMPANY USER PERSONAL USAGE DASHBOARD                      -->
+  <!-- ========================================================================= -->
+  {% if not rbac.is_company_admin and not rbac.is_super_admin %}
+  
+  <!-- My Features Breakdown -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+    <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+      <i class="fa-solid fa-chart-line text-blue-600"></i> My AI Feature Utilization Breakdown
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+        <div class="text-[11px] font-bold text-slate-400 uppercase">Vendor Discovery Searches</div>
+        <div class="text-2xl font-black text-slate-900 mt-1">{{ my_searches_count }}</div>
+        <p class="text-[11px] text-slate-500 mt-1">Multi-source supplier web discoveries initiated</p>
+      </div>
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+        <div class="text-[11px] font-bold text-slate-400 uppercase">Websites Extracted</div>
+        <div class="text-2xl font-black text-slate-900 mt-1">{{ my_extractions_count }}</div>
+        <p class="text-[11px] text-slate-500 mt-1">Direct domain facilities &amp; catalog extracts</p>
+      </div>
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+        <div class="text-[11px] font-bold text-slate-400 uppercase">AI Parameter Matches</div>
+        <div class="text-2xl font-black text-slate-900 mt-1">{{ my_matching_count }}</div>
+        <p class="text-[11px] text-slate-500 mt-1">Technical specification alignment checks</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- My Recent Jobs Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left text-blue-600"></i> My Recent Billable Operations
+      </h3>
+      <span class="text-[11px] text-slate-500">{{ my_recent_jobs|length }} recent jobs</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Feature</th>
+            <th class="py-2.5 px-3">Job ID / Target</th>
+            <th class="py-2.5 px-3">Credits Charged</th>
+            <th class="py-2.5 px-3">Status</th>
+            <th class="py-2.5 px-3 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for job in my_recent_jobs %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-800">
+              <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[11px]">
+                {{ job.feature_code|title }}
+              </span>
+            </td>
+            <td class="py-3 px-3 font-mono text-slate-700">
+              {% if job.search_job %}
+                Job #{{ job.search_job.id }} &mdash; {{ job.search_job.search_query|truncatechars:45 }}
+              {% else %}
+                Job #{{ job.id }}
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 font-bold text-rose-600">-{{ job.credits_charged }}</td>
+            <td class="py-3 px-3">
+              {% if job.status == 'completed' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Completed</span>
+              {% elif job.status == 'reserved' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Reserved</span>
+              {% elif job.status == 'refunded' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800">Refunded</span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Failed</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 text-right text-slate-400">{{ job.started_at|date:"M d, Y H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="py-8 text-center text-slate-400">No billable operations performed yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500">
+    <i class="fa-solid fa-lock text-slate-400 mr-1.5"></i>
+    Subscription plan tiers, credit purchases, and company invoices are restricted to Company Administrators.
+  </div>
+
+  {% endif %}
+
+  <!-- ========================================================================= -->
+  <!-- ROLE BRANCH 2: COMPANY ADMIN FULL BILLING & QUOTAS DASHBOARD              -->
+  <!-- ========================================================================= -->
+  {% if rbac.is_company_admin or rbac.is_super_admin %}
+
+  <!-- Available Plans Comparison Grid -->
+  <div>
+    <div class="mb-3 flex items-center justify-between">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Available Subscription Tiers</h3>
+        <p class="text-xs text-slate-500">Upgrade or downgrade your organization tier at any time</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {% for plan in available_plans %}
+      <div class="bg-white rounded-2xl p-6 border {% if subscription.plan_tier.code == plan.code %}border-2 border-blue-600 shadow-md relative{% else %}border-slate-200 shadow-xs{% endif %} flex flex-col justify-between">
+        
+        {% if subscription.plan_tier.code == plan.code %}
+        <span class="absolute -top-3 right-6 bg-blue-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
+          Active Plan
+        </span>
+        {% endif %}
+
+        <div>
+          <div class="flex items-center justify-between">
+            <h4 class="font-bold text-slate-900 text-base">{{ plan.name }}</h4>
+            <span class="text-[10px] font-mono text-slate-400 uppercase">{{ plan.billing_cycle }}</span>
+          </div>
+          <div class="mt-2 text-2xl font-black text-slate-900">
+            {{ plan.currency }} {{ plan.price }}
+            <span class="text-xs font-normal text-slate-400">/{{ plan.billing_cycle|slice:":2" }}</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">{{ plan.description }}</p>
+
+          <ul class="mt-4 space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-4">
+            <li class="flex items-center gap-2">
+              <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
+              <strong>{{ plan.included_credits }}</strong> monthly AI search credits
+            </li>
+            <li class="flex items-center gap-2">
+              <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
+              Up to <strong>{{ plan.max_team_members }}</strong> team members
+            </li>
+            <li class="flex items-center gap-2">
+              <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
+              <strong>{{ plan.max_products }}</strong> products catalog limit
+            </li>
+            <li class="flex items-center gap-2">
+              <i class="fa-solid fa-check text-emerald-500 text-xs"></i>
+              <strong>{{ plan.max_saved_vendors }}</strong> saved vendors capacity
+            </li>
+          </ul>
+        </div>
+
+        <div class="mt-6">
+          {% if subscription.plan_tier.code == plan.code %}
+            <button disabled class="w-full text-center bg-blue-50 text-blue-700 font-bold text-xs py-2 rounded-xl border border-blue-200">
+              Current Plan Active
+            </button>
+          {% else %}
+            <button 
+              type="button" 
+              onclick="openUpgradeModal('{{ plan.code }}', '{{ plan.name|escapejs }}', '{{ plan.price }}', '{{ plan.currency }}', '{{ plan.included_credits }}')"
+              class="w-full bg-slate-900 hover:bg-black text-white font-bold text-xs py-2 rounded-xl transition shadow cursor-pointer"
+            >
+              Switch to {{ plan.name }}
+            </button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Team Members Usage Breakdown -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-users text-blue-600"></i> Team Member Credit Consumption
+      </h3>
+      <span class="text-[11px] text-slate-500">Track which employee uses AI discovery features</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Member</th>
+            <th class="py-2.5 px-3">Email Address</th>
+            <th class="py-2.5 px-3">Total Operations</th>
+            <th class="py-2.5 px-3">Credits Consumed</th>
+            <th class="py-2.5 px-3 text-right">Share of Total</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for member in team_usage %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-900">
+              {{ member.user__first_name|default:"" }} {{ member.user__last_name|default:"" }}
+              {% if not member.user__first_name %}{{ member.user__email }}{% endif %}
+            </td>
+            <td class="py-3 px-3 text-slate-500 font-mono text-[11px]">{{ member.user__email }}</td>
+            <td class="py-3 px-3 font-semibold text-slate-700">{{ member.total_jobs }} jobs</td>
+            <td class="py-3 px-3 font-bold text-rose-600">-{{ member.total_credits }} credits</td>
+            <td class="py-3 px-3 text-right text-slate-400">
+              <span class="px-2 py-0.5 rounded bg-slate-100 font-bold text-[10px] text-slate-700">Active Contributor</span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="py-8 text-center text-slate-400">No team usage recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Credit Transactions Ledger (All Company Transactions) -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+      <div>
+        <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-receipt text-amber-500"></i> Company Credit Ledger &amp; Receipts
+        </h3>
+        <span class="text-[11px] text-slate-500">Auditable credit movements &amp; instant receipts</span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Date Range Filter -->
+        <form method="GET" class="inline-flex items-center gap-1.5 text-xs">
+          <input type="hidden" name="tx_type" value="{{ tx_type }}">
+          <select 
+            name="date_range" 
+            onchange="this.form.submit()" 
+            class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="all" {% if date_range == 'all' %}selected{% endif %}>All Time</option>
+            <option value="7d" {% if date_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+            <option value="30d" {% if date_range == '30d' %}selected{% endif %}>Last 30 Days</option>
+            <option value="90d" {% if date_range == '90d' %}selected{% endif %}>Last 90 Days</option>
+          </select>
+        </form>
+
+        <!-- CSV Export Button -->
+        <a 
+          href="?export=ledger_csv" 
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition cursor-pointer"
+          title="Download complete ledger as CSV file"
+        >
+          <i class="fa-solid fa-file-csv text-emerald-600"></i>
+          <span>Export CSV</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Filter Pills Row -->
+    <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
+      <span class="text-slate-400 font-bold mr-1 uppercase text-[10px]">Filter:</span>
+      <a 
+        href="?tx_type=all&date_range={{ date_range }}" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'all' or not tx_type %}bg-slate-900 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >All Events</a>
+      <a 
+        href="?tx_type=deduction&date_range={{ date_range }}" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'deduction' %}bg-rose-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Deductions</a>
+      <a 
+        href="?tx_type=purchase&date_range={{ date_range }}" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'purchase' %}bg-amber-500 text-slate-950{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Top-Up Packs</a>
+      <a 
+        href="?tx_type=allocation&date_range={{ date_range }}" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'allocation' %}bg-emerald-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Plan Credits</a>
+      <a 
+        href="?tx_type=refund&date_range={{ date_range }}" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'refund' %}bg-blue-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Refunds</a>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Receipt Ref</th>
+            <th class="py-2.5 px-3">Triggered By</th>
+            <th class="py-2.5 px-3">Type</th>
+            <th class="py-2.5 px-3">Credits</th>
+            <th class="py-2.5 px-3">Balance After</th>
+            <th class="py-2.5 px-3">Reason / Feature</th>
+            <th class="py-2.5 px-3 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for tx in company_transactions %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-blue-700">
+              #{{ tx.receipt_number|default:"RCP-00000" }}
+            </td>
+            <td class="py-3 px-3 text-slate-700 font-medium">
+              {% if tx.user %}{{ tx.user.get_full_name|default:tx.user.email }}{% else %}System Engine{% endif %}
+            </td>
+            <td class="py-3 px-3">
+              {% if tx.transaction_type == 'allocation' or tx.transaction_type == 'purchase' or tx.transaction_type == 'refund' or tx.credits > 0 %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-plus mr-1 text-[8px]"></i> {{ tx.get_transaction_type_display }}
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                  <i class="fa-solid fa-minus mr-1 text-[8px]"></i> {{ tx.get_transaction_type_display }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 font-bold {% if tx.credits > 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
+              {% if tx.credits > 0 %}+{% endif %}{{ tx.credits }}
+            </td>
+            <td class="py-3 px-3 font-semibold text-slate-800">{{ tx.balance_after }}</td>
+            <td class="py-3 px-3 text-slate-600">{{ tx.notes }}</td>
+            <td class="py-3 px-3 text-right text-slate-400">{{ tx.created_at|date:"M d, Y H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-8 text-center text-slate-400">No credit transactions matching criteria.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination Footer -->
+    {% if company_transactions.has_other_pages %}
+    <div class="p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/50">
+      <div>
+        Showing page <strong>{{ company_transactions.number }}</strong> of <strong>{{ company_transactions.paginator.num_pages }}</strong> ({{ company_transactions.paginator.count }} transactions)
+      </div>
+      <div class="flex items-center gap-1.5">
+        {% if company_transactions.has_previous %}
+          <a href="?page={{ company_transactions.previous_page_number }}&tx_type={{ tx_type }}&date_range={{ date_range }}" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">&laquo; Prev</a>
+        {% endif %}
+        <span class="px-2.5 py-1 font-bold text-slate-900 bg-white border border-slate-200 rounded-lg">{{ company_transactions.number }}</span>
+        {% if company_transactions.has_next %}
+          <a href="?page={{ company_transactions.next_page_number }}&tx_type={{ tx_type }}&date_range={{ date_range }}" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">Next &raquo;</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Invoices & Billing History Section -->
+  <div id="invoices-section" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="text-xs font-bold text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-file-invoice-dollar text-emerald-600"></i> Invoices &amp; Billing History
+      </h3>
+      <span class="text-[11px] text-slate-500">{{ invoices|length }} recorded invoices</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Invoice #</th>
+            <th class="py-2.5 px-3">Billing Period</th>
+            <th class="py-2.5 px-3">Amount</th>
+            <th class="py-2.5 px-3">Status</th>
+            <th class="py-2.5 px-3">Date</th>
+            <th class="py-2.5 px-3 text-right">Receipt</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for inv in invoices %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-slate-900">{{ inv.invoice_number }}</td>
+            <td class="py-3 px-3 text-slate-600">{{ inv.billing_period_start|date:"M d" }} &ndash; {{ inv.billing_period_end|date:"M d, Y" }}</td>
+            <td class="py-3 px-3 font-bold text-slate-900">{{ inv.currency }} {{ inv.total_amount }}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                {{ inv.get_status_display }}
+              </span>
+            </td>
+            <td class="py-3 px-3 text-slate-500">{{ inv.issue_date|date:"M d, Y" }}</td>
+            <td class="py-3 px-3 text-right">
+              <button 
+                type="button" 
+                onclick="openInvoiceModal('{{ inv.invoice_number }}', '{{ inv.subtotal|default:inv.total_amount }}', '{{ inv.tax|default:'0.00' }}', '{{ inv.total_amount }}', '{{ inv.currency }}', '{{ inv.issue_date|date:'M d, Y' }}', '{{ company.name|escapejs }}')"
+                class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition cursor-pointer"
+              >
+                <i class="fa-solid fa-eye text-slate-500 mr-1"></i> View
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="py-8 text-center text-slate-400">No invoices generated yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% endif %}
 
 </div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: UPGRADE / CHANGE PLAN (WITH 18% GST BREAKDOWN)                     -->
+<!-- ========================================================================= -->
+<div id="upgradePlanModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-arrow-up-right-dots"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Confirm Plan Upgrade</h3>
+          <p class="text-xs text-slate-500">Includes 18% GST with immediate tax invoice receipt</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeUpgradeModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="upgrade_plan">
+      <input type="hidden" name="plan_code" id="upgradeModalPlanCode" value="">
+
+      <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Selected Plan:</span>
+          <span class="font-bold text-slate-900" id="upgradeModalPlanName">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Included Monthly Credits:</span>
+          <span class="font-bold text-blue-600" id="upgradeModalCredits">-</span>
+        </div>
+        <div class="flex justify-between border-t border-slate-200 pt-2">
+          <span class="text-slate-500">Base Subscription:</span>
+          <span class="font-semibold text-slate-700" id="upgradeModalBasePrice">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">GST (18% - SAC 998313):</span>
+          <span class="font-semibold text-slate-700" id="upgradeModalTax">-</span>
+        </div>
+        <div class="flex justify-between border-t border-slate-200 pt-2 text-sm">
+          <span class="font-bold text-slate-900">Total Payable:</span>
+          <span class="font-black text-blue-700" id="upgradeModalPrice">-</span>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-slate-400">
+        By proceeding, an official tax invoice will be generated and credits will be added to your company wallet immediately.
+      </p>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeUpgradeModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-check"></i>
+          <span>Confirm &amp; Activate</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: BUY CREDITS TOP-UP PACK (WITH 18% GST BREAKDOWN)                   -->
+<!-- ========================================================================= -->
+<div id="buyCreditsModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-bolt"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Purchase Additional Credits</h3>
+          <p class="text-xs text-slate-500">Top-up packs never expire &amp; carry over monthly (incl. 18% GST)</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeBuyCreditsModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="buy_credits">
+
+      <div class="space-y-2.5">
+        <label class="block font-bold text-slate-700 uppercase tracking-wider">Select Credit Top-Up Pack</label>
+        
+        <label class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-amber-400 cursor-pointer bg-slate-50/50">
+          <div class="flex items-center gap-2.5">
+            <input type="radio" name="credits_pack" value="100" class="text-amber-500 focus:ring-amber-500">
+            <div>
+              <div class="font-bold text-slate-900">100 Search Credits</div>
+              <div class="text-[11px] text-slate-500">Base ₹2,499 + ₹449.82 (18% GST)</div>
+            </div>
+          </div>
+          <span class="font-bold text-slate-900">₹2,948.82</span>
+        </label>
+
+        <label class="flex items-center justify-between p-3 rounded-xl border-2 border-amber-500 cursor-pointer bg-amber-50/30">
+          <div class="flex items-center gap-2.5">
+            <input type="radio" name="credits_pack" value="500" checked class="text-amber-500 focus:ring-amber-500">
+            <div>
+              <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                <span>500 Search Credits</span>
+                <span class="bg-amber-500 text-slate-950 font-extrabold text-[9px] px-1.5 py-0.2 rounded">POPULAR</span>
+              </div>
+              <div class="text-[11px] text-slate-500">Base ₹9,999 + ₹1,799.82 (18% GST)</div>
+            </div>
+          </div>
+          <span class="font-bold text-slate-900">₹11,798.82</span>
+        </label>
+
+        <label class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-amber-400 cursor-pointer bg-slate-50/50">
+          <div class="flex items-center gap-2.5">
+            <input type="radio" name="credits_pack" value="1000" class="text-amber-500 focus:ring-amber-500">
+            <div>
+              <div class="font-bold text-slate-900">1,000 Search Credits</div>
+              <div class="text-[11px] text-slate-500">Base ₹17,999 + ₹3,239.82 (18% GST)</div>
+            </div>
+          </div>
+          <span class="font-bold text-slate-900">₹21,238.82</span>
+        </label>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeBuyCreditsModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-lock"></i>
+          <span>Complete Top-Up</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: REQUEST TOP-UP (FOR COMPANY USERS)                                 -->
+<!-- ========================================================================= -->
+<div id="requestTopupModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Request Credit Top-Up</h3>
+          <p class="text-xs text-slate-500">Notify company administrator to recharge credit wallet</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeRequestTopupModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="request_topup">
+
+      <div class="space-y-2">
+        <label class="block font-bold text-slate-700 uppercase tracking-wider">Requested Credit Pack</label>
+        <select name="credits_pack" class="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <option value="100">100 Credits — Quick vendor searches</option>
+          <option value="500" selected>500 Credits — Monthly pipeline quota</option>
+          <option value="1000">1,000 Credits — Heavy extraction &amp; matching batch</option>
+        </select>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="block font-bold text-slate-700 uppercase tracking-wider">Reason / Procurement Requirement (Optional)</label>
+        <textarea name="note" rows="3" placeholder="e.g. Need credits to run buyer discovery for machinery equipment export campaign..." class="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeRequestTopupModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Send Top-Up Request</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: INVOICE RECEIPT MODAL (WITH GST BREAKDOWN & SAC 998313)            -->
+<!-- ========================================================================= -->
+<div id="invoiceModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+      <div>
+        <div class="font-mono text-blue-600 font-black text-sm" id="modalInvNum">INV-2026-00000</div>
+        <p class="text-[11px] text-slate-400" id="modalInvDate">Date</p>
+      </div>
+      <button type="button" onclick="closeInvoiceModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="py-4 space-y-2.5 text-xs">
+      <div class="flex justify-between">
+        <span class="text-slate-500">Billed To:</span>
+        <span class="font-bold text-slate-900" id="modalInvCompany">Company Name</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-500">Service Category:</span>
+        <span class="font-semibold text-slate-800">B2B AI Procurement SaaS (SAC 998313)</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-500">Payment Status:</span>
+        <span class="px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 text-[10px]">PAID</span>
+      </div>
+
+      <div class="border-t border-slate-100 pt-2 space-y-1.5">
+        <div class="flex justify-between text-slate-600">
+          <span>Subtotal (Net):</span>
+          <span class="font-medium" id="modalInvSubtotal">INR 0.00</span>
+        </div>
+        <div class="flex justify-between text-slate-600">
+          <span>18% GST (CGST 9% + SGST 9%):</span>
+          <span class="font-medium" id="modalInvTax">INR 0.00</span>
+        </div>
+        <div class="flex justify-between border-t border-slate-200 pt-2 text-sm font-black">
+          <span class="text-slate-900">Total Paid:</span>
+          <span class="text-blue-700 font-black" id="modalInvAmount">INR 0.00</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+      <button type="button" onclick="window.print()" class="text-blue-600 hover:underline text-xs font-bold flex items-center gap-1 cursor-pointer">
+        <i class="fa-solid fa-print"></i> Print Official Receipt
+      </button>
+      <button type="button" onclick="closeInvoiceModal()" class="px-4 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openUpgradeModal(code, name, price, currency, credits) {
+  var base = parseFloat(price) || 0;
+  var tax = Math.round(base * 0.18 * 100) / 100;
+  var total = Math.round((base + tax) * 100) / 100;
+
+  document.getElementById('upgradeModalPlanCode').value = code;
+  document.getElementById('upgradeModalPlanName').textContent = name;
+  document.getElementById('upgradeModalCredits').textContent = credits + ' credits / month';
+  document.getElementById('upgradeModalBasePrice').textContent = currency + ' ' + base.toFixed(2);
+  document.getElementById('upgradeModalTax').textContent = currency + ' ' + tax.toFixed(2);
+  document.getElementById('upgradeModalPrice').textContent = currency + ' ' + total.toFixed(2);
+  document.getElementById('upgradePlanModal').classList.remove('hidden');
+}
+
+function closeUpgradeModal() {
+  document.getElementById('upgradePlanModal').classList.add('hidden');
+}
+
+function openBuyCreditsModal() {
+  document.getElementById('buyCreditsModal').classList.remove('hidden');
+}
+
+function closeBuyCreditsModal() {
+  document.getElementById('buyCreditsModal').classList.add('hidden');
+}
+
+function openRequestTopupModal() {
+  document.getElementById('requestTopupModal').classList.remove('hidden');
+}
+
+function closeRequestTopupModal() {
+  document.getElementById('requestTopupModal').classList.add('hidden');
+}
+
+function openInvoiceModal(invNum, subtotal, tax, totalAmount, currency, date, company) {
+  document.getElementById('modalInvNum').textContent = invNum;
+  document.getElementById('modalInvSubtotal').textContent = currency + ' ' + subtotal;
+  document.getElementById('modalInvTax').textContent = currency + ' ' + tax;
+  document.getElementById('modalInvAmount').textContent = currency + ' ' + totalAmount;
+  document.getElementById('modalInvDate').textContent = date;
+  document.getElementById('modalInvCompany').textContent = company;
+  document.getElementById('invoiceModal').classList.remove('hidden');
+}
+
+function closeInvoiceModal() {
+  document.getElementById('invoiceModal').classList.add('hidden');
+}
+</script>
 {% endblock %}

@@ -1610,6 +1610,21 @@ def export_reports_view(request):
             messages.warning(request, "Please select a product first to generate and download the export.")
             return redirect(f"{request.path}?report_type={report_type}")
 
+        # Credit reservation for report export
+        usage_rec = None
+        if company:
+            from apps.billing.services.wallet import CreditWalletService
+            ok, msg, usage_rec = CreditWalletService.reserve_credits(
+                company=company,
+                user=request.user,
+                feature_code="export_reports",
+                quantity=1,
+                idempotency_key=f"export_report:{company.id}:{request.user.id}:{report_type}:{selected_product.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            )
+            if not ok:
+                messages.error(request, f"Cannot export report: {msg} Please top up your wallet.")
+                return redirect(f"{request.path}?report_type={report_type}&product_id={selected_product.id}")
+
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         writer = csv.writer(response)
 
@@ -1632,7 +1647,6 @@ def export_reports_view(request):
                     item.need_signal or "",
                     item.created_at.strftime("%Y-%m-%d %H:%M"),
                 ])
-            return response
 
         elif report_type == "catalog":
             response["Content-Disposition"] = f'attachment; filename="Product_Catalog_{prod_slug}.csv"'
@@ -1656,7 +1670,6 @@ def export_reports_view(request):
                     p.specifications or "",
                     p.created_at.strftime("%Y-%m-%d %H:%M"),
                 ])
-            return response
 
         else:  # inquiries
             response["Content-Disposition"] = f'attachment; filename="Inquiries_Audit_{prod_slug}.csv"'
@@ -1674,7 +1687,12 @@ def export_reports_view(request):
                     inq.delivery_terms or "",
                     inq.sent_at.strftime("%Y-%m-%d %H:%M") if inq.sent_at else "",
                 ])
-            return response
+
+        if usage_rec:
+            from apps.billing.services.wallet import CreditWalletService
+            CreditWalletService.commit_usage(usage_rec)
+
+        return response
 
     checksum_seed = f"{company.id if company else 0}-{selected_product.id if selected_product else 0}-{timezone.now().strftime('%Y%m%d')}-{report_type}"
     report_checksum = hashlib.sha256(checksum_seed.encode("utf-8")).hexdigest()[:16].upper()

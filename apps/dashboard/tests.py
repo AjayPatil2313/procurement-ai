@@ -2916,7 +2916,7 @@ class SuperAdminHelpAndSupportTestCase(TestCase):
         self.assertEqual(self.ticket1.status, SupportTicket.Status.RESOLVED)
         self.assertEqual(self.ticket1.resolution, "Configured custom duties calculator formula in procurement settings.")
 
-    def test_regular_user_cannot_create_or_edit_faq(self):
+    def test_user_cannot_create_or_edit_faq(self):
         self.client.force_login(self.user)
         # Attempting create FAQ should be forbidden / redirected
         res_create = self.client.post(reverse("help-faq-create"), {
@@ -2927,6 +2927,52 @@ class SuperAdminHelpAndSupportTestCase(TestCase):
         self.assertNotEqual(res_create.status_code, 200)
         from apps.dashboard.models import FAQ
         self.assertFalse(FAQ.objects.filter(question="Should fail").exists())
+
+    def test_user_edit_support_ticket(self):
+        self.client.force_login(self.user)
+        # Set active company session
+        session = self.client.session
+        session["active_company_id"] = self.company.id
+        session.save()
+
+        edit_data = {
+            "subject": "Updated Landing Price Query",
+            "category": SupportTicket.Category.BILLING_CREDITS,
+            "priority": SupportTicket.Priority.URGENT,
+            "contact_email": "updated@apexheavy.com",
+            "contact_phone": "+91 99999 11111",
+            "description": "Updated query details with custom duties breakdown required.",
+        }
+        res = self.client.post(reverse("help-ticket-edit", kwargs={"pk": self.ticket1.id}), edit_data)
+        self.assertEqual(res.status_code, 302)
+        self.ticket1.refresh_from_db()
+        self.assertEqual(self.ticket1.subject, "Updated Landing Price Query")
+        self.assertEqual(self.ticket1.category, SupportTicket.Category.BILLING_CREDITS)
+        self.assertEqual(self.ticket1.priority, SupportTicket.Priority.URGENT)
+        self.assertEqual(self.ticket1.contact_email, "updated@apexheavy.com")
+        self.assertEqual(self.ticket1.contact_phone, "+91 99999 11111")
+        self.assertEqual(self.ticket1.description, "Updated query details with custom duties breakdown required.")
+
+    def test_user_soft_delete_support_ticket(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_company_id"] = self.company.id
+        session.save()
+
+        res = self.client.post(reverse("help-ticket-delete", kwargs={"pk": self.ticket1.id}))
+        self.assertEqual(res.status_code, 302)
+        self.ticket1.refresh_from_db()
+        # Verify it is soft-deleted, not purged from DB
+        self.assertTrue(self.ticket1.is_deleted)
+        self.assertIsNotNone(self.ticket1.deleted_at)
+        self.assertTrue(SupportTicket.objects.filter(id=self.ticket1.id).exists())
+
+        # Verify it no longer appears in help_support_view list or counts
+        page_res = self.client.get(reverse("help-support"))
+        self.assertEqual(page_res.status_code, 200)
+        self.assertNotContains(page_res, self.ticket1.subject)
+        self.assertEqual(page_res.context["total_tickets_count"], 0)
+
 
 
 

@@ -9,6 +9,7 @@ from apps.ai_search.services.ai_matcher import AIMatcher
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
 from apps.billing.models import Subscription, CreditTransaction
+from apps.billing.services.wallet import CreditWalletService
 
 logger = logging.getLogger(__name__)
 
@@ -177,17 +178,17 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
     location = product.location or (company.city if company else "India")
     query = f"{product.name} {category_name} industrial buyers procurement rfq {location}".strip()
 
-    # Credit enforcement
-    subscription = None
+    # Credit enforcement & atomic reservation via CreditWalletService
+    usage_rec = None
     if company:
-        subscription = getattr(company, "subscription", None)
-        if not subscription:
-            subscription, _ = Subscription.objects.get_or_create(
-                company=company,
-                defaults={"plan": Subscription.Plan.PRO, "credits_total": 500, "credits_used": 0}
-            )
-
-        if subscription.credits_remaining <= 0:
+        ok, msg, usage_rec = CreditWalletService.reserve_credits(
+            company=company,
+            user=user,
+            feature_code="vendor_discovery",
+            quantity=1,
+            idempotency_key=f"buyer_search:{company.id}:{user.id if user else 0}:{product.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+        )
+        if not ok:
             return SearchJob.objects.create(
                 company=company,
                 user=user,
@@ -195,7 +196,7 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
                 product=product,
                 search_query=query,
                 status=SearchJob.Status.FAILED,
-                error_message="Insufficient AI search credits. Please contact Super Admin or upgrade your subscription plan.",
+                error_message=msg,
                 started_at=timezone.now(),
                 finished_at=timezone.now(),
             )
@@ -277,17 +278,11 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
         job.finished_at = timezone.now()
         job.save()
 
-        # Deduct AI search credit & record transaction
-        if subscription:
-            subscription.credits_used += 1
-            subscription.save(update_fields=["credits_used", "updated_at"])
-            CreditTransaction.objects.create(
-                company=company,
-                transaction_type=CreditTransaction.TransactionType.DEBIT,
-                credits=1,
-                search_job=job,
-                notes=f"AI Buyer Search: {product.name[:70]}",
-            )
+        # Commit AI search credit deduction
+        if usage_rec:
+            usage_rec.search_job = job
+            usage_rec.save(update_fields=["search_job"])
+            CreditWalletService.commit_usage(usage_rec)
 
         APILog.objects.create(
             provider="WebSearchProvider & Scraper (Parallel)",
@@ -298,6 +293,8 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
 
     except Exception as e:
         logger.exception(f"Error during find_buyers_search: {e}")
+        if usage_rec:
+            CreditWalletService.refund_or_release(usage_rec, reason=str(e))
         job.status = SearchJob.Status.FAILED
         job.error_message = str(e)
         job.finished_at = timezone.now()
@@ -318,17 +315,17 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
     country = requirement.delivery_country or "India"
     query = f"{requirement.item_name} {category_name} manufacturers suppliers exporters {country}".strip()
 
-    # Credit enforcement
-    subscription = None
+    # Credit enforcement & atomic reservation via CreditWalletService
+    usage_rec = None
     if company:
-        subscription = getattr(company, "subscription", None)
-        if not subscription:
-            subscription, _ = Subscription.objects.get_or_create(
-                company=company,
-                defaults={"plan": Subscription.Plan.PRO, "credits_total": 500, "credits_used": 0}
-            )
-
-        if subscription.credits_remaining <= 0:
+        ok, msg, usage_rec = CreditWalletService.reserve_credits(
+            company=company,
+            user=user,
+            feature_code="vendor_discovery",
+            quantity=1,
+            idempotency_key=f"supplier_search:{company.id}:{user.id if user else 0}:{requirement.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+        )
+        if not ok:
             return SearchJob.objects.create(
                 company=company,
                 user=user,
@@ -336,7 +333,7 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
                 requirement=requirement,
                 search_query=query,
                 status=SearchJob.Status.FAILED,
-                error_message="Insufficient AI search credits. Please contact Super Admin or upgrade your subscription plan.",
+                error_message=msg,
                 started_at=timezone.now(),
                 finished_at=timezone.now(),
             )
@@ -413,17 +410,11 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
             requirement.status = Requirement.Status.SEARCHING
             requirement.save(update_fields=["status"])
 
-        # Deduct AI search credit & record transaction
-        if subscription:
-            subscription.credits_used += 1
-            subscription.save(update_fields=["credits_used", "updated_at"])
-            CreditTransaction.objects.create(
-                company=company,
-                transaction_type=CreditTransaction.TransactionType.DEBIT,
-                credits=1,
-                search_job=job,
-                notes=f"AI Supplier Search: {requirement.item_name[:70]}",
-            )
+        # Commit AI search credit deduction
+        if usage_rec:
+            usage_rec.search_job = job
+            usage_rec.save(update_fields=["search_job"])
+            CreditWalletService.commit_usage(usage_rec)
 
         APILog.objects.create(
             provider="WebSearchProvider & Scraper (Parallel)",
@@ -434,6 +425,8 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
 
     except Exception as e:
         logger.exception(f"Error during find_suppliers_search: {e}")
+        if usage_rec:
+            CreditWalletService.refund_or_release(usage_rec, reason=str(e))
         job.status = SearchJob.Status.FAILED
         job.error_message = str(e)
         job.finished_at = timezone.now()
