@@ -107,10 +107,6 @@ from apps.companies.admin_views import (
     admin_panel_toggle_maintenance_view,
     admin_panel_apilogs_view,
     admin_panel_auditlogs_view,
-    admin_panel_buyer_dashboard_view,
-    admin_panel_buyer_module_toggle_view,
-    admin_panel_buyer_module_edit_view,
-    admin_panel_buyer_layout_update_view,
 )
 from apps.ai_search.web_views import (
     matching_parameters_view,
@@ -250,10 +246,6 @@ urlpatterns = [
     path("admin-panel/maintenance/toggle/", admin_panel_toggle_maintenance_view, name="admin-panel-toggle-maintenance"),
     path("admin-panel/api-logs/", admin_panel_apilogs_view, name="admin-panel-apilogs"),
     path("admin-panel/audit-logs/", admin_panel_auditlogs_view, name="admin-panel-auditlogs"),
-    path("admin-panel/buyer-dashboard/", admin_panel_buyer_dashboard_view, name="admin-panel-buyer-dashboard"),
-    path("admin-panel/buyer-dashboard/modules/<int:pk>/toggle/", admin_panel_buyer_module_toggle_view, name="admin-panel-buyer-module-toggle"),
-    path("admin-panel/buyer-dashboard/modules/<int:pk>/edit/", admin_panel_buyer_module_edit_view, name="admin-panel-buyer-module-edit"),
-    path("admin-panel/buyer-dashboard/layout/update/", admin_panel_buyer_layout_update_view, name="admin-panel-buyer-layout-update"),
 
     # REST APIs
     path("api/auth/", include("apps.accounts.urls")),

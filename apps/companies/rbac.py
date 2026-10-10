@@ -281,34 +281,17 @@ def get_user_rbac_context(user, company_id=None):
         is_company_admin or "READ" in permissions_set or "products:READ" in permissions_set or "leads:READ" in permissions_set
     )
 
-    # Load dynamic buyer module configs from database
-    try:
-        from apps.dashboard.models import BuyerModuleConfig
-        active_buyer_modules = list(BuyerModuleConfig.get_active_modules())
-    except Exception:
-        active_buyer_modules = []
-
-    buyer_nav_modules = [
-        {
-            "key": m.module_key,
-            "name": m.display_name,
-            "nav_label": m.nav_label or m.display_name,
-            "url_name": m.url_name,
-            "icon": m.icon_class,
-            "order": m.order,
-            "is_visible_on_sidebar": m.is_visible_on_sidebar,
-            "min_plan": m.min_plan,
-        }
-        for m in active_buyer_modules if m.is_visible_on_sidebar
-    ]
-    active_buyer_keys = {m.module_key for m in active_buyer_modules}
-
     # Build visible modules list
     visible_modules = []
     if can_view_buyer:
-        visible_modules.append("buyer_dashboard")
-        for m in active_buyer_modules:
-            visible_modules.append(m.module_key)
+        visible_modules.extend([
+            "buyer_dashboard",
+            "my_requirements",
+            "find_suppliers",
+            "supplier_search",
+            "saved_suppliers",
+            "inquiries",
+        ])
     if can_view_seller:
         visible_modules.extend([
             "seller_dashboard",
@@ -332,10 +315,12 @@ def get_user_rbac_context(user, company_id=None):
         navigation = {
             "title": "Buyer Dashboard",
             "modules": [
-                {"name": "Buyer Dashboard", "url": "/dashboard/", "icon": "fa-house"}
-            ] + [
-                {"name": m["name"], "url_name": m["url_name"], "icon": m["icon"]}
-                for m in buyer_nav_modules
+                {"name": "Buyer Dashboard", "url": "/dashboard/", "icon": "fa-house"},
+                {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list"},
+                {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart"},
+                {"name": "Supplier Search", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass"},
+                {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark"},
+                {"name": "Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane"},
             ],
         }
     elif is_seller_only:
@@ -399,8 +384,6 @@ def get_user_rbac_context(user, company_id=None):
         "is_both": is_both,
         "visible_modules": visible_modules,
         "navigation": navigation,
-        "buyer_modules": buyer_nav_modules,
-        "active_buyer_keys": active_buyer_keys,
     }
 
 

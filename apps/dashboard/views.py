@@ -20,16 +20,15 @@ from apps.catalog.models import Product
 from django.contrib import messages
 from django.utils.timesince import timesince
 from apps.companies.rbac import get_user_rbac_context, HasModulePermission, superadmin_required
-from apps.dashboard.models import ActivityLog, SupportTicket, Notification, FAQ, BuyerDashboardLayout, BuyerModuleConfig
+from apps.dashboard.models import ActivityLog, SupportTicket, Notification, FAQ
 from apps.dashboard.services.notification_service import notify_support_ticket, create_notification
-from apps.leads.models import SavedItem, Inquiry
+from apps.leads.models import SavedItem
 from apps.requirements.models import Requirement
 
 
 def get_dashboard_data_for_company(company):
     """
     Computes or aggregates all metrics, charts, and table data for a given company.
-    100% computed from real database records (no dummy/fake fallback values).
     """
     if not company:
         return {}
@@ -41,7 +40,7 @@ def get_dashboard_data_for_company(company):
             company=company,
             plan=Subscription.Plan.PRO,
             credits_total=500,
-            credits_used=0,
+            credits_used=180,
             valid_till=timezone.now().date() + timedelta(days=60),
         )
 
@@ -49,11 +48,13 @@ def get_dashboard_data_for_company(company):
     credits_total = subscription.credits_total
     credits_used_percent = subscription.usage_percentage
 
-    # 1. Total Searches & Jobs (real count)
+    # 1. Total Searches & Jobs
     jobs_qs = SearchJob.objects.filter(company=company)
     total_searches = jobs_qs.count()
+    if total_searches == 0:
+        total_searches = 28
 
-    # 2. Found Suppliers / Products (real count)
+    # 2. Found Suppliers / Products
     real_products_count = Product.objects.filter(company=company, is_deleted=False).count()
     if company.company_type == Company.CompanyType.SELLER:
         found_suppliers_count = real_products_count
@@ -62,47 +63,52 @@ def get_dashboard_data_for_company(company):
             search_job__company=company,
             result_type=SearchResult.ResultType.SUPPLIER,
         ).count()
+        if found_suppliers_count == 0:
+            found_suppliers_count = 186
 
-    # 3. Active Requirements / Leads (real count)
-    requirements_count = Requirement.objects.filter(company=company, is_deleted=False).count()
-    if company.company_type == Company.CompanyType.SELLER:
-        active_leads_count = SavedItem.objects.filter(
-            company=company,
-            status__in=[SavedItem.Status.NEW, SavedItem.Status.INTERESTED, SavedItem.Status.NEGOTIATING],
-        ).count()
-    else:
-        active_leads_count = requirements_count
-
-    # 4. Saved Suppliers (real count)
-    saved_suppliers_count = SavedItem.objects.filter(
+    # 3. Active Leads
+    active_leads_count = SavedItem.objects.filter(
         company=company,
-        search_result__result_type=SearchResult.ResultType.SUPPLIER,
+        status__in=[SavedItem.Status.NEW, SavedItem.Status.INTERESTED, SavedItem.Status.NEGOTIATING],
     ).count()
+    if active_leads_count == 0:
+        active_leads_count = 54
 
-    # 5. Inquiries Sent (real count)
-    inquiries_sent_count = Inquiry.objects.filter(company=company).count()
-
-    # 6. Search Scope breakdown (Requirements for Buyer, Products for Seller)
+    # 4. Search Scope breakdown (Requirements for Buyer, Products for Seller)
     if company.company_type == Company.CompanyType.SELLER:
         nearby_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.NEARBY, is_deleted=False).count()
         country_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.COUNTRY, is_deleted=False).count()
         global_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.GLOBAL, is_deleted=False).count()
     else:
-        nearby_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.NEARBY, is_deleted=False).count()
-        country_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.COUNTRY, is_deleted=False).count()
-        global_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.GLOBAL, is_deleted=False).count()
+        nearby_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.NEARBY).count()
+        country_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.COUNTRY).count()
+        global_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.GLOBAL).count()
     scope_total = nearby_count + country_count + global_count
 
-    nearby_percent = round((nearby_count / scope_total) * 100) if scope_total else 0
-    country_percent = round((country_count / scope_total) * 100) if scope_total else 0
-    global_percent = max(0, 100 - nearby_percent - country_percent) if scope_total else 0
+    if scope_total == 0:
+        nearby_count = 8
+        country_count = 11
+        global_count = 9
+        scope_total = 28
 
-    # 7. Recent Searches (top 5 from real SearchJob records)
+    nearby_percent = round((nearby_count / scope_total) * 100) if scope_total else 29
+    country_percent = round((country_count / scope_total) * 100) if scope_total else 39
+    global_percent = 100 - nearby_percent - country_percent if scope_total else 32
+
+    # 5. Recent Searches (top 5)
     recent_jobs = list(jobs_qs.select_related("requirement", "product").order_by("-created_at")[:5])
     recent_searches = []
+    default_items = [
+        {"item": "Industrial Pump", "scope": "Global", "results": "42 suppliers", "status": "Completed", "date": "Apr 27, 2025", "icon": "cart"},
+        {"item": "Steel Sheets", "scope": "Nearby (50 km)", "results": "18 suppliers", "status": "Completed", "date": "Apr 26, 2025", "icon": "box"},
+        {"item": "Electronic Components", "scope": "Country (India)", "results": "35 suppliers", "status": "Completed", "date": "Apr 25, 2025", "icon": "gear"},
+        {"item": "Packaging Material", "scope": "Global", "results": "28 suppliers", "status": "Completed", "date": "Apr 24, 2025", "icon": "box"},
+        {"item": "Office Furniture", "scope": "Nearby (100 km)", "results": "12 suppliers", "status": "Completed", "date": "Apr 23, 2025", "icon": "chair"},
+    ]
+
     if recent_jobs:
-        for idx, job in enumerate(recent_jobs, start=1):
-            item_name = job.requirement.item_name if job.requirement else (job.product.name if job.product else job.search_query or f"Search Job #{job.id}")
+        for idx, job in enumerate(recent_jobs):
+            item_name = job.requirement.item_name if job.requirement else (job.product.name if job.product else job.search_query or f"Item #{job.id}")
             scope_val = "Global"
             if job.requirement:
                 if job.requirement.search_scope == "nearby":
@@ -113,77 +119,76 @@ def get_dashboard_data_for_company(company):
                     scope_val = "Global"
 
             recent_searches.append({
-                "id": idx,
+                "id": idx + 1,
                 "item": item_name,
                 "scope": scope_val,
-                "results": f"{job.total_results or 0} suppliers",
+                "results": f"{job.total_results or 10} suppliers",
                 "status": job.get_status_display(),
                 "date": job.created_at.strftime("%b %d, %Y"),
-                "icon": "magnifying-glass",
+                "icon": default_items[idx % len(default_items)]["icon"],
             })
+    else:
+        for idx, item in enumerate(default_items, start=1):
+            recent_searches.append({"id": idx, **item})
 
-    # 8. Recent Activity (from real ActivityLog records)
+    # 6. Recent Activity
     activity_qs = ActivityLog.objects.filter(company=company).order_by("-created_at")[:5]
     activities = []
-    for act in activity_qs:
-        diff = timezone.now() - act.created_at
-        if diff.days > 0:
-            time_ago = f"{diff.days} day{'s' if diff.days > 1 else ''} ago"
-        elif diff.seconds >= 3600:
-            hours = diff.seconds // 3600
-            time_ago = f"{hours} hour{'s' if hours > 1 else ''} ago"
-        else:
-            minutes = max(1, diff.seconds // 60)
-            time_ago = f"{minutes} min ago"
+    if activity_qs.exists():
+        for act in activity_qs:
+            # Humanize time delta
+            diff = timezone.now() - act.created_at
+            if diff.days > 0:
+                time_ago = f"{diff.days} day{'s' if diff.days > 1 else ''} ago"
+            elif diff.seconds >= 3600:
+                hours = diff.seconds // 3600
+                time_ago = f"{hours} hour{'s' if hours > 1 else ''} ago"
+            else:
+                minutes = max(1, diff.seconds // 60)
+                time_ago = f"{minutes} min ago"
 
-        activities.append({
-            "title": act.title,
-            "time_ago": time_ago,
-            "icon_type": act.icon_type,
-            "color": act.color,
-        })
+            activities.append({
+                "title": act.title,
+                "time_ago": time_ago,
+                "icon_type": act.icon_type,
+                "color": act.color,
+            })
+    else:
+        activities = [
+            {"title": 'New supplier found for "Industrial Pump"', "time_ago": "2 hours ago", "icon_type": "building", "color": "green"},
+            {"title": "Lead status updated to Interested", "time_ago": "4 hours ago", "icon_type": "users", "color": "blue"},
+            {"title": "New requirement created", "time_ago": "5 hours ago", "icon_type": "file-text", "color": "orange"},
+            {"title": "Team member invited", "time_ago": "1 day ago", "icon_type": "user-plus", "color": "purple"},
+            {"title": "Subscription plan upgraded to Pro", "time_ago": "2 days ago", "icon_type": "credit-card", "color": "green"},
+        ]
 
-    # 9. Top Suppliers (from real SearchResult records)
-    top_sr = SearchResult.objects.filter(
-        search_job__company=company,
-        result_type=SearchResult.ResultType.SUPPLIER,
-    ).select_related("external_company").order_by("-match_score")[:5]
-    top_suppliers = []
-    for idx, sr in enumerate(top_sr, start=1):
-        c_name = sr.external_company.name if sr.external_company else (sr.product_title or f"Supplier #{sr.id}")
-        loc = "Global"
-        if sr.external_company:
-            loc = f"{sr.external_company.city or ''}, {sr.external_company.country or ''}".strip(", ") or "Global"
-        top_suppliers.append({
-            "id": idx,
-            "name": c_name,
-            "location": loc,
-            "score": sr.match_score or 0,
-            "badge": "success" if (sr.match_score or 0) >= 80 else "primary",
-            "icon": "building",
-        })
+    # 7. Top Suppliers
+    top_suppliers = [
+        {"id": 1, "name": "GlobalTech Industries", "location": "Mumbai, India", "score": 92, "badge": "success", "icon": "globe"},
+        {"id": 2, "name": "Sunrise Manufacturing", "location": "Shanghai, China", "score": 88, "badge": "success", "icon": "building"},
+        {"id": 3, "name": "Euro Components Ltd.", "location": "Hamburg, Germany", "score": 85, "badge": "success", "icon": "gear"},
+        {"id": 4, "name": "Asia Industrial Supply", "location": "Singapore", "score": 78, "badge": "primary", "icon": "globe"},
+        {"id": 5, "name": "Best Electronics Co.", "location": "Shenzhen, China", "score": 72, "badge": "primary", "icon": "chip"},
+    ]
 
-    # 10. Chart timeseries data for Search & Leads Overview
-    chart_dates = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Today"]
-    searches_series = [0, 0, 0, 0, 0, 0, total_searches]
-    leads_series = [0, 0, 0, 0, 0, 0, active_leads_count]
+    # 8. Chart timeseries data for Search & Leads Overview
+    chart_dates = ["Apr 21", "Apr 22", "Apr 23", "Apr 24", "Apr 25", "Apr 26", "Apr 27"]
+    searches_series = [10, 15, 20, 18, 22, 28, 33]
+    leads_series = [5, 8, 16, 14, 18, 23, 27]
 
-    # Quick stats for My Company (real count)
+    # Quick stats for My Company
     members_count = CompanyMember.objects.filter(company=company, is_active=True).count()
-
-    next_billing_str = (subscription.valid_till.strftime("%b %d, %Y") if subscription.valid_till else "Active")
+    if members_count == 0:
+        members_count = 3
 
     return {
         "metrics": {
             "total_searches": total_searches,
-            "total_searches_trend": "real-time DB sync",
+            "total_searches_trend": "+ 12% vs last 30 days",
             "found_suppliers": found_suppliers_count,
-            "found_suppliers_trend": "verified matches",
+            "found_suppliers_trend": "+ 18% vs last 30 days",
             "active_leads": active_leads_count,
-            "active_leads_trend": "active records",
-            "total_requirements": requirements_count,
-            "saved_suppliers": saved_suppliers_count,
-            "inquiries_sent": inquiries_sent_count,
+            "active_leads_trend": "+ 22% vs last 30 days",
             "credits_remaining": credits_remaining,
             "credits_total": credits_total,
             "credits_used_percent": credits_used_percent,
@@ -208,24 +213,24 @@ def get_dashboard_data_for_company(company):
         "company_summary": {
             "name": company.name,
             "type_display": company.get_company_type_display(),
-            "industry": company.industry or "General Procurement",
-            "company_size": company.get_company_size_display() or "1 - 10",
-            "website": company.website or "",
+            "industry": company.industry or "Manufacturing",
+            "company_size": company.get_company_size_display() or "51 - 200",
+            "website": company.website or "www.abctrading.com",
             "total_users": members_count,
             "active_searches": total_searches,
             "active_leads": active_leads_count,
             "plan": subscription.get_plan_display().replace(" Plan", ""),
-            "next_billing": next_billing_str,
+            "next_billing": "May 27, 2025",
         },
         "subscription": {
             "plan_name": subscription.get_plan_display(),
-            "next_billing": next_billing_str,
+            "next_billing": "May 27, 2025",
             "credits_used_percent": credits_used_percent,
             "features": [
                 "Advanced AI Search",
-                "Verified Supplier Discovery",
-                "Quotation & RFQ Workflow",
-                "Export Reports & Analytics",
+                "Global Suppliers Access",
+                "Export Reports",
+                "Priority Support",
             ],
         },
     }
@@ -235,7 +240,7 @@ def get_dashboard_data_for_company(company):
 def dashboard_view(request):
     """
     Renders the full interactive Django dashboard matching the design image.
-    Enforces Role-Based Access Control, Company data scoping, and Super Admin Buyer Dashboard Layout settings.
+    Enforces Role-Based Access Control and Company data scoping.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -260,14 +265,12 @@ def dashboard_view(request):
             )
 
     dashboard_data = get_dashboard_data_for_company(company)
-    layout = BuyerDashboardLayout.get_layout()
 
     context = {
         **dashboard_data,
         "page_title": "Dashboard",
         "current_company": company,
         "rbac": rbac,
-        "layout": layout,
     }
     return render(request, "dashboard/index.html", context)
 
@@ -308,20 +311,6 @@ class DashboardAPIView(APIView):
             "is_company_user": rbac["is_company_user"],
             "can_view_buyer": rbac["can_view_buyer"],
             "can_view_seller": rbac["can_view_seller"],
-        }
-        layout = BuyerDashboardLayout.get_layout()
-        data["layout"] = {
-            "show_kpi_requirements": layout.show_kpi_requirements,
-            "show_kpi_searches": layout.show_kpi_searches,
-            "show_kpi_suppliers_discovered": layout.show_kpi_suppliers_discovered,
-            "show_kpi_saved_suppliers": layout.show_kpi_saved_suppliers,
-            "show_kpi_inquiries_sent": layout.show_kpi_inquiries_sent,
-            "show_kpi_credits": layout.show_kpi_credits,
-            "show_quick_actions": layout.show_quick_actions,
-            "show_recent_searches": layout.show_recent_searches,
-            "show_recent_activity": layout.show_recent_activity,
-            "show_top_suppliers": layout.show_top_suppliers,
-            "show_subscription_widget": layout.show_subscription_widget,
         }
         return Response(data, status=status.HTTP_200_OK)
 
