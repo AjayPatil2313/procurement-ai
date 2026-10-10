@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Find Suppliers — AI Sourcing Engine{% endblock %}
+{% block title %}Find Customers — AI Customer Discovery Engine{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,291 +11,477 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Requirements</a>
+        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Sourcing Requirements</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">AI Sourcing Engine</span>
+        <span class="text-slate-600 font-semibold">AI Customer Discovery</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
         </span>
-        <span>AI Supplier Discovery (Sourcing Engine)</span>
+        <span>AI Customer Discovery Engine</span>
       </h1>
-      <p class="text-xs text-slate-500 mt-1">Live web search and scraping engine extracting verified manufacturers, factory pricing, contact info, and MOQ.</p>
+      <p class="text-xs text-slate-500 mt-1">Live web search and scraping engine discovering verified customer and manufacturer matches, factory pricing, contact info, and MOQ.</p>
     </div>
     <div class="flex items-center gap-2">
       <a href="{% url 'saved-suppliers' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
-        <i class="fa-solid fa-bookmark mr-1.5 text-blue-600"></i> Shortlisted Suppliers
+        <i class="fa-solid fa-bookmark mr-1.5 text-blue-600"></i> Saved Customers
       </a>
-      <a href="{% url 'inquiries-list' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
-        <i class="fa-solid fa-envelope mr-1.5 text-emerald-600"></i> Sent RFQs
-      </a>
-      <span class="inline-flex items-center px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
-        <i class="fa-solid fa-bolt mr-1.5 text-emerald-600"></i> AI Match Engine Active
-      </span>
     </div>
   </div>
 
   <!-- Requirement Search Trigger Card -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-    <form method="POST" action="{% url 'find-suppliers' %}" class="flex flex-col md:flex-row items-center gap-4">
+    <form method="POST" action="{% url 'find-suppliers' %}" id="find-suppliers-form" class="space-y-4">
       {% csrf_token %}
-      <input type="hidden" name="action" value="run_search">
+      <input type="hidden" name="action" id="form_action" value="run_search">
+      <input type="hidden" name="has_criteria_payload" value="1">
+      <input type="hidden" name="requirement_id" id="selected_requirement_id" value="{% if selected_requirement %}{{ selected_requirement.id }}{% elif selected_requirement_id %}{{ selected_requirement_id }}{% endif %}">
 
-      <div class="flex-1 w-full">
-        <label for="requirement_id" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Select Requirement to Find Suppliers
-        </label>
-        <select id="requirement_id" name="requirement_id" class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-          <option value="">-- Choose Buyer Requirement --</option>
-          {% for req in requirements %}
-          <option value="{{ req.id }}" {% if selected_requirement_id == req.id %}selected{% endif %}>
-            {{ req.item_name }} ({{ req.quantity }} {{ req.unit }}) — {% if req.target_price %}Target: {{ req.currency }} {{ req.target_price }}{% else %}Open RFQ{% endif %}
-          </option>
-          {% endfor %}
-        </select>
+      <!-- Top Row: Requirement Selector + Apply Criteria + Launch Button -->
+      <div class="flex flex-col md:flex-row items-stretch md:items-end justify-between gap-3">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 flex-1">
+          
+          <!-- Requirement Selector -->
+          <div class="w-full sm:w-80 md:w-96 relative shrink-0">
+            <label for="req_select_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-cart-shopping text-blue-600"></i>
+                <span>Select Sourcing Requirement</span>
+              </span>
+              <span class="text-[11px] text-slate-400 font-medium normal-case">
+                {{ requirements|length }} Requirements
+              </span>
+            </label>
+            <select 
+              id="req_select_input" 
+              name="requirement_id_select"
+              onchange="if(this.value){ window.location.href='{% url 'find-suppliers' %}?requirement_id=' + this.value; } else { window.location.href='{% url 'find-suppliers' %}'; }"
+              class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-slate-800"
+            >
+              <option value="">-- Choose Sourcing Requirement --</option>
+              {% for req in requirements %}
+              <option value="{{ req.id }}" {% if selected_requirement_id == req.id or selected_requirement and selected_requirement.id == req.id %}selected{% endif %}>
+                {{ req.item_name }} ({{ req.quantity }} {{ req.unit }}) — {% if req.target_price %}₹{{ req.target_price }}{% else %}Open RFQ{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Apply Criteria Button (Directly Next to Requirement Selector) -->
+          <div class="shrink-0">
+            <button 
+              type="button" 
+              id="toggle_criteria_btn" 
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50/90 hover:bg-blue-100 text-blue-900 font-bold text-xs transition shadow-xs hover:border-blue-300 cursor-pointer"
+              title="Configure AI matching and evaluation criteria"
+            >
+              <i class="fa-solid fa-sliders text-blue-600"></i>
+              <span>Apply Criteria</span>
+              <span id="criteria_badge_count" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-600 text-white shadow-xs">
+                {{ active_criteria_count }} Active
+              </span>
+              <i class="fa-solid fa-chevron-down text-[10px] text-blue-500 transition-transform duration-200" id="criteria_chevron"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Side: Launch Button & Clear Filter -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button 
+            type="submit" 
+            id="launch_search_btn" 
+            class="flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition cursor-pointer"
+          >
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>Launch AI Customer Search</span>
+          </button>
+
+          {% if selected_requirement_id %}
+          <a href="{% url 'find-suppliers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition shrink-0" title="Reset search">
+            Clear Filter
+          </a>
+          {% endif %}
+        </div>
       </div>
 
-      <div class="flex items-center gap-2 w-full md:w-auto md:mt-5">
-        <button type="submit" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <span>Launch AI Supplier Search</span>
-        </button>
+      <!-- Live Search Progress Indicator (Hidden until launch) -->
+      <div id="search_loading_overlay" class="hidden p-3.5 rounded-xl border border-blue-200 bg-blue-50/80 animate-pulse text-xs transition-all">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <i class="fa-solid fa-circle-notch fa-spin text-sm"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-blue-950 flex items-center gap-2">
+              <span>AI Customer Discovery in Progress...</span>
+              <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-200 text-blue-900">Live Web Scraping</span>
+            </div>
+            <p class="text-[11px] text-blue-900/80 mt-0.5 leading-snug">
+              Searching vendor registries, scraping manufacturing sites, and evaluating technical fit with AI. Please wait 3-6 seconds...
+            </p>
+          </div>
+        </div>
+      </div>
 
-        {% if selected_requirement_id %}
-        <a href="{% url 'find-suppliers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition">
-          Clear Filter
-        </a>
-        {% endif %}
+      <!-- Collapsible Criteria Configuration Box -->
+      <div id="criteria_config_box" class="hidden border border-slate-200 bg-slate-50/80 rounded-2xl p-5 mt-3 space-y-5 transition-all">
+        
+        <!-- Criteria Drawer Header & Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-sliders"></i>
+              </span>
+              <h3 class="text-sm font-bold text-slate-900 tracking-tight">AI Matching Criteria & Parameters</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
+                Live AI Matcher
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              Select standard enterprise evaluation fields and add custom key-value criteria. The AI scoring pipeline uses these parameters to calculate supplier fit scores.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <button 
+              type="button" 
+              id="select_all_static_btn" 
+              class="text-[11px] font-semibold text-slate-600 hover:text-blue-600 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition"
+            >
+              Select All
+            </button>
+            <button 
+              type="button" 
+              id="reset_static_btn" 
+              class="text-[11px] font-semibold text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition"
+            >
+              Reset
+            </button>
+            <button 
+              type="button" 
+              id="add_criteria_btn_top" 
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition"
+            >
+              <i class="fa-solid fa-plus text-[10px]"></i>
+              <span>+ Add Criteria</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 1 (TOP): Custom Dynamic Criteria (2-Col Key & Value Rows) -->
+        <div class="pb-4 border-b border-slate-200">
+          <div class="flex items-center justify-between mb-2.5">
+            <div>
+              <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-wrench text-blue-600"></i>
+                <span>Custom Key-Value Criteria</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Specify domain-specific parameters like certification standards, factory capacity, or warranty periods.</p>
+            </div>
+          </div>
+
+          <div id="custom_criteria_container" class="space-y-2">
+            {% for item in custom_criteria_list %}
+            <div class="custom-criteria-row grid grid-cols-12 gap-2 p-2 items-center hover:bg-blue-50/30 transition rounded-lg animate-in fade-in duration-150">
+              <div class="col-span-5 sm:col-span-4">
+                <input 
+                  type="text" 
+                  name="custom_criteria_key[]" 
+                  value="{{ item.criteria_key }}" 
+                  placeholder="e.g. ISO 9001 Certified, Payment Terms Net 30..." 
+                  class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  required
+                >
+              </div>
+              <div class="col-span-6 sm:col-span-7">
+                <input 
+                  type="text" 
+                  name="custom_criteria_val[]" 
+                  value="{{ item.criteria_value }}" 
+                  placeholder="e.g. Mandatory, Min 5 Years manufacturing track record..." 
+                  class="w-full text-xs font-normal text-slate-700 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                  required
+                >
+              </div>
+              <div class="col-span-1 flex items-center justify-center">
+                <button 
+                  type="button" 
+                  class="remove-custom-row-btn w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition" 
+                  title="Remove criteria row"
+                >
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div id="empty_custom_placeholder" class="{% if custom_criteria_list %}hidden{% endif %} py-4 text-center border border-dashed border-slate-300 rounded-xl bg-white/60">
+            <p class="text-xs text-slate-500 font-medium">No custom criteria added yet.</p>
+            <button 
+              type="button" 
+              id="add_criteria_btn_bottom" 
+              class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition"
+            >
+              <i class="fa-solid fa-plus text-[10px]"></i> Add First Custom Parameter
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 2: Standard Enterprise Verification Parameters (10 Customer Criteria) -->
+        <div>
+          <div class="flex items-center justify-between mb-2.5">
+            <div class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-square-check text-blue-600"></i>
+              <span>Standard Enterprise Criteria (10 Target Parameters)</span>
+            </div>
+            <span class="text-[11px] text-slate-400">
+              Checkbox enables parameter &bull; Target values editable
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="static_criteria_grid">
+            {% for item in static_criteria_list %}
+            <div class="static-criteria-card bg-white rounded-xl border border-slate-200 p-3.5 hover:border-blue-300 transition shadow-xs flex flex-col justify-between group">
+              <div>
+                <div class="flex items-start justify-between gap-2 mb-1.5">
+                  <label for="crit_{{ item.key }}" class="flex items-center gap-2 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      name="static_criteria" 
+                      value="{{ item.key }}" 
+                      id="crit_{{ item.key }}" 
+                      {% if item.is_checked %}checked{% endif %}
+                      class="static-criteria-checkbox w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    >
+                    <span class="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition flex items-center gap-1.5">
+                      <i class="fa-solid {{ item.icon|default:'fa-circle-check' }} text-[11px] text-slate-400 group-hover:text-blue-500 transition"></i>
+                      <span>{{ item.name }}</span>
+                    </span>
+                  </label>
+                  <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
+                    {{ item.key }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-snug mb-2 pl-6">
+                  {{ item.description }}
+                </p>
+              </div>
+              <div class="pl-6 pt-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-slate-400 font-semibold shrink-0">Target:</span>
+                  <input 
+                    type="text" 
+                    name="static_val_{{ item.key }}" 
+                    value="{{ item.current_value }}" 
+                    placeholder="Target criteria specification..." 
+                    class="w-full text-[11px] font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition"
+                  >
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Criteria Drawer Footer -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
+          <div class="flex items-center gap-2 text-xs text-slate-600">
+            <i class="fa-solid fa-circle-check text-emerald-500"></i>
+            <span>Active Criteria: <strong id="criteria_summary_text" class="text-slate-900">{{ active_criteria_count }} Parameters Applied</strong></span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span id="save_feedback_toast" class="hidden text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+              <i class="fa-solid fa-check mr-1"></i> Saved!
+            </span>
+            <button 
+              type="button" 
+              id="save_criteria_ajax_btn" 
+              class="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition shadow-xs cursor-pointer"
+            >
+              <i class="fa-solid fa-floppy-disk text-slate-500 mr-1"></i> Save Criteria
+            </button>
+            <button 
+              type="button" 
+              id="close_criteria_btn" 
+              class="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+
       </div>
     </form>
   </div>
 
-  <!-- Active Results Count and Feedback -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500 px-1">
-    <div>
-      {% if selected_requirement %}
-        Showing suppliers for requirement: <strong class="text-slate-800">{{ selected_requirement.item_name }}</strong> ({{ results|length }} candidates)
-      {% else %}
-        Showing all qualified suppliers across procurement pipeline ({{ results|length }} discovered)
-      {% endif %}
+  {% if not selected_requirement %}
+  <!-- MODULE FUNCTIONALITY PROMPT CARD: NO REQUIREMENT SELECTED -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+    <div class="max-w-2xl mx-auto space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
+        <i class="fa-solid fa-cart-shopping"></i>
+      </div>
+      <div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 mb-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i> AI Customer Discovery Engine
+        </span>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Sourcing Requirement to Discover Matching Customers</h2>
+        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+          AI Customer Discovery searches commercial registries, B2B supplier directories, and verified manufacturer databases to discover prospective customers, evaluate technical fit, and extract direct contact details. <strong>Please select a sourcing requirement from the dropdown above to discover matching customers.</strong>
+        </p>
+      </div>
     </div>
-    {% if current_job and results %}
-    <a 
-      href="/api/billing/dossier/{{ current_job.id }}/pdf/" 
-      target="_blank"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition shrink-0"
-      title="Generate and download official PDF evaluation dossier"
-    >
-      <i class="fa-solid fa-file-pdf text-rose-400"></i>
-      <span>Download PDF Dossier</span>
-    </a>
+  </div>
+
+  {% else %}
+
+  <!-- Active Results Toolbar with Filters, Search and CSV Export -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <!-- Title & Live Counter -->
+      <div class="flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
+          <i class="fa-solid fa-users-viewfinder"></i>
+        </span>
+        <div>
+          <div class="text-xs font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+            <span>Discovered Customers for <span class="text-blue-600 font-extrabold">"{{ selected_requirement.item_name }}"</span></span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800" id="visible_leads_counter">
+              {{ results|length }} Qualified
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-0.5">
+            Showing <strong id="visible_count_num" class="text-slate-800">{{ results|length }}</strong> of {{ results|length }} discovered customer candidates
+          </p>
+        </div>
+      </div>
+
+      <!-- Actions: Search within results & CSV Export -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Quick search within results -->
+        <div class="relative w-full sm:w-56">
+          <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-[11px]"></i>
+          </div>
+          <input 
+            type="text" 
+            id="lead_filter_query" 
+            placeholder="Search company, city..." 
+            class="w-full pl-7 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 text-slate-800 placeholder-slate-400 transition"
+          >
+        </div>
+
+        {% if results %}
+        <a 
+          href="{% url 'export-discovered-suppliers-csv' %}?requirement_id={{ selected_requirement.id }}" 
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 font-bold text-xs transition shadow-xs shrink-0 cursor-pointer"
+          title="Export discovered customers to CSV"
+        >
+          <i class="fa-solid fa-file-csv text-emerald-600"></i>
+          <span>Export CSV</span>
+        </a>
+        {% if current_job %}
+        <a 
+          href="/api/billing/dossier/{{ current_job.id }}/pdf/" 
+          target="_blank"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition shrink-0"
+          title="Download Executive PDF Evaluation Dossier"
+        >
+          <i class="fa-solid fa-file-pdf text-rose-400"></i>
+          <span>PDF Dossier</span>
+        </a>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Quick Filter Chips -->
+    {% if results %}
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 pt-2 border-t border-slate-100 text-xs">
+      <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Filter:</span>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-xs cursor-pointer" data-filter="all">
+        All ({{ results|length }})
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="fit_90">
+        <i class="fa-solid fa-star text-amber-500 text-[10px] mr-1"></i> 90%+ Fit
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="fit_80">
+        80%+ Fit
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="has_contact">
+        <i class="fa-solid fa-address-book text-blue-500 text-[10px] mr-1"></i> Verified Contact
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="unsaved">
+        Unsaved
+      </button>
+      <button type="button" class="lead-filter-chip px-2.5 py-1 rounded-lg text-xs font-semibold transition bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer" data-filter="saved">
+        <i class="fa-solid fa-bookmark text-emerald-600 text-[10px] mr-1"></i> In Pipeline
+      </button>
+    </div>
     {% endif %}
   </div>
 
-  <!-- Results Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-    {% for r in results %}
-    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
-      <div>
-        <!-- Top row: Avatar, Supplier Name, Location, Match Badge -->
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex items-center space-x-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-sm border border-blue-100 shrink-0">
-              <i class="fa-solid fa-building"></i>
-            </div>
-            <div class="min-w-0">
-              <h3 class="font-bold text-slate-900 text-sm leading-tight truncate" title="{{ r.external_company.name }}">
-                {{ r.external_company.name }}
-              </h3>
-              <span class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                <i class="fa-solid fa-location-dot text-[11px] text-rose-500"></i>
-                <span class="truncate">
-                  {% if r.external_company.city and r.external_company.state %}
-                    {{ r.external_company.city }}, {{ r.external_company.state }}
-                  {% elif r.external_company.city %}
-                    {{ r.external_company.city }}, {{ r.external_company.country|default:"India" }}
-                  {% elif r.external_company.state %}
-                    {{ r.external_company.state }}, {{ r.external_company.country|default:"India" }}
-                  {% else %}
-                    Industrial Hub, {{ r.external_company.country|default:"India" }}
-                  {% endif %}
-                </span>
-              </span>
-            </div>
-          </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold shrink-0 {% if r.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
-            {{ r.match_score }}% Match
-          </span>
-        </div>
-
-        <!-- Role & Item Tags -->
-        <div class="flex flex-wrap items-center gap-1.5 mt-3 text-[11px]">
-          <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold capitalize">
-            {{ r.external_company.get_company_role_display|default:"Manufacturer" }}
-          </span>
-          <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold border border-blue-100 truncate max-w-[200px]">
-            For: {{ r.product_title }}
-          </span>
-        </div>
-
-        <!-- Commercial Terms Block -->
-        <div class="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
-          <div class="flex justify-between items-center">
-            <span class="text-slate-400">Estimated Price:</span>
-            <span class="font-bold text-slate-900">
-              {% if r.price %}
-                {{ r.price_currency }} {{ r.price }} / {{ r.price_unit|default:"pcs" }}
-              {% else %}
-                <span class="text-slate-400 font-medium">Contact for Quote</span>
-              {% endif %}
-            </span>
-          </div>
-
-          <div class="flex justify-between items-center">
-            <span class="text-slate-400">Min Order Qty (MOQ):</span>
-            <span class="font-semibold text-slate-700">{{ r.moq|default:"Flexible" }}</span>
-          </div>
-
-          {% if r.is_global_cheaper %}
-          <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] font-semibold flex items-center gap-1.5">
-            <i class="fa-solid fa-tag text-emerald-600"></i>
-            <span>Global Sourcing Advantage ({{ r.savings_percent|default:"15" }}% lower estimated cost)</span>
-          </div>
-          {% endif %}
-
-          <!-- Match Rationale & Signal -->
-          <div class="pt-1 space-y-1.5">
-            <div>
-              <span class="text-slate-400 block text-[11px] font-medium">Supplier Capability:</span>
-              <p class="font-medium text-slate-700 leading-relaxed text-[11px]">
-                {{ r.match_reason|truncatewords:28 }}
-              </p>
-            </div>
-
-            {% if r.need_signal %}
-            <div class="p-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-[11px] font-semibold flex items-start gap-1.5">
-              <i class="fa-solid fa-certificate text-blue-600 mt-0.5 shrink-0"></i>
-              <span class="leading-snug">{{ r.need_signal }}</span>
-            </div>
-            {% endif %}
-          </div>
-
-          <!-- Contact Details Block (Extracted via Scraper) -->
-          <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1.5 text-[11px]">
-            <div class="flex items-center justify-between text-slate-600">
-              <span class="text-slate-400"><i class="fa-solid fa-envelope mr-1.5 text-slate-400"></i> Email:</span>
-              {% if r.external_company.email %}
-              <a href="mailto:{{ r.external_company.email }}" class="font-semibold text-blue-600 hover:underline truncate max-w-[170px]">
-                {{ r.external_company.email }}
-              </a>
-              {% else %}
-              <span class="text-slate-400 italic">Available on site</span>
-              {% endif %}
-            </div>
-
-            <div class="flex items-center justify-between text-slate-600">
-              <span class="text-slate-400"><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i> Phone:</span>
-              {% if r.external_company.phone %}
-              <a href="tel:{{ r.external_company.phone }}" class="font-semibold text-slate-800 hover:text-blue-600">
-                {{ r.external_company.phone }}
-              </a>
-              {% else %}
-              <span class="text-slate-400 italic">Direct via website</span>
-              {% endif %}
-            </div>
-
-            {% if r.external_company.address %}
-            <div class="pt-1 border-t border-slate-200 text-slate-500 truncate" title="{{ r.external_company.address }}">
-              <i class="fa-solid fa-map-pin mr-1 text-slate-400"></i> {{ r.external_company.address }}
-            </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <!-- Action Card Footer -->
-      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-        <a href="{{ r.external_company.website|default:r.source_url }}" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-600 hover:underline font-semibold flex items-center">
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] mr-1"></i> Website
-        </a>
-
-        <div class="flex items-center gap-2">
-          {% if r.id in saved_result_ids %}
-          <a href="{% url 'saved-suppliers' %}" class="bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-blue-100 transition" title="Shortlisted in Procurement">
-            <i class="fa-solid fa-bookmark text-[10px]"></i>
-            <span>Shortlisted</span>
-          </a>
-          {% else %}
-          <form method="POST" action="{% url 'save-supplier-toggle' r.id %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-300 flex items-center gap-1.5 transition" title="Bookmark supplier">
-              <i class="fa-regular fa-bookmark text-[10px]"></i>
-              <span>Shortlist</span>
-            </button>
-          </form>
-          {% endif %}
-
-          <button type="button" onclick="openRfqModal('{{ r.id }}', '{{ r.external_company.name|escapejs }}', '{{ r.product_title|escapejs }}', '{{ r.external_company.email|default:''|escapejs }}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
-            <i class="fa-solid fa-envelope text-[10px]"></i>
-            <span>Send RFQ</span>
-          </button>
-        </div>
-      </div>
-    </div>
+  <!-- Results Grid (Compact Cards) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="leads_grid_container">
+    {% for lead in results %}
+      {% include "components/customer_compact_card.html" with lead=lead %}
     {% empty %}
-    <div class="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
-      <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100">
-        <i class="fa-solid fa-industry"></i>
+    <div class="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200 shadow-xs">
+      <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100">
+        <i class="fa-solid fa-magnifying-glass"></i>
       </div>
-      <h3 class="text-base font-bold text-slate-800 mb-1">No Suppliers Discovered Yet</h3>
+      <h3 class="text-base font-bold text-slate-800 mb-1">No Customers Discovered Yet</h3>
       <p class="text-xs text-slate-500 max-w-md mx-auto mb-5 leading-relaxed">
-        Select a requirement from the dropdown above and click <strong>"Launch AI Supplier Search"</strong>. Our automated web scraper will query commercial databases, crawl supplier websites, and extract factory specifications and quotes.
+        Click <strong>"Launch AI Customer Search"</strong> above to scrape live registries, discover verified commercial buyers & suppliers, and calculate AI compatibility for <strong>{{ selected_requirement.item_name }}</strong>.
       </p>
-      {% if requirements.first %}
-      <form method="POST" action="{% url 'find-suppliers' %}" class="inline-block">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="run_search">
-        <input type="hidden" name="requirement_id" value="{{ requirements.first.id }}">
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition inline-flex items-center gap-2">
-          <i class="fa-solid fa-bolt"></i>
-          <span>Search Suppliers for "{{ requirements.first.item_name }}"</span>
-        </button>
-      </form>
-      {% else %}
-      <a href="{% url 'requirements-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition inline-flex items-center gap-2">
-        <i class="fa-solid fa-plus"></i> Post Requirement First
-      </a>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
 
+  <!-- No Matching Filtered Leads Placeholder -->
+  <div id="no_filtered_leads_placeholder" class="hidden bg-white rounded-2xl p-10 text-center text-slate-400 border border-slate-200">
+    <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center text-lg mx-auto mb-2">
+      <i class="fa-solid fa-filter"></i>
+    </div>
+    <h4 class="text-sm font-bold text-slate-800">No customers match your active filter</h4>
+    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+      Try clearing your search query or selecting a different filter chip above.
+    </p>
+    <button type="button" id="clear_lead_filters_btn" class="mt-3 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition cursor-pointer">
+      Reset Filters
+    </button>
+  </div>
+  {% endif %}
+
 </div>
 
-<!-- Interactive RFQ Modal -->
-<div id="rfqModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-    <!-- Modal Header -->
-    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+<!-- Company 360° Credentials Modal Component -->
+{% include "components/company_details_modal.html" %}
+
+<!-- Official RFQ Modal -->
+<div id="rfqModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+        <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-base">
           <i class="fa-solid fa-envelope"></i>
         </div>
         <div>
-          <h3 class="text-sm font-bold text-slate-900">Send Request for Quotation (RFQ)</h3>
-          <p id="rfqModalSubtitle" class="text-xs text-slate-500 font-medium">To: Supplier Name</p>
+          <h3 class="text-sm font-bold text-slate-900">Send Commercial RFQ</h3>
+          <p id="rfqModalSubtitle" class="text-xs text-slate-500">To: Supplier</p>
         </div>
       </div>
-      <button type="button" onclick="closeRfqModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+      <button type="button" onclick="closeRfqModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
         <i class="fa-solid fa-xmark text-sm"></i>
       </button>
     </div>
 
-    <!-- Modal Form -->
-    <form id="rfqForm" method="POST" action="" enctype="multipart/form-data">
+    <form method="POST" id="rfqForm" enctype="multipart/form-data">
       {% csrf_token %}
-      <div class="p-5 space-y-4 text-xs">
+      <div class="p-6 space-y-4 text-xs">
         <div>
           <label for="rfq_sent_to_email" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
             Supplier Recipient Email
@@ -340,10 +526,10 @@
 
       <!-- Modal Footer -->
       <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-        <button type="button" onclick="closeRfqModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs">
+        <button type="button" onclick="closeRfqModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer">
           Cancel
         </button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition text-xs">
+        <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition text-xs cursor-pointer">
           <i class="fa-solid fa-envelope"></i>
           <span>Dispatch Official RFQ</span>
         </button>
@@ -353,6 +539,7 @@
 </div>
 
 <script>
+// RFQ Modal logic
 function openRfqModal(resultId, supplierName, productTitle, targetEmail) {
   const modal = document.getElementById('rfqModal');
   const form = document.getElementById('rfqForm');
@@ -374,11 +561,361 @@ function closeRfqModal() {
   document.getElementById('rfqModal').classList.add('hidden');
 }
 
-// Close on backdrop click
 document.getElementById('rfqModal')?.addEventListener('click', function(e) {
   if (e.target === this) {
     closeRfqModal();
   }
+});
+
+// Criteria Configuration Logic
+document.addEventListener('DOMContentLoaded', function() {
+  const toggleCriteriaBtn = document.getElementById('toggle_criteria_btn');
+  const criteriaConfigBox = document.getElementById('criteria_config_box');
+  const criteriaChevron = document.getElementById('criteria_chevron');
+  const closeCriteriaBtn = document.getElementById('close_criteria_btn');
+  const saveCriteriaAjaxBtn = document.getElementById('save_criteria_ajax_btn');
+  const addCriteriaBtnTop = document.getElementById('add_criteria_btn_top');
+  const addCriteriaBtnBottom = document.getElementById('add_criteria_btn_bottom');
+  const customCriteriaContainer = document.getElementById('custom_criteria_container');
+  const emptyCustomPlaceholder = document.getElementById('empty_custom_placeholder');
+  const selectAllStaticBtn = document.getElementById('select_all_static_btn');
+  const resetStaticBtn = document.getElementById('reset_static_btn');
+  const form = document.getElementById('find-suppliers-form');
+
+  function updateCriteriaCount() {
+    const staticCount = document.querySelectorAll('.static-criteria-checkbox:checked').length;
+    const customCount = document.querySelectorAll('.custom-criteria-row').length;
+    const total = staticCount + customCount;
+    const badge = document.getElementById('criteria_badge_count');
+    const summary = document.getElementById('criteria_summary_text');
+    if (badge) badge.textContent = `${total} Active`;
+    if (summary) summary.textContent = `${total} Parameters Applied`;
+  }
+
+  if (toggleCriteriaBtn && criteriaConfigBox) {
+    toggleCriteriaBtn.addEventListener('click', function() {
+      const isHidden = criteriaConfigBox.classList.contains('hidden');
+      if (isHidden) {
+        criteriaConfigBox.classList.remove('hidden');
+        if (criteriaChevron) criteriaChevron.style.transform = 'rotate(180deg)';
+      } else {
+        criteriaConfigBox.classList.add('hidden');
+        if (criteriaChevron) criteriaChevron.style.transform = 'rotate(0deg)';
+      }
+    });
+  }
+
+  if (closeCriteriaBtn && criteriaConfigBox) {
+    closeCriteriaBtn.addEventListener('click', function() {
+      criteriaConfigBox.classList.add('hidden');
+      if (criteriaChevron) criteriaChevron.style.transform = 'rotate(0deg)';
+    });
+  }
+
+  function addCustomCriteriaRow(keyVal = '', valueVal = '') {
+    if (!customCriteriaContainer) return;
+    if (emptyCustomPlaceholder) emptyCustomPlaceholder.classList.add('hidden');
+
+    const row = document.createElement('div');
+    row.className = 'custom-criteria-row grid grid-cols-12 gap-2 p-2 items-center hover:bg-blue-50/30 transition rounded-lg animate-in fade-in duration-150';
+    row.innerHTML = `
+      <div class="col-span-5 sm:col-span-4">
+        <input 
+          type="text" 
+          name="custom_criteria_key[]" 
+          value="${keyVal}" 
+          placeholder="e.g. ISO Standard, Lead Time..." 
+          class="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          required
+        >
+      </div>
+      <div class="col-span-6 sm:col-span-7">
+        <input 
+          type="text" 
+          name="custom_criteria_val[]" 
+          value="${valueVal}" 
+          placeholder="e.g. Mandatory, Within 7 Days..." 
+          class="w-full text-xs font-normal text-slate-700 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          required
+        >
+      </div>
+      <div class="col-span-1 flex items-center justify-center">
+        <button 
+          type="button" 
+          class="remove-custom-row-btn w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition" 
+          title="Remove criteria row"
+        >
+          <i class="fa-solid fa-trash-can text-xs"></i>
+        </button>
+      </div>
+    `;
+
+    customCriteriaContainer.prepend(row);
+    const keyInput = row.querySelector('input[name="custom_criteria_key[]"]');
+    if (keyInput) keyInput.focus();
+    updateCriteriaCount();
+  }
+
+  if (addCriteriaBtnTop) {
+    addCriteriaBtnTop.addEventListener('click', function(e) {
+      e.preventDefault();
+      addCustomCriteriaRow();
+    });
+  }
+
+  if (addCriteriaBtnBottom) {
+    addCriteriaBtnBottom.addEventListener('click', function(e) {
+      e.preventDefault();
+      addCustomCriteriaRow();
+    });
+  }
+
+  if (customCriteriaContainer) {
+    customCriteriaContainer.addEventListener('click', function(e) {
+      const removeBtn = e.target.closest('.remove-custom-row-btn');
+      if (removeBtn) {
+        e.preventDefault();
+        const row = removeBtn.closest('.custom-criteria-row');
+        if (row) {
+          row.remove();
+          const remaining = document.querySelectorAll('.custom-criteria-row').length;
+          if (remaining === 0 && emptyCustomPlaceholder) {
+            emptyCustomPlaceholder.classList.remove('hidden');
+          }
+          updateCriteriaCount();
+        }
+      }
+    });
+  }
+
+  document.querySelectorAll('.static-criteria-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateCriteriaCount);
+  });
+
+  if (selectAllStaticBtn) {
+    selectAllStaticBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.static-criteria-checkbox').forEach(cb => { cb.checked = true; });
+      updateCriteriaCount();
+    });
+  }
+
+  if (resetStaticBtn) {
+    resetStaticBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.static-criteria-checkbox').forEach(cb => { cb.checked = false; });
+      updateCriteriaCount();
+    });
+  }
+
+  // AJAX save criteria button
+  if (saveCriteriaAjaxBtn) {
+    saveCriteriaAjaxBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const saveBtn = this;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+
+      const formData = new FormData(form);
+      formData.set('action', 'save_criteria');
+
+      fetch("{% url 'find-suppliers' %}", {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk text-slate-500 mr-1"></i> Save Criteria';
+
+        const toast = document.getElementById('save_feedback_toast');
+        if (toast) {
+          toast.classList.remove('hidden');
+          setTimeout(() => { toast.classList.add('hidden'); }, 3000);
+        }
+        if (data && data.active_count !== undefined) {
+          const badge = document.getElementById('criteria_badge_count');
+          const summary = document.getElementById('criteria_summary_text');
+          if (badge) badge.textContent = `${data.active_count} Active`;
+          if (summary) summary.textContent = `${data.active_count} Parameters Applied`;
+        }
+      })
+      .catch(() => {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk text-slate-500 mr-1"></i> Save Criteria';
+      });
+    });
+  }
+
+  // Show loading indicator on search submit
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      const reqId = document.getElementById('selected_requirement_id').value;
+      if (!reqId) {
+        e.preventDefault();
+        alert('Please choose a sourcing requirement to find matching customers.');
+        return;
+      }
+      const overlay = document.getElementById('search_loading_overlay');
+      if (overlay) overlay.classList.remove('hidden');
+    });
+  }
+
+  // ==========================================
+  // Discovered Customers In-Page Filtering & Instant Search
+  // ==========================================
+  const leadFilterInput = document.getElementById('lead_filter_query');
+  const leadFilterChips = document.querySelectorAll('.lead-filter-chip');
+  const leadCards = Array.from(document.querySelectorAll('.customer-compact-card'));
+  const visibleCountNum = document.getElementById('visible_count_num');
+  const visibleLeadsCounter = document.getElementById('visible_leads_counter');
+  const noFilteredLeadsPlaceholder = document.getElementById('no_filtered_leads_placeholder');
+  const clearLeadFiltersBtn = document.getElementById('clear_lead_filters_btn');
+
+  let activeFilterChip = 'all';
+
+  function applyLeadFilters() {
+    if (leadCards.length === 0) return;
+    const query = (leadFilterInput ? leadFilterInput.value : '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    leadCards.forEach(card => {
+      const name = (card.getAttribute('data-company-name') || '').toLowerCase();
+      const location = (card.getAttribute('data-company-location') || '').toLowerCase();
+      const industry = (card.getAttribute('data-company-industry') || '').toLowerCase();
+      const score = parseInt(card.getAttribute('data-match-score') || '0', 10);
+      const email = (card.getAttribute('data-company-email') || '').trim();
+      const phone = (card.getAttribute('data-company-phone') || '').trim();
+      const isSaved = card.getAttribute('data-is-saved') === 'true';
+
+      // 1. Text query matching
+      const matchesQuery = !query || name.includes(query) || location.includes(query) || industry.includes(query);
+
+      // 2. Chip filter matching
+      let matchesChip = true;
+      if (activeFilterChip === 'fit_90') {
+        matchesChip = score >= 90;
+      } else if (activeFilterChip === 'fit_80') {
+        matchesChip = score >= 80;
+      } else if (activeFilterChip === 'has_contact') {
+        matchesChip = Boolean(email || phone);
+      } else if (activeFilterChip === 'unsaved') {
+        matchesChip = !isSaved;
+      } else if (activeFilterChip === 'saved') {
+        matchesChip = isSaved;
+      }
+
+      if (matchesQuery && matchesChip) {
+        card.classList.remove('hidden');
+        visibleCount++;
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+
+    if (visibleCountNum) visibleCountNum.textContent = visibleCount;
+    if (visibleLeadsCounter) visibleLeadsCounter.textContent = `${visibleCount} Discovered`;
+
+    if (noFilteredLeadsPlaceholder) {
+      if (visibleCount === 0 && leadCards.length > 0) {
+        noFilteredLeadsPlaceholder.classList.remove('hidden');
+      } else {
+        noFilteredLeadsPlaceholder.classList.add('hidden');
+      }
+    }
+  }
+
+  if (leadFilterInput) {
+    leadFilterInput.addEventListener('input', applyLeadFilters);
+  }
+
+  leadFilterChips.forEach(chip => {
+    chip.addEventListener('click', function(e) {
+      e.preventDefault();
+      leadFilterChips.forEach(c => {
+        c.classList.remove('bg-blue-600', 'text-white', 'shadow-xs', 'font-bold');
+        c.classList.add('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'font-semibold');
+      });
+      this.classList.remove('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'font-semibold');
+      this.classList.add('bg-blue-600', 'text-white', 'shadow-xs', 'font-bold');
+
+      activeFilterChip = this.getAttribute('data-filter') || 'all';
+      applyLeadFilters();
+    });
+  });
+
+  if (clearLeadFiltersBtn) {
+    clearLeadFiltersBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (leadFilterInput) leadFilterInput.value = '';
+      const allChip = document.querySelector('.lead-filter-chip[data-filter="all"]');
+      if (allChip) allChip.click();
+      else {
+        activeFilterChip = 'all';
+        applyLeadFilters();
+      }
+    });
+  }
+
+  // ==========================================
+  // 1-Click AJAX Customer Bookmarking (Zero Page Reload)
+  // ==========================================
+  document.addEventListener('submit', function(e) {
+    const saveForm = e.target.closest('.card-save-form');
+    if (!saveForm) return;
+
+    e.preventDefault();
+    const btn = saveForm.querySelector('button[type="submit"]');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[9px]"></i>';
+    }
+
+    const card = saveForm.closest('.customer-compact-card');
+    const slot = saveForm.closest('.card-save-slot');
+
+    fetch(saveForm.action, {
+      method: 'POST',
+      body: new FormData(saveForm),
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        if (card) card.setAttribute('data-is-saved', 'true');
+        if (slot) {
+          slot.innerHTML = `
+            <a href="{% url 'saved-suppliers' %}" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition animate-in zoom-in-95 duration-150" title="Saved to Customers">
+              <i class="fa-solid fa-check text-[9px]"></i>
+              <span>Saved</span>
+            </a>
+          `;
+        }
+        if (activeFilterChip === 'unsaved') {
+          applyLeadFilters();
+        }
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalBtnHtml;
+        }
+      }
+    })
+    .catch(err => {
+      console.error('AJAX save customer error:', err);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+      }
+    });
+  });
 });
 </script>
 {% endblock %}

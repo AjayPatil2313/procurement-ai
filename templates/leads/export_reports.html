@@ -129,7 +129,7 @@
       class="flex-1 min-w-[180px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition {% if report_type == 'leads' %}{% if is_seller_context %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-blue-600 text-white shadow-sm shadow-blue-600/20{% endif %}{% else %}text-slate-600 hover:bg-slate-100{% endif %}"
     >
       <i class="fa-solid fa-users-viewfinder"></i>
-      <span>Vendor List Discovery</span>
+      <span>{% if is_seller_context %}Vendor List Discovery{% else %}Supplier Discovery Intelligence{% endif %}</span>
       <span class="text-[10px] px-1.5 py-0.5 rounded-full {% if report_type == 'leads' %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">
         {{ total_leads_count }}
       </span>
@@ -140,7 +140,7 @@
       class="flex-1 min-w-[180px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition {% if report_type == 'inquiries' %}{% if is_seller_context %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-blue-600 text-white shadow-sm shadow-blue-600/20{% endif %}{% else %}text-slate-600 hover:bg-slate-100{% endif %}"
     >
       <i class="fa-solid fa-envelope"></i>
-      <span>Inquiries & Outreach Audit</span>
+      <span>{% if is_seller_context %}Inquiries & Outreach Audit{% else %}Inquiries & Quotes Audit{% endif %}</span>
       <span class="text-[10px] px-1.5 py-0.5 rounded-full {% if report_type == 'inquiries' %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">
         {{ total_inquiry_count }}
       </span>
@@ -151,7 +151,7 @@
       class="flex-1 min-w-[180px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition {% if report_type == 'catalog' %}{% if is_seller_context %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-blue-600 text-white shadow-sm shadow-blue-600/20{% endif %}{% else %}text-slate-600 hover:bg-slate-100{% endif %}"
     >
       <i class="fa-solid fa-boxes-stacked"></i>
-      <span>Product Catalog Specs</span>
+      <span>{% if is_seller_context %}Product Catalog Specs{% else %}Requirement Specifications{% endif %}</span>
       <span class="text-[10px] px-1.5 py-0.5 rounded-full {% if report_type == 'catalog' %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">
         {{ total_catalog_count|default:products|length }}
       </span>
@@ -165,10 +165,10 @@
         <label for="export_product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
           <span class="flex items-center gap-1.5">
             <i class="fa-solid fa-filter {% if is_seller_context %}text-orange-500{% else %}text-blue-500{% endif %}"></i>
-            <span>Select Product to Scope Report</span>
+            <span>{% if is_seller_context %}Select Product to Scope Report{% else %}Select Requirement to Scope Report{% endif %}</span>
           </span>
           <span class="text-slate-400 font-medium normal-case">
-            {{ products|length }} Products &bull; Select to load data
+            {{ products|length }} {% if is_seller_context %}Products{% else %}Requirements{% endif %} &bull; Select to load data
           </span>
         </label>
 
@@ -181,7 +181,7 @@
             type="text" 
             id="export_product_filter_input" 
             autocomplete="off"
-            placeholder="Search and choose a product from catalog..."
+            placeholder="Search and choose a {% if is_seller_context %}product from catalog{% else %}requirement item{% endif %}..."
             value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
             class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 {% if is_seller_context %}focus:ring-orange-500 focus:border-orange-500{% else %}focus:ring-blue-500 focus:border-blue-500{% endif %} transition text-slate-800 placeholder-slate-400"
           >

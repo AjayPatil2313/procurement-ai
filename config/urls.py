@@ -41,7 +41,12 @@ from apps.requirements.web_views import (
     requirement_detail_view,
     requirement_edit_view,
     requirement_delete_view,
+    requirement_restore_view,
+    requirements_export_csv_view,
+    requirements_import_template_view,
+    requirements_import_csv_view,
     find_suppliers_view,
+    export_discovered_suppliers_csv_view,
 )
 from apps.catalog.web_views import (
     products_list_view,
@@ -68,6 +73,7 @@ from apps.leads.web_views import (
     add_inquiry_message_view,
     update_inquiry_status_view,
     price_comparison_view,
+    export_price_comparison_csv_view,
     leads_list_view,
     export_reports_view,
     save_lead_toggle_view,
@@ -76,7 +82,9 @@ from apps.leads.web_views import (
     export_saved_leads_csv_view,
     export_inquiries_csv_view,
     save_supplier_toggle_view,
+    update_saved_supplier_view,
     delete_saved_supplier_view,
+    export_saved_suppliers_csv_view,
     send_rfq_view,
 )
 from apps.companies.admin_views import (
@@ -99,6 +107,10 @@ from apps.companies.admin_views import (
     admin_panel_toggle_maintenance_view,
     admin_panel_apilogs_view,
     admin_panel_auditlogs_view,
+    admin_panel_buyer_dashboard_view,
+    admin_panel_buyer_module_toggle_view,
+    admin_panel_buyer_module_edit_view,
+    admin_panel_buyer_layout_update_view,
 )
 from apps.ai_search.web_views import (
     matching_parameters_view,
@@ -148,14 +160,21 @@ urlpatterns = [
 
     # Buyer / Procurement (Web)
     path("procurement/find-suppliers/", find_suppliers_view, name="find-suppliers"),
+    path("procurement/find-suppliers/export/", export_discovered_suppliers_csv_view, name="export-discovered-suppliers-csv"),
     path("procurement/requirements/", requirements_list_view, name="requirements-list"),
     path("procurement/requirements/create/", requirement_create_view, name="requirements-create"),
     path("procurement/requirements/new/", requirement_create_view, name="requirement-create"),
+    path("procurement/requirements/export/", requirements_export_csv_view, name="requirements-export-csv"),
+    path("procurement/requirements/import/", requirements_import_csv_view, name="requirements-import-csv"),
+    path("procurement/requirements/import-template/", requirements_import_template_view, name="requirements-import-template"),
     path("procurement/requirements/<int:pk>/", requirement_detail_view, name="requirement-detail"),
     path("procurement/requirements/<int:pk>/edit/", requirement_edit_view, name="requirement-edit"),
     path("procurement/requirements/<int:pk>/delete/", requirement_delete_view, name="requirement-delete"),
+    path("procurement/requirements/<int:pk>/restore/", requirement_restore_view, name="requirements-restore"),
     path("procurement/suppliers/save/<int:result_id>/", save_supplier_toggle_view, name="save-supplier-toggle"),
     path("procurement/saved-suppliers/", saved_suppliers_view, name="saved-suppliers"),
+    path("procurement/saved-suppliers/export/", export_saved_suppliers_csv_view, name="export-saved-suppliers-csv"),
+    path("procurement/saved-suppliers/<int:item_id>/update/", update_saved_supplier_view, name="update-saved-supplier"),
     path("procurement/saved-suppliers/<int:item_id>/delete/", delete_saved_supplier_view, name="delete-saved-supplier"),
     path("procurement/inquiries/", inquiries_list_view, name="inquiries-list"),
     path("procurement/inquiries/export/", export_inquiries_csv_view, name="export-inquiries-csv"),
@@ -167,6 +186,7 @@ urlpatterns = [
     path("procurement/inquiries/<int:pk>/delete/", delete_inquiry_view, name="delete-inquiry"),
     path("procurement/inquiries/send/<int:result_id>/", send_rfq_view, name="send-rfq"),
     path("procurement/price-comparison/", price_comparison_view, name="price-comparison"),
+    path("procurement/price-comparison/export/", export_price_comparison_csv_view, name="export-price-comparison-csv"),
     path("procurement/export-reports/", export_reports_view, name="export-reports"),
 
     # Seller / Sales (Web)
@@ -230,6 +250,10 @@ urlpatterns = [
     path("admin-panel/maintenance/toggle/", admin_panel_toggle_maintenance_view, name="admin-panel-toggle-maintenance"),
     path("admin-panel/api-logs/", admin_panel_apilogs_view, name="admin-panel-apilogs"),
     path("admin-panel/audit-logs/", admin_panel_auditlogs_view, name="admin-panel-auditlogs"),
+    path("admin-panel/buyer-dashboard/", admin_panel_buyer_dashboard_view, name="admin-panel-buyer-dashboard"),
+    path("admin-panel/buyer-dashboard/modules/<int:pk>/toggle/", admin_panel_buyer_module_toggle_view, name="admin-panel-buyer-module-toggle"),
+    path("admin-panel/buyer-dashboard/modules/<int:pk>/edit/", admin_panel_buyer_module_edit_view, name="admin-panel-buyer-module-edit"),
+    path("admin-panel/buyer-dashboard/layout/update/", admin_panel_buyer_layout_update_view, name="admin-panel-buyer-layout-update"),
 
     # REST APIs
     path("api/auth/", include("apps.accounts.urls")),

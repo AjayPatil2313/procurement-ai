@@ -9,6 +9,7 @@ from apps.catalog.models import Product, Category
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany
 from apps.leads.models import Inquiry, InquiryMessage, SavedItem
 from apps.leads.services.email_service import send_inquiry_email
+from apps.requirements.models import Requirement
 
 User = get_user_model()
 
@@ -465,5 +466,295 @@ class DynamicInquiriesAndReportsTestCase(TestCase):
         data = response.json()
         self.assertTrue(data["success"])
         self.assertEqual(data["status"], Inquiry.Status.IN_DISCUSSION)
+
+
+class BuyerProcurementPipelineAndComparisonTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="buyer_procure@example.com",
+            password="securepassword123",
+            first_name="Arthur",
+            last_name="Buyer",
+        )
+        self.company = Company.objects.create(
+            name="Apex Engineering Procurement",
+            company_type=Company.CompanyType.BUYER,
+            industry="Manufacturing",
+            created_by=self.user,
+        )
+        self.member = CompanyMember.objects.create(
+            user=self.user,
+            company=self.company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.category = Category.objects.create(name="Industrial Valves")
+        self.requirement = Requirement.objects.create(
+            company=self.company,
+            created_by=self.user,
+            category=self.category,
+            item_name="High-Pressure Gate Valves",
+            quantity=100,
+            unit="units",
+            target_price=Decimal("12000.00"),
+            currency="INR",
+            delivery_city="Pune",
+            status=Requirement.Status.SEARCHING,
+        )
+
+        self.ext_company1 = ExternalCompany.objects.create(
+            name="Precision Valve Corp",
+            email="sales@precisionvalves.com",
+            phone="+91 91234 56789",
+            city="Ahmedabad",
+            country="India",
+        )
+        self.ext_company2 = ExternalCompany.objects.create(
+            name="Global Flow Systems",
+            email="quotes@globalflow.com",
+            phone="+91 99887 76655",
+            city="Vadodara",
+            country="India",
+        )
+
+        self.search_job = SearchJob.objects.create(
+            company=self.company,
+            requirement=self.requirement,
+            job_type=SearchJob.JobType.FIND_SUPPLIERS,
+            status=SearchJob.Status.COMPLETED,
+        )
+
+        self.search_result1 = SearchResult.objects.create(
+            search_job=self.search_job,
+            external_company=self.ext_company1,
+            product_title="Forged Gate Valve ANSI 600",
+            result_type=SearchResult.ResultType.SUPPLIER,
+            price=Decimal("10500.00"),
+            match_score=95,
+            match_reason="Matches industrial high pressure gate valve specifications",
+        )
+        self.search_result2 = SearchResult.objects.create(
+            search_job=self.search_job,
+            external_company=self.ext_company2,
+            product_title="Cast Steel Gate Valve 150#",
+            result_type=SearchResult.ResultType.SUPPLIER,
+            price=Decimal("13000.00"),
+            match_score=88,
+            match_reason="Matches cast steel gate valve specs",
+        )
+
+        self.client = Client()
+        self.client.login(email="buyer_procure@example.com", password="securepassword123")
+        session = self.client.session
+        session["active_company_id"] = self.company.id
+        session.save()
+
+    def test_saved_suppliers_toggle_and_deduplication(self):
+        """Test bookmarking a supplier creates a SavedItem and prevents duplicates."""
+        url = reverse("save-supplier-toggle", kwargs={"result_id": self.search_result1.id})
+
+        # 1. First save via AJAX
+        response = self.client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertTrue(data["created"])
+        self.assertEqual(SavedItem.objects.filter(company=self.company).count(), 1)
+
+        # 2. Second save attempt triggers deduplication
+        dup_response = self.client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(dup_response.status_code, 200)
+        dup_data = dup_response.json()
+        self.assertTrue(dup_data["success"])
+        self.assertFalse(dup_data["created"])
+        self.assertEqual(SavedItem.objects.filter(company=self.company).count(), 1)
+
+    def test_saved_suppliers_list_and_ajax_update(self):
+        """Test viewing shortlisted suppliers and updating pipeline stage / notes via AJAX."""
+        saved_item = SavedItem.objects.create(
+            company=self.company,
+            search_result=self.search_result1,
+            status=SavedItem.Status.INTERESTED,
+        )
+
+        # 1. View list with requirement filter
+        list_url = reverse("saved-suppliers") + f"?requirement_id={self.requirement.id}"
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Precision Valve Corp")
+        self.assertEqual(response.context["total_saved_count"], 1)
+
+        # 2. Update status and notes via AJAX
+        update_url = reverse("update-saved-supplier", kwargs={"item_id": saved_item.id})
+        update_res = self.client.post(update_url, {
+            "status": "contacted",
+            "notes": "Sent formal RFQ inquiry for 100 units.",
+        }, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(update_res.status_code, 200)
+        data = update_res.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["status"], "contacted")
+        self.assertEqual(data["notes"], "Sent formal RFQ inquiry for 100 units.")
+
+        saved_item.refresh_from_db()
+        self.assertEqual(saved_item.status, SavedItem.Status.CONTACTED)
+        self.assertEqual(saved_item.notes, "Sent formal RFQ inquiry for 100 units.")
+
+    def test_export_saved_suppliers_csv(self):
+        """Test 1-click CSV export for shortlisted suppliers."""
+        SavedItem.objects.create(
+            company=self.company,
+            search_result=self.search_result1,
+            status=SavedItem.Status.CONTACTED,
+            notes="Sample procurement note",
+        )
+
+        url = reverse("export-saved-suppliers-csv") + f"?requirement_id={self.requirement.id}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("Shortlisted_Suppliers", response["Content-Disposition"])
+
+        content = response.content.decode("utf-8")
+        self.assertIn("Precision Valve Corp", content)
+        self.assertIn("High-Pressure Gate Valves", content)
+
+    def test_price_comparison_view_and_calculations(self):
+        """Test price comparison dashboard calculates variance, savings %, and handles verified quotes vs web prices."""
+        # Record formal quote for supplier 1 via Inquiry
+        Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result1,
+            subject="RFQ: Gate Valves",
+            message="Quotation required",
+            sent_to_email="sales@precisionvalves.com",
+            quoted_price=Decimal("10200.00"),
+            quoted_currency="INR",
+            delivery_terms="Door Delivery, 10 Days",
+            status=Inquiry.Status.REPLIED,
+        )
+
+        url = reverse("price-comparison") + f"?requirement_id={self.requirement.id}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_requirement"], self.requirement)
+        self.assertEqual(response.context["target_price"], Decimal("12000.00"))
+
+        comparison_items = response.context["comparison_items"]
+        self.assertEqual(len(comparison_items), 2)
+
+        # Supplier 1: formal quote 10200 vs target 12000 (savings = 1800, 15.0%)
+        sup1 = next(item for item in comparison_items if item["company"].id == self.ext_company1.id)
+        self.assertTrue(sup1["is_verified_quote"])
+        self.assertEqual(sup1["price"], Decimal("10200.00"))
+        self.assertEqual(sup1["variance"], Decimal("-1800.00"))
+        self.assertEqual(sup1["savings_percent"], 15.0)
+
+        # Supplier 2: discovered web price 13000 vs target 12000 (variance = +1000)
+        sup2 = next(item for item in comparison_items if item["company"].id == self.ext_company2.id)
+        self.assertFalse(sup2["is_verified_quote"])
+        self.assertEqual(sup2["price"], Decimal("13000.00"))
+        self.assertEqual(sup2["variance"], Decimal("1000.00"))
+        self.assertIsNone(sup2["savings_percent"])
+
+        # Check KPIs
+        self.assertEqual(response.context["lowest_price"], Decimal("10200.00"))
+        self.assertEqual(response.context["max_savings_pct"], 15.0)
+        self.assertEqual(response.context["cheaper_options_count"], 1)
+
+    def test_export_price_comparison_csv(self):
+        """Test dedicated 1-click CSV export for price comparison matrix."""
+        Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result1,
+            subject="RFQ: Gate Valves",
+            message="Quotation required",
+            sent_to_email="sales@precisionvalves.com",
+            quoted_price=Decimal("10200.00"),
+            quoted_currency="INR",
+            delivery_terms="Door Delivery, 10 Days",
+            status=Inquiry.Status.REPLIED,
+        )
+
+        url = reverse("export-price-comparison-csv") + f"?requirement_id={self.requirement.id}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("Price_Comparison_", response["Content-Disposition"])
+
+        content = response.content.decode("utf-8")
+        self.assertIn("Precision Valve Corp", content)
+        self.assertIn("10200.00", content)
+        self.assertIn("12000.00", content)
+        self.assertIn("Verified Formal Quote", content)
+
+    def test_buyer_inquiries_list_and_export_csv(self):
+        """Test Buyer inquiries view lists requirement-linked RFQs and exports Buyer CSV."""
+        inq = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result1,
+            subject="Commercial Inquiry: High-Pressure Valves",
+            message="Please provide terms",
+            sent_to_email="sales@precisionvalves.com",
+            quoted_price=Decimal("10200.00"),
+            quoted_currency="INR",
+            status=Inquiry.Status.SENT,
+        )
+        inq.ensure_initial_message()
+
+        # 1. Inquiries list view in buyer context
+        list_url = reverse("inquiries-list") + f"?requirement_id={self.requirement.id}"
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Precision Valve Corp")
+        self.assertIn("requirements", response.context)
+
+        # 2. Export inquiries CSV in buyer context
+        export_url = reverse("export-inquiries-csv") + f"?requirement_id={self.requirement.id}"
+        export_res = self.client.get(export_url)
+        self.assertEqual(export_res.status_code, 200)
+        self.assertEqual(export_res["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("Procurement_Inquiries", export_res["Content-Disposition"])
+
+        content = export_res.content.decode("utf-8")
+        self.assertIn("High-Pressure Gate Valves", content)
+        self.assertIn("Precision Valve Corp", content)
+
+    def test_buyer_export_reports_view_and_csv(self):
+        """Test Buyer export reports dashboard displays requirements catalog and downloads CSV."""
+        url = reverse("export-reports")
+
+        # 1. Landing view with requirement selected
+        response = self.client.get(url, {"report_type": "leads", "requirement_id": self.requirement.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Precision Valve Corp")
+        self.assertFalse(response.context["is_seller_context"])
+        self.assertGreaterEqual(len(response.context["preview_records"]), 1)
+
+        # 2. Download CSV for Supplier Intelligence
+        csv_res = self.client.get(url, {
+            "download": "1",
+            "format": "csv",
+            "report_type": "leads",
+            "requirement_id": self.requirement.id,
+        })
+        self.assertEqual(csv_res.status_code, 200)
+        self.assertEqual(csv_res["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("Supplier_Discovery_Report", csv_res["Content-Disposition"])
+        self.assertIn("Precision Valve Corp", csv_res.content.decode("utf-8"))
+
+        # 3. Download CSV for Requirement Specifications
+        specs_res = self.client.get(url, {
+            "download": "1",
+            "format": "csv",
+            "report_type": "catalog",
+            "requirement_id": self.requirement.id,
+        })
+        self.assertEqual(specs_res.status_code, 200)
+        self.assertEqual(specs_res["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn("Requirement_Specifications", specs_res["Content-Disposition"])
+        self.assertIn("High-Pressure Gate Valves", specs_res.content.decode("utf-8"))
+
 
 

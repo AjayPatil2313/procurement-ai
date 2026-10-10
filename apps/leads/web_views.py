@@ -15,6 +15,7 @@ from apps.leads.models import SavedItem, Inquiry, PriceHistory, InquiryMessage
 from apps.leads.services.email_service import send_inquiry_email
 from apps.ai_search.models import SearchResult, ExternalCompany
 from apps.catalog.models import Product
+from apps.requirements.models import Requirement
 from apps.companies.rbac import get_user_rbac_context
 from apps.dashboard.services.notification_service import (
     notify_proposal_sent,
@@ -626,6 +627,7 @@ def save_supplier_toggle_view(request, result_id):
     """
     Shortlist Supplier Action:
     Allows buyers to bookmark a qualified supplier for procurement.
+    Deduplicates bookmarked suppliers per requirement.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -635,19 +637,34 @@ def save_supplier_toggle_view(request, result_id):
         messages.error(request, "Access restricted: Procurement module permission required.")
         return redirect("dashboard")
 
-    result = get_object_or_404(SearchResult, id=result_id)
+    if rbac["is_super_admin"] and not company:
+        result = get_object_or_404(SearchResult, id=result_id)
+    else:
+        result = get_object_or_404(SearchResult, id=result_id, search_job__company=company)
 
-    saved_item, created = SavedItem.objects.get_or_create(
+    # Prevent duplicate bookmarking of the same supplier for this requirement
+    target_req = result.search_job.requirement if result.search_job else None
+    existing_saved = SavedItem.objects.filter(
         company=company,
-        search_result=result,
-        defaults={"status": SavedItem.Status.INTERESTED},
-    )
+        search_result__external_company=result.external_company,
+        search_result__search_job__requirement=target_req,
+    ).first()
+
+    if existing_saved:
+        saved_item = existing_saved
+        created = False
+    else:
+        saved_item, created = SavedItem.objects.get_or_create(
+            company=company,
+            search_result=result,
+            defaults={"status": SavedItem.Status.INTERESTED},
+        )
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({
             "success": True,
             "created": created,
-            "message": f"Supplier '{result.external_company.name}' shortlisted!" if created else "Supplier is already shortlisted.",
+            "message": f"Supplier '{result.external_company.name}' shortlisted!" if created else "Supplier is already shortlisted for this requirement.",
         })
 
     if created:
@@ -662,8 +679,13 @@ def save_supplier_toggle_view(request, result_id):
 @login_required
 def saved_suppliers_view(request):
     """
-    Saved / Shortlisted Suppliers View:
-    Displays all bookmarked suppliers with pricing, MOQ, and direct RFQ action.
+    Saved / Shortlisted Suppliers Pipeline (Requirement-Wise):
+    Displays bookmarked suppliers organized requirement-by-requirement.
+    Supports:
+    - Requirement-specific filtering or consolidated overview
+    - Pipeline stage tracking (Interested, Contacted, Negotiating, Won, Lost)
+    - Team member assignment and deal notes
+    - Metric summary cards
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -673,26 +695,284 @@ def saved_suppliers_view(request):
         messages.error(request, "Access restricted: Saved Suppliers is only available for Buyer accounts.")
         return redirect("dashboard")
 
-    saved_suppliers = SavedItem.objects.filter(
+    requirements = list(Requirement.objects.filter(company=company, is_deleted=False).order_by(Lower("item_name"))) if company else []
+
+    base_qs = SavedItem.objects.filter(
         company=company,
         search_result__result_type=SearchResult.ResultType.SUPPLIER,
     ).select_related(
         "search_result",
         "search_result__external_company",
+        "search_result__search_job",
+        "search_result__search_job__requirement",
+        "search_result__search_job__requirement__category",
+        "assigned_to",
     ).order_by("-created_at")
 
+    # Status filter
+    status_filter = request.GET.get("status", "").strip().lower()
+    if status_filter and status_filter in dict(SavedItem.Status.choices):
+        base_qs = base_qs.filter(status=status_filter)
+
+    # Search filter
+    q = request.GET.get("q", "").strip()
+    if q:
+        base_qs = base_qs.filter(
+            Q(search_result__external_company__name__icontains=q)
+            | Q(search_result__external_company__city__icontains=q)
+            | Q(search_result__external_company__email__icontains=q)
+            | Q(search_result__product_title__icontains=q)
+            | Q(notes__icontains=q)
+        )
+
+    # Assigned to filter
+    assigned_filter = request.GET.get("assigned_to", "").strip()
+    if assigned_filter == "unassigned":
+        base_qs = base_qs.filter(assigned_to__isnull=True)
+    elif assigned_filter.isdigit():
+        base_qs = base_qs.filter(assigned_to_id=int(assigned_filter))
+
+    # Count saved items per requirement
+    req_counts = (
+        base_qs
+        .order_by()
+        .filter(search_result__search_job__requirement__isnull=False)
+        .values("search_result__search_job__requirement_id")
+        .annotate(total=Count("id"))
+    )
+    counts_map = {item["search_result__search_job__requirement_id"]: item["total"] for item in req_counts}
+    for r in requirements:
+        r.saved_count = counts_map.get(r.id, 0)
+
+    unassigned_count = (
+        base_qs
+        .order_by()
+        .filter(search_result__search_job__requirement__isnull=True)
+        .count()
+    )
+    total_saved_count = sum(r.saved_count for r in requirements) + unassigned_count
+
+    req_id_str = request.GET.get("requirement_id", "").strip()
+    selected_requirement = None
+    is_unassigned_view = False
+    is_single_req = False
+    items = []
+    requirement_groups = []
+    unassigned_group = None
+
+    if req_id_str and req_id_str.isdigit():
+        selected_requirement = Requirement.objects.filter(id=int(req_id_str), company=company, is_deleted=False).first()
+        if selected_requirement:
+            is_single_req = True
+            raw_items = list(base_qs.filter(search_result__search_job__requirement=selected_requirement))
+            items = deduplicate_saved_items(raw_items)
+    elif req_id_str == "unassigned":
+        is_unassigned_view = True
+        is_single_req = True
+        raw_items = list(base_qs.filter(search_result__search_job__requirement__isnull=True))
+        items = deduplicate_saved_items(raw_items)
+
+    active_items = items if is_single_req else []
+    total_suppliers_count = len(active_items)
+    high_fit_count = sum(1 for it in active_items if (it.search_result and it.search_result.match_score >= 85))
+    verified_contact_count = sum(1 for it in active_items if (it.search_result and it.search_result.external_company and (it.search_result.external_company.email or it.search_result.external_company.phone)))
+    negotiating_count = sum(1 for it in active_items if it.status in [SavedItem.Status.NEGOTIATING, SavedItem.Status.WON])
+
+    # Company team members for assignment dropdown
+    team_members = []
+    if company:
+        team_members = [
+            m.user for m in company.members.filter(is_active=True).select_related("user") if m.user
+        ]
+
     return render(request, "leads/saved_suppliers.html", {
-        "saved_suppliers": saved_suppliers,
+        "requirements": requirements,
+        "selected_requirement": selected_requirement,
+        "selected_requirement_id": int(req_id_str) if req_id_str and req_id_str.isdigit() else None,
+        "is_unassigned_view": is_unassigned_view,
+        "is_single_req": is_single_req,
+        "requirement_groups": requirement_groups,
+        "unassigned_group": unassigned_group,
+        "unassigned_count": unassigned_count,
+        "total_saved_count": total_saved_count,
+        "saved_suppliers": active_items,
+        "items": items,
+        "total_suppliers_count": total_suppliers_count,
+        "high_fit_count": high_fit_count,
+        "verified_contact_count": verified_contact_count,
+        "negotiating_count": negotiating_count,
+        "status_choices": SavedItem.Status.choices,
+        "current_status": status_filter,
+        "team_members": team_members,
+        "search_query": q,
         "company": company,
-        "rbac": rbac,
-        "page_title": "Shortlisted Suppliers",
+        "page_title": f"Saved Customers — {selected_requirement.item_name}" if selected_requirement else "Saved Customers (Requirement-Wise)",
     })
+
+
+@login_required
+def update_saved_supplier_view(request, item_id):
+    """
+    Updates status, notes, or assigned team member for shortlisted supplier.
+    Supports AJAX and standard POST.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        return JsonResponse({"success": False, "error": "Access restricted"}, status=403)
+
+    item = get_object_or_404(SavedItem, id=item_id, company=company)
+
+    if request.method == "POST":
+        status_val = request.POST.get("status", "").strip().lower()
+        notes = request.POST.get("notes")
+        assigned_to_id = request.POST.get("assigned_to")
+
+        if status_val and status_val in dict(SavedItem.Status.choices):
+            item.status = status_val
+
+        if notes is not None:
+            item.notes = notes.strip()
+
+        if assigned_to_id is not None:
+            if assigned_to_id == "":
+                item.assigned_to = None
+            elif assigned_to_id.isdigit():
+                item.assigned_to_id = int(assigned_to_id)
+
+        item.save()
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "status": item.status,
+                "status_display": item.get_status_display(),
+                "assigned_to_id": item.assigned_to_id,
+                "assigned_to_name": item.assigned_to.get_full_name() or item.assigned_to.email if item.assigned_to else "Unassigned",
+                "notes": item.notes,
+                "message": f"Supplier '{item.search_result.external_company.name}' updated successfully.",
+            })
+
+        messages.success(request, f"Supplier '{item.search_result.external_company.name}' updated successfully.")
+
+    redirect_to = request.META.get("HTTP_REFERER") or reverse("saved-suppliers")
+    return redirect(redirect_to)
+
+
+@login_required
+def export_saved_suppliers_csv_view(request):
+    """
+    1-Click CSV Export for Shortlisted Suppliers Pipeline:
+    Exports all bookmarked suppliers with qualification status,
+    assigned team member, procurement notes, contact info, and pricing.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Procurement module permission required.")
+        return redirect("dashboard")
+
+    requirement_id_str = request.GET.get("requirement_id", "").strip()
+    selected_requirement = None
+    qs = SavedItem.objects.filter(
+        company=company,
+        search_result__result_type=SearchResult.ResultType.SUPPLIER,
+    ).filter(
+        Q(search_result__search_job__requirement__is_deleted=False) | Q(search_result__search_job__requirement__isnull=True)
+    ).select_related(
+        "search_result",
+        "search_result__external_company",
+        "search_result__search_job",
+        "search_result__search_job__requirement",
+        "search_result__search_job__requirement__category",
+        "assigned_to",
+    ).order_by("-created_at")
+
+    if requirement_id_str and requirement_id_str.isdigit():
+        selected_requirement = Requirement.objects.filter(id=int(requirement_id_str), company=company, is_deleted=False).first()
+        if selected_requirement:
+            qs = qs.filter(search_result__search_job__requirement=selected_requirement)
+    elif requirement_id_str == "unassigned":
+        qs = qs.filter(search_result__search_job__requirement__isnull=True)
+
+    status_filter = request.GET.get("status", "").strip().lower()
+    if status_filter and status_filter in dict(SavedItem.Status.choices):
+        qs = qs.filter(status=status_filter)
+
+    assigned_filter = request.GET.get("assigned_to", "").strip()
+    if assigned_filter == "unassigned":
+        qs = qs.filter(assigned_to__isnull=True)
+    elif assigned_filter.isdigit():
+        qs = qs.filter(assigned_to_id=int(assigned_filter))
+
+    raw_items = list(qs)
+    items = deduplicate_saved_items(raw_items)
+
+    req_slug = selected_requirement.item_name.replace(" ", "_") if selected_requirement else "All_Requirements"
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="Shortlisted_Suppliers_{req_slug}.csv"'
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "Supplier Company Name",
+        "Role",
+        "Industry",
+        "City",
+        "Country",
+        "Website",
+        "Email",
+        "Phone",
+        "Requirement Item",
+        "Category",
+        "Estimated Price",
+        "Currency",
+        "MOQ",
+        "Match Score (%)",
+        "Pipeline Stage",
+        "Assigned Member",
+        "Procurement Notes",
+        "Date Saved",
+    ])
+
+    for item in items:
+        ext = item.search_result.external_company if item.search_result else None
+        req_obj = item.search_result.search_job.requirement if (item.search_result and item.search_result.search_job) else None
+        req_name = req_obj.item_name if req_obj else (item.search_result.product_title if item.search_result else "General")
+        cat_name = req_obj.category.name if (req_obj and req_obj.category) else "General"
+        assigned_name = item.assigned_to.get_full_name() or item.assigned_to.email if item.assigned_to else "Unassigned"
+        writer.writerow([
+            ext.name if ext else "Unknown",
+            ext.get_company_role_display() if ext else "Supplier",
+            ext.industry or "" if ext else "",
+            ext.city or "" if ext else "",
+            ext.country or "India" if ext else "India",
+            ext.website or "" if ext else "",
+            ext.email or "" if ext else "",
+            ext.phone or "" if ext else "",
+            req_name,
+            cat_name,
+            item.search_result.price if (item.search_result and item.search_result.price is not None) else "",
+            item.search_result.price_currency if item.search_result else "INR",
+            item.search_result.moq if item.search_result else "",
+            item.search_result.match_score if item.search_result else "",
+            item.get_status_display(),
+            assigned_name,
+            item.notes or "",
+            item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "",
+        ])
+
+    return response
 
 
 @login_required
 def delete_saved_supplier_view(request, item_id):
     """
     Removes supplier from shortlisted suppliers.
+    Supports instant AJAX removals and safe HTTP referer redirects.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -706,8 +986,15 @@ def delete_saved_supplier_view(request, item_id):
     name = item.search_result.external_company.name
     item.delete()
 
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({
+            "success": True,
+            "message": f"Supplier '{name}' removed from your shortlist.",
+        })
+
     messages.success(request, f"Supplier '{name}' removed from shortlist.")
-    return redirect("saved-suppliers")
+    redirect_to = request.META.get("HTTP_REFERER") or reverse("saved-suppliers")
+    return redirect(redirect_to)
 
 
 @login_required
@@ -845,15 +1132,14 @@ def inquiries_list_view(request):
 
     is_seller_context = request.path.startswith("/sales/") or (rbac["can_view_seller"] and not rbac["can_view_buyer"])
 
-    # Fetch company products sorted strictly A to Z
-    products = list(Product.objects.filter(company=company, is_deleted=False).order_by(Lower("name"))) if company else []
-
     base_qs = Inquiry.objects.filter(company=company).select_related(
         "search_result",
         "search_result__external_company",
         "search_result__search_job",
         "search_result__search_job__product",
         "search_result__search_job__product__category",
+        "search_result__search_job__requirement",
+        "search_result__search_job__requirement__category",
     ).annotate(messages_count=Count("messages"))
 
     # Filter by date range
@@ -882,61 +1168,112 @@ def inquiries_list_view(request):
     if status_filter and status_filter in [s[0] for s in Inquiry.Status.choices]:
         base_qs = base_qs.filter(status=status_filter)
 
-    # Count inquiries per product (order_by() clears ordering for reliable SQL GROUP BY)
-    inquiry_counts = (
-        base_qs
-        .order_by()
-        .filter(search_result__search_job__product__isnull=False)
-        .values("search_result__search_job__product_id")
-        .annotate(total=Count("id"))
-    )
-    counts_map = {item["search_result__search_job__product_id"]: item["total"] for item in inquiry_counts}
-    for p in products:
-        p.inquiry_count = counts_map.get(p.id, 0)
-
-    total_inquiries_count = base_qs.count()
-    unassigned_count = base_qs.filter(search_result__search_job__product__isnull=True).count()
-
-    product_id_str = request.GET.get("product_id", "").strip()
-    selected_product = None
+    item_id_str = request.GET.get("product_id", "").strip() or request.GET.get("requirement_id", "").strip()
+    selected_item = None
     is_unassigned_view = False
-    is_single_product = False
+    is_single_item = False
     inquiries = []
-    product_groups = []
+    item_groups = []
     unassigned_group = None
 
-    if product_id_str and product_id_str.isdigit():
-        selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
-        if selected_product:
-            is_single_product = True
-            inquiries = list(base_qs.filter(search_result__search_job__product=selected_product).order_by("-sent_at"))
-    elif product_id_str == "unassigned":
-        is_unassigned_view = True
-        is_single_product = True
-        inquiries = list(base_qs.filter(search_result__search_job__product__isnull=True).order_by("-sent_at"))
-    else:
-        # Group by product so it is NOT "all-in-one"
-        for p in products:
-            if p.inquiry_count > 0:
-                p_inqs = list(base_qs.filter(search_result__search_job__product=p).order_by("-sent_at"))
-                product_groups.append({
-                    "product": p,
-                    "inquiries": p_inqs,
-                    "count": len(p_inqs),
-                    "sent_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.SENT),
-                    "discussion_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.IN_DISCUSSION),
-                    "replied_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.REPLIED),
-                    "won_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.WON),
-                })
-        if unassigned_count > 0:
-            unassigned_inqs = list(base_qs.filter(search_result__search_job__product__isnull=True).order_by("-sent_at"))
-            unassigned_group = {
-                "title": "Other Inquiries",
-                "inquiries": unassigned_inqs,
-                "count": len(unassigned_inqs),
-            }
+    if is_seller_context:
+        # Fetch company products sorted strictly A to Z
+        items_list = list(Product.objects.filter(company=company, is_deleted=False).order_by(Lower("name"))) if company else []
+        inquiry_counts = (
+            base_qs
+            .order_by()
+            .filter(search_result__search_job__product__isnull=False)
+            .values("search_result__search_job__product_id")
+            .annotate(total=Count("id"))
+        )
+        counts_map = {it["search_result__search_job__product_id"]: it["total"] for it in inquiry_counts}
+        for p in items_list:
+            p.inquiry_count = counts_map.get(p.id, 0)
 
-    active_inqs = inquiries if is_single_product else list(base_qs)
+        unassigned_count = base_qs.filter(search_result__search_job__product__isnull=True).count()
+
+        if item_id_str and item_id_str.isdigit():
+            selected_item = Product.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
+            if selected_item:
+                is_single_item = True
+                inquiries = list(base_qs.filter(search_result__search_job__product=selected_item).order_by("-sent_at"))
+        elif item_id_str == "unassigned":
+            is_unassigned_view = True
+            is_single_item = True
+            inquiries = list(base_qs.filter(search_result__search_job__product__isnull=True).order_by("-sent_at"))
+        else:
+            for p in items_list:
+                if p.inquiry_count > 0:
+                    p_inqs = list(base_qs.filter(search_result__search_job__product=p).order_by("-sent_at"))
+                    item_groups.append({
+                        "product": p,
+                        "inquiries": p_inqs,
+                        "count": len(p_inqs),
+                        "sent_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.SENT),
+                        "discussion_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.IN_DISCUSSION),
+                        "replied_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.REPLIED),
+                        "won_count": sum(1 for i in p_inqs if i.status == Inquiry.Status.WON),
+                    })
+            if unassigned_count > 0:
+                unassigned_inqs = list(base_qs.filter(search_result__search_job__product__isnull=True).order_by("-sent_at"))
+                unassigned_group = {
+                    "title": "Other Inquiries",
+                    "inquiries": unassigned_inqs,
+                    "count": len(unassigned_inqs),
+                }
+    else:
+        # Buyer Context: Group by Procurement Requirements
+        items_list = list(Requirement.objects.filter(company=company, is_deleted=False).order_by(Lower("item_name"))) if company else []
+        for r in items_list:
+            r.name = r.item_name
+
+        inquiry_counts = (
+            base_qs
+            .order_by()
+            .filter(search_result__search_job__requirement__isnull=False)
+            .values("search_result__search_job__requirement_id")
+            .annotate(total=Count("id"))
+        )
+        counts_map = {it["search_result__search_job__requirement_id"]: it["total"] for it in inquiry_counts}
+        for r in items_list:
+            r.inquiry_count = counts_map.get(r.id, 0)
+
+        unassigned_count = base_qs.filter(search_result__search_job__requirement__isnull=True).count()
+
+        if item_id_str and item_id_str.isdigit():
+            selected_item = Requirement.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
+            if selected_item:
+                selected_item.name = selected_item.item_name
+                is_single_item = True
+                inquiries = list(base_qs.filter(search_result__search_job__requirement=selected_item).order_by("-sent_at"))
+        elif item_id_str == "unassigned":
+            is_unassigned_view = True
+            is_single_item = True
+            inquiries = list(base_qs.filter(search_result__search_job__requirement__isnull=True).order_by("-sent_at"))
+        else:
+            for r in items_list:
+                if r.inquiry_count > 0:
+                    r_inqs = list(base_qs.filter(search_result__search_job__requirement=r).order_by("-sent_at"))
+                    item_groups.append({
+                        "product": r,
+                        "requirement": r,
+                        "inquiries": r_inqs,
+                        "count": len(r_inqs),
+                        "sent_count": sum(1 for i in r_inqs if i.status == Inquiry.Status.SENT),
+                        "discussion_count": sum(1 for i in r_inqs if i.status == Inquiry.Status.IN_DISCUSSION),
+                        "replied_count": sum(1 for i in r_inqs if i.status == Inquiry.Status.REPLIED),
+                        "won_count": sum(1 for i in r_inqs if i.status == Inquiry.Status.WON),
+                    })
+            if unassigned_count > 0:
+                unassigned_inqs = list(base_qs.filter(search_result__search_job__requirement__isnull=True).order_by("-sent_at"))
+                unassigned_group = {
+                    "title": "Other Inquiries",
+                    "inquiries": unassigned_inqs,
+                    "count": len(unassigned_inqs),
+                }
+
+    total_inquiries_count = base_qs.count()
+    active_inqs = inquiries if is_single_item else list(base_qs)
     total_count = len(active_inqs)
     sent_count = sum(1 for i in active_inqs if i.status == Inquiry.Status.SENT)
     discussion_count = sum(1 for i in active_inqs if i.status == Inquiry.Status.IN_DISCUSSION)
@@ -947,18 +1284,22 @@ def inquiries_list_view(request):
     conversion_rate = round(((won_count + replied_count) / total_count * 100), 1) if total_count else 0.0
 
     page_title = (
-        (f"Buyer Inquiries - {selected_product.name}" if selected_product else "Buyer Inquiries (Product-Wise)")
+        (f"Buyer Inquiries - {selected_item.name}" if selected_item else "Buyer Inquiries (Product-Wise)")
         if is_seller_context else
-        (f"Inquiries - {selected_product.name}" if selected_product else "Inquiries & RFQs (Product-Wise)")
+        (f"Supplier Inquiries - {selected_item.name}" if selected_item else "Supplier Inquiries & RFQs (Requirement-Wise)")
     )
 
     return render(request, "leads/inquiries.html", {
-        "products": products,
-        "selected_product": selected_product,
-        "selected_product_id": int(product_id_str) if product_id_str and product_id_str.isdigit() else None,
+        "products": items_list,
+        "requirements": items_list if not is_seller_context else [],
+        "selected_product": selected_item,
+        "selected_requirement": selected_item if not is_seller_context else None,
+        "selected_product_id": int(item_id_str) if item_id_str and item_id_str.isdigit() else None,
+        "selected_requirement_id": int(item_id_str) if item_id_str and item_id_str.isdigit() else None,
         "is_unassigned_view": is_unassigned_view,
-        "is_single_product": is_single_product,
-        "product_groups": product_groups,
+        "is_single_product": is_single_item,
+        "product_groups": item_groups,
+        "requirement_groups": item_groups if not is_seller_context else [],
         "unassigned_group": unassigned_group,
         "unassigned_count": unassigned_count,
         "total_inquiries_count": total_inquiries_count,
@@ -1323,7 +1664,7 @@ def delete_inquiry_view(request, pk):
 def export_inquiries_csv_view(request):
     """
     Dedicated 1-Click CSV Export for Commercial Inquiries & Quotes:
-    Respects current company isolation, active product selection, date range, and status filters.
+    Respects current company isolation, active product or requirement selection, date range, and status filters.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -1341,17 +1682,28 @@ def export_inquiries_csv_view(request):
         "search_result__search_job",
         "search_result__search_job__product",
         "search_result__search_job__product__category",
+        "search_result__search_job__requirement",
+        "search_result__search_job__requirement__category",
     ).annotate(messages_count=Count("messages")).order_by("-sent_at")
 
-    # Filter by product
-    product_id_str = request.GET.get("product_id", "").strip()
-    selected_product = None
-    if product_id_str.isdigit():
-        selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
-        if selected_product:
-            qs = qs.filter(search_result__search_job__product=selected_product)
-    elif product_id_str == "unassigned":
-        qs = qs.filter(search_result__search_job__product__isnull=True)
+    # Filter by product or requirement
+    item_id_str = request.GET.get("product_id", "").strip() or request.GET.get("requirement_id", "").strip()
+    selected_item = None
+    if is_seller_context:
+        if item_id_str.isdigit():
+            selected_item = Product.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
+            if selected_item:
+                qs = qs.filter(search_result__search_job__product=selected_item)
+        elif item_id_str == "unassigned":
+            qs = qs.filter(search_result__search_job__product__isnull=True)
+    else:
+        if item_id_str.isdigit():
+            selected_item = Requirement.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
+            if selected_item:
+                selected_item.name = selected_item.item_name
+                qs = qs.filter(search_result__search_job__requirement=selected_item)
+        elif item_id_str == "unassigned":
+            qs = qs.filter(search_result__search_job__requirement__isnull=True)
 
     # Filter by date range
     date_range = request.GET.get("date_range", "all").strip().lower()
@@ -1379,53 +1731,91 @@ def export_inquiries_csv_view(request):
             | Q(message__icontains=q)
         )
 
-    prod_slug = selected_product.name.replace(" ", "_") if selected_product else "All_Products"
+    item_slug = (selected_item.name if hasattr(selected_item, "name") else selected_item.item_name).replace(" ", "_") if selected_item else ("All_Products" if is_seller_context else "All_Requirements")
     context_prefix = "Sales_Inquiries" if is_seller_context else "Procurement_Inquiries"
     timestamp = now.strftime("%Y%m%d_%H%M")
-    filename = f"{context_prefix}_{prod_slug}_{timestamp}.csv"
+    filename = f"{context_prefix}_{item_slug}_{timestamp}.csv"
 
     response = HttpResponse(content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     writer = csv.writer(response)
 
-    writer.writerow([
-        "Inquiry ID",
-        "Counterparty Company",
-        "Contact Email",
-        "Catalog / Target Product",
-        "Category",
-        "Inquiry Subject",
-        "Pipeline Status",
-        "Quoted Price Amount",
-        "Currency",
-        "Commercial Delivery Terms",
-        "Thread Messages Count",
-        "Has Attachment",
-        "Dispatched Date",
-        "Last Updated",
-    ])
-
-    for inq in qs:
-        ext = inq.search_result.external_company if inq.search_result else None
-        prod_obj = inq.search_result.search_job.product if (inq.search_result and inq.search_result.search_job) else None
-        prod_name = prod_obj.name if prod_obj else (inq.search_result.product_title if inq.search_result else "General")
-        cat_name = prod_obj.category.name if (prod_obj and prod_obj.category) else "General"
+    if is_seller_context:
         writer.writerow([
-            inq.id,
-            ext.name if ext else "Unknown",
-            inq.sent_to_email or (ext.email if ext else ""),
-            prod_name,
-            cat_name,
-            inq.subject or "",
-            inq.get_status_display(),
-            str(inq.quoted_price) if inq.quoted_price is not None else "",
-            inq.quoted_currency or "INR",
-            inq.delivery_terms or "",
-            getattr(inq, "messages_count", inq.messages.count()),
-            "Yes" if inq.attachment else "No",
-            inq.sent_at.strftime("%Y-%m-%d %H:%M") if inq.sent_at else "",
-            inq.updated_at.strftime("%Y-%m-%d %H:%M") if inq.updated_at else "",
+            "Inquiry ID",
+            "Counterparty Company",
+            "Contact Email",
+            "Catalog / Target Product",
+            "Category",
+            "Inquiry Subject",
+            "Pipeline Status",
+            "Quoted Price Amount",
+            "Currency",
+            "Commercial Delivery Terms",
+            "Thread Messages Count",
+            "Has Attachment",
+            "Dispatched Date",
+            "Last Updated",
         ])
+        for inq in qs:
+            ext = inq.search_result.external_company if inq.search_result else None
+            prod_obj = inq.search_result.search_job.product if (inq.search_result and inq.search_result.search_job) else None
+            prod_name = prod_obj.name if prod_obj else (inq.search_result.product_title if inq.search_result else "General")
+            cat_name = prod_obj.category.name if (prod_obj and prod_obj.category) else "General"
+            writer.writerow([
+                inq.id,
+                ext.name if ext else "Unknown",
+                inq.sent_to_email or (ext.email if ext else ""),
+                prod_name,
+                cat_name,
+                inq.subject or "",
+                inq.get_status_display(),
+                str(inq.quoted_price) if inq.quoted_price is not None else "",
+                inq.quoted_currency or "INR",
+                inq.delivery_terms or "",
+                getattr(inq, "messages_count", inq.messages.count()),
+                "Yes" if inq.attachment else "No",
+                inq.sent_at.strftime("%Y-%m-%d %H:%M") if inq.sent_at else "",
+                inq.updated_at.strftime("%Y-%m-%d %H:%M") if inq.updated_at else "",
+            ])
+    else:
+        writer.writerow([
+            "Inquiry ID",
+            "Supplier Company Name",
+            "Contact Email",
+            "Procurement Requirement",
+            "Category",
+            "Inquiry Subject",
+            "Pipeline Status",
+            "Quoted Price Amount",
+            "Currency",
+            "Commercial Delivery Terms",
+            "Thread Messages Count",
+            "Has Attachment",
+            "Dispatched Date",
+            "Last Updated",
+        ])
+        for inq in qs:
+            ext = inq.search_result.external_company if inq.search_result else None
+            req_obj = inq.search_result.search_job.requirement if (inq.search_result and inq.search_result.search_job) else None
+            req_name = req_obj.item_name if req_obj else (inq.search_result.product_title if inq.search_result else "General")
+            cat_name = req_obj.category.name if (req_obj and req_obj.category) else "General"
+            writer.writerow([
+                inq.id,
+                ext.name if ext else "Unknown",
+                inq.sent_to_email or (ext.email if ext else ""),
+                req_name,
+                cat_name,
+                inq.subject or "",
+                inq.get_status_display(),
+                str(inq.quoted_price) if inq.quoted_price is not None else "",
+                inq.quoted_currency or "INR",
+                inq.delivery_terms or "",
+                getattr(inq, "messages_count", inq.messages.count()),
+                "Yes" if inq.attachment else "No",
+                inq.sent_at.strftime("%Y-%m-%d %H:%M") if inq.sent_at else "",
+                inq.updated_at.strftime("%Y-%m-%d %H:%M") if inq.updated_at else "",
+            ])
 
     return response
 
@@ -1437,8 +1827,10 @@ def export_inquiries_csv_view(request):
 @login_required
 def price_comparison_view(request):
     """
-    Side-by-Side Price Comparison:
-    Compares suppliers for buyer requirements.
+    Side-by-Side Price Comparison Matrix:
+    Compares supplier prices for buyer requirements using verified available supplier prices,
+    formal quotes from Inquiries, currency, quantity, MOQ, delivery terms, and source domain.
+    Never invents prices — clearly marks missing or unverified quotes.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -1448,37 +1840,257 @@ def price_comparison_view(request):
         messages.error(request, "Access restricted: Price Comparison is only available for Buyer accounts.")
         return redirect("dashboard")
 
-    results = SearchResult.objects.filter(
+    # Load all company procurement requirements sorted strictly A to Z
+    requirements = list(Requirement.objects.filter(company=company, is_deleted=False).order_by(Lower("item_name"))) if company else []
+
+    req_id_str = request.GET.get("requirement_id", "").strip()
+    selected_requirement = None
+    if req_id_str and req_id_str.isdigit():
+        selected_requirement = Requirement.objects.filter(id=int(req_id_str), company=company, is_deleted=False).first()
+    elif requirements:
+        selected_requirement = requirements[0]
+
+    # Fetch candidate suppliers for this requirement
+    candidates_qs = SearchResult.objects.filter(
         search_job__company=company,
         result_type=SearchResult.ResultType.SUPPLIER,
-    ).select_related("external_company", "search_job").order_by("price")[:30]
+    ).select_related(
+        "external_company",
+        "search_job",
+        "search_job__requirement",
+        "search_job__requirement__category",
+    ).order_by("-match_score", "-created_at")
+
+    if selected_requirement:
+        candidates_qs = candidates_qs.filter(search_job__requirement=selected_requirement)
+
+    # Fetch formal quotes recorded from Inquiry
+    quotes_map = {}
+    inquiries_with_quotes = Inquiry.objects.filter(
+        company=company,
+        quoted_price__isnull=False,
+    ).select_related("search_result", "search_result__external_company")
+    if selected_requirement:
+        inquiries_with_quotes = inquiries_with_quotes.filter(search_result__search_job__requirement=selected_requirement)
+
+    for inq in inquiries_with_quotes:
+        if inq.search_result_id:
+            quotes_map[inq.search_result_id] = inq
+        if inq.search_result and inq.search_result.external_company_id:
+            quotes_map[f"comp_{inq.search_result.external_company_id}"] = inq
+
+    # Build structured side-by-side comparison items
+    comparison_items = []
+    seen_companies = set()
+    valid_prices = []
+
+    target_price = selected_requirement.target_price if selected_requirement else None
+    target_currency = selected_requirement.currency if selected_requirement else "INR"
+
+    for r in candidates_qs:
+        cid = r.external_company_id
+        if cid and cid in seen_companies:
+            continue
+        if cid:
+            seen_companies.add(cid)
+
+        # Check if there is a verified inquiry quote
+        inq_quote = quotes_map.get(r.id) or (quotes_map.get(f"comp_{cid}") if cid else None)
+
+        is_verified_quote = False
+        price_val = None
+        price_currency = target_currency
+        delivery_terms = ""
+        moq_val = r.moq or (selected_requirement.quantity if selected_requirement else 1)
+
+        if inq_quote and inq_quote.quoted_price is not None:
+            is_verified_quote = True
+            price_val = inq_quote.quoted_price
+            price_currency = inq_quote.quoted_currency or target_currency
+            delivery_terms = inq_quote.delivery_terms or ""
+        elif r.price is not None:
+            price_val = r.price
+            price_currency = r.price_currency or target_currency
+
+        # Calculate variance and savings vs target price
+        variance = None
+        savings_percent = None
+        is_cheaper = False
+        if price_val is not None:
+            valid_prices.append(price_val)
+            if target_price and target_price > 0:
+                variance = price_val - target_price
+                if price_val < target_price:
+                    is_cheaper = True
+                    savings_percent = round(((target_price - price_val) / target_price) * 100, 1)
+
+        comparison_items.append({
+            "result": r,
+            "company": r.external_company,
+            "product_title": r.product_title or (selected_requirement.item_name if selected_requirement else "Requirement Item"),
+            "price": price_val,
+            "currency": price_currency,
+            "is_verified_quote": is_verified_quote,
+            "price_status": "Verified Formal Quote" if is_verified_quote else ("Web Discovered Price" if price_val is not None else "Quote on Request"),
+            "delivery_terms": delivery_terms,
+            "moq": moq_val,
+            "match_score": r.match_score,
+            "distance_km": r.distance_km,
+            "variance": variance,
+            "savings_percent": savings_percent,
+            "is_cheaper": is_cheaper,
+            "source_domain": r.external_company.domain if r.external_company else "",
+            "last_updated": inq_quote.updated_at if inq_quote else r.created_at,
+        })
+
+    # Summary KPI calculation
+    total_compared_count = len(comparison_items)
+    verified_quotes_count = sum(1 for it in comparison_items if it["is_verified_quote"])
+    lowest_price = min(valid_prices) if valid_prices else None
+    avg_price = round(sum(valid_prices) / len(valid_prices), 2) if valid_prices else None
+    cheaper_options_count = sum(1 for it in comparison_items if it["is_cheaper"])
+    max_savings_pct = max([it["savings_percent"] for it in comparison_items if it["savings_percent"] is not None], default=0.0)
 
     return render(request, "leads/price_comparison.html", {
-        "results": results,
+        "requirements": requirements,
+        "selected_requirement": selected_requirement,
+        "selected_requirement_id": selected_requirement.id if selected_requirement else None,
+        "comparison_items": comparison_items,
+        "results": [it["result"] for it in comparison_items],
+        "total_compared_count": total_compared_count,
+        "verified_quotes_count": verified_quotes_count,
+        "lowest_price": lowest_price,
+        "avg_price": avg_price,
+        "cheaper_options_count": cheaper_options_count,
+        "max_savings_pct": max_savings_pct,
+        "target_price": target_price,
+        "target_currency": target_currency,
         "company": company,
         "rbac": rbac,
-        "page_title": "Price Comparison",
+        "page_title": f"Price Comparison — {selected_requirement.item_name}" if selected_requirement else "Price Comparison & Landed Cost Analysis",
     })
+
+
+@login_required
+def export_price_comparison_csv_view(request):
+    """
+    1-Click CSV Export for Price Comparison Matrix:
+    Exports verified supplier quotes, discovered prices, MOQ, delivery terms,
+    target price variance, savings %, and match scores.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Price Comparison permission required.")
+        return redirect("dashboard")
+
+    req_id_str = request.GET.get("requirement_id", "").strip()
+    selected_requirement = None
+    if req_id_str and req_id_str.isdigit():
+        selected_requirement = Requirement.objects.filter(id=int(req_id_str), company=company, is_deleted=False).first()
+
+    candidates_qs = SearchResult.objects.filter(
+        search_job__company=company,
+        result_type=SearchResult.ResultType.SUPPLIER,
+    ).select_related(
+        "external_company",
+        "search_job",
+        "search_job__requirement",
+        "search_job__requirement__category",
+    ).order_by("-match_score")
+
+    if selected_requirement:
+        candidates_qs = candidates_qs.filter(search_job__requirement=selected_requirement)
+
+    quotes_map = {}
+    inquiries_with_quotes = Inquiry.objects.filter(company=company, quoted_price__isnull=False)
+    if selected_requirement:
+        inquiries_with_quotes = inquiries_with_quotes.filter(search_result__search_job__requirement=selected_requirement)
+    for inq in inquiries_with_quotes:
+        if inq.search_result_id:
+            quotes_map[inq.search_result_id] = inq
+        if inq.search_result and inq.search_result.external_company_id:
+            quotes_map[f"comp_{inq.search_result.external_company_id}"] = inq
+
+    target_price = selected_requirement.target_price if selected_requirement else None
+    target_currency = selected_requirement.currency if selected_requirement else "INR"
+    req_slug = selected_requirement.item_name.replace(" ", "_") if selected_requirement else "All_Requirements"
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="Price_Comparison_{req_slug}.csv"'
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "Supplier Company Name",
+        "Country",
+        "City",
+        "Requirement Item",
+        "Target Price",
+        "Supplier Price",
+        "Currency",
+        "Price Status",
+        "Target Price Variance",
+        "Savings (%)",
+        "MOQ",
+        "Commercial Delivery Terms",
+        "Match Score (%)",
+        "Source Domain",
+        "Last Updated",
+    ])
+
+    seen_companies = set()
+    for r in candidates_qs:
+        cid = r.external_company_id
+        if cid and cid in seen_companies:
+            continue
+        if cid:
+            seen_companies.add(cid)
+
+        inq_quote = quotes_map.get(r.id) or (quotes_map.get(f"comp_{cid}") if cid else None)
+        is_verified_quote = bool(inq_quote and inq_quote.quoted_price is not None)
+        price_val = inq_quote.quoted_price if is_verified_quote else r.price
+        price_currency = inq_quote.quoted_currency if is_verified_quote else (r.price_currency or target_currency)
+        delivery_terms = inq_quote.delivery_terms if is_verified_quote else ""
+        price_status = "Verified Formal Quote" if is_verified_quote else ("Web Discovered" if price_val is not None else "Quote on Request")
+
+        variance_str = ""
+        savings_str = ""
+        if price_val is not None and target_price and target_price > 0:
+            diff = price_val - target_price
+            variance_str = f"+{diff}" if diff > 0 else str(diff)
+            if price_val < target_price:
+                savings_str = f"{round(((target_price - price_val) / target_price) * 100, 1)}%"
+
+        writer.writerow([
+            r.external_company.name if r.external_company else "Unknown",
+            r.external_company.country or "India" if r.external_company else "India",
+            r.external_company.city or "" if r.external_company else "",
+            selected_requirement.item_name if selected_requirement else (r.product_title or "General"),
+            str(target_price) if target_price else "Open Budget",
+            str(price_val) if price_val is not None else "Quote on Request",
+            price_currency,
+            price_status,
+            variance_str,
+            savings_str,
+            r.moq or 1,
+            delivery_terms,
+            r.match_score,
+            r.external_company.domain or "" if r.external_company else "",
+            (inq_quote.updated_at if inq_quote else r.created_at).strftime("%Y-%m-%d %H:%M"),
+        ])
+
+    return response
 
 
 @login_required
 def export_reports_view(request):
     """
-    Interactive & Dynamic Export Reports Dashboard (Product-Wise):
+    Interactive & Dynamic Export Reports Dashboard:
     Provides real-time interactive report previews, dynamic multi-dimension filtering,
     summary KPI metrics, and export engines in CSV, JSON, and printable format.
-    Supports:
-    1. Report Types:
-       - 'leads': Buyer Leads & Market Discovery Intelligence
-       - 'inquiries': Commercial Inquiries & Outreach Audit
-    2. Dynamic Dimension Filters:
-       - product_id: Filter by product or consolidated catalog
-       - date_range: all, 7d, 30d, this_month
-       - min_score: 0, 70, 85 (for leads)
-       - status: inquiry status (for inquiries)
-       - q: real-time keyword search
-    3. Live On-Page Preview Table with sorting and KPI metrics.
-    4. Downloads in CSV, JSON, or Printable dossier.
+    Supports both Seller (Products, Leads, Inquiries) and Buyer (Requirements, Suppliers, Inquiries) workflows.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -1486,34 +2098,46 @@ def export_reports_view(request):
 
     is_seller_context = request.path.startswith("/sales/") or (rbac["can_view_seller"] and not rbac["can_view_buyer"])
 
-    # Fetch company products sorted strictly A to Z
-    products = list(Product.objects.filter(company=company, is_deleted=False).order_by(Lower("name"))) if company else []
-
     # Active Report Type
     report_type = request.GET.get("type") or request.GET.get("report_type") or "leads"
     valid_types = ["leads", "inquiries", "catalog"]
     if report_type not in valid_types:
         report_type = "leads"
 
-    # Base QuerySets
-    leads_base = SearchResult.objects.filter(search_job__company=company, result_type=SearchResult.ResultType.LEAD)
-    inquiries_base = Inquiry.objects.filter(company=company)
-
-    # Calculate catalog overview stats for products
-    leads_map = {item["search_job__product_id"]: item["total"] for item in leads_base.filter(search_job__product__isnull=False).values("search_job__product_id").annotate(total=Count("id"))}
-    inquiry_map = {item["search_result__search_job__product_id"]: item["total"] for item in inquiries_base.filter(search_result__search_job__product__isnull=False).values("search_result__search_job__product_id").annotate(total=Count("id"))}
-
-    for p in products:
-        p.lead_count = leads_map.get(p.id, 0)
-        p.inquiry_count = inquiry_map.get(p.id, 0)
+    # Fetch company catalog items (Products for Seller, Requirements for Buyer)
+    if is_seller_context:
+        items_list = list(Product.objects.filter(company=company, is_deleted=False).order_by(Lower("name"))) if company else []
+        leads_base = SearchResult.objects.filter(search_job__company=company, result_type=SearchResult.ResultType.LEAD)
+        leads_map = {item["search_job__product_id"]: item["total"] for item in leads_base.filter(search_job__product__isnull=False).values("search_job__product_id").annotate(total=Count("id"))}
+        inquiries_base = Inquiry.objects.filter(company=company)
+        inquiry_map = {item["search_result__search_job__product_id"]: item["total"] for item in inquiries_base.filter(search_result__search_job__product__isnull=False).values("search_result__search_job__product_id").annotate(total=Count("id"))}
+        for p in items_list:
+            p.lead_count = leads_map.get(p.id, 0)
+            p.inquiry_count = inquiry_map.get(p.id, 0)
+    else:
+        items_list = list(Requirement.objects.filter(company=company, is_deleted=False).order_by(Lower("item_name"))) if company else []
+        for r in items_list:
+            r.name = r.item_name
+        leads_base = SearchResult.objects.filter(search_job__company=company, result_type=SearchResult.ResultType.SUPPLIER)
+        leads_map = {item["search_job__requirement_id"]: item["total"] for item in leads_base.filter(search_job__requirement__isnull=False).values("search_job__requirement_id").annotate(total=Count("id"))}
+        inquiries_base = Inquiry.objects.filter(company=company)
+        inquiry_map = {item["search_result__search_job__requirement_id"]: item["total"] for item in inquiries_base.filter(search_result__search_job__requirement__isnull=False).values("search_result__search_job__requirement_id").annotate(total=Count("id"))}
+        for r in items_list:
+            r.lead_count = leads_map.get(r.id, 0)
+            r.inquiry_count = inquiry_map.get(r.id, 0)
 
     total_leads_count = leads_base.count()
     total_inquiry_count = inquiries_base.count()
 
-    product_id_str = request.GET.get("product_id", "").strip()
-    selected_product = None
-    if product_id_str and product_id_str.isdigit():
-        selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
+    item_id_str = request.GET.get("product_id", "").strip() or request.GET.get("requirement_id", "").strip()
+    selected_item = None
+    if item_id_str and item_id_str.isdigit():
+        if is_seller_context:
+            selected_item = Product.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
+        else:
+            selected_item = Requirement.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
+            if selected_item:
+                selected_item.name = selected_item.item_name
 
     # Dynamic Filters
     date_range = request.GET.get("date_range", "all").strip().lower()
@@ -1533,7 +2157,7 @@ def export_reports_view(request):
     q_search = request.GET.get("q", "").strip()
 
     # Filtered QuerySets based on active controls
-    if not selected_product:
+    if not selected_item:
         leads_filtered = leads_base.none()
         inquiries_filtered = inquiries_base.none()
         kpi_leads_count = 0
@@ -1550,12 +2174,20 @@ def export_reports_view(request):
         avg_match_score = 0.0
         preview_records = []
     else:
-        leads_filtered = leads_base.filter(search_job__product=selected_product).select_related(
-            "external_company", "search_job", "search_job__product", "search_job__product__category"
-        )
-        inquiries_filtered = inquiries_base.filter(search_result__search_job__product=selected_product).select_related(
-            "search_result", "search_result__external_company", "search_result__search_job__product"
-        )
+        if is_seller_context:
+            leads_filtered = leads_base.filter(search_job__product=selected_item).select_related(
+                "external_company", "search_job", "search_job__product", "search_job__product__category"
+            )
+            inquiries_filtered = inquiries_base.filter(search_result__search_job__product=selected_item).select_related(
+                "search_result", "search_result__external_company", "search_result__search_job__product"
+            )
+        else:
+            leads_filtered = leads_base.filter(search_job__requirement=selected_item).select_related(
+                "external_company", "search_job", "search_job__requirement", "search_job__requirement__category"
+            )
+            inquiries_filtered = inquiries_base.filter(search_result__search_job__requirement=selected_item).select_related(
+                "search_result", "search_result__external_company", "search_result__search_job__requirement"
+            )
 
         avg_res = leads_filtered.aggregate(avg_score=Avg("match_score"))
         avg_match_score = round(float(avg_res["avg_score"]), 1) if avg_res["avg_score"] is not None else 0.0
@@ -1603,16 +2235,16 @@ def export_reports_view(request):
         if report_type == "leads":
             preview_records = list(leads_filtered.order_by("-match_score", "-created_at")[:100])
         elif report_type == "catalog":
-            preview_records = [selected_product] if selected_product else []
+            preview_records = [selected_item] if selected_item else []
         else:
             preview_records = list(inquiries_filtered.order_by("-sent_at")[:100])
 
-    prod_slug = selected_product.name.replace(" ", "_") if selected_product else "Selected_Product"
+    item_slug = (selected_item.name if hasattr(selected_item, "name") else selected_item.item_name).replace(" ", "_") if selected_item else "Selected_Item"
 
     # HANDLE EXPORT DOWNLOADS (CSV)
     if request.GET.get("download") == "1":
-        if not selected_product:
-            messages.warning(request, "Please select a product first to generate and download the export.")
+        if not selected_item:
+            messages.warning(request, f"Please select a {'product' if is_seller_context else 'requirement'} first to generate and download the export.")
             return redirect(f"{request.path}?report_type={report_type}")
 
         # Credit reservation for report export
@@ -1624,29 +2256,33 @@ def export_reports_view(request):
                 user=request.user,
                 feature_code="export_reports",
                 quantity=1,
-                idempotency_key=f"export_report:{company.id}:{request.user.id}:{report_type}:{selected_product.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                idempotency_key=f"export_report:{company.id}:{request.user.id}:{report_type}:{selected_item.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
             )
             if not ok:
                 messages.error(request, f"Cannot export report: {msg} Please top up your wallet.")
-                return redirect(f"{request.path}?report_type={report_type}&product_id={selected_product.id}")
+                return redirect(f"{request.path}?report_type={report_type}&product_id={selected_item.id}")
 
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         writer = csv.writer(response)
 
         if report_type == "leads":
-            response["Content-Disposition"] = f'attachment; filename="Vendor_Report_{prod_slug}.csv"'
-            writer.writerow(["Company Name", "Industry", "City", "Country", "Website", "Email", "Phone", "Target Product", "Category", "Fit Score (%)", "Fit Reason", "Intent Signal", "Discovered At"])
+            prefix = "Vendor_Report" if is_seller_context else "Supplier_Discovery_Report"
+            response["Content-Disposition"] = f'attachment; filename="{prefix}_{item_slug}.csv"'
+            writer.writerow(["Company Name", "Industry", "City", "Country", "Website", "Email", "Phone", "Target Item", "Category", "Fit Score (%)", "Fit Reason", "Intent Signal", "Discovered At"])
             for item in leads_filtered.order_by("-match_score", "-created_at")[:1000]:
+                job = item.search_job
+                target_name = (job.product.name if job.product else item.product_title) if (is_seller_context and job) else (job.requirement.item_name if (job and job.requirement) else item.product_title)
+                cat_name = (job.product.category.name if (job.product and job.product.category) else "General") if (is_seller_context and job) else (job.requirement.category.name if (job and job.requirement and job.requirement.category) else "General")
                 writer.writerow([
-                    item.external_company.name,
-                    item.external_company.industry or "",
-                    item.external_company.city or "",
-                    item.external_company.country or "India",
-                    item.external_company.website or "",
-                    item.external_company.email or "",
-                    item.external_company.phone or "",
-                    item.search_job.product.name if (item.search_job and item.search_job.product) else item.product_title,
-                    item.search_job.product.category.name if (item.search_job and item.search_job.product and item.search_job.product.category) else "General",
+                    item.external_company.name if item.external_company else "Unknown",
+                    item.external_company.industry or "" if item.external_company else "",
+                    item.external_company.city or "" if item.external_company else "",
+                    item.external_company.country or "India" if item.external_company else "India",
+                    item.external_company.website or "" if item.external_company else "",
+                    item.external_company.email or "" if item.external_company else "",
+                    item.external_company.phone or "" if item.external_company else "",
+                    target_name,
+                    cat_name,
                     item.match_score,
                     item.match_reason or "",
                     item.need_signal or "",
@@ -1654,38 +2290,63 @@ def export_reports_view(request):
                 ])
 
         elif report_type == "catalog":
-            response["Content-Disposition"] = f'attachment; filename="Product_Catalog_{prod_slug}.csv"'
-            writer.writerow(["Product Name", "Category", "Type", "Price", "Currency", "MOQ", "Unit", "Availability", "Location", "Search Scope", "Description", "Specifications", "Created At"])
-            prods_to_export = Product.objects.filter(company=company, is_deleted=False)
-            if selected_product:
-                prods_to_export = prods_to_export.filter(id=selected_product.id)
-            for p in prods_to_export.order_by("name"):
-                writer.writerow([
-                    p.name,
-                    p.category.name if p.category else "General",
-                    p.get_type_display(),
-                    p.price or "",
-                    p.currency,
-                    p.minimum_order_quantity or p.moq or 1,
-                    p.unit,
-                    p.get_availability_display(),
-                    p.location or (company.city if company else "India"),
-                    p.get_search_scope_display(),
-                    p.description or "",
-                    p.specifications or "",
-                    p.created_at.strftime("%Y-%m-%d %H:%M"),
-                ])
+            if is_seller_context:
+                response["Content-Disposition"] = f'attachment; filename="Product_Catalog_{item_slug}.csv"'
+                writer.writerow(["Product Name", "Category", "Type", "Price", "Currency", "MOQ", "Unit", "Availability", "Location", "Search Scope", "Description", "Specifications", "Created At"])
+                prods_to_export = Product.objects.filter(company=company, is_deleted=False)
+                if selected_item:
+                    prods_to_export = prods_to_export.filter(id=selected_item.id)
+                for p in prods_to_export.order_by("name"):
+                    writer.writerow([
+                        p.name,
+                        p.category.name if p.category else "General",
+                        p.get_type_display(),
+                        p.price or "",
+                        p.currency,
+                        p.minimum_order_quantity or p.moq or 1,
+                        p.unit,
+                        p.get_availability_display(),
+                        p.location or (company.city if company else "India"),
+                        p.get_search_scope_display(),
+                        p.description or "",
+                        p.specifications or "",
+                        p.created_at.strftime("%Y-%m-%d %H:%M"),
+                    ])
+            else:
+                response["Content-Disposition"] = f'attachment; filename="Requirement_Specifications_{item_slug}.csv"'
+                writer.writerow(["Requirement Item", "Category", "Quantity", "Unit", "Target Price", "Currency", "Delivery City", "Search Scope", "Status", "Description", "Specifications", "Created At"])
+                reqs_to_export = Requirement.objects.filter(company=company, is_deleted=False)
+                if selected_item:
+                    reqs_to_export = reqs_to_export.filter(id=selected_item.id)
+                for r in reqs_to_export.order_by("item_name"):
+                    writer.writerow([
+                        r.item_name,
+                        r.category.name if r.category else "General",
+                        r.quantity,
+                        r.unit,
+                        r.target_price or "",
+                        r.currency,
+                        r.delivery_city or (company.city if company else "India"),
+                        r.get_search_scope_display(),
+                        r.get_status_display(),
+                        r.description or "",
+                        r.specifications or "",
+                        r.created_at.strftime("%Y-%m-%d %H:%M"),
+                    ])
 
         else:  # inquiries
-            response["Content-Disposition"] = f'attachment; filename="Inquiries_Audit_{prod_slug}.csv"'
-            writer.writerow(["Inquiry ID", "Recipient Company", "Recipient Email", "Subject", "Product", "Status", "Quoted Price", "Currency", "Delivery Terms", "Date Sent"])
+            prefix = "Inquiries_Audit" if is_seller_context else "Procurement_Inquiries_Audit"
+            response["Content-Disposition"] = f'attachment; filename="{prefix}_{item_slug}.csv"'
+            writer.writerow(["Inquiry ID", "Counterparty Company", "Contact Email", "Subject", "Item / Requirement", "Status", "Quoted Price", "Currency", "Delivery Terms", "Date Sent"])
             for inq in inquiries_filtered.order_by("-sent_at")[:1000]:
+                job = inq.search_result.search_job if inq.search_result else None
+                item_label = (job.product.name if job.product else inq.search_result.product_title) if (is_seller_context and job) else (job.requirement.item_name if (job and job.requirement) else (inq.search_result.product_title if inq.search_result else "General"))
                 writer.writerow([
                     inq.id,
                     inq.search_result.external_company.name if inq.search_result else "External Vendor",
                     inq.sent_to_email,
                     inq.subject,
-                    inq.search_result.search_job.product.name if (inq.search_result and inq.search_result.search_job and inq.search_result.search_job.product) else (inq.search_result.product_title if inq.search_result else "General"),
+                    item_label,
                     inq.get_status_display(),
                     inq.quoted_price or "",
                     inq.quoted_currency or "INR",
@@ -1699,18 +2360,21 @@ def export_reports_view(request):
 
         return response
 
-    checksum_seed = f"{company.id if company else 0}-{selected_product.id if selected_product else 0}-{timezone.now().strftime('%Y%m%d')}-{report_type}"
+    checksum_seed = f"{company.id if company else 0}-{selected_item.id if selected_item else 0}-{timezone.now().strftime('%Y%m%d')}-{report_type}"
     report_checksum = hashlib.sha256(checksum_seed.encode("utf-8")).hexdigest()[:16].upper()
 
     return render(request, "leads/export_reports.html", {
-        "products": products,
-        "selected_product": selected_product,
-        "selected_product_id": int(product_id_str) if product_id_str and product_id_str.isdigit() else None,
+        "products": items_list,
+        "requirements": items_list if not is_seller_context else [],
+        "selected_product": selected_item,
+        "selected_requirement": selected_item if not is_seller_context else None,
+        "selected_product_id": int(item_id_str) if item_id_str and item_id_str.isdigit() else None,
+        "selected_requirement_id": int(item_id_str) if item_id_str and item_id_str.isdigit() else None,
         "report_type": report_type,
         "preview_records": preview_records,
         "total_leads_count": total_leads_count,
         "total_inquiry_count": total_inquiry_count,
-        "total_catalog_count": len(products),
+        "total_catalog_count": len(items_list),
         "kpi_leads_count": kpi_leads_count,
         "kpi_inquiries_count": kpi_inquiries_count,
         "kpi_high_fit_count": kpi_high_fit_count,
@@ -1724,7 +2388,7 @@ def export_reports_view(request):
         "kpi_inquiry_won_rate": kpi_inquiry_won_rate,
         "avg_match_score": avg_match_score,
         "current_timestamp": timezone.now(),
-        "report_ref": f"REP-{selected_product.id:04d}-{timezone.now().strftime('%Y%m%d%H%M')}" if selected_product else "",
+        "report_ref": f"REP-{selected_item.id:04d}-{timezone.now().strftime('%Y%m%d%H%M')}" if selected_item else "",
         "report_checksum": report_checksum,
         "date_range": date_range,
         "min_score": min_score,
@@ -1735,11 +2399,11 @@ def export_reports_view(request):
         "company": company,
         "rbac": rbac,
         "page_title": (
-            (f"Vendor Report - {selected_product.name}" if selected_product else "Vendor Report & Analytics")
+            (f"{'Vendor Report' if is_seller_context else 'Supplier Report'} - {selected_item.name}" if selected_item else ("Vendor Report & Analytics" if is_seller_context else "Supplier Intelligence Report"))
             if report_type == "leads" else
-            (f"Catalog Specifications - {selected_product.name}" if selected_product else "Catalog Specifications Dossier")
+            (f"{'Catalog Specs' if is_seller_context else 'Requirement Specs'} - {selected_item.name}" if selected_item else ("Catalog Specifications Dossier" if is_seller_context else "Procurement Specifications Dossier"))
             if report_type == "catalog" else
-            (f"Inquiries Audit - {selected_product.name}" if selected_product else "Inquiries & Outreach Audit Report")
+            (f"Inquiries Audit - {selected_item.name}" if selected_item else "Inquiries & Outreach Audit Report")
         ),
     })
 

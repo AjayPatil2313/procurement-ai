@@ -380,6 +380,13 @@ function triggerProposalFromDetails() {
       currentCdmLead.email,
       currentCdmLead.productTitle
     );
+  } else if (typeof openRfqModal === 'function') {
+    openRfqModal(
+      currentCdmLead.leadId,
+      currentCdmLead.name,
+      currentCdmLead.productTitle,
+      currentCdmLead.email
+    );
   }
 }
 
@@ -427,5 +434,61 @@ document.addEventListener('keydown', function(e) {
       closeCompanyDetailsModal();
     }
   }
+});
+
+// Modal Save AJAX Submit
+document.getElementById('cdm_save_form')?.addEventListener('submit', function(e) {
+  e.preventDefault();
+  const saveBtn = document.getElementById('cdm_save_btn');
+  const originalHtml = saveBtn ? saveBtn.innerHTML : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+  }
+
+  fetch(this.action, {
+    method: 'POST',
+    body: new FormData(this),
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      currentCdmLead.isSaved = true;
+      if (saveBtn) {
+        saveBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-700 font-bold text-xs flex items-center gap-1.5';
+        saveBtn.innerHTML = '<i class="fa-solid fa-check text-emerald-600"></i> <span>Saved</span>';
+        saveBtn.disabled = true;
+      }
+
+      // Update corresponding card on page if present
+      const card = document.querySelector(`[data-lead-id="${currentCdmLead.leadId}"]`);
+      if (card) {
+        card.setAttribute('data-is-saved', 'true');
+        const slot = card.querySelector('.card-save-slot');
+        if (slot) {
+          slot.innerHTML = `
+            <span class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 animate-in zoom-in-95 duration-150" title="Saved">
+              <i class="fa-solid fa-check text-[9px]"></i>
+              <span>Saved</span>
+            </span>
+          `;
+        }
+      }
+    } else {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHtml;
+      }
+    }
+  })
+  .catch(() => {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalHtml;
+    }
+  });
 });
 </script>

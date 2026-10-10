@@ -1,87 +1,378 @@
 {% extends "base.html" %}
 
-{% block title %}Price Comparison — AI Procurement Platform{% endblock %}
+{% block title %}Price Comparison & Landed Cost Analysis — AI Procurement{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
-  <div class="flex items-center justify-between">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Price Comparison & Landed Cost Analysis</h1>
-      <p class="text-xs text-slate-500 mt-1">Compare nearby suppliers vs. global exporters to find significant cost savings</p>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Procurement</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Price Comparison</span>
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+        <span class="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-scale-balanced"></i>
+        </span>
+        <span>Price Comparison & Landed Cost Analysis</span>
+      </h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Side-by-side commercial comparison across verified supplier quotes, web-discovered factory prices, and MOQ terms.
+      </p>
     </div>
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-    {% for r in results %}
-    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
-      <div>
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-bold text-slate-400 uppercase tracking-wide">{{ r.external_company.country|default:"Global" }}</span>
-          {% if r.is_global_cheaper %}
-          <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
-            Cheaper Option {% if r.savings_percent %}({{ r.savings_percent }}% savings){% endif %}
-          </span>
-          {% endif %}
-        </div>
-
-        <h3 class="font-bold text-slate-900 text-base mt-2">{{ r.external_company.name }}</h3>
-        <p class="text-xs text-slate-500">{{ r.product_title }}</p>
-
-        <div class="mt-4 p-3 bg-slate-50 rounded-xl space-y-1.5 text-xs">
-          <div class="flex justify-between">
-            <span class="text-slate-400">Unit Price:</span>
-            <span class="font-black text-slate-900 text-sm">
-              {% if r.price %}
-                {{ r.price_currency|default:"₹" }} {{ r.price }}
-              {% else %}
-                <span class="text-slate-500 font-medium">Quote on Request</span>
-              {% endif %}
-            </span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-400">Distance:</span>
-            <span class="font-semibold text-slate-700">
-              {% if r.distance_km %}
-                {{ r.distance_km }} km
-              {% else %}
-                <span class="text-slate-400 font-normal">Location unverified</span>
-              {% endif %}
-            </span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-400">Match Score:</span>
-            <span class="font-bold text-emerald-600">{{ r.match_score }}%</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-        <span class="text-[11px] text-slate-400">Source: {{ r.external_company.city|default:"Global Network" }}</span>
-        {% if r.external_company.email %}
-        <a href="mailto:{{ r.external_company.email }}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition">
-          Inquire Now
-        </a>
-        {% else %}
-        <a href="{% url 'find-suppliers' %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs px-3 py-1.5 rounded-lg transition">
-          View Pipeline
-        </a>
-        {% endif %}
-      </div>
-    </div>
-    {% empty %}
-    <div class="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
-      <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-xs">
-        <i class="fa-solid fa-scale-balanced"></i>
-      </div>
-      <h3 class="text-lg font-bold text-slate-800 mb-1">No Price Comparisons Available Yet</h3>
-      <p class="text-sm text-slate-500 max-w-md mx-auto mb-6">Run AI Supplier Discovery on your requirements to compare nearby vs. global supplier prices and landed costs.</p>
-      <a href="{% url 'find-suppliers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-sm">
-        <i class="fa-solid fa-bolt"></i> Discover Suppliers
+    <div class="flex items-center gap-2.5 flex-wrap">
+      {% if selected_requirement %}
+      <a 
+        href="{% url 'export-price-comparison-csv' %}?requirement_id={{ selected_requirement.id }}" 
+        class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition shadow-xs"
+        title="Export price comparison matrix to CSV"
+      >
+        <i class="fa-solid fa-file-csv text-emerald-600 text-sm"></i>
+        <span>Export CSV</span>
+      </a>
+      {% endif %}
+      <a 
+        href="{% url 'find-suppliers' %}{% if selected_requirement %}?requirement_id={{ selected_requirement.id }}{% endif %}" 
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20"
+      >
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span>Discover Suppliers</span>
       </a>
     </div>
-    {% endfor %}
   </div>
+
+  <!-- Requirement Selector Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div class="flex-1">
+        <label for="price_comp_req_select" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-cart-shopping text-purple-600"></i>
+            <span>Select Requirement to Compare Supplier Quotes</span>
+          </span>
+          <span class="text-slate-400 font-medium normal-case">
+            {{ requirements|length }} Requirements Available
+          </span>
+        </label>
+        <form method="GET" action="{% url 'price-comparison' %}">
+          <select 
+            id="price_comp_req_select" 
+            name="requirement_id" 
+            onchange="this.form.submit()" 
+            class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition text-slate-800"
+          >
+            <option value="">-- Choose Requirement --</option>
+            {% for r in requirements %}
+            <option value="{{ r.id }}" {% if selected_requirement and selected_requirement.id == r.id %}selected{% endif %}>
+              {{ r.item_name }} ({{ r.quantity }} {{ r.unit }}) — {% if r.target_price %}Target: {{ r.currency }} {{ r.target_price }}{% else %}Open Budget{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+
+    <!-- Quick Tabs -->
+    {% if requirements %}
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-slate-100 text-xs scrollbar-thin">
+      <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+        <i class="fa-solid fa-tags text-[10px]"></i> Quick Tabs:
+      </span>
+      {% for r in requirements %}
+      <a 
+        href="{% url 'price-comparison' %}?requirement_id={{ r.id }}" 
+        class="shrink-0 px-3 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 {% if selected_requirement and selected_requirement.id == r.id %}bg-purple-600 text-white font-bold shadow-xs{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}"
+      >
+        <span class="truncate max-w-[160px]">{{ r.item_name }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if selected_requirement %}
+  <!-- Target Price Baseline Banner -->
+  <div class="bg-gradient-to-r from-purple-50 via-blue-50 to-indigo-50 border border-purple-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex items-center gap-3.5">
+      <div class="w-11 h-11 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+        <i class="fa-solid fa-bullseye"></i>
+      </div>
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-purple-700">Procurement Baseline</div>
+        <h2 class="text-base font-black text-slate-900 mt-0.5">
+          {{ selected_requirement.item_name }}
+        </h2>
+        <div class="text-xs text-slate-600 flex items-center gap-2 mt-0.5">
+          <span>Quantity: <strong>{{ selected_requirement.quantity }} {{ selected_requirement.unit }}</strong></span>
+          <span>&bull;</span>
+          <span>Delivery Hub: <strong>{{ selected_requirement.delivery_city|default:company.city|default:"India" }}</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-4 bg-white/80 backdrop-blur-xs px-4 py-2.5 rounded-xl border border-purple-200 shrink-0">
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Target Budget Price</div>
+        <div class="text-lg font-black text-slate-900">
+          {% if target_price %}
+            {{ target_currency }} {{ target_price }} <span class="text-xs text-slate-500 font-normal">/ unit</span>
+          {% else %}
+            <span class="text-slate-500 text-xs font-semibold italic">Open / Unspecified</span>
+          {% endif %}
+        </div>
+      </div>
+      {% if target_price and lowest_price and lowest_price < target_price %}
+      <div class="pl-3 border-l border-slate-200">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Savings Opportunity</div>
+        <div class="text-sm font-black text-emerald-600">
+          {{ max_savings_pct }}% Cheaper Option
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- KPI Metrics Cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Suppliers Compared</div>
+        <div class="text-2xl font-black text-slate-900 mt-1">{{ total_compared_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-industry"></i>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Formal Quotes</div>
+        <div class="text-2xl font-black text-emerald-600 mt-1">{{ verified_quotes_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-file-invoice-dollar"></i>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Lowest Price</div>
+        <div class="text-2xl font-black text-blue-600 mt-1">
+          {% if lowest_price %}₹{{ lowest_price }}{% else %}<span class="text-sm text-slate-400 font-semibold">N/A</span>{% endif %}
+        </div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-tag"></i>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Average Price</div>
+        <div class="text-2xl font-black text-indigo-600 mt-1">
+          {% if avg_price %}₹{{ avg_price }}{% else %}<span class="text-sm text-slate-400 font-semibold">N/A</span>{% endif %}
+        </div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-chart-line"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side-by-Side Comparison Matrix Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-bold text-slate-900">Side-by-Side Supplier Comparison Matrix</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Verified supplier pricing vs. discovered web estimates. Values are never fabricated.</p>
+      </div>
+      <div class="text-xs text-slate-400 font-medium">
+        {{ comparison_items|length }} Suppliers
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Supplier & Facility</th>
+            <th class="py-3 px-4">Price Status</th>
+            <th class="py-3 px-4">Unit Price</th>
+            <th class="py-3 px-4">Variance vs Target</th>
+            <th class="py-3 px-4">MOQ</th>
+            <th class="py-3 px-4">Commercial Terms</th>
+            <th class="py-3 px-4">Match Fit</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for item in comparison_items %}
+          <tr class="hover:bg-slate-50/70 transition">
+            
+            <!-- Supplier -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center space-x-3">
+                <span class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-semibold text-xs border border-purple-100 shrink-0">
+                  <i class="fa-solid fa-building"></i>
+                </span>
+                <div class="min-w-0">
+                  <div class="font-bold text-slate-900 truncate max-w-[200px]" title="{{ item.company.name }}">
+                    {{ item.company.name }}
+                  </div>
+                  <div class="text-[11px] text-slate-400 font-normal">
+                    <i class="fa-solid fa-location-dot text-rose-500 text-[10px] mr-0.5"></i>
+                    {{ item.company.city|default:"Industrial Hub" }}, {{ item.company.country|default:"India" }}
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Price Status -->
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              {% if item.is_verified_quote %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                <i class="fa-solid fa-circle-check text-[9px] mr-1 text-emerald-600"></i> Verified Formal Quote
+              </span>
+              {% elif item.price %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                <i class="fa-solid fa-globe text-[9px] mr-1 text-blue-500"></i> Web Discovered
+              </span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                <i class="fa-solid fa-clock text-[9px] mr-1 text-slate-400"></i> Quote on Request
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Price -->
+            <td class="py-3.5 px-4 font-black text-slate-900 whitespace-nowrap text-sm">
+              {% if item.price %}
+                {{ item.currency }} {{ item.price }}
+              {% else %}
+                <span class="text-slate-400 font-medium text-xs">Request Quote</span>
+              {% endif %}
+            </td>
+
+            <!-- Variance -->
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              {% if item.variance is not None %}
+                {% if item.variance < 0 %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <i class="fa-solid fa-arrow-down text-[9px] mr-1"></i> -₹{{ item.variance|stringformat:"d"|slice:"1:" }} ({{ item.savings_percent }}% save)
+                </span>
+                {% elif item.variance > 0 %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                  <i class="fa-solid fa-arrow-up text-[9px] mr-1"></i> +₹{{ item.variance }}
+                </span>
+                {% else %}
+                <span class="text-slate-500 font-bold text-xs">Exact Match (0)</span>
+                {% endif %}
+              {% else %}
+                <span class="text-slate-400 font-normal text-xs">—</span>
+              {% endif %}
+            </td>
+
+            <!-- MOQ -->
+            <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+              {{ item.moq|default:"Standard batch" }}
+            </td>
+
+            <!-- Commercial Terms -->
+            <td class="py-3.5 px-4 text-slate-600 max-w-xs">
+              {% if item.delivery_terms %}
+                <span class="truncate block" title="{{ item.delivery_terms }}">{{ item.delivery_terms }}</span>
+              {% else %}
+                <span class="text-slate-400 italic">Standard EXW / FOB</span>
+              {% endif %}
+            </td>
+
+            <!-- Match Score -->
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if item.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
+                {{ item.match_score }}%
+              </span>
+            </td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <div class="inline-flex items-center gap-1.5">
+                <a 
+                  href="{% url 'save-supplier-toggle' item.result.id %}" 
+                  class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition" 
+                  title="Shortlist Supplier"
+                >
+                  <i class="fa-regular fa-bookmark text-xs"></i>
+                </a>
+
+                {% if item.company.email %}
+                <a 
+                  href="mailto:{{ item.company.email }}" 
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1"
+                >
+                  <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                  <span>RFQ</span>
+                </a>
+                {% else %}
+                <a 
+                  href="{% url 'find-suppliers' %}?requirement_id={{ selected_requirement.id }}" 
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-lg transition"
+                >
+                  Details
+                </a>
+                {% endif %}
+              </div>
+            </td>
+
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="py-14 text-center text-slate-400">
+              <div class="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-2xl mx-auto mb-3 border border-purple-100">
+                <i class="fa-solid fa-scale-balanced"></i>
+              </div>
+              <h3 class="font-bold text-slate-800 text-sm mb-1">No Comparison Data for this Requirement</h3>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4 leading-relaxed">
+                Run AI Supplier Discovery to locate candidate manufacturers, gather quoted pricing, and view side-by-side landed cost comparisons.
+              </p>
+              <a 
+                href="{% url 'find-suppliers' %}?requirement_id={{ selected_requirement.id }}" 
+                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20"
+              >
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Discover Suppliers</span>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- Empty State: No Requirement Selected -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-12 shadow-sm text-center">
+    <div class="max-w-md mx-auto space-y-3">
+      <div class="w-16 h-16 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-2xl mx-auto shadow-xs border border-purple-100">
+        <i class="fa-solid fa-scale-balanced"></i>
+      </div>
+      <h3 class="text-lg font-bold text-slate-800">Select a Requirement to Compare Prices</h3>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Choose any of your procurement requirements from the dropdown above to view side-by-side commercial quotes, target price variances, and verified supplier terms.
+      </p>
+      {% if not requirements %}
+      <a href="{% url 'requirements-create' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20 mt-2">
+        <i class="fa-solid fa-plus"></i> Create First Requirement
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}

@@ -3,6 +3,7 @@ import datetime
 import random
 import string
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
@@ -24,9 +25,15 @@ from apps.billing.models import (
     Invoice,
 )
 from apps.billing.services.wallet import CreditWalletService
-from apps.ai_search.models import SearchJob
-from apps.dashboard.models import ActivityLog, SupportTicket, PlatformSetting
-from apps.leads.models import Inquiry
+from apps.ai_search.models import SearchJob, SearchResult
+from apps.dashboard.models import (
+    ActivityLog,
+    SupportTicket,
+    PlatformSetting,
+    BuyerModuleConfig,
+    BuyerDashboardLayout,
+)
+from apps.leads.models import Inquiry, SavedItem
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
 from apps.companies.rbac import superadmin_required
@@ -1049,4 +1056,252 @@ def admin_panel_toggle_maintenance_view(request):
     if next_url:
         return redirect(next_url)
     return redirect("admin-panel-dashboard")
+
+
+# ============================================================
+# SUPER ADMIN: BUYER DASHBOARD & MODULE GOVERNANCE
+# ============================================================
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_dashboard_view(request):
+    """
+    Dedicated Super Admin Buyer Dashboard & Module Governance Center.
+    Allows Super Admins to:
+    1. Enable / Disable Buyer modules (My Requirements, Find Suppliers, Saved Suppliers,
+       Inquiries, Price Comparison, Export Reports, Subscription & Credits, Invoices & Billing, Help & Support).
+    2. Configure Buyer module order, display names, navigation labels, and icons.
+    3. Configure Buyer dashboard layout & KPI visibility toggles.
+    4. View and manage Buyer companies, active requirements, searches run, saved items, and inquiries.
+    """
+    BuyerModuleConfig.ensure_defaults()
+    modules = BuyerModuleConfig.objects.all().order_by("order", "id")
+    layout = BuyerDashboardLayout.get_layout()
+
+    # Active tab ('modules', 'layout', 'companies')
+    active_tab = request.GET.get("tab", "modules")
+
+    # Real DB Aggregate Metrics across all Buyer and BOTH companies
+    buyer_companies_qs = Company.objects.filter(
+        company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH],
+        is_deleted=False,
+    )
+    total_buyer_companies = buyer_companies_qs.count()
+    buyer_only_companies = buyer_companies_qs.filter(company_type=Company.CompanyType.BUYER).count()
+    both_companies = buyer_companies_qs.filter(company_type=Company.CompanyType.BOTH).count()
+
+    total_requirements = Requirement.objects.filter(is_deleted=False).count()
+    total_searches_run = SearchJob.objects.filter(job_type=SearchJob.JobType.FIND_SUPPLIERS).count()
+    total_suppliers_discovered = SearchResult.objects.filter(result_type=SearchResult.ResultType.SUPPLIER).count()
+    total_saved_suppliers = SavedItem.objects.filter(search_result__result_type=SearchResult.ResultType.SUPPLIER).count()
+    total_inquiries_sent = Inquiry.objects.count()
+
+    total_credits_allocated = Subscription.objects.aggregate(t=Sum("credits_total"))["t"] or 0
+    total_credits_used = Subscription.objects.aggregate(t=Sum("credits_used"))["t"] or 0
+    total_credits_remaining = max(0, total_credits_allocated - total_credits_used)
+
+    # Search & filters for Buyer Companies Directory
+    q = request.GET.get("q", "").strip()
+    status_filter = request.GET.get("status", "all")
+    plan_filter = request.GET.get("plan", "all")
+
+    companies_list = buyer_companies_qs.select_related("subscription").prefetch_related("members", "requirements").order_by("-created_at")
+
+    if q:
+        companies_list = companies_list.filter(
+            Q(name__icontains=q)
+            | Q(city__icontains=q)
+            | Q(industry__icontains=q)
+            | Q(email__icontains=q)
+        )
+
+    if status_filter == "active":
+        companies_list = companies_list.filter(is_active=True)
+    elif status_filter == "inactive":
+        companies_list = companies_list.filter(is_active=False)
+
+    if plan_filter in [Subscription.Plan.FREE, Subscription.Plan.PRO, Subscription.Plan.ENTERPRISE]:
+        companies_list = companies_list.filter(subscription__plan=plan_filter)
+
+    # Annotate company stats
+    annotated_companies = []
+    for comp in companies_list[:50]:
+        req_count = comp.requirements.filter(is_deleted=False).count()
+        jobs_count = SearchJob.objects.filter(company=comp, job_type=SearchJob.JobType.FIND_SUPPLIERS).count()
+        saved_count = SavedItem.objects.filter(company=comp, search_result__result_type=SearchResult.ResultType.SUPPLIER).count()
+        inq_count = Inquiry.objects.filter(company=comp).count()
+        sub = getattr(comp, "subscription", None)
+        admin_member = comp.members.filter(role=CompanyMember.Role.ADMIN).select_related("user").first()
+        admin_user = admin_member.user if admin_member else None
+
+        annotated_companies.append({
+            "company": comp,
+            "req_count": req_count,
+            "jobs_count": jobs_count,
+            "saved_count": saved_count,
+            "inq_count": inq_count,
+            "subscription": sub,
+            "admin_user": admin_user,
+        })
+
+    # Recent activity logs for buyer dashboard
+    recent_buyer_activities = ActivityLog.objects.filter(
+        company__company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH]
+    ).select_related("company", "user").order_by("-created_at")[:10]
+
+    return render(request, "admin_panel/buyer_dashboard.html", {
+        "page_title": "Buyer Dashboard & Module Governance",
+        "active_tab": active_tab,
+        "modules": modules,
+        "layout": layout,
+        "total_buyer_companies": total_buyer_companies,
+        "buyer_only_companies": buyer_only_companies,
+        "both_companies": both_companies,
+        "total_requirements": total_requirements,
+        "total_searches_run": total_searches_run,
+        "total_suppliers_discovered": total_suppliers_discovered,
+        "total_saved_suppliers": total_saved_suppliers,
+        "total_inquiries_sent": total_inquiries_sent,
+        "total_credits_allocated": total_credits_allocated,
+        "total_credits_remaining": total_credits_remaining,
+        "annotated_companies": annotated_companies,
+        "recent_buyer_activities": recent_buyer_activities,
+        "q": q,
+        "status_filter": status_filter,
+        "plan_filter": plan_filter,
+    })
+
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_module_toggle_view(request, pk):
+    """
+    Super Admin action to toggle Buyer module enabled/disabled state.
+    """
+    if request.method == "POST":
+        module = get_object_or_404(BuyerModuleConfig, pk=pk)
+        module.is_enabled = not module.is_enabled
+        module.save(update_fields=["is_enabled", "updated_at"])
+
+        # Audit logging
+        state_str = "ENABLED" if module.is_enabled else "DISABLED"
+        first_company = Company.objects.first()
+        if first_company:
+            ActivityLog.objects.create(
+                company=first_company,
+                user=request.user,
+                activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
+                title=f"Buyer Module {state_str}: {module.display_name}",
+                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Buyer module.",
+                icon_type="toggle-on" if module.is_enabled else "toggle-off",
+                color="emerald" if module.is_enabled else "rose",
+            )
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "is_enabled": module.is_enabled,
+                "module_key": module.module_key,
+                "display_name": module.display_name,
+                "message": f"Module '{module.display_name}' is now {state_str}!",
+            })
+
+        messages.success(request, f"Buyer module '{module.display_name}' is now {state_str}.")
+
+    next_url = request.POST.get("next") or reverse("admin-panel-buyer-dashboard")
+    return redirect(next_url)
+
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_module_edit_view(request, pk):
+    """
+    Super Admin action to configure Buyer module display name, nav label,
+    icon, order, min plan, credit requirements, and sidebar visibility.
+    """
+    module = get_object_or_404(BuyerModuleConfig, pk=pk)
+
+    if request.method == "POST":
+        display_name = request.POST.get("display_name", "").strip()
+        nav_label = request.POST.get("nav_label", "").strip()
+        icon_class = request.POST.get("icon_class", "").strip()
+        order_raw = request.POST.get("order", "0").strip()
+        min_plan = request.POST.get("min_plan", "FREE").strip()
+        requires_credits = bool(request.POST.get("requires_credits"))
+        is_visible_on_sidebar = bool(request.POST.get("is_visible_on_sidebar"))
+        description = request.POST.get("description", "").strip()
+
+        if display_name:
+            module.display_name = display_name
+        if nav_label:
+            module.nav_label = nav_label
+        if icon_class:
+            module.icon_class = icon_class
+        try:
+            module.order = max(0, int(order_raw))
+        except ValueError:
+            pass
+        if min_plan in dict(BuyerModuleConfig.MinPlan.choices):
+            module.min_plan = min_plan
+        module.requires_credits = requires_credits
+        module.is_visible_on_sidebar = is_visible_on_sidebar
+        if description:
+            module.description = description
+        module.save()
+
+        first_company = Company.objects.first()
+        if first_company:
+            ActivityLog.objects.create(
+                company=first_company,
+                user=request.user,
+                activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
+                title=f"Buyer Module Updated: {module.display_name}",
+                description=f"Super Admin {request.user.email} updated configuration for '{module.display_name}' (Order: {module.order}, Min Plan: {module.min_plan}).",
+                icon_type="gear",
+                color="blue",
+            )
+
+        messages.success(request, f"Configuration updated for Buyer module '{module.display_name}'.")
+
+    return redirect(reverse("admin-panel-buyer-dashboard") + "?tab=modules")
+
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_layout_update_view(request):
+    """
+    Super Admin action to configure Buyer Dashboard layout, KPI cards visibility,
+    and widget display.
+    """
+    if request.method == "POST":
+        layout = BuyerDashboardLayout.get_layout()
+        layout.show_kpi_requirements = bool(request.POST.get("show_kpi_requirements"))
+        layout.show_kpi_searches = bool(request.POST.get("show_kpi_searches"))
+        layout.show_kpi_suppliers_discovered = bool(request.POST.get("show_kpi_suppliers_discovered"))
+        layout.show_kpi_saved_suppliers = bool(request.POST.get("show_kpi_saved_suppliers"))
+        layout.show_kpi_inquiries_sent = bool(request.POST.get("show_kpi_inquiries_sent"))
+        layout.show_kpi_credits = bool(request.POST.get("show_kpi_credits"))
+        layout.show_quick_actions = bool(request.POST.get("show_quick_actions"))
+        layout.show_recent_searches = bool(request.POST.get("show_recent_searches"))
+        layout.show_recent_activity = bool(request.POST.get("show_recent_activity"))
+        layout.show_top_suppliers = bool(request.POST.get("show_top_suppliers"))
+        layout.show_subscription_widget = bool(request.POST.get("show_subscription_widget"))
+        layout.save()
+
+        first_company = Company.objects.first()
+        if first_company:
+            ActivityLog.objects.create(
+                company=first_company,
+                user=request.user,
+                activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
+                title="Buyer Dashboard Layout Updated",
+                description=f"Super Admin {request.user.email} updated KPI visibility and widget switches for the Buyer Dashboard.",
+                icon_type="table-columns",
+                color="indigo",
+            )
+
+        messages.success(request, "Buyer Dashboard layout and KPI card preferences updated successfully.")
+
+    return redirect(reverse("admin-panel-buyer-dashboard") + "?tab=layout")
+
 

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Shortlisted Suppliers — AI Procurement{% endblock %}
+{% block title %}Saved Customers (Pipeline) — AI Procurement{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,108 +11,314 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'find-suppliers' %}" class="hover:text-blue-600 transition">Supplier Sourcing</a>
+        <a href="{% url 'find-suppliers' %}" class="hover:text-blue-600 transition">Find Customers</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">Shortlist</span>
+        <span class="text-slate-600 font-semibold">Saved Customers</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-bookmark"></i>
         </span>
-        <span>Shortlisted Suppliers</span>
+        <span>Saved Customers Pipeline</span>
       </h1>
-      <p class="text-xs text-slate-500 mt-1">Vetted manufacturers and vendors bookmarked for official RFQ dispatch and price evaluation.</p>
+      <p class="text-xs text-slate-500 mt-1">
+        Track qualified customer and vendor candidates, assign team reps, manage deal stages, and record procurement notes requirement-by-requirement.
+      </p>
     </div>
-    <div class="flex items-center gap-2.5">
-      <a href="{% url 'inquiries-list' %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
-        <i class="fa-solid fa-envelope text-emerald-600"></i>
-        <span>Sent Inquiries (RFQs)</span>
-      </a>
-      <a href="{% url 'find-suppliers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-xl transition shadow-sm">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <span>Find More Suppliers</span>
+    <div class="flex items-center gap-2.5 flex-wrap">
+      <a href="{% url 'find-suppliers' %}{% if selected_requirement %}?requirement_id={{ selected_requirement.id }}{% endif %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span>Find Customers</span>
       </a>
     </div>
   </div>
 
-  <!-- Summary Stats -->
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">
+  <!-- Requirement Filter & Selector Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3.5">
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      
+      <!-- Searchable Combobox Dropdown -->
+      <div class="flex-1 relative" id="saved-requirement-combobox">
+        <label for="saved_req_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-filter text-blue-600"></i>
+            <span>Filter Pipeline by Requirement</span>
+          </span>
+          <span class="text-slate-400 font-medium normal-case">
+            {{ requirements|length }} Requirements &bull; A-Z
+          </span>
+        </label>
+
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          </div>
+
+          <input 
+            type="text" 
+            id="saved_req_filter_input" 
+            autocomplete="off"
+            placeholder="Type requirement item name to filter pipeline (A-Z)..."
+            value="{% if selected_requirement %}{{ selected_requirement.item_name }}{% endif %}"
+            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-slate-800 placeholder-slate-400"
+          >
+
+          <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+            {% if selected_requirement or is_unassigned_view %}
+            <a 
+              href="{% url 'saved-suppliers' %}" 
+              id="clear_saved_filter_btn" 
+              class="text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+              title="Clear requirement filter"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </a>
+            {% else %}
+            <button 
+              type="button" 
+              id="clear_saved_filter_btn" 
+              class="hidden text-slate-400 hover:text-slate-600 p-1 rounded-md transition" 
+              title="Clear requirement filter"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+            {% endif %}
+            <button 
+              type="button" 
+              id="toggle_saved_dropdown_btn" 
+              class="text-slate-400 hover:text-blue-600 p-1 rounded-md transition"
+              title="Toggle requirement list"
+            >
+              <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="saved_chevron"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Dropdown Menu -->
+        <div 
+          id="saved_dropdown_menu" 
+          class="hidden absolute z-30 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
+        >
+          {% for r in requirements %}
+          <a 
+            href="{% url 'saved-suppliers' %}?requirement_id={{ r.id }}" 
+            class="saved-req-option px-3.5 py-2.5 hover:bg-blue-50/70 flex items-center justify-between transition group {% if selected_requirement and selected_requirement.id == r.id %}bg-blue-50 text-blue-950 font-bold{% endif %}"
+            data-id="{{ r.id }}"
+            data-name="{{ r.item_name }}"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                {{ forloop.counter }}
+              </span>
+              <div class="truncate">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition truncate">
+                  {{ r.item_name }}
+                </div>
+                <div class="text-[10px] text-slate-400 font-normal">
+                  {{ r.category.name|default:"General Category" }} &bull; Target: ₹{{ r.target_price|default:"Open" }}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              {% if r.saved_count > 0 %}
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                {{ r.saved_count }} Saved
+              </span>
+              {% else %}
+              <span class="text-[10px] px-1.5 py-0.5 rounded text-slate-400 bg-slate-50">
+                0
+              </span>
+              {% endif %}
+            </div>
+          </a>
+          {% empty %}
+          <div class="p-4 text-center text-xs text-slate-400">
+            No requirements created yet.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Navigation Requirement Tabs -->
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-slate-100 text-xs scrollbar-thin">
+      <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+        <i class="fa-solid fa-tags text-[10px]"></i> Quick Tabs:
+      </span>
+
+      {% for r in requirements %}
+      <a 
+        href="{% url 'saved-suppliers' %}?requirement_id={{ r.id }}" 
+        class="shrink-0 px-3 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 {% if selected_requirement and selected_requirement.id == r.id %}bg-blue-600 text-white font-bold shadow-xs{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}"
+      >
+        <span class="truncate max-w-[150px]">{{ r.item_name }}</span>
+        <span class="px-1.5 py-0.2 rounded-full text-[10px] {% if selected_requirement and selected_requirement.id == r.id %}bg-white/20 text-white font-bold{% elif r.saved_count > 0 %}bg-blue-100 text-blue-700 font-bold{% else %}bg-slate-200 text-slate-500{% endif %}">
+          {{ r.saved_count }}
+        </span>
+      </a>
+      {% empty %}
+      <span class="text-xs text-slate-400 italic">No requirements created yet.</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if not selected_requirement and not is_unassigned_view %}
+  <!-- MODULE FUNCTIONALITY PROMPT CARD: NO REQUIREMENT SELECTED -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+    <div class="max-w-2xl mx-auto space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
+        <i class="fa-solid fa-bookmark"></i>
+      </div>
+      <div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 mb-2">
+          <i class="fa-solid fa-layer-group text-[11px]"></i> Saved Customers Pipeline
+        </span>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Requirement to View Saved Customers</h2>
+        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+          Please select a requirement from the searchable dropdown or quick tabs above to view its saved customer pipeline, manage deal stages, assign reps, and send RFQs.
+        </p>
+      </div>
+      {% if requirements %}
+      <div class="pt-2 flex flex-wrap items-center justify-center gap-2">
+        {% for r in requirements %}
+        <a href="{% url 'saved-suppliers' %}?requirement_id={{ r.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-700 hover:text-blue-700 text-xs font-semibold transition">
+          <i class="fa-solid fa-box text-[10px] text-blue-500"></i>
+          <span>{{ r.item_name }}</span>
+          {% if r.saved_count > 0 %}
+          <span class="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">{{ r.saved_count }}</span>
+          {% endif %}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+
+  <!-- Metric KPI Cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total in Pipeline</div>
+        <div class="text-2xl font-black text-slate-900 mt-1">{{ total_suppliers_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
         <i class="fa-solid fa-industry"></i>
       </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
-        <div class="text-xs text-slate-500 font-medium">Shortlisted Vendors</div>
-        <div class="text-xl font-black text-slate-900">{{ saved_suppliers|length }}</div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">High Fit (85%+)</div>
+        <div class="text-2xl font-black text-emerald-600 mt-1">{{ high_fit_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-star"></i>
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-base shrink-0">
-        <i class="fa-solid fa-circle-check"></i>
-      </div>
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
-        <div class="text-xs text-slate-500 font-medium">Verified Commercial Contacts</div>
-        <div class="text-xl font-black text-slate-900">
-          {% with count=0 %}
-            {% for item in saved_suppliers %}
-              {% if item.search_result.external_company.email %}
-                {{ forloop.counter }}
-              {% endif %}
-            {% empty %}
-              0
-            {% endfor %}
-          {% endwith %}
-        </div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Verified Contact</div>
+        <div class="text-2xl font-black text-purple-600 mt-1">{{ verified_contact_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-address-book"></i>
       </div>
     </div>
 
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3.5">
-      <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-base shrink-0">
-        <i class="fa-solid fa-scale-balanced"></i>
-      </div>
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
-        <div class="text-xs text-slate-500 font-medium">Price Comparison Ready</div>
-        <div class="text-xl font-black text-slate-900">
-          <a href="{% url 'price-comparison' %}" class="text-xs font-bold text-blue-600 hover:underline">Compare Quotes &rarr;</a>
-        </div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">In Negotiation</div>
+        <div class="text-2xl font-black text-amber-600 mt-1">{{ negotiating_count }}</div>
+      </div>
+      <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base">
+        <i class="fa-solid fa-handshake"></i>
       </div>
     </div>
   </div>
 
-  <!-- Suppliers Table -->
+  <!-- Suppliers Pipeline List / Table Card -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    
+    <!-- Table Header & Filters -->
+    <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <h2 class="text-sm font-bold text-slate-900">
+          {% if selected_requirement %}{{ selected_requirement.item_name }} Pipeline{% else %}Consolidated Saved Customers{% endif %} ({{ total_suppliers_count }})
+        </h2>
+        <span class="text-xs text-slate-400">Isolated to <strong class="text-slate-700">{{ company.name }}</strong></span>
+      </div>
+
+      <!-- Filters Form -->
+      <form method="GET" class="flex flex-wrap items-center gap-2">
+        {% if selected_requirement %}
+        <input type="hidden" name="requirement_id" value="{{ selected_requirement.id }}">
+        {% endif %}
+
+        <div class="relative w-full sm:w-60">
+          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </span>
+          <input 
+            type="text" 
+            name="q" 
+            value="{{ search_query }}" 
+            placeholder="Search supplier, city, notes..." 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          >
+        </div>
+
+        <select name="status" onchange="this.form.submit()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-blue-500 transition">
+          <option value="">All Stages</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        {% if search_query or current_status %}
+        <a href="{% url 'saved-suppliers' %}{% if selected_requirement %}?requirement_id={{ selected_requirement.id }}{% endif %}" class="text-xs text-slate-400 hover:text-rose-600 font-semibold px-2 py-1 transition" title="Clear Filters">
+          <i class="fa-solid fa-xmark mr-1"></i> Clear
+        </a>
+        {% endif %}
+      </form>
+    </div>
+
+    <!-- Table -->
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
-            <th class="py-3 px-4">Supplier & Facility</th>
+            <th class="py-3 px-4">Supplier Company</th>
             <th class="py-3 px-4">Location</th>
-            <th class="py-3 px-4">Sourced Item</th>
-            <th class="py-3 px-4">Estimated Quote</th>
-            <th class="py-3 px-4">MOQ</th>
-            <th class="py-3 px-4">AI Score</th>
+            <th class="py-3 px-4">Requirement Item</th>
+            <th class="py-3 px-4">Match Fit</th>
+            <th class="py-3 px-4">Pipeline Stage</th>
+            <th class="py-3 px-4">Assigned Member</th>
+            <th class="py-3 px-4">Procurement Notes</th>
             <th class="py-3 px-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for item in saved_suppliers %}
-          <tr class="hover:bg-slate-50/70 transition">
+          <tr class="hover:bg-slate-50/70 transition" id="supplier-row-{{ item.id }}">
+            
+            <!-- Company -->
             <td class="py-3.5 px-4 font-bold text-slate-900">
-              <div class="flex items-center">
-                <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mr-3 font-semibold text-xs border border-blue-100 shrink-0">
+              <div class="flex items-center space-x-3">
+                <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-semibold text-xs border border-blue-100 shrink-0">
                   <i class="fa-solid fa-building"></i>
                 </span>
                 <div class="min-w-0">
-                  <div class="font-bold text-slate-900 truncate max-w-[220px]" title="{{ item.search_result.external_company.name }}">
+                  <div class="font-bold text-slate-900 truncate max-w-[200px]" title="{{ item.search_result.external_company.name }}">
                     {{ item.search_result.external_company.name }}
                   </div>
                   {% if item.search_result.external_company.email %}
-                    <div class="text-[11px] text-slate-500 font-normal truncate max-w-[220px]">
+                    <div class="text-[11px] text-slate-500 font-normal truncate max-w-[200px]">
                       {{ item.search_result.external_company.email }}
                     </div>
                   {% elif item.search_result.external_company.domain %}
-                    <div class="text-[11px] text-slate-400 font-normal truncate max-w-[220px]">
+                    <div class="text-[11px] text-slate-400 font-normal truncate max-w-[200px]">
                       {{ item.search_result.external_company.domain }}
                     </div>
                   {% endif %}
@@ -120,73 +326,113 @@
               </div>
             </td>
 
+            <!-- Location -->
             <td class="py-3.5 px-4 text-slate-600 font-medium whitespace-nowrap">
               <i class="fa-solid fa-location-dot text-rose-500 text-[11px] mr-1"></i>
-              {% if item.search_result.external_company.city %}{{ item.search_result.external_company.city }}, {% endif %}{{ item.search_result.external_company.country|default:"Global" }}
+              {% if item.search_result.external_company.city %}{{ item.search_result.external_company.city }}, {% endif %}{{ item.search_result.external_company.country|default:"India" }}
             </td>
 
+            <!-- Requirement Item -->
             <td class="py-3.5 px-4 font-semibold text-slate-800">
-              <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium truncate max-w-[200px] inline-block" title="{{ item.search_result.product_title }}">
+              <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium truncate max-w-[180px] inline-block" title="{{ item.search_result.product_title }}">
                 {{ item.search_result.product_title }}
               </span>
             </td>
 
-            <td class="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-              {% if item.search_result.price %}
-                {{ item.search_result.price_currency }} {{ item.search_result.price }} / {{ item.search_result.price_unit|default:"pcs" }}
-              {% else %}
-                <span class="text-slate-400 font-medium text-[11px]">Quote upon RFQ</span>
-              {% endif %}
-            </td>
-
-            <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-              {{ item.search_result.moq|default:"Flexible" }}
-            </td>
-
+            <!-- Match Score -->
             <td class="py-3.5 px-4 whitespace-nowrap">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {% if item.search_result.match_score >= 85 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
                 {{ item.search_result.match_score }}% Match
               </span>
             </td>
 
-            <td class="py-3.5 px-4 text-right whitespace-nowrap">
-              <div class="inline-flex items-center gap-1.5">
-                <button type="button"
-                        onclick="openRfqModal('{{ item.search_result.id }}', '{{ item.search_result.external_company.name|escapejs }}', '{{ item.search_result.product_title|escapejs }}', '{{ item.search_result.external_company.email|default:''|escapejs }}')"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
-                  <i class="fa-solid fa-envelope text-[10px]"></i>
-                  <span>Send RFQ</span>
-                </button>
+            <!-- Stage Dropdown / Badge -->
+            <td class="py-3.5 px-4 whitespace-nowrap">
+              <select 
+                onchange="updateSupplierStage({{ item.id }}, this.value)"
+                class="text-[11px] font-bold rounded-lg px-2 py-1 border transition cursor-pointer {% if item.status == 'won' %}bg-emerald-50 text-emerald-800 border-emerald-300{% elif item.status == 'negotiating' %}bg-amber-50 text-amber-800 border-amber-300{% elif item.status == 'contacted' %}bg-blue-50 text-blue-800 border-blue-300{% elif item.status == 'lost' %}bg-rose-50 text-rose-800 border-rose-300{% else %}bg-slate-50 text-slate-700 border-slate-300{% endif %}"
+              >
+                {% for val, label in status_choices %}
+                <option value="{{ val }}" {% if item.status == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </td>
 
-                {% if item.search_result.external_company.website %}
-                <a href="{{ item.search_result.external_company.website }}" target="_blank" rel="noopener noreferrer"
-                   class="w-7 h-7 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition" title="Visit Website">
-                  <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
-                </a>
+            <!-- Assigned Rep -->
+            <td class="py-3.5 px-4 whitespace-nowrap text-slate-600" id="assigned-text-{{ item.id }}">
+              {% if item.assigned_to %}
+                <span class="font-medium text-slate-800 flex items-center gap-1.5">
+                  <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] flex items-center justify-center font-bold">
+                    {{ item.assigned_to.first_name|first|default:"U" }}
+                  </span>
+                  <span>{{ item.assigned_to.get_full_name|default:item.assigned_to.email }}</span>
+                </span>
+              {% else %}
+                <span class="text-slate-400 italic">Unassigned</span>
+              {% endif %}
+            </td>
+
+            <!-- Notes Preview -->
+            <td class="py-3.5 px-4 max-w-xs">
+              <div class="truncate text-slate-600 cursor-pointer hover:text-blue-600 transition" onclick="openManageSupplierModal({{ item.id }}, '{{ item.search_result.external_company.name|escapejs }}', '{{ item.status }}', '{{ item.assigned_to_id|default:'' }}', '{{ item.notes|default:''|escapejs }}')">
+                {% if item.notes %}
+                  <span class="font-medium text-slate-700"><i class="fa-regular fa-comment-dots mr-1 text-blue-500"></i> {{ item.notes|truncatechars:45 }}</span>
+                {% else %}
+                  <span class="text-slate-400 italic">+ Add note</span>
                 {% endif %}
-
-                <form method="POST" action="{% url 'delete-saved-supplier' item.id %}" class="inline" onsubmit="return confirm('Remove this supplier from your shortlist?');">
-                  {% csrf_token %}
-                  <button type="submit" class="w-7 h-7 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center transition" title="Remove from shortlist">
-                    <i class="fa-solid fa-trash-can text-[11px]"></i>
-                  </button>
-                </form>
               </div>
             </td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right whitespace-nowrap">
+              <div class="inline-flex items-center gap-1.5">
+                <!-- Manage Details Modal Button -->
+                <button 
+                  type="button"
+                  onclick="openManageSupplierModal({{ item.id }}, '{{ item.search_result.external_company.name|escapejs }}', '{{ item.status }}', '{{ item.assigned_to_id|default:'' }}', '{{ item.notes|default:''|escapejs }}')"
+                  class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                  title="Edit Notes & Assignment"
+                >
+                  <i class="fa-solid fa-pen-to-square text-xs"></i>
+                </button>
+
+                <!-- Send RFQ Button -->
+                <button 
+                  type="button"
+                  onclick="openRfqModal('{{ item.search_result.id }}', '{{ item.search_result.external_company.name|escapejs }}', '{{ item.search_result.product_title|escapejs }}', '{{ item.search_result.external_company.email|default:''|escapejs }}')"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1 cursor-pointer"
+                  title="Send RFQ"
+                >
+                  <i class="fa-solid fa-envelope text-[10px]"></i>
+                  <span>RFQ</span>
+                </button>
+
+                <!-- Remove Button -->
+                <button 
+                  type="button"
+                  onclick="deleteSupplierAjax({{ item.id }}, '{{ item.search_result.external_company.name|escapejs }}')"
+                  class="p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                  title="Remove from saved customers"
+                >
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            </td>
+
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="py-14 text-center text-slate-400">
+            <td colspan="8" class="py-14 text-center text-slate-400">
               <div class="w-14 h-14 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-2xl mx-auto mb-3 border border-blue-100">
                 <i class="fa-regular fa-bookmark"></i>
               </div>
-              <h3 class="font-bold text-slate-800 text-sm mb-1">No Shortlisted Suppliers Yet</h3>
+              <h3 class="font-bold text-slate-800 text-sm mb-1">No Saved Customers in this Pipeline</h3>
               <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4 leading-relaxed">
-                Browse AI-recommended suppliers from your procurement requirements and click <strong>"Shortlist"</strong> to bookmark them here.
+                Run AI Customer Search for this requirement and click <strong>"Save"</strong> to bookmark candidates here.
               </p>
-              <a href="{% url 'find-suppliers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20">
+              <a href="{% url 'find-suppliers' %}{% if selected_requirement %}?requirement_id={{ selected_requirement.id }}{% endif %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-blue-500/20">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <span>Discover Qualified Suppliers</span>
+                <span>Discover Qualified Customers</span>
               </a>
             </td>
           </tr>
@@ -194,8 +440,73 @@
         </tbody>
       </table>
     </div>
-  </div>
 
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Manage Customer Modal (Notes & Member Assignment) -->
+<div id="manageSupplierModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Manage Saved Customer</h3>
+          <p id="manageSupplierModalSubtitle" class="text-xs text-slate-500 font-medium">Supplier Name</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeManageSupplierModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="manageSupplierForm" method="POST" action="" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      
+      <div>
+        <label for="manage_status" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Pipeline Qualification Stage
+        </label>
+        <select id="manage_status" name="status" class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800">
+          {% for val, label in status_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="manage_assigned_to" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Assign Procurement Team Member
+        </label>
+        <select id="manage_assigned_to" name="assigned_to" class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800">
+          <option value="">Unassigned</option>
+          {% for member in team_members %}
+          <option value="{{ member.id }}">{{ member.get_full_name|default:member.email }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="manage_notes" class="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+          Internal Procurement & Negotiation Notes
+        </label>
+        <textarea id="manage_notes" name="notes" rows="4" placeholder="Enter confidential negotiations, payment terms, or vendor history..." class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800 leading-relaxed"></textarea>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeManageSupplierModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 transition cursor-pointer">
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Interactive RFQ Modal -->
@@ -211,7 +522,7 @@
           <p id="rfqModalSubtitle" class="text-xs text-slate-500 font-medium">To: Supplier Name</p>
         </div>
       </div>
-      <button type="button" onclick="closeRfqModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition">
+      <button type="button" onclick="closeRfqModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
         <i class="fa-solid fa-xmark text-sm"></i>
       </button>
     </div>
@@ -261,10 +572,10 @@
       </div>
 
       <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-        <button type="button" onclick="closeRfqModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs">
+        <button type="button" onclick="closeRfqModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer">
           Cancel
         </button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition text-xs">
+        <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition text-xs cursor-pointer">
           <i class="fa-solid fa-envelope"></i>
           <span>Dispatch Official RFQ</span>
         </button>
@@ -274,6 +585,75 @@
 </div>
 
 <script>
+// Manage Supplier Modal
+function openManageSupplierModal(itemId, name, status, assignedId, notes) {
+  const modal = document.getElementById('manageSupplierModal');
+  const form = document.getElementById('manageSupplierForm');
+  const subtitle = document.getElementById('manageSupplierModalSubtitle');
+  const statusSelect = document.getElementById('manage_status');
+  const assignedSelect = document.getElementById('manage_assigned_to');
+  const notesText = document.getElementById('manage_notes');
+
+  form.action = `/procurement/saved-suppliers/${itemId}/update/`;
+  subtitle.textContent = name;
+  statusSelect.value = status;
+  assignedSelect.value = assignedId || '';
+  notesText.value = notes || '';
+
+  modal.classList.remove('hidden');
+}
+
+function closeManageSupplierModal() {
+  document.getElementById('manageSupplierModal').classList.add('hidden');
+}
+
+// Inline AJAX Stage Update
+function updateSupplierStage(itemId, newStage) {
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+  const formData = new FormData();
+  formData.append('status', newStage);
+
+  fetch(`/procurement/saved-suppliers/${itemId}/update/`, {
+    method: 'POST',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-CSRFToken': csrfToken
+    },
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      // Reload or update visually
+    }
+  });
+}
+
+// AJAX Removal
+function deleteSupplierAjax(itemId, name) {
+  if (!confirm(`Remove customer '${name}' from your saved customers?`)) return;
+
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+  fetch(`/procurement/saved-suppliers/${itemId}/delete/`, {
+    method: 'POST',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-CSRFToken': csrfToken
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      const row = document.getElementById(`supplier-row-${itemId}`);
+      if (row) row.remove();
+    }
+  })
+  .catch(() => {
+    window.location.reload();
+  });
+}
+
+// RFQ Modal
 function openRfqModal(resultId, supplierName, productTitle, targetEmail) {
   const modal = document.getElementById('rfqModal');
   const form = document.getElementById('rfqForm');
@@ -295,10 +675,51 @@ function closeRfqModal() {
   document.getElementById('rfqModal').classList.add('hidden');
 }
 
-document.getElementById('rfqModal')?.addEventListener('click', function(e) {
-  if (e.target === this) {
-    closeRfqModal();
+// Combobox Dropdown Logic
+document.addEventListener('DOMContentLoaded', function() {
+  const input = document.getElementById('saved_req_filter_input');
+  const menu = document.getElementById('saved_dropdown_menu');
+  const chevron = document.getElementById('saved_chevron');
+  const toggleBtn = document.getElementById('toggle_saved_dropdown_btn');
+
+  if (toggleBtn && menu) {
+    toggleBtn.addEventListener('click', function() {
+      const isHidden = menu.classList.contains('hidden');
+      if (isHidden) {
+        menu.classList.remove('hidden');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+      } else {
+        menu.classList.add('hidden');
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+      }
+    });
   }
+
+  if (input && menu) {
+    input.addEventListener('focus', function() {
+      menu.classList.remove('hidden');
+      if (chevron) chevron.style.transform = 'rotate(180deg)';
+    });
+
+    input.addEventListener('input', function() {
+      const term = this.value.toLowerCase().trim();
+      document.querySelectorAll('.saved-req-option').forEach(opt => {
+        const name = (opt.getAttribute('data-name') || '').toLowerCase();
+        if (name.includes(term)) {
+          opt.style.display = 'flex';
+        } else {
+          opt.style.display = 'none';
+        }
+      });
+    });
+  }
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#saved-requirement-combobox')) {
+      if (menu) menu.classList.add('hidden');
+      if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+  });
 });
 </script>
 {% endblock %}

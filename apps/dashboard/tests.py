@@ -2974,6 +2974,224 @@ class SuperAdminHelpAndSupportTestCase(TestCase):
         self.assertEqual(page_res.context["total_tickets_count"], 0)
 
 
+class SuperAdminBuyerDashboardTestCase(TestCase):
+    """
+    Automated test suite verifying the Super Admin Managed Buyer Dashboard:
+    - Super Admin permission enforcement (RBAC)
+    - Buyer module configuration (toggle, edit order, min_plan, display name)
+    - Layout & KPI settings persistence and dynamic reflection on Buyer Dashboard
+    - Dynamic sidebar filtering via rbac.buyer_modules
+    - Real database metrics calculation (zero fake numbers)
+    - Multi-tenant company isolation and audit trail logging
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+        # Super Admin
+        self.superadmin = User.objects.create_superuser(
+            email="superadmin_test@procure.ai",
+            password="Password@123",
+            first_name="Super",
+            last_name="Admin",
+        )
+
+        # Buyer Company
+        self.buyer_company = Company.objects.create(
+            name="Apex Buyer Enterprise",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.superadmin,
+        )
+        self.buyer_subscription = Subscription.objects.create(
+            company=self.buyer_company,
+            plan=Subscription.Plan.PRO,
+            credits_total=1000,
+            credits_used=250,
+        )
+
+        # Company Admin for Buyer Company
+        self.buyer_admin = User.objects.create_user(
+            email="buyeradmin@apexbuyer.com",
+            password="Password@123",
+            first_name="Rohan",
+            last_name="Verma",
+        )
+        self.buyer_member = CompanyMember.objects.create(
+            user=self.buyer_admin,
+            company=self.buyer_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Seller Company (to test visibility filtering)
+        self.seller_company = Company.objects.create(
+            name="Apex Seller Manufacturing",
+            company_type=Company.CompanyType.SELLER,
+            created_by=self.superadmin,
+        )
+        self.seller_user = User.objects.create_user(
+            email="selleradmin@apexseller.com",
+            password="Password@123",
+        )
+        CompanyMember.objects.create(
+            user=self.seller_user,
+            company=self.seller_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Ensure default modules exist
+        from apps.dashboard.models import BuyerModuleConfig, BuyerDashboardLayout
+        BuyerModuleConfig.ensure_defaults()
+        BuyerDashboardLayout.get_layout()
+
+    def test_superadmin_can_access_buyer_dashboard_management(self):
+        self.client.force_login(self.superadmin)
+        res = self.client.get(reverse("admin-panel-buyer-dashboard"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Buyer Dashboard & Module Governance")
+        self.assertContains(res, "Buyer Feature Modules Management")
+        self.assertContains(res, "Apex Buyer Enterprise")
+
+    def test_regular_user_cannot_access_buyer_dashboard_management(self):
+        self.client.force_login(self.buyer_admin)
+        res = self.client.get(reverse("admin-panel-buyer-dashboard"))
+        self.assertIn(res.status_code, [302, 403])
+
+    def test_buyer_module_toggle_updates_database_and_audit_log(self):
+        self.client.force_login(self.superadmin)
+        from apps.dashboard.models import BuyerModuleConfig, ActivityLog
+        mod = BuyerModuleConfig.objects.get(module_key="find_suppliers")
+        self.assertTrue(mod.is_enabled)
+
+        # Toggle to disabled
+        res = self.client.post(reverse("admin-panel-buyer-module-toggle", kwargs={"pk": mod.pk}))
+        self.assertEqual(res.status_code, 302)
+        mod.refresh_from_db()
+        self.assertFalse(mod.is_enabled)
+
+        # Verify audit log created
+        log = ActivityLog.objects.filter(title__icontains="Buyer Module DISABLED").first()
+        self.assertIsNotNone(log)
+        self.assertIn("find_suppliers", log.description)
+
+        # Toggle back to enabled
+        res2 = self.client.post(reverse("admin-panel-buyer-module-toggle", kwargs={"pk": mod.pk}))
+        self.assertEqual(res2.status_code, 302)
+        mod.refresh_from_db()
+        self.assertTrue(mod.is_enabled)
+
+    def test_buyer_module_edit_updates_properties(self):
+        self.client.force_login(self.superadmin)
+        from apps.dashboard.models import BuyerModuleConfig
+        mod = BuyerModuleConfig.objects.get(module_key="my_requirements")
+
+        edit_data = {
+            "display_name": "Custom Sourcing Orders",
+            "nav_label": "Procure Orders",
+            "icon_class": "fa-folder-open",
+            "order": 15,
+            "min_plan": "PRO",
+            "requires_credits": "1",
+            "is_visible_on_sidebar": "1",
+            "description": "Customized module description by Super Admin",
+        }
+        res = self.client.post(reverse("admin-panel-buyer-module-edit", kwargs={"pk": mod.pk}), edit_data)
+        self.assertEqual(res.status_code, 302)
+        mod.refresh_from_db()
+        self.assertEqual(mod.display_name, "Custom Sourcing Orders")
+        self.assertEqual(mod.nav_label, "Procure Orders")
+        self.assertEqual(mod.icon_class, "fa-folder-open")
+        self.assertEqual(mod.order, 15)
+        self.assertEqual(mod.min_plan, "PRO")
+        self.assertTrue(mod.requires_credits)
+
+    def test_buyer_dashboard_layout_update_persists(self):
+        self.client.force_login(self.superadmin)
+        from apps.dashboard.models import BuyerDashboardLayout
+        layout = BuyerDashboardLayout.get_layout()
+
+        # Update layout to disable certain cards
+        data = {
+            "show_kpi_requirements": "1",
+            "show_kpi_suppliers_discovered": "1",
+            "show_quick_actions": "1",
+            "show_recent_searches": "1",
+            "show_top_suppliers": "1",
+            "show_subscription_widget": "1",
+        }
+        res = self.client.post(reverse("admin-panel-buyer-layout-update"), data)
+        self.assertEqual(res.status_code, 302)
+
+        layout.refresh_from_db()
+        self.assertTrue(layout.show_kpi_requirements)
+        self.assertFalse(layout.show_kpi_searches)
+        self.assertTrue(layout.show_kpi_suppliers_discovered)
+        self.assertFalse(layout.show_kpi_credits)
+        self.assertFalse(layout.show_recent_activity)
+
+    def test_layout_settings_dynamically_hide_dashboard_cards(self):
+        from apps.dashboard.models import BuyerDashboardLayout
+        layout = BuyerDashboardLayout.get_layout()
+        layout.show_kpi_searches = False
+        layout.show_recent_activity = False
+        layout.save()
+
+        # Login as buyer admin and view dashboard
+        self.client.force_login(self.buyer_admin)
+        session = self.client.session
+        session["active_company_id"] = self.buyer_company.id
+        session.save()
+
+        res = self.client.get(reverse("dashboard"))
+        self.assertEqual(res.status_code, 200)
+        self.assertNotContains(res, "Total Searches")
+        self.assertNotContains(res, "Recent Activity")
+        self.assertContains(res, "Active Requirements")
+
+    def test_module_disabled_removes_it_from_sidebar_and_rbac(self):
+        from apps.dashboard.models import BuyerModuleConfig
+        from apps.companies.rbac import get_user_rbac_context
+
+        mod = BuyerModuleConfig.objects.get(module_key="price_comparison")
+        mod.is_enabled = False
+        mod.save()
+
+        # Verify RBAC context has price_comparison excluded
+        rbac = get_user_rbac_context(self.buyer_admin, company_id=self.buyer_company.id)
+        self.assertNotIn("price_comparison", rbac["active_buyer_keys"])
+        self.assertFalse(any(m["key"] == "price_comparison" for m in rbac["buyer_modules"]))
+
+        # Verify it doesn't appear in rendered sidebar
+        self.client.force_login(self.buyer_admin)
+        session = self.client.session
+        session["active_company_id"] = self.buyer_company.id
+        session.save()
+
+        res = self.client.get(reverse("dashboard"))
+        self.assertEqual(res.status_code, 200)
+        self.assertNotContains(res, reverse("price-comparison"))
+
+    def test_genuine_database_statistics_no_fake_numbers(self):
+        from apps.dashboard.views import get_dashboard_data_for_company
+
+        empty_company = Company.objects.create(
+            name="Empty Tenant Ltd",
+            company_type=Company.CompanyType.BUYER,
+            created_by=self.superadmin,
+        )
+        data = get_dashboard_data_for_company(empty_company)
+
+        self.assertEqual(data["metrics"]["total_searches"], 0)
+        self.assertEqual(data["metrics"]["found_suppliers"], 0)
+        self.assertEqual(data["metrics"]["active_leads"], 0)
+        self.assertEqual(data["metrics"]["total_requirements"], 0)
+        self.assertEqual(data["metrics"]["saved_suppliers"], 0)
+        self.assertEqual(data["metrics"]["inquiries_sent"], 0)
+        self.assertEqual(data["recent_searches"], [])
+        self.assertEqual(data["top_suppliers"], [])
+
+
 
 
 

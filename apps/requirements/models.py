@@ -84,3 +84,43 @@ class Requirement(models.Model):
         self.is_deleted = False
         self.deleted_at = None
         self.save(update_fields=["is_deleted", "deleted_at"])
+
+    @property
+    def name(self):
+        return self.item_name
+
+    @name.setter
+    def name(self, value):
+        self.item_name = value
+
+    @property
+    def moq(self):
+        return self.quantity
+
+    @moq.setter
+    def moq(self, value):
+        self.quantity = value
+
+    @property
+    def minimum_order_quantity(self):
+        return self.quantity
+
+    @minimum_order_quantity.setter
+    def minimum_order_quantity(self, value):
+        self.quantity = value
+
+    @property
+    def price(self):
+        return self.target_price
+
+    @price.setter
+    def price(self, value):
+        self.target_price = value
+
+    @property
+    def price_min(self):
+        return self.target_price
+
+    @price_min.setter
+    def price_min(self, value):
+        self.target_price = value

@@ -80,7 +80,7 @@ def _process_buyer_candidate(cand: dict, product: Product, matching_parameters: 
     return cand, scraped, fit
 
 
-def _process_supplier_candidate(cand: dict, requirement: Requirement) -> tuple[dict, dict, dict]:
+def _process_supplier_candidate(cand: dict, requirement: Requirement, matching_parameters: list | None = None) -> tuple[dict, dict, dict]:
     """Scrapes supplier (with cache check) and runs AI fit evaluation in parallel worker thread."""
     scraped = _get_or_scrape_company(cand)
     fit = AIMatcher.evaluate_fit(
@@ -90,6 +90,7 @@ def _process_supplier_candidate(cand: dict, requirement: Requirement) -> tuple[d
         target_price=requirement.target_price,
         currency=requirement.currency or "INR",
         job_type="find_suppliers",
+        matching_parameters=matching_parameters,
     )
     return cand, scraped, fit
 
@@ -303,12 +304,13 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
     return job
 
 
-def run_find_suppliers_search(requirement: Requirement, user, company) -> SearchJob:
+def run_find_suppliers_search(requirement: Requirement, user, company, criteria_override: list | None = None) -> SearchJob:
     """
     High-Performance Find Suppliers Pipeline (Parallel Concurrency):
     1. Formulates search query based on requirement item name, specs, and destination.
     2. Runs WebSearchProvider to retrieve candidate verified manufacturers & exporters.
-    3. Crawls websites AND evaluates Gemini AI matches concurrently via ThreadPoolExecutor.
+    3. Crawls websites AND evaluates Gemini AI matches concurrently via ThreadPoolExecutor
+       applying the company's active dynamic Matching Parameters or custom criteria override.
     4. Saves/updates ExternalCompany and SearchResult (type SUPPLIER) in MySQL.
     """
     category_name = requirement.category.name if requirement.category else ""
@@ -350,6 +352,13 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
     )
 
     try:
+        # Load active matching criteria for this company or use criteria_override
+        if criteria_override is not None:
+            active_params = criteria_override
+        else:
+            matching_params = ensure_default_parameters_for_company(company)
+            active_params = [p for p in matching_params if p.is_active]
+
         search_provider = WebSearchProvider(timeout=3.5)
         candidates = search_provider.search(query, num_results=6)
         job.progress_percent = 40
@@ -360,7 +369,7 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
         max_workers = min(len(candidates), 6) if candidates else 1
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_cand = {
-                executor.submit(_process_supplier_candidate, cand, requirement): cand
+                executor.submit(_process_supplier_candidate, cand, requirement, active_params): cand
                 for cand in candidates
             }
             for future in as_completed(future_to_cand):
@@ -381,6 +390,11 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
                 continue
             seen_ext_company_ids.add(ext_company.id)
 
+            combined_raw = {
+                **scraped,
+                "matched_parameters": fit.get("matched_parameters", []),
+            }
+
             SearchResult.objects.create(
                 search_job=job,
                 external_company=ext_company,
@@ -396,7 +410,7 @@ def run_find_suppliers_search(requirement: Requirement, user, company) -> Search
                 match_reason=fit.get("match_reason", ""),
                 need_signal=fit.get("need_signal", ""),
                 source_url=cand.get("url", "")[:500],
-                raw_data=scraped,
+                raw_data=combined_raw,
             )
             saved_results += 1
 

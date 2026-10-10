@@ -17,75 +17,120 @@
     </div>
   </div>
 
-  <!-- 1. TOP 4 METRICS CARDS -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+  <!-- 1. TOP METRICS CARDS (Super Admin Governed) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
     
-    <!-- Total Searches -->
+    {% if layout.show_kpi_searches %}
+    <!-- Total Searches Card -->
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
       <div class="space-y-2">
         <span class="text-xs font-semibold text-slate-500 tracking-wide">Total Searches</span>
         <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.total_searches }}</div>
         <div class="flex items-center text-xs text-slate-500 font-medium">
           <span class="text-emerald-600 font-bold mr-1.5 flex items-center">
-            <i class="fa-solid fa-arrow-up text-[10px] mr-1"></i> 12%
+            <i class="fa-solid fa-arrows-rotate text-[10px] mr-1"></i> Sync
           </span>
-          <span>vs last 30 days</span>
+          <span>{{ metrics.total_searches_trend }}</span>
         </div>
       </div>
       <div class="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
         <i class="fa-solid fa-magnifying-glass text-lg"></i>
       </div>
     </div>
+    {% endif %}
 
-    <!-- Found Suppliers / Products -->
+    {% if layout.show_kpi_suppliers_discovered %}
+    <!-- Found Suppliers / Products Card -->
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
       <div class="space-y-2">
         <span class="text-xs font-semibold text-slate-500 tracking-wide">
-          {% if rbac.is_seller_only %}Products Catalog{% else %}Found Suppliers{% endif %}
+          {% if rbac.is_seller_only %}Products Catalog{% else %}Discovered Suppliers{% endif %}
         </span>
         <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.found_suppliers }}</div>
         <div class="flex items-center text-xs text-slate-500 font-medium">
           <span class="text-emerald-600 font-bold mr-1.5 flex items-center">
-            <i class="fa-solid fa-arrow-up text-[10px] mr-1"></i> 18%
+            <i class="fa-solid fa-check-double text-[10px] mr-1"></i>
           </span>
-          <span>vs last 30 days</span>
+          <span>{{ metrics.found_suppliers_trend }}</span>
         </div>
       </div>
       <div class="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 shrink-0">
         <i class="fa-solid {% if rbac.is_seller_only %}fa-box-open{% else %}fa-users{% endif %} text-lg"></i>
       </div>
     </div>
+    {% endif %}
 
-    <!-- Active Leads / Requirements -->
+    {% if layout.show_kpi_requirements %}
+    <!-- Active Requirements Card -->
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
       <div class="space-y-2">
         <span class="text-xs font-semibold text-slate-500 tracking-wide">
-          {% if rbac.is_buyer_only %}Active Requirements{% else %}Active Leads{% endif %}
+          {% if rbac.is_seller_only %}Active Catalog Leads{% else %}Active Requirements{% endif %}
         </span>
         <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.active_leads }}</div>
         <div class="flex items-center text-xs text-slate-500 font-medium">
-          <span class="text-emerald-600 font-bold mr-1.5 flex items-center">
-            <i class="fa-solid fa-arrow-up text-[10px] mr-1"></i> 22%
+          <span class="text-purple-600 font-bold mr-1.5 flex items-center">
+            <i class="fa-solid fa-list-check text-[10px] mr-1"></i>
           </span>
-          <span>vs last 30 days</span>
+          <span>{{ metrics.active_leads_trend }}</span>
         </div>
       </div>
       <div class="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
-        <i class="fa-solid {% if rbac.is_buyer_only %}fa-clipboard-list{% else %}fa-user-group{% endif %} text-lg"></i>
+        <i class="fa-solid {% if rbac.is_seller_only %}fa-boxes-stacked{% else %}fa-clipboard-list{% endif %} text-lg"></i>
       </div>
     </div>
+    {% endif %}
 
-    <!-- Credits Remaining -->
+    {% if layout.show_kpi_saved_suppliers and rbac.can_view_buyer %}
+    <!-- Saved Suppliers Pipeline Card -->
+    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
+      <div class="space-y-2">
+        <span class="text-xs font-semibold text-slate-500 tracking-wide">Saved Customers</span>
+        <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.saved_suppliers }}</div>
+        <div class="flex items-center text-xs text-slate-500 font-medium">
+          <span class="text-indigo-600 font-bold mr-1.5 flex items-center">
+            <i class="fa-solid fa-bookmark text-[10px] mr-1"></i>
+          </span>
+          <span>Shortlisted pipeline</span>
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 shrink-0">
+        <i class="fa-solid fa-bookmark text-lg"></i>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if layout.show_kpi_inquiries_sent and rbac.can_view_buyer %}
+    <!-- Inquiries Sent Card -->
+    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
+      <div class="space-y-2">
+        <span class="text-xs font-semibold text-slate-500 tracking-wide">Sent Inquiries / RFQs</span>
+        <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.inquiries_sent }}</div>
+        <div class="flex items-center text-xs text-slate-500 font-medium">
+          <span class="text-sky-600 font-bold mr-1.5 flex items-center">
+            <i class="fa-solid fa-paper-plane text-[10px] mr-1"></i>
+          </span>
+          <span>Active RFQs</span>
+        </div>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20 shrink-0">
+        <i class="fa-solid fa-paper-plane text-lg"></i>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if layout.show_kpi_credits %}
+    <!-- Credits Remaining Card -->
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between transition hover:shadow-md">
       <div class="flex items-start justify-between">
         <div class="space-y-1">
           <span class="text-xs font-semibold text-slate-500 tracking-wide">Credits Remaining</span>
           <div class="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {{ metrics.credits_remaining }} <span class="text-sm font-semibold text-slate-400">of {{ metrics.credits_total }}</span>
+            {{ metrics.credits_remaining }} <span class="text-xs font-semibold text-slate-400">/ {{ metrics.credits_total }}</span>
           </div>
         </div>
         <div class="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
-          <i class="fa-solid fa-layer-group text-lg"></i>
+          <i class="fa-solid fa-coins text-lg"></i>
         </div>
       </div>
       <div class="mt-4 flex items-center space-x-2">
@@ -95,10 +140,12 @@
         <span class="text-xs font-bold text-slate-600">{{ metrics.credits_used_percent }}%</span>
       </div>
     </div>
+    {% endif %}
 
   </div>
 
-  <!-- QUICK ACTIONS -->
+  <!-- QUICK ACTIONS (Super Admin Governed) -->
+  {% if layout.show_quick_actions %}
   <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
     <div class="flex items-center justify-between mb-3.5">
       <h2 class="text-sm font-bold text-slate-900 flex items-center">
@@ -117,7 +164,7 @@
 
       <a href="{% url 'find-suppliers' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
         <i class="fa-solid fa-wand-magic-sparkles mr-2 text-sm"></i>
-        <span>Find Suppliers (AI)</span>
+        <span>Find Customers (AI)</span>
       </a>
       {% endif %}
 
@@ -144,12 +191,15 @@
 
     </div>
   </div>
+  {% endif %}
 
-  <!-- 3. THIRD ROW: RECENT SEARCHES & RECENT ACTIVITY -->
+  <!-- 3. THIRD ROW: RECENT SEARCHES & RECENT ACTIVITY (Super Admin Governed) -->
+  {% if layout.show_recent_searches or layout.show_recent_activity %}
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
     
-    <!-- Recent Searches Table -->
-    <div class="lg:col-span-8 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+    {% if layout.show_recent_searches %}
+    <!-- Recent Searches Table Section -->
+    <div class="{% if layout.show_recent_activity %}lg:col-span-8{% else %}lg:col-span-12{% endif %} bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-sm font-bold text-slate-900">Recent Searches</h2>
         <a href="{% url 'requirements-list' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
@@ -158,6 +208,7 @@
       </div>
 
       <div class="overflow-x-auto">
+        {% if recent_searches %}
         <table class="w-full text-left text-xs">
           <thead>
             <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-semibold">
@@ -175,15 +226,7 @@
               <td class="py-3.5 pl-2 font-medium text-slate-400">{{ item.id }}</td>
               <td class="py-3.5 font-semibold text-slate-800 flex items-center">
                 <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-2.5 shrink-0 text-xs">
-                  {% if item.icon == 'cart' %}
-                    <i class="fa-solid fa-cart-shopping"></i>
-                  {% elif item.icon == 'gear' %}
-                    <i class="fa-solid fa-gear"></i>
-                  {% elif item.icon == 'chair' %}
-                    <i class="fa-solid fa-couch"></i>
-                  {% else %}
-                    <i class="fa-solid fa-box"></i>
-                  {% endif %}
+                  <i class="fa-solid fa-magnifying-glass"></i>
                 </span>
                 <span>{{ item.item }}</span>
               </td>
@@ -199,61 +242,68 @@
             {% endfor %}
           </tbody>
         </table>
+        {% else %}
+        <div class="py-10 text-center text-slate-400 text-xs">
+          <i class="fa-solid fa-magnifying-glass text-3xl mb-2 text-slate-300"></i>
+          <p class="font-medium text-slate-600">No searches executed yet</p>
+          <p class="text-slate-400 mt-0.5">Use "Find Customers (AI)" to discover verified business contacts.</p>
+        </div>
+        {% endif %}
       </div>
     </div>
+    {% endif %}
 
-    <!-- Recent Activity Timeline -->
-    <div class="lg:col-span-4 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+    {% if layout.show_recent_activity %}
+    <!-- Recent Activity Timeline Section -->
+    <div class="{% if layout.show_recent_searches %}lg:col-span-4{% else %}lg:col-span-12{% endif %} bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-sm font-bold text-slate-900">Recent Activity</h2>
-        <a href="#" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
-          View all <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
-        </a>
+        <span class="text-[11px] text-slate-400">Live system events</span>
       </div>
 
       <div class="space-y-4 flex-1">
-        {% for act in recent_activities %}
-        <div class="flex items-start space-x-3">
-          <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs mt-0.5
-            {% if act.color == 'green' %}bg-emerald-100 text-emerald-600
-            {% elif act.color == 'blue' %}bg-blue-100 text-blue-600
-            {% elif act.color == 'orange' %}bg-amber-100 text-amber-600
-            {% elif act.color == 'purple' %}bg-purple-100 text-purple-600
-            {% else %}bg-slate-100 text-slate-600{% endif %}">
-            {% if act.icon_type == 'building' %}
-              <i class="fa-solid fa-building"></i>
-            {% elif act.icon_type == 'users' %}
-              <i class="fa-solid fa-user-check"></i>
-            {% elif act.icon_type == 'file-text' %}
-              <i class="fa-solid fa-file-circle-check"></i>
-            {% elif act.icon_type == 'user-plus' %}
-              <i class="fa-solid fa-user-plus"></i>
-            {% elif act.icon_type == 'credit-card' %}
-              <i class="fa-solid fa-shield-check"></i>
-            {% else %}
-              <i class="fa-solid fa-bell"></i>
-            {% endif %}
+        {% if recent_activities %}
+          {% for act in recent_activities %}
+          <div class="flex items-start space-x-3">
+            <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs mt-0.5
+              {% if act.color == 'green' or act.color == 'emerald' %}bg-emerald-100 text-emerald-600
+              {% elif act.color == 'blue' %}bg-blue-100 text-blue-600
+              {% elif act.color == 'orange' or act.color == 'amber' %}bg-amber-100 text-amber-600
+              {% elif act.color == 'purple' %}bg-purple-100 text-purple-600
+              {% else %}bg-slate-100 text-slate-600{% endif %}">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs font-semibold text-slate-800 leading-snug">{{ act.title }}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">{{ act.time_ago }}</div>
+            </div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-semibold text-slate-800 leading-snug">{{ act.title }}</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">{{ act.time_ago }}</div>
+          {% endfor %}
+        {% else %}
+          <div class="py-8 text-center text-slate-400 text-xs">
+            <i class="fa-solid fa-clock-rotate-left text-2xl mb-1.5 text-slate-300"></i>
+            <p class="font-medium text-slate-600">No recent activities recorded</p>
+            <p class="text-slate-400 mt-0.5">Actions will be tracked here in real-time.</p>
           </div>
-        </div>
-        {% endfor %}
+        {% endif %}
       </div>
     </div>
+    {% endif %}
 
   </div>
+  {% endif %}
 
-  <!-- 4. FOURTH ROW: TOP SUPPLIERS, SUBSCRIPTION & CREDITS -->
+  <!-- 4. FOURTH ROW: TOP SUPPLIERS, SUBSCRIPTION & CREDITS (Super Admin Governed) -->
+  {% if layout.show_top_suppliers or layout.show_subscription_widget %}
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
     
     <!-- Top Suppliers (Based on Recent Searches) -->
-    <div class="lg:col-span-8 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
+    {% if layout.show_top_suppliers %}
+    <div class="{% if layout.show_subscription_widget %}lg:col-span-8{% else %}lg:col-span-12{% endif %} bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h2 class="text-sm font-bold text-slate-900">Top Suppliers</h2>
-          <span class="text-[11px] text-slate-400">(Based on Recent Searches)</span>
+          <h2 class="text-sm font-bold text-slate-900">Top Discovered Suppliers</h2>
+          <span class="text-[11px] text-slate-400">(Ranked by AI Match Score)</span>
         </div>
         <a href="{% url 'saved-suppliers' %}" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
           View all <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
@@ -261,6 +311,7 @@
       </div>
 
       <div class="overflow-x-auto flex-1">
+        {% if top_suppliers %}
         <table class="w-full text-left text-xs">
           <thead>
             <tr class="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-semibold">
@@ -276,15 +327,7 @@
               <td class="py-2.5 pl-2 font-medium text-slate-400">{{ sup.id }}</td>
               <td class="py-2.5 font-semibold text-slate-800 flex items-center">
                 <span class="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center mr-2 shrink-0 text-xs">
-                  {% if sup.icon == 'globe' %}
-                    <i class="fa-solid fa-globe"></i>
-                  {% elif sup.icon == 'building' %}
-                    <i class="fa-solid fa-building"></i>
-                  {% elif sup.icon == 'chip' %}
-                    <i class="fa-solid fa-microchip"></i>
-                  {% else %}
-                    <i class="fa-solid fa-gear"></i>
-                  {% endif %}
+                  <i class="fa-solid fa-building"></i>
                 </span>
                 <span class="truncate">{{ sup.name }}</span>
               </td>
@@ -299,11 +342,20 @@
             {% endfor %}
           </tbody>
         </table>
+        {% else %}
+        <div class="py-10 text-center text-slate-400 text-xs">
+          <i class="fa-solid fa-building text-3xl mb-2 text-slate-300"></i>
+          <p class="font-medium text-slate-600">No discovered suppliers yet</p>
+          <p class="text-slate-400 mt-0.5">Run a search to discover verified suppliers with match scores.</p>
+        </div>
+        {% endif %}
       </div>
     </div>
+    {% endif %}
 
     <!-- Subscription & Credits -->
-    <div class="lg:col-span-4 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+    {% if layout.show_subscription_widget %}
+    <div class="{% if layout.show_top_suppliers %}lg:col-span-4{% else %}lg:col-span-12{% endif %} bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
       <div>
         <h2 class="text-sm font-bold text-slate-900 mb-3">Subscription & Credits</h2>
         
@@ -318,38 +370,33 @@
           </div>
           <div>
             <div class="flex items-center text-xs font-bold text-amber-600">
-              <i class="fa-solid fa-crown mr-1 text-amber-500"></i> Pro Plan
+              <i class="fa-solid fa-crown mr-1 text-amber-500"></i> {{ subscription.plan_name }}
             </div>
-            <div class="text-[11px] text-slate-400 mt-0.5">Next Billing</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">Next Billing / Expiry</div>
             <div class="text-xs font-semibold text-slate-800">{{ subscription.next_billing }}</div>
           </div>
         </div>
 
-        <!-- Upgrade Button -->
+        <!-- Upgrade / Top-up Button -->
         <a href="{% url 'subscription-billing-web' %}" class="w-full text-center block bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2 px-3 rounded-lg transition shadow-sm mb-4">
-          Upgrade Plan
+          Manage Subscription & Credits
         </a>
 
         <!-- Plan Features List -->
         <div class="space-y-1.5 text-xs text-slate-600">
           <div class="font-bold text-slate-700 text-[11px] uppercase tracking-wider mb-1">Plan Features</div>
+          {% for feat in subscription.features %}
           <div class="flex items-center text-slate-600">
-            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Advanced AI Search
+            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> {{ feat }}
           </div>
-          <div class="flex items-center text-slate-600">
-            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Global Suppliers Access
-          </div>
-          <div class="flex items-center text-slate-600">
-            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Export Reports
-          </div>
-          <div class="flex items-center text-slate-600">
-            <i class="fa-solid fa-check text-emerald-600 text-xs mr-2"></i> Priority Support
-          </div>
+          {% endfor %}
         </div>
       </div>
     </div>
+    {% endif %}
 
   </div>
+  {% endif %}
 
 </div>
 {% endblock %}

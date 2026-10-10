@@ -80,21 +80,33 @@
             <i class="fa-solid fa-cart-shopping text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
+            {% if rbac.buyer_modules %}
+              {% for mod in rbac.buyer_modules %}
+                {% if mod.key != 'subscription_credits' and mod.key != 'invoices_billing' and mod.key != 'help_support' %}
+                <a href="{% url mod.url_name %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.resolver_match.url_name == mod.url_name %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                  <span class="flex items-center">
+                    <i class="fa-solid {{ mod.icon }} w-5 text-center mr-2.5 text-xs"></i> {{ mod.name }}
+                  </span>
+                  <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+                </a>
+                {% endif %}
+              {% endfor %}
+            {% else %}
             <a href="{% url 'requirements-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/requirements/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-clipboard-list w-5 text-center mr-2.5 text-xs"></i> My Requirements
+                <i class="fa-solid fa-clipboard-list w-5 text-center mr-2.5 text-xs"></i> Sourcing Requirements
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             <a href="{% url 'find-suppliers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/find-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-magnifying-glass-chart w-5 text-center mr-2.5 text-xs"></i> Find Suppliers
+                <i class="fa-solid fa-magnifying-glass-chart w-5 text-center mr-2.5 text-xs"></i> Find Customers
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
             <a href="{% url 'saved-suppliers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/saved-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Saved Suppliers
+                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Saved Customers
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -116,6 +128,7 @@
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
+            {% endif %}
           </div>
         </div>
         {% endif %}
@@ -191,19 +204,23 @@
             </a>
             {% endif %}
 
+            {% if 'subscription_credits' in rbac.active_buyer_keys or rbac.is_seller_only or rbac.is_super_admin %}
             <a href="{% url 'subscription-billing-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/billing/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-coins w-5 text-center mr-2.5 text-xs text-amber-400"></i> Subscription &amp; Credits
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
+            {% endif %}
 
+            {% if 'invoices_billing' in rbac.active_buyer_keys or rbac.is_seller_only or rbac.is_super_admin %}
             <a href="{% url 'company-invoices' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/invoices/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-file-invoice-dollar w-5 text-center mr-2.5 text-xs text-emerald-400"></i> Invoices &amp; Billing
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
+            {% endif %}
           </div>
         </div>
         {% endif %}
@@ -219,6 +236,12 @@
             <a href="{% url 'admin-panel-dashboard' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-solid fa-chart-line w-5 text-center mr-2.5 text-xs text-red-400"></i> Dashboard
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
+            <a href="{% url 'admin-panel-buyer-dashboard' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if '/admin-panel/buyer-dashboard/' in request.path %}bg-red-600/20 text-red-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-cart-shopping w-5 text-center mr-2.5 text-xs text-cyan-400"></i> Buyer Dashboard Mgmt
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
