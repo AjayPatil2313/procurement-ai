@@ -1,0 +1,289 @@
+<!-- ======================================================== -->
+<!-- MODERN AI SEARCH PROGRESS LOADER MODAL -->
+<!-- ======================================================== -->
+<div 
+  id="ai_search_modern_modal" 
+  class="fixed inset-0 z-[9999] hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md transition-all duration-300"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modern_loader_headline"
+>
+  <style>
+    @keyframes ai-spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes ai-spin-reverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    @keyframes ai-pulse-glow {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+    .ai-spin-slow {
+      animation: ai-spin-slow 10s linear infinite;
+    }
+    .ai-spin-mid {
+      animation: ai-spin-slow 2.8s linear infinite;
+    }
+    .ai-spin-reverse {
+      animation: ai-spin-reverse 5s linear infinite;
+    }
+    .ai-pulse-glow {
+      animation: ai-pulse-glow 2s ease-in-out infinite;
+    }
+  </style>
+
+  <div class="relative w-full max-w-lg bg-white/95 rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden p-6 sm:p-8 text-center animate-in fade-in zoom-in-95 duration-200">
+    
+    <!-- Ambient Gradient Glow -->
+    {% if loader_color == 'orange' %}
+    <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-72 h-72 bg-gradient-to-tr from-orange-500/25 via-amber-500/20 to-rose-500/25 rounded-full blur-3xl pointer-events-none"></div>
+    {% else %}
+    <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-72 h-72 bg-gradient-to-tr from-blue-600/25 via-indigo-500/20 to-cyan-400/25 rounded-full blur-3xl pointer-events-none"></div>
+    {% endif %}
+
+    <!-- Central Futuristic AI Radar / Spinner Orb -->
+    <div class="relative w-24 h-24 mx-auto mb-5 flex items-center justify-center">
+      <!-- Outer dashed ring -->
+      <div class="absolute inset-0 rounded-full border-2 border-dashed {% if loader_color == 'orange' %}border-orange-400/60{% else %}border-blue-400/60{% endif %} ai-spin-slow"></div>
+      <!-- Middle gradient spinning ring -->
+      <div class="absolute inset-2 rounded-full border-2 {% if loader_color == 'orange' %}border-t-orange-500 border-r-amber-400{% else %}border-t-blue-600 border-r-cyan-400{% endif %} border-b-transparent border-l-transparent ai-spin-mid"></div>
+      <!-- Inner counter-spinning dashed ring -->
+      <div class="absolute inset-4 rounded-full border border-dashed {% if loader_color == 'orange' %}border-amber-300/80{% else %}border-cyan-300/80{% endif %} ai-spin-reverse"></div>
+      <!-- Core Pulsating Orb -->
+      <div class="relative w-14 h-14 rounded-2xl {% if loader_color == 'orange' %}bg-gradient-to-tr from-orange-500 to-amber-500 shadow-orange-500/30{% else %}bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-blue-500/30{% endif %} text-white flex items-center justify-center text-xl shadow-lg ai-pulse-glow">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+      </div>
+      <!-- Live Ping Indicator -->
+      <span class="absolute top-0.5 right-1 flex h-3.5 w-3.5">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full {% if loader_color == 'orange' %}bg-orange-400{% else %}bg-blue-400{% endif %} opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3.5 w-3.5 {% if loader_color == 'orange' %}bg-orange-500{% else %}bg-blue-600{% endif %}"></span>
+      </span>
+    </div>
+
+    <!-- Active Engine Badge -->
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full {% if loader_color == 'orange' %}bg-orange-100 text-orange-800 border border-orange-200/80{% else %}bg-blue-100 text-blue-800 border border-blue-200/80{% endif %} text-[11px] font-extrabold uppercase tracking-wider mb-2">
+      <span class="w-2 h-2 rounded-full {% if loader_color == 'orange' %}bg-orange-500{% else %}bg-blue-600{% endif %} animate-ping"></span>
+      <span id="modern_loader_badge_text">{% if loader_type == 'vendor' %}AI Vendor Discovery Active{% else %}AI Customer Discovery Active{% endif %}</span>
+    </div>
+
+    <!-- Main Headline -->
+    <h3 class="text-xl font-black text-slate-900 tracking-tight" id="modern_loader_headline">
+      {% if loader_type == 'vendor' %}Searching &amp; Evaluating Vendors...{% else %}Searching &amp; Evaluating Customers...{% endif %}
+    </h3>
+
+    <!-- Target Item & Criteria Pill -->
+    <div class="flex items-center justify-center flex-wrap gap-2 my-3">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
+        <i class="fa-solid {% if loader_color == 'orange' %}fa-box text-orange-500{% else %}fa-cart-shopping text-blue-600{% endif %} text-[11px]"></i>
+        <span id="modern_loader_target_name" class="truncate max-w-[220px]">Selected Target</span>
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl {% if loader_color == 'orange' %}bg-orange-50 text-orange-700 border border-orange-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %} text-xs font-bold">
+        <i class="fa-solid fa-sliders text-[11px] {% if loader_color == 'orange' %}text-orange-600{% else %}text-blue-600{% endif %}"></i>
+        <span id="modern_loader_criteria_count">0 Criteria Applied</span>
+      </span>
+    </div>
+
+    <!-- Dynamic Status Message with Fading Animation -->
+    <div class="h-10 flex items-center justify-center my-2.5 px-2">
+      <p id="modern_loader_status_msg" class="text-xs font-semibold text-slate-600 transition-opacity duration-200">
+        Synthesizing search parameters &amp; generating AI discovery vectors...
+      </p>
+    </div>
+
+    <!-- Animated Progress Bar -->
+    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mb-2 relative p-0.5 border border-slate-200/80">
+      <div 
+        id="modern_loader_progress_bar" 
+        class="h-full rounded-full {% if loader_color == 'orange' %}bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600{% else %}bg-gradient-to-r from-blue-600 via-cyan-400 to-indigo-600{% endif %} transition-all duration-700 ease-out" 
+        style="width: 15%"
+      ></div>
+    </div>
+    <div class="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1 mb-4">
+      <span id="modern_loader_step_label">Step 1 of 4: Query Vectors</span>
+      <span id="modern_loader_progress_pct" class="{% if loader_color == 'orange' %}text-orange-600{% else %}text-blue-600{% endif %} font-extrabold">15%</span>
+    </div>
+
+    <!-- 4-Stage Multi-Step Pipeline Indicator Cards -->
+    <div class="grid grid-cols-4 gap-1.5 pt-3 border-t border-slate-100 text-left">
+      <div id="ml_step_1" class="p-2 rounded-xl {% if loader_color == 'orange' %}bg-orange-50 border border-orange-300{% else %}bg-blue-50 border border-blue-300{% endif %} transition-all">
+        <div class="flex items-center justify-between text-[10px] font-extrabold {% if loader_color == 'orange' %}text-orange-950{% else %}text-blue-950{% endif %} mb-0.5">
+          <span>1. Query</span>
+          <i class="fa-solid fa-spinner fa-spin {% if loader_color == 'orange' %}text-orange-600{% else %}text-blue-600{% endif %} step-icon text-[10px]"></i>
+        </div>
+        <p class="text-[9px] {% if loader_color == 'orange' %}text-orange-700/80{% else %}text-blue-700/80{% endif %} leading-tight">AI Vectors</p>
+      </div>
+
+      <div id="ml_step_2" class="p-2 rounded-xl bg-slate-50 border border-slate-200 opacity-60 transition-all">
+        <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-700 mb-0.5">
+          <span>2. Scrape</span>
+          <i class="fa-regular fa-circle text-slate-400 step-icon text-[10px]"></i>
+        </div>
+        <p class="text-[9px] text-slate-400 leading-tight">Live Web</p>
+      </div>
+
+      <div id="ml_step_3" class="p-2 rounded-xl bg-slate-50 border border-slate-200 opacity-60 transition-all">
+        <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-700 mb-0.5">
+          <span>3. Match</span>
+          <i class="fa-regular fa-circle text-slate-400 step-icon text-[10px]"></i>
+        </div>
+        <p class="text-[9px] text-slate-400 leading-tight">Criteria Fit</p>
+      </div>
+
+      <div id="ml_step_4" class="p-2 rounded-xl bg-slate-50 border border-slate-200 opacity-60 transition-all">
+        <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-700 mb-0.5">
+          <span>4. Score</span>
+          <i class="fa-regular fa-circle text-slate-400 step-icon text-[10px]"></i>
+        </div>
+        <p class="text-[9px] text-slate-400 leading-tight">Results</p>
+      </div>
+    </div>
+
+    <!-- Reassuring Bottom Notice -->
+    <p class="text-[10px] text-slate-400 mt-4 leading-normal flex items-center justify-center gap-1.5">
+      <i class="fa-solid fa-clock-rotate-left text-slate-400 text-[10px]"></i>
+      <span>Deep web search &amp; AI evaluation takes ~5–10 seconds. Results will appear automatically.</span>
+    </p>
+  </div>
+</div>
+
+<script>
+window.triggerAiSearchModernLoader = function(options = {}) {
+  const modal = document.getElementById('ai_search_modern_modal');
+  if (!modal) return;
+
+  const targetName = options.targetName || 'Selected Item';
+  const criteriaCount = options.criteriaCount || '0 Active';
+  const mode = options.type || '{{ loader_type|default:"vendor" }}';
+  const theme = '{{ loader_color|default:"orange" }}';
+
+  const targetEl = document.getElementById('modern_loader_target_name');
+  if (targetEl) targetEl.textContent = targetName;
+
+  const criteriaEl = document.getElementById('modern_loader_criteria_count');
+  if (criteriaEl) {
+    criteriaEl.textContent = String(criteriaCount).includes('Criteria') 
+      ? criteriaCount 
+      : `${criteriaCount} Criteria Applied`;
+  }
+
+  // Display modal
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  try {
+    document.body.style.overflow = 'hidden';
+  } catch (e) {}
+
+  const progressBar = document.getElementById('modern_loader_progress_bar');
+  const progressPct = document.getElementById('modern_loader_progress_pct');
+  const stepLabel = document.getElementById('modern_loader_step_label');
+  const statusMsg = document.getElementById('modern_loader_status_msg');
+
+  const step1 = document.getElementById('ml_step_1');
+  const step2 = document.getElementById('ml_step_2');
+  const step3 = document.getElementById('ml_step_3');
+  const step4 = document.getElementById('ml_step_4');
+  const stepEls = [step1, step2, step3, step4];
+
+  const vendorSteps = [
+    {
+      pct: 18,
+      label: 'Step 1 of 4: AI Query Vectors',
+      msg: 'Synthesizing product specifications & generating targeted AI discovery queries...'
+    },
+    {
+      pct: 44,
+      label: 'Step 2 of 4: Live Web Scraping',
+      msg: 'Scanning commercial B2B registries & scraping candidate company websites...'
+    },
+    {
+      pct: 72,
+      label: 'Step 3 of 4: Criteria Fit Matching',
+      msg: 'Evaluating technical fit, MOQs, contact details & pricing against applied criteria...'
+    },
+    {
+      pct: 94,
+      label: 'Step 4 of 4: Finalizing & Scoring',
+      msg: 'Calculating fit scores, verifying contact details & compiling match cards...'
+    }
+  ];
+
+  const supplierSteps = [
+    {
+      pct: 18,
+      label: 'Step 1 of 4: AI Query Vectors',
+      msg: 'Analyzing procurement requirements & generating deep supplier discovery queries...'
+    },
+    {
+      pct: 44,
+      label: 'Step 2 of 4: Live Web Scraping',
+      msg: 'Querying manufacturer registries & scraping verified supplier sites...'
+    },
+    {
+      pct: 72,
+      label: 'Step 3 of 4: Criteria Fit Matching',
+      msg: 'Extracting verified contact info, factory specs & matching against criteria...'
+    },
+    {
+      pct: 94,
+      label: 'Step 4 of 4: Finalizing & Scoring',
+      msg: 'Ranking compatibility scores & preparing verified customer/supplier dossier...'
+    }
+  ];
+
+  const stepsList = mode === 'supplier' ? supplierSteps : vendorSteps;
+
+  function setStep(idx) {
+    const s = stepsList[idx];
+    if (!s) return;
+
+    if (progressBar) progressBar.style.width = s.pct + '%';
+    if (progressPct) progressPct.textContent = s.pct + '%';
+    if (stepLabel) stepLabel.textContent = s.label;
+
+    if (statusMsg) {
+      statusMsg.style.opacity = '0';
+      setTimeout(() => {
+        statusMsg.textContent = s.msg;
+        statusMsg.style.opacity = '1';
+      }, 150);
+    }
+
+    stepEls.forEach((el, i) => {
+      if (!el) return;
+      const icon = el.querySelector('.step-icon');
+      if (i < idx) {
+        // Complete
+        el.className = 'p-2 rounded-xl bg-emerald-50 border border-emerald-300 transition-all';
+        if (icon) icon.className = 'fa-solid fa-check text-emerald-600 step-icon text-[10px]';
+      } else if (i === idx) {
+        // Current active
+        if (theme === 'orange') {
+          el.className = 'p-2 rounded-xl bg-orange-50 border border-orange-300 transition-all shadow-xs';
+          if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-orange-600 step-icon text-[10px]';
+        } else {
+          el.className = 'p-2 rounded-xl bg-blue-50 border border-blue-300 transition-all shadow-xs';
+          if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-blue-600 step-icon text-[10px]';
+        }
+      } else {
+        // Pending
+        el.className = 'p-2 rounded-xl bg-slate-50 border border-slate-200 opacity-60 transition-all';
+        if (icon) icon.className = 'fa-regular fa-circle text-slate-400 step-icon text-[10px]';
+      }
+    });
+  }
+
+  setStep(0);
+  let stepIdx = 0;
+  const timer = setInterval(() => {
+    stepIdx++;
+    if (stepIdx < stepsList.length) {
+      setStep(stepIdx);
+    } else {
+      clearInterval(timer);
+    }
+  }, 2200);
+};
+</script>

@@ -197,6 +197,19 @@ class SearchResult(models.Model):
             models.Index(fields=["search_job", "result_type", "-match_score"]),
         ]
 
+    @property
+    def company_name(self):
+        if self.external_company:
+            return self.external_company.name
+        return ""
+
+    @property
+    def location(self):
+        if self.external_company:
+            parts = [p for p in [self.external_company.city, self.external_company.country] if p]
+            return ", ".join(parts) if parts else "Global"
+        return "Global"
+
     def __str__(self):
         return f"{self.external_company.name} - {self.product_title} ({self.match_score}%)"
 

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}AI Providers & Infrastructure — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">AI Engines & Discovery Infrastructure</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Real-time status of LLM reasoning engines, web scrapers, and external B2B search APIs</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="flex items-center gap-2">
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Total Search Jobs:</span> <span class="font-bold text-slate-900">{{ total_search_jobs }}</span>
+      </div>
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Completed:</span> <span class="font-bold text-emerald-600">{{ completed_jobs }}</span>
+      </div>
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Total AI Calls:</span> <span class="font-bold text-indigo-600">{{ total_ai_usage }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Provider Cards Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for p in providers %}
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold {% if p.status == 'Operational' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% else %}bg-rose-50 text-rose-700 border border-rose-200{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full {% if p.status == 'Operational' %}bg-emerald-500{% else %}bg-rose-500{% endif %} mr-1.5 animate-pulse"></span>
+            {{ p.status }}
+          </span>
+          <div class="flex items-center gap-1.5">
+            {% if p.key_configured %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="API Key present in environment">
+                <i class="fa-solid fa-key text-[9px] mr-1"></i> Key Configured
+              </span>
+            {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title="Missing API Key in environment">
+                <i class="fa-solid fa-triangle-exclamation text-[9px] mr-1"></i> Key Missing
+              </span>
+            {% endif %}
+            {% if p.is_default %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <i class="fa-solid fa-star text-[9px] mr-1"></i> Default Active
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 mb-2">
+          <span class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0 text-sm font-bold">
+            {% if p.code == 'GEMINI' %}<i class="fa-solid fa-wand-magic-sparkles text-blue-600"></i>
+            {% elif p.code == 'OPENAI' %}<i class="fa-solid fa-robot text-emerald-600"></i>
+            {% elif p.code == 'SERPAPI' %}<i class="fa-solid fa-globe text-purple-600"></i>
+            {% elif p.code == 'TAVILY' %}<i class="fa-solid fa-magnifying-glass text-amber-600"></i>
+            {% else %}<i class="fa-solid fa-spider text-indigo-600"></i>{% endif %}
+          </span>
+          <div>
+            <h3 class="text-sm font-black text-slate-900 leading-tight">{{ p.name }}</h3>
+            <span class="text-[11px] text-slate-500 font-medium">{{ p.type }}</span>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 mt-2 leading-relaxed">{{ p.description }}</p>
+      </div>
+
+      <div class="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
+        <span class="text-slate-400">Response Latency:</span>
+        <span class="font-mono font-bold text-slate-800 flex items-center gap-1">
+          <i class="fa-solid fa-gauge-high text-slate-400 text-[10px]"></i> {{ p.latency }}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Discovery Architecture Info Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    <div class="flex items-start gap-4">
+      <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0 text-blue-600 text-xl">
+        <i class="fa-solid fa-network-wired"></i>
+      </div>
+      <div class="space-y-3">
+        <h3 class="text-base font-black text-slate-900">Multi-Tier AI Partner Discovery Architecture</h3>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          When a buyer posts a requirement or a seller seeks buyers, the discovery pipeline executes across 4 sequential stages:
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <span class="text-[10px] font-bold text-blue-600 uppercase">Stage 1</span>
+            <div class="font-bold text-xs text-slate-900 mt-0.5">Semantic Querying</div>
+            <p class="text-[11px] text-slate-500 mt-1">Google Gemini parses requirements into specialized B2B keyword payloads.</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <span class="text-[10px] font-bold text-purple-600 uppercase">Stage 2</span>
+            <div class="font-bold text-xs text-slate-900 mt-0.5">Web Search & Discovery</div>
+            <p class="text-[11px] text-slate-500 mt-1">SerpAPI / Tavily indexes verified suppliers and corporate registrations.</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <span class="text-[10px] font-bold text-emerald-600 uppercase">Stage 3</span>
+            <div class="font-bold text-xs text-slate-900 mt-0.5">Headless Web Scraping</div>
+            <p class="text-[11px] text-slate-500 mt-1">HTML extraction extracts contact data, addresses, GSTIN, and emails.</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <span class="text-[10px] font-bold text-amber-600 uppercase">Stage 4</span>
+            <div class="font-bold text-xs text-slate-900 mt-0.5">AI Scoring & Ranking</div>
+            <p class="text-[11px] text-slate-500 mt-1">Computes 0-100% Match Scores, confidence metrics, and relevance tags.</p>
+          </div>
+        </div>
+
+        <div class="pt-2 flex items-center justify-between">
+          <a href="{% url 'admin-panel-search-activity' %}" class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700">
+            <span>Monitor Live Search Executions</span>
+            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1075,6 +1075,74 @@ def company_invoices_web_view(request):
 
 
 @login_required
+def company_credit_ledger_web_view(request):
+    """
+    Dedicated Company Credit Ledger Dashboard:
+    - Immutable credit ledger tracking allocations, purchases, feature deductions, and refunds.
+    - Transaction filtering by type (purchased, used, refunded, adjusted) and date range.
+    - Configurable pagination (default 10 items per page; options: 10, 25, 50, 100).
+    - Summary credit KPI cards: Usable Balance, Total Credits Added, Credits Consumed.
+    - Export certified CSV statements.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not company:
+        messages.error(request, "Please switch to an active company to access Credit Ledger.")
+        return redirect("dashboard")
+
+    wallet = CreditWalletService.get_or_create_wallet(company)
+    try:
+        subscription = company.subscription
+    except Exception:
+        subscription = Subscription.objects.filter(company=company).first()
+
+    tx_qs = CreditTransaction.objects.filter(company=company).select_related("user")
+    tx_type = request.GET.get("tx_type", "all").strip().lower()
+    date_range = request.GET.get("date_range", "all").strip().lower()
+
+    if tx_type != "all":
+        tx_qs = tx_qs.filter(transaction_type=tx_type)
+
+    if date_range == "7d":
+        tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=7))
+    elif date_range == "30d":
+        tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=30))
+    elif date_range == "90d":
+        tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=90))
+
+    try:
+        ledger_page_size = int(request.GET.get("ledger_limit", 10))
+        if ledger_page_size not in [10, 25, 50, 100]:
+            ledger_page_size = 10
+    except (ValueError, TypeError):
+        ledger_page_size = 10
+
+    ledger_paginator = Paginator(tx_qs.order_by("-created_at"), ledger_page_size)
+    ledger_page_num = request.GET.get("page", 1) or request.GET.get("ledger_page", 1)
+    ledger_page = ledger_paginator.get_page(ledger_page_num)
+
+    total_credits_inflow = CreditTransaction.objects.filter(company=company, credits__gt=0).aggregate(s=Sum("credits"))["s"] or 0
+    total_credits_consumed = CreditTransaction.objects.filter(company=company, credits__lt=0).aggregate(s=Sum("credits"))["s"] or 0
+    total_credits_consumed = abs(total_credits_consumed)
+
+    return render(request, "billing/credit_ledger.html", {
+        "company": company,
+        "subscription": subscription,
+        "wallet": wallet,
+        "ledger_page": ledger_page,
+        "ledger_limit": ledger_page_size,
+        "tx_type": tx_type,
+        "date_range": date_range,
+        "total_credits_inflow": total_credits_inflow,
+        "total_credits_consumed": total_credits_consumed,
+        "rbac": rbac,
+        "page_title": "Company Credit Ledger",
+    })
+
+
+@login_required
 def export_statement_csv_view(request):
     """
     Exports official bank-statement style CSV for company audit:
@@ -1259,8 +1327,8 @@ def seller_roles_web_view(request):
         messages.error(request, "No active company found.")
         return redirect("dashboard")
 
-    if not (rbac["is_company_admin"] or rbac["is_super_admin"] or rbac["can_view_seller"]):
-        messages.error(request, "Access restricted: Company administrator or seller permissions required.")
+    if not (rbac["is_company_admin"] or rbac["is_super_admin"] or rbac["can_view_seller"] or rbac["can_view_buyer"]):
+        messages.error(request, "Access restricted: Company administrator permissions required.")
         return redirect("dashboard")
 
     ensure_company_default_roles(company)

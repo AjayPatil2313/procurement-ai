@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Role Management & Responsibilities — AI Sales{% endblock %}
+{% block title %}Role Management & Responsibilities — Platform{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,7 +11,7 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Sales</a>
+        <a href="{% url 'company-team-web' %}" class="hover:text-blue-600 transition">Company</a>
         <span>&bull;</span>
         <span class="text-slate-600 font-semibold">Roles & Responsibilities</span>
       </div>
@@ -22,7 +22,7 @@
         <span>Role Management</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
-        Configure organizational sales roles and assign module-by-module permission matrix (Read, Write, Edit, Delete, Admin).
+        Configure organizational roles and assign module-by-module permission matrix (Read, Write, Edit, Delete, Admin).
       </p>
     </div>
 

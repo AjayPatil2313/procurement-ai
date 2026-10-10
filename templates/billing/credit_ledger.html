@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block title %}Company Credit Ledger — {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto">
+
+  <!-- ========================================================================= -->
+  <!-- TOP HEADER & CONTROLS BANNER                                              -->
+  <!-- ========================================================================= -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
+        <span>&bull;</span>
+        <a href="{% url 'subscription-billing-web' %}" class="hover:text-blue-600 transition">Subscription &amp; Credits</a>
+        <span>&bull;</span>
+        <span class="text-slate-600 font-semibold">Credit Ledger</span>
+      </div>
+      <div class="flex items-center gap-2 mb-1">
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Company Credit Ledger</h1>
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+          <i class="fa-solid fa-receipt text-[10px]"></i> Immutable Ledger
+        </span>
+      </div>
+      <p class="text-xs text-slate-500">
+        Itemized credit allocations, purchases, AI discovery deductions, and certified account ledger history.
+      </p>
+    </div>
+
+    <!-- Top Action Buttons -->
+    <div class="flex items-center gap-2.5 flex-wrap">
+      <a 
+        href="{% url 'subscription-billing-web' %}" 
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+      >
+        <i class="fa-solid fa-coins text-amber-500"></i>
+        <span>Manage Subscription &amp; Credits</span>
+      </a>
+
+      <a 
+        href="{% url 'company-invoices' %}" 
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+      >
+        <i class="fa-solid fa-file-invoice-dollar text-emerald-600"></i>
+        <span>View Tax Invoices</span>
+      </a>
+
+      <button 
+        type="button" 
+        onclick="openStatementExportModal()"
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm cursor-pointer"
+        title="Download certified bank-style account statement CSV with custom date range"
+      >
+        <i class="fa-solid fa-file-csv"></i>
+        <span>Download Statement</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 4 FINANCIAL / CREDIT KPI METRIC CARDS                                     -->
+  <!-- ========================================================================= -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- 1. Available Wallet Balance -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Usable Wallet Balance</span>
+        <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm border border-amber-100">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+      </div>
+      <div class="mt-2">
+        <div class="text-2xl font-black text-amber-600">{{ wallet.total_available }}</div>
+        <p class="text-[11px] text-slate-500 mt-1">Current usable search credits</p>
+      </div>
+    </div>
+
+    <!-- 2. Total Inflows (Purchases + Allocations) -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Credits Added</span>
+        <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-sm border border-blue-100">
+          <i class="fa-solid fa-arrow-down-left"></i>
+        </div>
+      </div>
+      <div class="mt-2">
+        <div class="text-2xl font-black text-blue-600">+{{ total_credits_inflow }}</div>
+        <p class="text-[11px] text-slate-500 mt-1">Subscription plans &amp; top-up packs</p>
+      </div>
+    </div>
+
+    <!-- 3. Total Credits Consumed -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Credits Consumed</span>
+        <div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-sm border border-rose-100">
+          <i class="fa-solid fa-arrow-up-right"></i>
+        </div>
+      </div>
+      <div class="mt-2">
+        <div class="text-2xl font-black text-rose-600">-{{ total_credits_consumed }}</div>
+        <p class="text-[11px] text-slate-500 mt-1">AI search, extraction &amp; matching jobs</p>
+      </div>
+    </div>
+
+    <!-- 4. Active Plan Allowance -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Active Plan Quota</span>
+        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm border border-emerald-100">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+      </div>
+      <div class="mt-2">
+        <div class="text-2xl font-black text-slate-900">{% if subscription %}{{ subscription.credits_total|default:wallet.subscription_credits|default:0 }}{% else %}{{ wallet.subscription_credits|default:0 }}{% endif %}</div>
+        <p class="text-[11px] text-slate-500 mt-1">{% if subscription and subscription.plan_tier %}{{ subscription.plan_tier.name }}{% elif subscription %}{{ subscription.get_plan_display|default:"Standard Plan" }}{% else %}Standard Plan{% endif %} tier</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- ITEMISED COMPANY CREDIT LEDGER TABLE                                      -->
+  <!-- ========================================================================= -->
+  <div id="ledger-section" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+      <div>
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-receipt text-amber-500"></i> Itemized Transaction History
+        </h3>
+        <span class="text-[11px] text-slate-500">Immutable ledger recording all credit movements with timestamp and balance after</span>
+      </div>
+
+      <!-- Controls: Date Range & Page Limit -->
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <!-- Date Range Filter -->
+        <form method="GET" class="inline-flex items-center gap-1.5 text-xs">
+          <input type="hidden" name="tx_type" value="{{ tx_type }}">
+          <input type="hidden" name="ledger_limit" value="{{ ledger_limit }}">
+          <label class="text-[11px] font-semibold text-slate-500">Date:</label>
+          <select 
+            name="date_range" 
+            onchange="this.form.submit()" 
+            class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="all" {% if date_range == 'all' or not date_range %}selected{% endif %}>All Time</option>
+            <option value="7d" {% if date_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+            <option value="30d" {% if date_range == '30d' %}selected{% endif %}>Last 30 Days</option>
+            <option value="90d" {% if date_range == '90d' %}selected{% endif %}>Last 90 Days</option>
+          </select>
+        </form>
+
+        <!-- Ledger Per Page Limit (Default 10) -->
+        <form method="GET" class="inline-flex items-center gap-1.5 text-xs">
+          <input type="hidden" name="tx_type" value="{{ tx_type }}">
+          <input type="hidden" name="date_range" value="{{ date_range }}">
+          <label class="text-[11px] font-semibold text-slate-500">Show:</label>
+          <select 
+            name="ledger_limit" 
+            onchange="this.form.submit()" 
+            class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="10" {% if ledger_limit == 10 %}selected{% endif %}>10 per page</option>
+            <option value="25" {% if ledger_limit == 25 %}selected{% endif %}>25 per page</option>
+            <option value="50" {% if ledger_limit == 50 %}selected{% endif %}>50 per page</option>
+            <option value="100" {% if ledger_limit == 100 %}selected{% endif %}>100 per page</option>
+          </select>
+        </form>
+      </div>
+    </div>
+
+    <!-- Filter Pills Row -->
+    <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
+      <span class="text-slate-400 font-bold mr-1 uppercase text-[10px]">Event Type:</span>
+      <a 
+        href="?tx_type=all&date_range={{ date_range }}&ledger_limit={{ ledger_limit }}#ledger-section" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'all' or not tx_type %}bg-slate-900 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >All Events</a>
+      <a 
+        href="?tx_type=PURCHASE&date_range={{ date_range }}&ledger_limit={{ ledger_limit }}#ledger-section" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'PURCHASE' or tx_type == 'purchase' %}bg-blue-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Purchases &amp; Renewals</a>
+      <a 
+        href="?tx_type=USAGE&date_range={{ date_range }}&ledger_limit={{ ledger_limit }}#ledger-section" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'USAGE' or tx_type == 'usage' %}bg-rose-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Usage Deductions</a>
+      <a 
+        href="?tx_type=REFUND&date_range={{ date_range }}&ledger_limit={{ ledger_limit }}#ledger-section" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'REFUND' or tx_type == 'refund' %}bg-emerald-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Refunds</a>
+      <a 
+        href="?tx_type=ADMIN_ADJUSTMENT&date_range={{ date_range }}&ledger_limit={{ ledger_limit }}#ledger-section" 
+        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'ADMIN_ADJUSTMENT' or tx_type == 'admin_adjustment' %}bg-purple-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+      >Admin Adjustments</a>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Receipt / Ref #</th>
+            <th class="py-2.5 px-3">Transaction Type</th>
+            <th class="py-2.5 px-3">Description</th>
+            <th class="py-2.5 px-3 text-right">Credits Amount</th>
+            <th class="py-2.5 px-3 text-right">Balance After</th>
+            <th class="py-2.5 px-3">Logged By</th>
+            <th class="py-2.5 px-3 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for tx in ledger_page %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-slate-800">
+              <span class="inline-flex items-center gap-1.5">
+                <i class="fa-solid fa-receipt text-slate-400 text-xs"></i>
+                #TX-{{ tx.id|stringformat:"05d" }}
+              </span>
+            </td>
+            <td class="py-3 px-3">
+              {% if tx.transaction_type == 'PURCHASE' or tx.transaction_type == 'purchase' or tx.credits > 0 %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                  <i class="fa-solid fa-plus text-[8px] mr-1"></i> Allocation
+                </span>
+              {% elif tx.transaction_type == 'REFUND' or tx.transaction_type == 'refund' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-rotate-left text-[8px] mr-1"></i> Refund
+                </span>
+              {% elif tx.transaction_type == 'ADMIN_ADJUSTMENT' or tx.transaction_type == 'admin_adjustment' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                  <i class="fa-solid fa-user-shield text-[8px] mr-1"></i> Admin Adjusted
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                  <i class="fa-solid fa-minus text-[8px] mr-1"></i> Usage Deduction
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 text-slate-700 font-medium">
+              {{ tx.notes|default:tx.feature_code|default:"Credit balance transaction" }}
+            </td>
+            <td class="py-3 px-3 text-right font-black font-mono {% if tx.credits > 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
+              {% if tx.credits > 0 %}+{{ tx.credits }}{% else %}{{ tx.credits }}{% endif %}
+            </td>
+            <td class="py-3 px-3 text-right font-bold font-mono text-slate-900">
+              {{ tx.balance_after }}
+            </td>
+            <td class="py-3 px-3 text-slate-600">
+              {% if tx.user %}
+                <span class="font-medium text-slate-800">{{ tx.user.get_full_name|default:tx.user.email }}</span>
+              {% else %}
+                <span class="text-slate-400 italic">System Automation</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 text-right text-slate-500 whitespace-nowrap">
+              {{ tx.created_at|date:"M d, Y H:i" }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-10 text-center text-slate-400">
+              <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 text-lg mb-2">
+                <i class="fa-solid fa-receipt"></i>
+              </div>
+              <p class="font-bold text-slate-700 text-xs">No credit ledger transactions found.</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">Transactions will automatically log when searches run or credits are topped up.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Ledger Pagination Footer -->
+    {% if ledger_page.has_other_pages %}
+    <div class="p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/50">
+      <div>
+        Showing page <strong>{{ ledger_page.number }}</strong> of <strong>{{ ledger_page.paginator.num_pages }}</strong> 
+        ({{ ledger_page.paginator.count }} total transactions)
+      </div>
+      <div class="flex items-center gap-1.5">
+        {% if ledger_page.has_previous %}
+          <a href="?page={{ ledger_page.previous_page_number }}&ledger_limit={{ ledger_limit }}&tx_type={{ tx_type }}&date_range={{ date_range }}#ledger-section" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">&laquo; Prev</a>
+        {% endif %}
+        <span class="px-2.5 py-1 font-bold text-slate-900 bg-white border border-slate-200 rounded-lg">{{ ledger_page.number }}</span>
+        {% if ledger_page.has_next %}
+          <a href="?page={{ ledger_page.next_page_number }}&ledger_limit={{ ledger_limit }}&tx_type={{ tx_type }}&date_range={{ date_range }}#ledger-section" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">Next &raquo;</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: ACCOUNT STATEMENT CSV EXPORT                                       -->
+<!-- ========================================================================= -->
+<div id="statementExportModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-file-csv"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Download Account Statement</h3>
+          <p class="text-xs text-slate-500 font-medium">Bank-style credit ledger &amp; tax invoice audit export</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeStatementExportModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="GET" action="{% url 'export-statement-csv' %}">
+      <div class="p-5 space-y-4 text-xs">
+        <div class="p-3 bg-blue-50 border border-blue-100 rounded-xl text-blue-900 text-[11px] leading-relaxed">
+          <i class="fa-solid fa-circle-info text-blue-600 mr-1"></i>
+          This CSV file includes an opening credit balance, itemized transactions with timestamps and balance tracking, and closing credit balance for corporate GST audit compliance.
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Start Date</label>
+            <input 
+              type="date" 
+              name="start_date" 
+              required
+              class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+            >
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">End Date</label>
+            <input 
+              type="date" 
+              name="end_date" 
+              required
+              class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeStatementExportModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition text-xs cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2 transition text-xs cursor-pointer">
+          <i class="fa-solid fa-download"></i>
+          <span>Generate Statement (.CSV)</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openStatementExportModal() {
+    const modal = document.getElementById('statementExportModal');
+    if (modal) modal.classList.remove('hidden');
+    
+    // Set default dates if empty (last 30 days)
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const startInput = document.querySelector('input[name="start_date"]');
+    const endInput = document.querySelector('input[name="end_date"]');
+    if (startInput && !startInput.value) startInput.value = thirtyDaysAgo;
+    if (endInput && !endInput.value) endInput.value = today;
+  }
+
+  function closeStatementExportModal() {
+    const modal = document.getElementById('statementExportModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  document.getElementById('statementExportModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeStatementExportModal();
+  });
+</script>
+{% endblock %}

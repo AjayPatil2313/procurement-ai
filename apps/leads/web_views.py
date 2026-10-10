@@ -82,6 +82,84 @@ def save_lead_toggle_view(request, result_id):
     return redirect(redirect_to)
 
 
+@login_required
+def batch_save_leads_view(request):
+    """
+    Batch Save / Shortlist Multiple Leads Action:
+    Allows sellers (and buyers) to bookmark multiple candidate leads at once into their pipeline.
+    Accepts POST with list of result_ids.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_seller"] or rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        return JsonResponse({"success": False, "message": "Permission denied: Module access required."}, status=403)
+
+    if request.method != "POST":
+        return JsonResponse({"success": False, "message": "Method not allowed. Use POST."}, status=405)
+
+    result_ids = []
+    if request.content_type == "application/json":
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            result_ids = data.get("result_ids", [])
+        except Exception:
+            result_ids = []
+    else:
+        result_ids = request.POST.getlist("result_ids[]") or request.POST.getlist("result_ids")
+
+    if not result_ids:
+        return JsonResponse({"success": False, "message": "No leads selected for batch saving."}, status=400)
+
+    cleaned_ids = []
+    for rid in result_ids:
+        try:
+            cleaned_ids.append(int(rid))
+        except (ValueError, TypeError):
+            continue
+
+    if not cleaned_ids:
+        return JsonResponse({"success": False, "message": "Invalid lead identifiers provided."}, status=400)
+
+    results_qs = SearchResult.objects.filter(id__in=cleaned_ids).select_related("external_company", "search_job", "search_job__product")
+    if not (rbac["is_super_admin"] and not company):
+        results_qs = results_qs.filter(search_job__company=company)
+
+    saved_count = 0
+    already_saved_count = 0
+
+    for res in results_qs:
+        target_product = res.search_job.product if res.search_job else None
+        existing_saved = SavedItem.objects.filter(
+            company=company,
+            search_result__external_company=res.external_company,
+            search_result__search_job__product=target_product,
+        ).first()
+
+        if existing_saved:
+            already_saved_count += 1
+        else:
+            SavedItem.objects.create(
+                company=company,
+                search_result=res,
+                status=SavedItem.Status.NEW,
+            )
+            saved_count += 1
+
+    msg = f"Successfully added {saved_count} lead(s) to your pipeline."
+    if already_saved_count > 0:
+        msg += f" ({already_saved_count} already existed in pipeline)."
+
+    return JsonResponse({
+        "success": True,
+        "saved_count": saved_count,
+        "already_saved_count": already_saved_count,
+        "total_processed": len(cleaned_ids),
+        "message": msg,
+    })
+
+
 def deduplicate_saved_items(items):
     """
     Deduplicates SavedItem records by search_result__external_company_id,
@@ -310,6 +388,28 @@ def update_saved_lead_view(request, item_id):
         item.save()
 
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            base_qs = SavedItem.objects.filter(
+                company=company,
+                search_result__result_type=SearchResult.ResultType.LEAD,
+            ).filter(
+                Q(search_result__search_job__product__is_deleted=False) | Q(search_result__search_job__product__isnull=True)
+            ).select_related("search_result")
+            active_items = deduplicate_saved_items(list(base_qs))
+            stage_counts = {
+                "new": sum(1 for i in active_items if i.status == SavedItem.Status.NEW),
+                "contacted": sum(1 for i in active_items if i.status == SavedItem.Status.CONTACTED),
+                "negotiating": sum(1 for i in active_items if i.status == SavedItem.Status.NEGOTIATING),
+                "interested": sum(1 for i in active_items if i.status == SavedItem.Status.INTERESTED),
+                "won": sum(1 for i in active_items if i.status == SavedItem.Status.WON),
+                "lost": sum(1 for i in active_items if i.status == SavedItem.Status.LOST),
+            }
+            total_pipeline_count = len(active_items)
+            won_count = stage_counts["won"]
+            win_rate_pct = round((won_count / total_pipeline_count * 100)) if total_pipeline_count > 0 else 0
+            active_velocity_count = stage_counts["contacted"] + stage_counts["negotiating"] + stage_counts["interested"]
+            assigned_count = sum(1 for i in active_items if i.assigned_to_id is not None)
+            assigned_coverage_pct = round((assigned_count / total_pipeline_count * 100)) if total_pipeline_count > 0 else 0
+
             return JsonResponse({
                 "success": True,
                 "status": item.status,
@@ -317,6 +417,11 @@ def update_saved_lead_view(request, item_id):
                 "assigned_to_id": item.assigned_to_id,
                 "assigned_to_name": item.assigned_to.get_full_name() or item.assigned_to.email if item.assigned_to else "Unassigned Rep",
                 "notes": item.notes,
+                "stage_counts": stage_counts,
+                "total_pipeline_count": total_pipeline_count,
+                "win_rate_pct": win_rate_pct,
+                "active_velocity_count": active_velocity_count,
+                "assigned_coverage_pct": assigned_coverage_pct,
                 "message": f"Lead '{item.search_result.external_company.name}' updated successfully.",
             })
 
@@ -2130,13 +2235,23 @@ def export_reports_view(request):
     total_inquiry_count = inquiries_base.count()
 
     item_id_str = request.GET.get("product_id", "").strip() or request.GET.get("requirement_id", "").strip()
+    prod_id_str = request.GET.get("product_id", "").strip()
+    req_id_str = request.GET.get("requirement_id", "").strip()
     selected_item = None
-    if item_id_str and item_id_str.isdigit():
+    if prod_id_str and prod_id_str.isdigit():
+        selected_item = Product.objects.filter(id=int(prod_id_str), company=company, is_deleted=False).first()
+    elif req_id_str and req_id_str.isdigit():
+        selected_item = Requirement.objects.filter(id=int(req_id_str), company=company, is_deleted=False).first()
+        if selected_item:
+            selected_item.name = selected_item.item_name
+    elif item_id_str and item_id_str.isdigit():
         if is_seller_context:
             selected_item = Product.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
         else:
             selected_item = Requirement.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
-            if selected_item:
+            if not selected_item:
+                selected_item = Product.objects.filter(id=int(item_id_str), company=company, is_deleted=False).first()
+            if selected_item and hasattr(selected_item, "item_name"):
                 selected_item.name = selected_item.item_name
 
     # Dynamic Filters
@@ -2174,7 +2289,7 @@ def export_reports_view(request):
         avg_match_score = 0.0
         preview_records = []
     else:
-        if is_seller_context:
+        if is_seller_context or isinstance(selected_item, Product):
             leads_filtered = leads_base.filter(search_job__product=selected_item).select_related(
                 "external_company", "search_job", "search_job__product", "search_job__product__category"
             )
@@ -2290,7 +2405,7 @@ def export_reports_view(request):
                 ])
 
         elif report_type == "catalog":
-            if is_seller_context:
+            if is_seller_context or isinstance(selected_item, Product):
                 response["Content-Disposition"] = f'attachment; filename="Product_Catalog_{item_slug}.csv"'
                 writer.writerow(["Product Name", "Category", "Type", "Price", "Currency", "MOQ", "Unit", "Availability", "Location", "Search Scope", "Description", "Specifications", "Created At"])
                 prods_to_export = Product.objects.filter(company=company, is_deleted=False)

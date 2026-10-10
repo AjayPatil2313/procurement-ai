@@ -679,8 +679,14 @@
           </div>
           <div>
             <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Currency</label>
-            <input type="text" name="currency" id="quickQuoteCurrencyInput" value="INR" maxlength="3"
-                   class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 uppercase">
+            <select name="currency" id="quickQuoteCurrencyInput" class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 cursor-pointer">
+              <option value="INR" selected>INR (₹)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="AED">AED (د.إ)</option>
+              <option value="SGD">SGD (S$)</option>
+            </select>
           </div>
         </div>
 

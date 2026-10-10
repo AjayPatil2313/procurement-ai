@@ -26,8 +26,18 @@
     <!-- Top row: Avatar, Name, Location, Fit Score -->
     <div class="flex items-start justify-between gap-2">
       <div class="flex items-center space-x-2.5 min-w-0">
-        <div class="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white font-bold flex items-center justify-center text-xs border border-orange-100 shrink-0 transition">
-          <i class="fa-solid fa-industry"></i>
+        <div class="shrink-0" onclick="event.stopPropagation()">
+          <input 
+            type="checkbox" 
+            class="vendor-batch-checkbox w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300 transition cursor-pointer"
+            value="{{ lead.id }}"
+            data-company-name="{{ lead.external_company.name|escape }}"
+            {% if lead.id in saved_result_ids %}data-already-saved="true"{% endif %}
+            onchange="handleVendorBatchCheckboxChange()"
+          >
+        </div>
+        <div class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white font-bold flex items-center justify-center text-xs border border-orange-100 shrink-0 transition">
+          <i class="fa-solid fa-industry text-[11px]"></i>
         </div>
         <div class="min-w-0">
           <h3 class="font-bold text-slate-900 text-xs leading-tight truncate group-hover:text-orange-600 transition" title="{{ lead.external_company.name }}">

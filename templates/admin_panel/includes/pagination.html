@@ -1,0 +1,56 @@
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<div class="px-5 py-4 border-t border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+  <div class="font-medium">
+    Showing <span class="font-bold text-slate-900">{{ page_obj.start_index }}</span> to <span class="font-bold text-slate-900">{{ page_obj.end_index }}</span> of <span class="font-bold text-slate-900">{{ page_obj.paginator.count }}</span> entries
+  </div>
+
+  <nav class="inline-flex items-center gap-1">
+    <!-- First & Previous -->
+    {% if page_obj.has_previous %}
+      <a href="?{% if query_string %}{{ query_string }}&{% endif %}page=1" class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition" title="First Page">
+        <i class="fa-solid fa-angles-left text-[10px]"></i>
+      </a>
+      <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-semibold transition">
+        <i class="fa-solid fa-chevron-left text-[10px] mr-1"></i> Prev
+      </a>
+    {% else %}
+      <span class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed">
+        <i class="fa-solid fa-angles-left text-[10px]"></i>
+      </span>
+      <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-semibold cursor-not-allowed">
+        <i class="fa-solid fa-chevron-left text-[10px] mr-1"></i> Prev
+      </span>
+    {% endif %}
+
+    <!-- Page Number Badges -->
+    {% for page_num in page_obj.paginator.page_range %}
+      {% if page_num == page_obj.number %}
+        <span class="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold shadow-sm">{{ page_num }}</span>
+      {% elif page_num >= page_obj.number|add:"-2" and page_num <= page_obj.number|add:"2" %}
+        <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_num }}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-semibold transition">{{ page_num }}</a>
+      {% elif page_num == 1 or page_num == page_obj.paginator.num_pages %}
+        <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_num }}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-semibold transition">{{ page_num }}</a>
+      {% elif page_num == page_obj.number|add:"-3" or page_num == page_obj.number|add:"3" %}
+        <span class="px-2 py-1.5 text-slate-400 font-bold">...</span>
+      {% endif %}
+    {% endfor %}
+
+    <!-- Next & Last -->
+    {% if page_obj.has_next %}
+      <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-semibold transition">
+        Next <i class="fa-solid fa-chevron-right text-[10px] ml-1"></i>
+      </a>
+      <a href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition" title="Last Page">
+        <i class="fa-solid fa-angles-right text-[10px]"></i>
+      </a>
+    {% else %}
+      <span class="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-semibold cursor-not-allowed">
+        Next <i class="fa-solid fa-chevron-right text-[10px] ml-1"></i>
+      </span>
+      <span class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed">
+        <i class="fa-solid fa-angles-right text-[10px]"></i>
+      </span>
+    {% endif %}
+  </nav>
+</div>
+{% endif %}

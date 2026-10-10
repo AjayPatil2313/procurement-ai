@@ -319,6 +319,10 @@ class CreditTransaction(models.Model):
                     break
         super().save(*args, **kwargs)
 
+    @property
+    def description(self):
+        return self.notes or self.feature_code or "Credit transaction"
+
     def __str__(self):
         return f"{self.receipt_number or 'RCP'} - {self.company.name} - {self.transaction_type} {self.credits} ({self.notes})"
 

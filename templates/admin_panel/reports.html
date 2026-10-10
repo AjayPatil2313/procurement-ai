@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Data Exports — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Data Exports & Intelligence Center</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Generate and download official CSV datasets with real-time database records and audit trails</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <i class="fa-solid fa-file-csv mr-1.5 text-emerald-500"></i> UTF-8 Formatted Direct Exports
+      </span>
+    </div>
+  </div>
+
+  <!-- Export Datasets Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+    <!-- 1. Companies Export Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 text-xl">
+            <i class="fa-solid fa-building"></i>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-700">
+            {{ total_companies }} Companies
+          </span>
+        </div>
+
+        <h3 class="text-base font-black text-slate-900">Registered Companies Directory</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Complete master record of all Buyer, Seller, and Dual companies including legal business names, registration numbers, verification badges, subscription plan tiers, and country coordinates.
+        </p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+          <span class="font-bold text-slate-700">Dataset Attributes:</span> ID, Company Name, Legal Entity, Operating Type, Subscription Plan, Verified Status, Active Status, Country, Industry, Registration Date.
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-mono">Format: .CSV</span>
+        <a href="{% url 'admin-panel-reports' %}?export=companies_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Export Companies CSV</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 2. Users Export Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 text-xl">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-700">
+            {{ total_users }} Users
+          </span>
+        </div>
+
+        <h3 class="text-base font-black text-slate-900">Platform Users & Access Accounts</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Granular export of all registered user identities across organizations, including assigned security roles, parent company membership, activation statuses, and account creation dates.
+        </p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+          <span class="font-bold text-slate-700">Dataset Attributes:</span> User ID, Email Address, Full Name, Associated Company, Assigned Role, Activation State, Superuser Flag, Joined Date.
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-mono">Format: .CSV</span>
+        <a href="{% url 'admin-panel-reports' %}?export=users_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Export Users CSV</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 3. Searches Export Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-xl">
+            <i class="fa-solid fa-magnifying-glass-chart"></i>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-700">
+            {{ total_searches }} Searches
+          </span>
+        </div>
+
+        <h3 class="text-base font-black text-slate-900">AI Search Jobs & Discovery Logs</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Complete analytical telemetry of all partner discovery jobs initiated by platform buyers and sellers, tracking search query keywords, target scopes, execution states, and partner count.
+        </p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+          <span class="font-bold text-slate-700">Dataset Attributes:</span> Job ID, Initiating Company, Search Query / Item, Operation Scope, Execution Status, Total Results Discovered, Executed Timestamp.
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-mono">Format: .CSV</span>
+        <a href="{% url 'admin-panel-reports' %}?export=searches_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Export Search Jobs CSV</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 4. Inquiries Export Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 text-xl">
+            <i class="fa-solid fa-paper-plane"></i>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-700">
+            {{ total_inquiries }} Inquiries
+          </span>
+        </div>
+
+        <h3 class="text-base font-black text-slate-900">Commercial Inquiries & RFQs Dataset</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Platform-wide transaction outreach records tracking sent requests for quotes, supplier responses, quoted commercial figures, negotiation lifecycle milestones, and closed deal statuses.
+        </p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+          <span class="font-bold text-slate-700">Dataset Attributes:</span> Inquiry ID, Sender Company, Recipient Supplier / Partner, RFQ Subject, Negotiation Status, Quoted Pricing, Sent Date.
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-mono">Format: .CSV</span>
+        <a href="{% url 'admin-panel-reports' %}?export=inquiries_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Export Inquiries CSV</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Financial Ledger Quick Download Pill -->
+  <div class="bg-slate-900 text-white rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-amber-400 text-lg">
+        <i class="fa-solid fa-file-invoice-dollar"></i>
+      </div>
+      <div>
+        <h4 class="text-sm font-bold text-white">Global Financial & Credit Ledger Dataset</h4>
+        <p class="text-xs text-slate-400">Export audited receipt-backed wallet credits and debits across all platform companies</p>
+      </div>
+    </div>
+    <a href="{% url 'admin-panel-plans' %}?export=global_ledger_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition">
+      <i class="fa-solid fa-download"></i>
+      <span>Download Global Credit Ledger</span>
+    </a>
+  </div>
+
+</div>
+{% endblock %}

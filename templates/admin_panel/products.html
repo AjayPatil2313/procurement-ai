@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Products Catalog Moderation — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Products & Catalog Moderation</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Audit catalog offerings, inspect seller product listings, and govern commercial compliance</p>
+    </div>
+
+    <!-- Quick Stats Pill -->
+    <div class="flex items-center gap-2">
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Active Products:</span> <span class="font-bold text-slate-900">{{ total_products }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search product name, SKU, seller..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
+      </div>
+
+      <!-- Company Filter -->
+      <div>
+        <select name="company_id" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if company_filter == 'all' %}selected{% endif %}>All Seller Companies</option>
+          {% for comp in all_companies %}
+          <option value="{{ comp.id }}" {% if company_filter == comp.id|stringformat:"s" %}selected{% endif %}>{{ comp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Availability Filter -->
+      <div>
+        <select name="availability" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if avail_filter == 'all' %}selected{% endif %}>All Availabilities</option>
+          <option value="in_stock" {% if avail_filter == 'in_stock' %}selected{% endif %}>In Stock</option>
+          <option value="out_of_stock" {% if avail_filter == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
+          <option value="on_order" {% if avail_filter == 'on_order' %}selected{% endif %}>On Order / Pre-order</option>
+          <option value="discontinued" {% if avail_filter == 'discontinued' %}selected{% endif %}>Discontinued</option>
+        </select>
+      </div>
+
+      <!-- Clear Button -->
+      <div class="flex items-center gap-2">
+        {% if q or company_filter != 'all' or avail_filter != 'all' %}
+        <a href="{% url 'admin-panel-products' %}" class="w-full py-1.5 px-3 text-xs text-center text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl transition font-semibold" title="Clear Filters">
+          <i class="fa-solid fa-xmark mr-1"></i> Clear Filters
+        </a>
+        {% else %}
+        <button type="submit" class="w-full py-1.5 px-3 text-xs text-center text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition font-semibold shadow-sm">
+          <i class="fa-solid fa-filter mr-1"></i> Apply Filter
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Products Table Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Product Details</th>
+            <th class="py-3 px-4">Seller Company</th>
+            <th class="py-3 px-4">Price / Unit</th>
+            <th class="py-3 px-4">Stock Availability</th>
+            <th class="py-3 px-4">Moderation Status</th>
+            <th class="py-3 px-4">Listed Date</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for p in products %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- Product Info -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center flex-shrink-0 text-xs border border-purple-100">
+                  <i class="fa-solid fa-box"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">{{ p.name }}</div>
+                  <div class="text-[11px] font-normal text-slate-500">
+                    SKU: <span class="font-mono text-slate-700 font-semibold">{{ p.sku|default:"N/A" }}</span>
+                    {% if p.category %}• {{ p.category.name }}{% endif %}
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Seller Company -->
+            <td class="py-3.5 px-4 font-medium text-slate-700">
+              <a href="{% url 'admin-panel-company-detail' p.company.id %}" class="hover:text-blue-600 flex items-center gap-1 group">
+                <span>{{ p.company.name }}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400 group-hover:text-blue-500"></i>
+              </a>
+            </td>
+
+            <!-- Price -->
+            <td class="py-3.5 px-4 font-semibold text-slate-900">
+              {% if p.price %}
+                {{ p.currency|default:"₹" }} {{ p.price }}
+              {% else %}
+                <span class="text-slate-400 italic">Quote on RFQ</span>
+              {% endif %}
+            </td>
+
+            <!-- Availability -->
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if p.availability == 'in_stock' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif p.availability == 'out_of_stock' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
+                {{ p.get_availability_display|default:"In Stock" }}
+              </span>
+            </td>
+
+            <!-- Moderation Status -->
+            <td class="py-3.5 px-4">
+              {% if p.is_deleted %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                  <i class="fa-solid fa-eye-slash mr-1 text-rose-500"></i> Delisted / Moderated
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <i class="fa-solid fa-circle-check mr-1 text-emerald-500"></i> Active Public
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- Listed Date -->
+            <td class="py-3.5 px-4 text-slate-500">{{ p.created_at|date:"M d, Y" }}</td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+              <form method="POST" action="" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_deleted">
+                <input type="hidden" name="product_id" value="{{ p.id }}">
+                {% if p.is_deleted %}
+                  <button type="submit" class="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold rounded-lg border border-emerald-200 transition cursor-pointer" title="Reactivate Product">
+                    <i class="fa-solid fa-eye mr-1 text-emerald-600"></i> Relist
+                  </button>
+                {% else %}
+                  <button type="submit" class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold rounded-lg border border-rose-200 transition cursor-pointer" title="Delist / Hide Product from Platform">
+                    <i class="fa-solid fa-eye-slash mr-1 text-rose-600"></i> Delist
+                  </button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300 block"></i>
+              No products found matching criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "admin_panel/includes/pagination.html" %}
+  </div>
+
+</div>
+{% endblock %}

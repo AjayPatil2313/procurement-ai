@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Search Operations Monitor — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform AI Search Operations Monitor</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Live execution telemetry across supplier discovery and buyer prospecting jobs</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="flex items-center gap-2">
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Total Jobs:</span> <span class="font-bold text-slate-900">{{ total_jobs }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Completed:</span> <span class="font-bold text-emerald-600">{{ completed_jobs }}</span>
+      </div>
+      <div class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Failed:</span> <span class="font-bold text-rose-600">{{ failed_jobs }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search query, company, item..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
+      </div>
+
+      <!-- Company Filter -->
+      <div>
+        <select name="company_id" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if company_filter == 'all' %}selected{% endif %}>All Companies</option>
+          {% for comp in all_companies %}
+          <option value="{{ comp.id }}" {% if company_filter == comp.id|stringformat:"s" %}selected{% endif %}>{{ comp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div>
+        <select name="status" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Job Statuses</option>
+          <option value="COMPLETED" {% if status_filter == 'COMPLETED' %}selected{% endif %}>Completed Only</option>
+          <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>Pending Only</option>
+          <option value="IN_PROGRESS" {% if status_filter == 'IN_PROGRESS' %}selected{% endif %}>In Progress Only</option>
+          <option value="FAILED" {% if status_filter == 'FAILED' %}selected{% endif %}>Failed Only</option>
+        </select>
+      </div>
+
+      <!-- Clear Button -->
+      <div class="flex items-center gap-2">
+        {% if q or company_filter != 'all' or status_filter != 'all' %}
+        <a href="{% url 'admin-panel-search-activity' %}" class="w-full py-1.5 px-3 text-xs text-center text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl transition font-semibold" title="Clear Filters">
+          <i class="fa-solid fa-xmark mr-1"></i> Clear Filters
+        </a>
+        {% else %}
+        <button type="submit" class="w-full py-1.5 px-3 text-xs text-center text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition font-semibold shadow-sm">
+          <i class="fa-solid fa-filter mr-1"></i> Apply Filter
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Search Jobs Table Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Search Job & Target</th>
+            <th class="py-3 px-4">Company</th>
+            <th class="py-3 px-4">Operation Scope</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4">Results Discovered</th>
+            <th class="py-3 px-4">Duration</th>
+            <th class="py-3 px-4">Timestamp</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for job in search_jobs %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- Query / Target -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center flex-shrink-0 text-xs border border-blue-100">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">
+                    {% if job.requirement %}
+                      {{ job.requirement.item_name }}
+                    {% elif job.product %}
+                      {{ job.product.name }}
+                    {% else %}
+                      {{ job.search_query|default:"General Partner Discovery" }}
+                    {% endif %}
+                  </div>
+                  <div class="text-[11px] font-normal text-slate-500">
+                    Job ID: <span class="font-mono text-slate-600">JOB-{{ job.id|stringformat:"05d" }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Company -->
+            <td class="py-3.5 px-4 font-medium text-slate-700">
+              <a href="{% url 'admin-panel-company-detail' job.company.id %}" class="hover:text-blue-600 flex items-center gap-1 group">
+                <span>{{ job.company.name }}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400 group-hover:text-blue-500"></i>
+              </a>
+            </td>
+
+            <!-- Operation Scope -->
+            <td class="py-3.5 px-4">
+              {% if job.requirement %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <i class="fa-solid fa-building-user mr-1"></i> Supplier Discovery
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                  <i class="fa-solid fa-crosshairs mr-1"></i> Buyer Discovery
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- Status -->
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold {% if job.status == 'COMPLETED' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif job.status == 'FAILED' %}bg-rose-50 text-rose-700 border border-rose-200{% elif job.status == 'IN_PROGRESS' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                {% if job.status == 'COMPLETED' %}<i class="fa-solid fa-circle-check text-[9px] mr-1 text-emerald-500"></i>
+                {% elif job.status == 'FAILED' %}<i class="fa-solid fa-circle-exclamation text-[9px] mr-1 text-rose-500"></i>
+                {% elif job.status == 'IN_PROGRESS' %}<i class="fa-solid fa-spinner fa-spin text-[9px] mr-1 text-amber-500"></i>
+                {% endif %}
+                {{ job.get_status_display|default:job.status }}
+              </span>
+            </td>
+
+            <!-- Results Discovered -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-slate-100 text-slate-800 font-mono">
+                {{ job.total_results|default:0 }} partners
+              </span>
+            </td>
+
+            <!-- Duration -->
+            <td class="py-3.5 px-4 font-mono text-slate-600 text-[11px]">
+              {% if job.execution_time_ms %}
+                {{ job.execution_time_ms }} ms
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Timestamp -->
+            <td class="py-3.5 px-4 text-slate-500 whitespace-nowrap">{{ job.created_at|date:"M d, H:i:s" }}</td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+              <button type="button" onclick="showJobDetail('{{ job.id }}', '{{ job.company.name|escapejs }}', '{{ job.search_query|default:""|escapejs }}', '{{ job.get_status_display|default:job.status }}', '{{ job.total_results|default:0 }}', '{{ job.error_message|default:""|escapejs }}')" class="inline-flex items-center px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 transition cursor-pointer" title="Inspect Search Job Telemetry">
+                <i class="fa-solid fa-info-circle mr-1 text-slate-500"></i> Info
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-magnifying-glass-chart text-3xl mb-2 text-slate-300 block"></i>
+              No search execution jobs found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "admin_panel/includes/pagination.html" %}
+  </div>
+
+  <!-- Job Inspection Modal -->
+  <div id="jobModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+            <h3 class="text-base font-black text-slate-900" id="jobModalTitle">Job Details</h3>
+          </div>
+          <button type="button" onclick="closeJobDetail()" class="text-slate-400 hover:text-slate-700 p-1">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-3 text-xs">
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+            <div class="flex justify-between">
+              <span class="text-slate-500">Executing Company:</span>
+              <span class="font-bold text-slate-900" id="jobModalCompany">Company</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">Status:</span>
+              <span class="font-bold text-slate-900" id="jobModalStatus">Status</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500">Matches Found:</span>
+              <span class="font-bold text-slate-900" id="jobModalCount">0</span>
+            </div>
+          </div>
+
+          <div>
+            <span class="text-slate-500 font-bold block mb-1">Search Query / Prompt:</span>
+            <div class="p-3 bg-slate-100 rounded-xl font-mono text-[11px] text-slate-800 break-words" id="jobModalQuery">Query</div>
+          </div>
+
+          <div id="jobModalErrorBlock" class="hidden">
+            <span class="text-rose-600 font-bold block mb-1">Error Diagnostics:</span>
+            <div class="p-3 bg-rose-50 rounded-xl font-mono text-[11px] text-rose-800 border border-rose-200 break-words" id="jobModalError">Error</div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button type="button" onclick="closeJobDetail()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showJobDetail(id, company, query, status, count, error) {
+  document.getElementById('jobModalTitle').textContent = `Search Job #JOB-${id.padStart(5, '0')}`;
+  document.getElementById('jobModalCompany').textContent = company;
+  document.getElementById('jobModalStatus').textContent = status;
+  document.getElementById('jobModalCount').textContent = `${count} partner entities`;
+  document.getElementById('jobModalQuery').textContent = query || 'Automated multi-parameter search';
+
+  const errBlock = document.getElementById('jobModalErrorBlock');
+  if (error && error.trim() !== '') {
+    document.getElementById('jobModalError').textContent = error;
+    errBlock.classList.remove('hidden');
+  } else {
+    errBlock.classList.add('hidden');
+  }
+
+  document.getElementById('jobModal').classList.remove('hidden');
+}
+
+function closeJobDetail() {
+  document.getElementById('jobModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

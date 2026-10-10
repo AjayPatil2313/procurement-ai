@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}B2B Inquiries Monitor — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform B2B Inquiries & RFQs Monitor</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Track cross-company commercial correspondence, request for quotes, and deal conversions</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="flex items-center gap-2">
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Total Inquiries:</span> <span class="font-bold text-slate-900">{{ total_inquiries }}</span>
+      </div>
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Deals Won:</span> <span class="font-bold text-emerald-600">{{ won_count }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search subject, supplier, buyer..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
+      </div>
+
+      <!-- Company Filter -->
+      <div>
+        <select name="company_id" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if company_filter == 'all' %}selected{% endif %}>All Sender Companies</option>
+          {% for comp in all_companies %}
+          <option value="{{ comp.id }}" {% if company_filter == comp.id|stringformat:"s" %}selected{% endif %}>{{ comp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div>
+        <select name="status" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Inquiry Statuses</option>
+          <option value="SENT" {% if status_filter == 'SENT' %}selected{% endif %}>Sent Only</option>
+          <option value="REPLIED" {% if status_filter == 'REPLIED' %}selected{% endif %}>Replied / Quoted</option>
+          <option value="NEGOTIATING" {% if status_filter == 'NEGOTIATING' %}selected{% endif %}>Under Negotiation</option>
+          <option value="WON" {% if status_filter == 'WON' %}selected{% endif %}>Deal Won</option>
+          <option value="LOST" {% if status_filter == 'LOST' %}selected{% endif %}>Deal Lost</option>
+          <option value="CLOSED" {% if status_filter == 'CLOSED' %}selected{% endif %}>Closed</option>
+        </select>
+      </div>
+
+      <!-- Clear Button -->
+      <div class="flex items-center gap-2">
+        {% if q or company_filter != 'all' or status_filter != 'all' %}
+        <a href="{% url 'admin-panel-inquiries' %}" class="w-full py-1.5 px-3 text-xs text-center text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl transition font-semibold" title="Clear Filters">
+          <i class="fa-solid fa-xmark mr-1"></i> Clear Filters
+        </a>
+        {% else %}
+        <button type="submit" class="w-full py-1.5 px-3 text-xs text-center text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition font-semibold shadow-sm">
+          <i class="fa-solid fa-filter mr-1"></i> Apply Filter
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Inquiries Table Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Subject & Details</th>
+            <th class="py-3 px-4">Sender Company</th>
+            <th class="py-3 px-4">Recipient Supplier / Partner</th>
+            <th class="py-3 px-4">Quoted Value</th>
+            <th class="py-3 px-4">Pipeline Status</th>
+            <th class="py-3 px-4">Sent Date</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for inq in inquiries %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- Subject -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center flex-shrink-0 text-xs border border-purple-100">
+                  <i class="fa-solid fa-paper-plane"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">{{ inq.subject }}</div>
+                  <div class="text-[11px] font-normal text-slate-500">
+                    Ref: <span class="font-mono text-slate-600">RFQ-{{ inq.id|stringformat:"05d" }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Sender Company -->
+            <td class="py-3.5 px-4 font-medium text-slate-700">
+              <a href="{% url 'admin-panel-company-detail' inq.company.id %}" class="hover:text-blue-600 flex items-center gap-1 group">
+                <span>{{ inq.company.name }}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400 group-hover:text-blue-500"></i>
+              </a>
+            </td>
+
+            <!-- Recipient Supplier -->
+            <td class="py-3.5 px-4 font-medium text-slate-800">
+              <div>{{ inq.search_result.company_name|default:inq.sent_to_email }}</div>
+              {% if inq.sent_to_email %}
+                <div class="text-[10px] text-slate-400 font-mono">{{ inq.sent_to_email }}</div>
+              {% endif %}
+            </td>
+
+            <!-- Quoted Value -->
+            <td class="py-3.5 px-4 font-semibold text-slate-900">
+              {% if inq.quoted_price %}
+                {{ inq.quoted_currency|default:"₹" }} {{ inq.quoted_price }}
+              {% else %}
+                <span class="text-slate-400 italic">No quote recorded</span>
+              {% endif %}
+            </td>
+
+            <!-- Status -->
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if inq.status == 'WON' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif inq.status == 'REPLIED' %}bg-blue-50 text-blue-700 border border-blue-200{% elif inq.status == 'NEGOTIATING' %}bg-purple-50 text-purple-700 border border-purple-200{% elif inq.status == 'LOST' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                {{ inq.get_status_display|default:inq.status }}
+              </span>
+            </td>
+
+            <!-- Date -->
+            <td class="py-3.5 px-4 text-slate-500">{{ inq.sent_at|default:inq.created_at|date:"M d, Y" }}</td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+              <button type="button" onclick="showInquiryDetail('{{ inq.id }}', '{{ inq.subject|escapejs }}', '{{ inq.company.name|escapejs }}', '{{ inq.sent_to_email|escapejs }}', '{{ inq.get_status_display|default:inq.status }}', '{{ inq.quoted_price|default:"" }}', '{{ inq.message|default:"No message body."|escapejs }}')" class="inline-flex items-center px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 transition cursor-pointer" title="Inspect RFQ Details">
+                <i class="fa-solid fa-eye mr-1 text-slate-500"></i> View
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-envelope-open-text text-3xl mb-2 text-slate-300 block"></i>
+              No B2B inquiries found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "admin_panel/includes/pagination.html" %}
+  </div>
+
+  <!-- Inquiry Inspection Modal -->
+  <div id="inqModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-paper-plane"></i>
+            </span>
+            <h3 class="text-base font-black text-slate-900" id="inqModalSubject">Inquiry Subject</h3>
+          </div>
+          <button type="button" onclick="closeInquiryDetail()" class="text-slate-400 hover:text-slate-700 p-1">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-3 text-xs">
+          <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+            <div>
+              <span class="text-slate-400 block text-[10px]">Sender Company</span>
+              <span class="font-bold text-slate-900" id="inqModalSender">Company</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px]">Recipient Partner</span>
+              <span class="font-bold text-slate-900" id="inqModalRecipient">Supplier</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px]">Status</span>
+              <span class="font-bold text-slate-900" id="inqModalStatus">Status</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px]">Quoted Amount</span>
+              <span class="font-bold text-slate-900" id="inqModalQuote">Quote</span>
+            </div>
+          </div>
+
+          <div>
+            <span class="text-slate-500 font-bold block mb-1">Message Content:</span>
+            <div class="p-3 bg-white rounded-xl border border-slate-200 text-slate-700 text-xs leading-relaxed max-h-48 overflow-y-auto" id="inqModalMessage">
+              Message text
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button type="button" onclick="closeInquiryDetail()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showInquiryDetail(id, subject, sender, recipient, status, quote, message) {
+  document.getElementById('inqModalSubject').textContent = subject;
+  document.getElementById('inqModalSender').textContent = sender;
+  document.getElementById('inqModalRecipient').textContent = recipient;
+  document.getElementById('inqModalStatus').textContent = status;
+  document.getElementById('inqModalQuote').textContent = quote ? `₹ ${quote}` : 'Not provided yet';
+  document.getElementById('inqModalMessage').textContent = message;
+  document.getElementById('inqModal').classList.remove('hidden');
+}
+
+function closeInquiryDetail() {
+  document.getElementById('inqModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

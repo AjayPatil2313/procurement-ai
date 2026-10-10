@@ -3,7 +3,7 @@
 {% block title %}Vendor List — AI Vendors by Product{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-6 w-full">
 
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -372,27 +372,27 @@
             >
           </div>
 
-          <!-- Layout Toggle: Compact Cards (Default) vs Table View -->
+          <!-- Layout Toggle: Table View (Default) vs Compact Cards -->
           <div class="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
-            <button 
-              type="button" 
-              onclick="switchVendorLayout('cards')" 
-              id="viewBtnCards" 
-              class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-orange-600 shadow-xs cursor-pointer"
-              title="Compact Cards View"
-            >
-              <i class="fa-solid fa-grip"></i>
-              <span>Cards</span>
-            </button>
             <button 
               type="button" 
               onclick="switchVendorLayout('table')" 
               id="viewBtnTable" 
-              class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
-              title="Spreadsheet Table View"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-orange-600 shadow-xs cursor-pointer"
+              title="Spreadsheet Table View (Default Full-Size)"
             >
               <i class="fa-solid fa-table-list"></i>
               <span>Table</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="switchVendorLayout('cards')" 
+              id="viewBtnCards" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
+              title="Compact Cards View"
+            >
+              <i class="fa-solid fa-grip"></i>
+              <span>Cards</span>
             </button>
           </div>
         </div>
@@ -424,41 +424,27 @@
       {% endif %}
     </div>
 
-    <!-- Filtered Leads Compact Cards Grid (Default View) -->
-    <div class="vendor-view-cards grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {% for lead in leads %}
-        {% include "components/vendor_compact_card.html" with lead=lead %}
-      {% empty %}
-        <div class="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
-          <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mx-auto mb-3">
-            <i class="fa-solid fa-users-viewfinder text-lg"></i>
-          </div>
-          <p class="font-bold text-slate-700 text-sm">No vendors discovered yet for this product</p>
-          <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            Run an AI Vendor Search to scrape and identify verified enterprise vendors for this product.
-          </p>
-          {% if selected_product %}
-          <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="inline-flex items-center gap-1.5 mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span>Launch AI Vendor Search</span>
-          </a>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </div>
-
-    <!-- Filtered Leads Table View -->
-    <div class="vendor-view-table hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs min-w-[860px]">
+    <!-- Filtered Leads Table View (Default Full-Size Spreadsheet View) -->
+    <div class="vendor-view-table bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left text-xs min-w-full">
           <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
             <tr>
-              <th class="py-3 px-4 min-w-[200px] w-64">Company Name</th>
-              <th class="py-3 px-4 w-36 whitespace-nowrap">Location</th>
-              <th class="py-3 px-4 w-28 whitespace-nowrap">Match Score</th>
-              <th class="py-3 px-4 min-w-[220px]">Need Signal & Fit Reason</th>
-              <th class="py-3 px-4 w-44 whitespace-nowrap">Verified Contact</th>
-              <th class="py-3 px-4 text-right w-44 whitespace-nowrap">Actions</th>
+              <th class="py-3.5 px-3 w-10 text-center">
+                <input 
+                  type="checkbox" 
+                  id="selectAllVendorsTable" 
+                  onchange="toggleSelectAllVendors(this)" 
+                  class="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300 transition cursor-pointer"
+                  title="Select / Deselect All"
+                >
+              </th>
+              <th class="py-3.5 px-4 min-w-[220px]">Company Name</th>
+              <th class="py-3.5 px-4 w-40 whitespace-nowrap">Location</th>
+              <th class="py-3.5 px-4 w-32 whitespace-nowrap">Match Score</th>
+              <th class="py-3.5 px-4 min-w-[280px]">Need Signal & Fit Reason</th>
+              <th class="py-3.5 px-4 w-48 whitespace-nowrap">Verified Contact</th>
+              <th class="py-3.5 px-4 text-right w-52 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -487,6 +473,16 @@
               data-save-url="{% url 'save-lead-toggle' lead.id %}"
               title="Click row to view full company credentials & dossier"
             >
+              <td class="py-3.5 px-3 text-center" onclick="event.stopPropagation()">
+                <input 
+                  type="checkbox" 
+                  class="vendor-batch-checkbox w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300 transition cursor-pointer"
+                  value="{{ lead.id }}"
+                  data-company-name="{{ lead.external_company.name|escape }}"
+                  {% if lead.id in saved_result_ids %}data-already-saved="true"{% endif %}
+                  onchange="handleVendorBatchCheckboxChange()"
+                >
+              </td>
               <td class="py-3.5 px-4 font-bold text-slate-900">
                 <div class="flex items-center">
                   <span class="w-8 h-8 rounded-xl bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white border border-orange-100 flex items-center justify-center mr-3 font-semibold text-xs shrink-0 transition">
@@ -513,8 +509,8 @@
                   {{ lead.match_score }}% Fit
                 </span>
               </td>
-              <td class="py-3.5 px-4 text-slate-700 max-w-sm">
-                <div class="font-medium text-xs">{{ lead.match_reason|truncatewords:24 }}</div>
+              <td class="py-3.5 px-4 text-slate-700 min-w-[280px]">
+                <div class="font-medium text-xs leading-relaxed">{{ lead.match_reason|truncatewords:32 }}</div>
                 {% if lead.raw_data.matched_parameters %}
                 <div class="flex flex-wrap items-center gap-1 mt-1">
                   {% for param in lead.raw_data.matched_parameters %}
@@ -605,7 +601,29 @@
             {% endfor %}
           </tbody>
         </table>
-      </div>
+    </div>
+
+    <!-- Filtered Leads Compact Cards Grid (Toggle View) -->
+    <div class="vendor-view-cards hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+      {% for lead in leads %}
+        {% include "components/vendor_compact_card.html" with lead=lead %}
+      {% empty %}
+        <div class="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 2xl:col-span-5 bg-white rounded-2xl p-12 text-center text-slate-400 border border-slate-200">
+          <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center mx-auto mb-3">
+            <i class="fa-solid fa-users-viewfinder text-lg"></i>
+          </div>
+          <p class="font-bold text-slate-700 text-sm">No vendors discovered yet for this product</p>
+          <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            Run an AI Vendor Search to scrape and identify verified enterprise vendors for this product.
+          </p>
+          {% if selected_product %}
+          <a href="{% url 'find-buyers' %}?product_id={{ selected_product.id }}" class="inline-flex items-center gap-1.5 mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-orange-500/20">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>Launch AI Vendor Search</span>
+          </a>
+          {% endif %}
+        </div>
+      {% endfor %}
     </div>
 
     <!-- No Filtered Vendors Found Placeholder -->
@@ -728,11 +746,35 @@
         <button type="submit" class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 transition text-xs">
           <i class="fa-solid fa-envelope"></i>
           <span>Send Commercial Proposal</span>
-        </button>
       </div>
     </form>
   </div>
 </div>
+
+  <!-- Floating Batch Action Bar for Pipeline Shortlisting -->
+  <div id="vendorBatchActionBar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 hidden bg-slate-900 text-white rounded-2xl shadow-2xl px-5 py-3 border border-slate-700 flex items-center gap-4 animate-in slide-in-from-bottom duration-200">
+    <div class="flex items-center gap-2 text-xs">
+      <span class="w-6 h-6 rounded-full bg-orange-500 text-white font-bold flex items-center justify-center text-[11px]" id="batchSelectedCounter">0</span>
+      <span class="font-bold">Vendors Selected</span>
+    </div>
+    <div class="h-4 w-px bg-slate-700"></div>
+    <button 
+      type="button" 
+      onclick="executeBatchSaveToPipeline()"
+      id="batchSaveBtn"
+      class="px-4 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
+    >
+      <i class="fa-solid fa-bookmark text-[11px]"></i>
+      <span>Save to Pipeline</span>
+    </button>
+    <button 
+      type="button" 
+      onclick="clearAllVendorSelection()"
+      class="text-xs text-slate-400 hover:text-white font-semibold transition cursor-pointer"
+    >
+      Deselect All
+    </button>
+  </div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -795,9 +837,9 @@ function switchVendorLayout(mode) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  let savedMode = 'cards';
+  let savedMode = 'table';
   try {
-    savedMode = localStorage.getItem('vendor_list_layout') || 'cards';
+    savedMode = localStorage.getItem('vendor_list_layout') || 'table';
   } catch(e) {}
   switchVendorLayout(savedMode);
 
@@ -1074,6 +1116,95 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
-});
+
+// ==========================================
+// Multi-Select Batch Actions (Save Selected to Pipeline)
+// ==========================================
+function handleVendorBatchCheckboxChange() {
+  const checkboxes = document.querySelectorAll('.vendor-batch-checkbox:checked');
+  const count = checkboxes.length;
+  const bar = document.getElementById('vendorBatchActionBar');
+  const counter = document.getElementById('batchSelectedCounter');
+  if (counter) counter.textContent = count;
+  if (bar) {
+    if (count > 0) bar.classList.remove('hidden');
+    else bar.classList.add('hidden');
+  }
+}
+
+function toggleSelectAllVendors(masterCheckbox) {
+  const isChecked = masterCheckbox.checked;
+  document.querySelectorAll('.vendor-batch-checkbox').forEach(cb => {
+    cb.checked = isChecked;
+  });
+  handleVendorBatchCheckboxChange();
+}
+
+function clearAllVendorSelection() {
+  document.querySelectorAll('.vendor-batch-checkbox').forEach(cb => cb.checked = false);
+  const master = document.getElementById('selectAllVendorsTable');
+  if (master) master.checked = false;
+  handleVendorBatchCheckboxChange();
+}
+
+function executeBatchSaveToPipeline() {
+  const checkboxes = document.querySelectorAll('.vendor-batch-checkbox:checked');
+  const resultIds = Array.from(checkboxes).map(cb => cb.value);
+  if (!resultIds.length) return;
+
+  const btn = document.getElementById('batchSaveBtn');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+  }
+
+  fetch('{% url "batch-save-leads" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: JSON.stringify({ result_ids: resultIds })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data && data.success) {
+      resultIds.forEach(id => {
+        document.querySelectorAll(`[data-lead-id="${id}"]`).forEach(el => {
+          el.setAttribute('data-is-saved', 'true');
+          const slot = el.querySelector('.card-save-slot');
+          if (slot) {
+            slot.innerHTML = `
+              <a href="{% url 'saved-leads' %}" class="bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-[11px] px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition" title="In Pipeline">
+                <i class="fa-solid fa-check text-[9px]"></i>
+                <span>Saved</span>
+              </a>
+            `;
+          }
+        });
+      });
+      clearAllVendorSelection();
+      if (typeof showToastNotification === 'function') {
+        showToastNotification('Pipeline Updated', data.message, 'fa-circle-check', 'emerald');
+      } else {
+        alert(data.message);
+      }
+    } else {
+      alert((data && data.message) || 'Error saving leads');
+    }
+  })
+  .catch(err => {
+    console.error('Batch save error:', err);
+    alert('An unexpected error occurred while saving.');
+  })
+  .finally(() => {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  });
+}
 </script>
 {% endblock %}

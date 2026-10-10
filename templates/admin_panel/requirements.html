@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Buyer Requirements Moderation — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
+        <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
+      </div>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Platform Buyer Sourcing Requirements</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Audit procurement intents, evaluate sourcing pipelines, and ensure platform RFP compliance</p>
+    </div>
+
+    <!-- Quick Stats Pill -->
+    <div class="flex items-center gap-2">
+      <div class="px-3.5 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        <span class="text-slate-500">Active Requirements:</span> <span class="font-bold text-slate-900">{{ total_requirements }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search item, buyer company, specs..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
+      </div>
+
+      <!-- Company Filter -->
+      <div>
+        <select name="company_id" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if company_filter == 'all' %}selected{% endif %}>All Buyer Companies</option>
+          {% for comp in all_companies %}
+          <option value="{{ comp.id }}" {% if company_filter == comp.id|stringformat:"s" %}selected{% endif %}>{{ comp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div>
+        <select name="status" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Requirement Statuses</option>
+          <option value="OPEN" {% if status_filter == 'OPEN' %}selected{% endif %}>Open Sourcing</option>
+          <option value="IN_PROGRESS" {% if status_filter == 'IN_PROGRESS' %}selected{% endif %}>In Progress</option>
+          <option value="COMPLETED" {% if status_filter == 'COMPLETED' %}selected{% endif %}>Completed / Fulfilled</option>
+          <option value="CANCELLED" {% if status_filter == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+        </select>
+      </div>
+
+      <!-- Clear Button -->
+      <div class="flex items-center gap-2">
+        {% if q or company_filter != 'all' or status_filter != 'all' %}
+        <a href="{% url 'admin-panel-requirements' %}" class="w-full py-1.5 px-3 text-xs text-center text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl transition font-semibold" title="Clear Filters">
+          <i class="fa-solid fa-xmark mr-1"></i> Clear Filters
+        </a>
+        {% else %}
+        <button type="submit" class="w-full py-1.5 px-3 text-xs text-center text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition font-semibold shadow-sm">
+          <i class="fa-solid fa-filter mr-1"></i> Apply Filter
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Requirements Table Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Requirement Item</th>
+            <th class="py-3 px-4">Buyer Company</th>
+            <th class="py-3 px-4">Volume Required</th>
+            <th class="py-3 px-4">Delivery Location</th>
+            <th class="py-3 px-4">Pipeline Status</th>
+            <th class="py-3 px-4">Posted Date</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for r in requirements %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- Item Details -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center flex-shrink-0 text-xs border border-emerald-100">
+                  <i class="fa-solid fa-clipboard-list"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">{{ r.item_name }}</div>
+                  <div class="text-[11px] font-normal text-slate-500">
+                    {% if r.category %}{{ r.category.name }} • {% endif %}
+                    Ref: <span class="font-mono text-slate-600">REQ-{{ r.id|stringformat:"05d" }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Buyer Company -->
+            <td class="py-3.5 px-4 font-medium text-slate-700">
+              <a href="{% url 'admin-panel-company-detail' r.company.id %}" class="hover:text-blue-600 flex items-center gap-1 group">
+                <span>{{ r.company.name }}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400 group-hover:text-blue-500"></i>
+              </a>
+            </td>
+
+            <!-- Volume -->
+            <td class="py-3.5 px-4 font-semibold text-slate-900">
+              {% if r.quantity %}
+                {{ r.quantity }} {{ r.unit|default:"units" }}
+              {% else %}
+                <span class="text-slate-400 italic">Unspecified</span>
+              {% endif %}
+            </td>
+
+            <!-- Location -->
+            <td class="py-3.5 px-4 text-slate-600">
+              {{ r.delivery_location|default:"Standard Delivery" }}
+            </td>
+
+            <!-- Status -->
+            <td class="py-3.5 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if r.status == 'OPEN' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif r.status == 'IN_PROGRESS' %}bg-blue-50 text-blue-700 border border-blue-200{% elif r.status == 'COMPLETED' %}bg-purple-50 text-purple-700 border border-purple-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                {{ r.get_status_display|default:r.status }}
+              </span>
+            </td>
+
+            <!-- Posted Date -->
+            <td class="py-3.5 px-4 text-slate-500">{{ r.created_at|date:"M d, Y" }}</td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
+              <button type="button" onclick="showRequirementDetail('{{ r.id }}', '{{ r.item_name|escapejs }}', '{{ r.company.name|escapejs }}', '{{ r.quantity|default:"" }} {{ r.unit|default:"" }}', '{{ r.delivery_location|default:"N/A"|escapejs }}', '{{ r.description|default:"No extended specifications provided."|escapejs }}')" class="inline-flex items-center px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 transition cursor-pointer" title="View Requirement Details">
+                <i class="fa-solid fa-eye mr-1 text-slate-500"></i> Inspect
+              </button>
+
+              <form method="POST" action="" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_deleted">
+                <input type="hidden" name="requirement_id" value="{{ r.id }}">
+                {% if r.is_deleted %}
+                  <button type="submit" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold rounded-lg border border-emerald-200 transition cursor-pointer" title="Restore Requirement">
+                    <i class="fa-solid fa-rotate-left mr-1 text-emerald-600"></i> Restore
+                  </button>
+                {% else %}
+                  <button type="submit" class="inline-flex items-center px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold rounded-lg border border-rose-200 transition cursor-pointer" title="Delist / Hide Requirement">
+                    <i class="fa-solid fa-ban mr-1 text-rose-600"></i> Delist
+                  </button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <i class="fa-solid fa-clipboard-question text-3xl mb-2 text-slate-300 block"></i>
+              No buyer sourcing requirements found matching query.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "admin_panel/includes/pagination.html" %}
+  </div>
+
+  <!-- Requirement Inspection Modal -->
+  <div id="reqModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-clipboard-check"></i>
+            </span>
+            <h3 class="text-base font-black text-slate-900" id="reqModalTitle">Requirement Title</h3>
+          </div>
+          <button type="button" onclick="closeRequirementDetail()" class="text-slate-400 hover:text-slate-700 p-1">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-3 text-xs">
+          <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+            <div>
+              <span class="text-slate-400 block text-[10px]">Buyer Company</span>
+              <span class="font-bold text-slate-900" id="reqModalCompany">Company</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px]">Requested Quantity</span>
+              <span class="font-bold text-slate-900" id="reqModalQty">0 units</span>
+            </div>
+            <div class="col-span-2">
+              <span class="text-slate-400 block text-[10px]">Delivery Location</span>
+              <span class="font-bold text-slate-900" id="reqModalLoc">Location</span>
+            </div>
+          </div>
+
+          <div>
+            <span class="text-slate-500 font-bold block mb-1">Specifications & Scope:</span>
+            <div class="p-3 bg-white rounded-xl border border-slate-200 text-slate-700 text-xs leading-relaxed max-h-48 overflow-y-auto" id="reqModalDesc">
+              Details
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button type="button" onclick="closeRequirementDetail()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showRequirementDetail(id, title, company, qty, loc, desc) {
+  document.getElementById('reqModalTitle').textContent = title;
+  document.getElementById('reqModalCompany').textContent = company;
+  document.getElementById('reqModalQty').textContent = qty;
+  document.getElementById('reqModalLoc').textContent = loc;
+  document.getElementById('reqModalDesc').textContent = desc;
+  document.getElementById('reqModal').classList.remove('hidden');
+}
+
+function closeRequirementDetail() {
+  document.getElementById('reqModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

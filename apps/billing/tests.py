@@ -960,5 +960,11 @@ class SubscriptionScenariosAndInvoicesWebTestCase(TestCase):
         self.assertIn("Opening Credit Balance", csv_res.content.decode("utf-8"))
         self.assertIn("Closing Credit Balance", csv_res.content.decode("utf-8"))
 
+        # 3. Dedicated Company Credit Ledger loads
+        ledger_res = self.client.get(reverse("company-credit-ledger"))
+        self.assertEqual(ledger_res.status_code, 200)
+        self.assertContains(ledger_res, "Company Credit Ledger")
+        self.assertContains(ledger_res, "Itemized Transaction History")
+
 
 

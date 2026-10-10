@@ -41,7 +41,7 @@
 
   <!-- Search & Filter Bar -->
   <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-3">
       <!-- Search Input -->
       <div class="relative md:col-span-1">
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
@@ -55,6 +55,16 @@
           <option value="BUYER" {% if type_filter == 'BUYER' %}selected{% endif %}>Buyers (Procurement)</option>
           <option value="SELLER" {% if type_filter == 'SELLER' %}selected{% endif %}>Sellers (Vendors)</option>
           <option value="BOTH" {% if type_filter == 'BOTH' %}selected{% endif %}>Hybrid (Both)</option>
+        </select>
+      </div>
+
+      <!-- Plan Filter -->
+      <div>
+        <select name="plan" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
+          <option value="all" {% if plan_filter == 'all' %}selected{% endif %}>All Subscription Plans</option>
+          <option value="free" {% if plan_filter == 'free' %}selected{% endif %}>Free Starter</option>
+          <option value="pro" {% if plan_filter == 'pro' %}selected{% endif %}>Pro Tier</option>
+          <option value="enterprise" {% if plan_filter == 'enterprise' %}selected{% endif %}>Enterprise Tier</option>
         </select>
       </div>
 
@@ -75,7 +85,7 @@
           <option value="verified" {% if verified_filter == 'verified' %}selected{% endif %}>Verified Only</option>
           <option value="pending" {% if verified_filter == 'pending' %}selected{% endif %}>Pending Verification</option>
         </select>
-        {% if q or type_filter != 'all' or status_filter != 'all' or verified_filter != 'all' %}
+        {% if q or type_filter != 'all' or status_filter != 'all' or verified_filter != 'all' or plan_filter != 'all' %}
         <a href="{% url 'admin-panel-companies' %}" class="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 bg-slate-100 rounded-xl transition" title="Clear Filters">
           <i class="fa-solid fa-xmark"></i>
         </a>
@@ -84,24 +94,58 @@
     </form>
   </div>
 
-  <!-- Companies Table Card -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-3 px-4">Company Name</th>
-            <th class="py-3 px-4">Type</th>
-            <th class="py-3 px-4">Subscription & Credits</th>
-            <th class="py-3 px-4">Verification</th>
-            <th class="py-3 px-4">Account Status</th>
-            <th class="py-3 px-4">Created Date</th>
-            <th class="py-3 px-4 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for c in companies %}
-          <tr class="hover:bg-slate-50/80 transition">
+  <!-- Companies Table Card (with Bulk Actions and Sorting) -->
+  <form method="POST" id="bulkCompanyForm" action="">
+    {% csrf_token %}
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-3 w-8 text-center">
+                <input type="checkbox" id="selectAllCompanies" onclick="toggleAllCompanies(this)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+              </th>
+              <th class="py-3 px-4">
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}sort=name&order={% if sort_by == 'name' and order == 'asc' %}desc{% else %}asc{% endif %}" class="inline-flex items-center gap-1 group text-slate-600 hover:text-slate-900">
+                  <span>Company Name</span>
+                  <i class="fa-solid {% if sort_by == 'name' %}{% if order == 'asc' %}fa-arrow-up-short-wide text-blue-600{% else %}fa-arrow-down-wide-short text-blue-600{% endif %}{% else %}fa-sort text-slate-300 group-hover:text-slate-500{% endif %} text-[10px]"></i>
+                </a>
+              </th>
+              <th class="py-3 px-4">
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}sort=company_type&order={% if sort_by == 'company_type' and order == 'asc' %}desc{% else %}asc{% endif %}" class="inline-flex items-center gap-1 group text-slate-600 hover:text-slate-900">
+                  <span>Type</span>
+                  <i class="fa-solid {% if sort_by == 'company_type' %}{% if order == 'asc' %}fa-arrow-up-short-wide text-blue-600{% else %}fa-arrow-down-wide-short text-blue-600{% endif %}{% else %}fa-sort text-slate-300 group-hover:text-slate-500{% endif %} text-[10px]"></i>
+                </a>
+              </th>
+              <th class="py-3 px-4">Subscription & Credits</th>
+              <th class="py-3 px-4">
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}sort=is_verified&order={% if sort_by == 'is_verified' and order == 'asc' %}desc{% else %}asc{% endif %}" class="inline-flex items-center gap-1 group text-slate-600 hover:text-slate-900">
+                  <span>Verification</span>
+                  <i class="fa-solid {% if sort_by == 'is_verified' %}{% if order == 'asc' %}fa-arrow-up-short-wide text-blue-600{% else %}fa-arrow-down-wide-short text-blue-600{% endif %}{% else %}fa-sort text-slate-300 group-hover:text-slate-500{% endif %} text-[10px]"></i>
+                </a>
+              </th>
+              <th class="py-3 px-4">
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}sort=is_active&order={% if sort_by == 'is_active' and order == 'asc' %}desc{% else %}asc{% endif %}" class="inline-flex items-center gap-1 group text-slate-600 hover:text-slate-900">
+                  <span>Account Status</span>
+                  <i class="fa-solid {% if sort_by == 'is_active' %}{% if order == 'asc' %}fa-arrow-up-short-wide text-blue-600{% else %}fa-arrow-down-wide-short text-blue-600{% endif %}{% else %}fa-sort text-slate-300 group-hover:text-slate-500{% endif %} text-[10px]"></i>
+                </a>
+              </th>
+              <th class="py-3 px-4">
+                <a href="?{% if query_string %}{{ query_string }}&{% endif %}sort=created_at&order={% if sort_by == 'created_at' and order == 'asc' %}desc{% else %}asc{% endif %}" class="inline-flex items-center gap-1 group text-slate-600 hover:text-slate-900">
+                  <span>Created Date</span>
+                  <i class="fa-solid {% if sort_by == 'created_at' %}{% if order == 'asc' %}fa-arrow-up-short-wide text-blue-600{% else %}fa-arrow-down-wide-short text-blue-600{% endif %}{% else %}fa-sort text-slate-300 group-hover:text-slate-500{% endif %} text-[10px]"></i>
+                </a>
+              </th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in companies %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <!-- Row Checkbox -->
+              <td class="py-3.5 px-3 text-center">
+                <input type="checkbox" name="selected_ids" value="{{ c.id }}" class="company-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" onchange="updateBulkCompanyBar()">
+              </td>
             <!-- Company Info (Clickable to 360 Dossier) -->
             <td class="py-3.5 px-4 font-bold text-slate-900">
               <a href="{% url 'admin-panel-company-detail' c.id %}" class="flex items-center group">
@@ -120,11 +164,12 @@
               </a>
             </td>
 
-            <!-- Type -->
+            <!-- Type (Interactive Change Type Modal Trigger) -->
             <td class="py-3.5 px-4 font-medium text-slate-700">
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if c.company_type == 'BUYER' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif c.company_type == 'SELLER' %}bg-purple-50 text-purple-800 border border-purple-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
-                {{ c.get_company_type_display }}
-              </span>
+              <button type="button" onclick="openChangeTypeModal('{{ c.id }}', '{{ c.name|escapejs }}', '{{ c.company_type }}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition {% if c.company_type == 'BUYER' %}bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200{% elif c.company_type == 'SELLER' %}bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200{% else %}bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200{% endif %}" title="Click to change operating type">
+                <span>{{ c.get_company_type_display }}</span>
+                <i class="fa-solid fa-arrows-rotate text-[9px] opacity-70"></i>
+              </button>
             </td>
 
             <!-- Subscription & Credits -->
@@ -184,8 +229,8 @@
             <!-- Created Date -->
             <td class="py-3.5 px-4 text-slate-500">{{ c.created_at|date:"M d, Y" }}</td>
 
-            <!-- Action Buttons: View, Edit Company, Plan, Soft-Delete / Restore -->
-            <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+            <!-- Action Buttons: View, Edit Company, Plan, Type, Soft-Delete / Restore -->
+            <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
               <!-- View Dossier Link -->
               <a href="{% url 'admin-panel-company-detail' c.id %}" class="inline-flex items-center px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 transition" title="View complete 360 data dossier">
                 <i class="fa-solid fa-eye mr-1 text-slate-500"></i> View
@@ -196,8 +241,13 @@
                 <i class="fa-solid fa-pen-to-square mr-1 text-blue-600"></i> Edit
               </a>
 
+              <!-- Change Type Action Trigger -->
+              <button type="button" onclick="openChangeTypeModal('{{ c.id }}', '{{ c.name|escapejs }}', '{{ c.company_type }}')" class="inline-flex items-center px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-semibold rounded-lg border border-purple-200 transition cursor-pointer" title="Switch Operating Type (Buyer/Seller/Both)">
+                <i class="fa-solid fa-arrows-split-up-and-left mr-1 text-purple-600"></i> Type
+              </button>
+
               <!-- Manage Plan Link -->
-              <a href="{% url 'admin-panel-plans' %}?q={{ c.name }}" class="inline-flex items-center px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold rounded-lg border border-amber-200 transition" title="Adjust credits or plan tier">
+              <a href="{% url 'admin-panel-plans' %}?q={{ c.name }}" class="inline-flex items-center px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold rounded-lg border border-amber-200 transition" title="Adjust credits or plan tier">
                 <i class="fa-solid fa-credit-card mr-1 text-amber-600"></i> Plan
               </a>
 
@@ -219,7 +269,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="py-12 text-center text-slate-400">
+            <td colspan="8" class="py-12 text-center text-slate-400">
               <i class="fa-solid fa-building text-3xl mb-2 text-slate-300 block"></i>
               No companies match your search criteria.
             </td>
@@ -228,7 +278,34 @@
         </tbody>
       </table>
     </div>
+    {% include "admin_panel/includes/pagination.html" %}
   </div>
+
+  <!-- Floating Bulk Action Toolbar -->
+  <div id="bulkCompanyBar" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 hidden items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-150">
+    <div class="flex items-center gap-2 pr-3 border-r border-slate-700 text-xs font-bold">
+      <span class="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[11px]" id="bulkCompanyCount">0</span>
+      <span>Selected</span>
+    </div>
+    <div class="flex items-center gap-2 text-xs font-semibold">
+      <button type="submit" name="bulk_action" value="verify" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-circle-check"></i> Bulk Verify
+      </button>
+      <button type="submit" name="bulk_action" value="activate" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-power-off"></i> Bulk Activate
+      </button>
+      <button type="submit" name="bulk_action" value="suspend" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white transition flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-pause"></i> Bulk Suspend
+      </button>
+      <button type="submit" name="bulk_action" value="export" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white transition flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-download"></i> Export CSV
+      </button>
+      <button type="button" onclick="clearBulkCompanySelection()" class="px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition" title="Clear Selection">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  </div>
+  </form>
 
   <!-- Modern Soft Delete Confirmation Modal -->
   <div id="softDeleteModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
@@ -270,6 +347,79 @@
     </div>
   </div>
 
+  <!-- Modern Change Company Type Modal -->
+  <div id="changeTypeModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <!-- Icon & Header -->
+        <div class="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center mx-auto text-xl shadow-sm mb-4">
+          <i class="fa-solid fa-arrows-split-up-and-left"></i>
+        </div>
+
+        <h3 class="text-lg font-black text-slate-900 text-center">Change Company Operating Type</h3>
+        <p class="text-xs text-slate-500 text-center mt-0.5">Control workspace navigation and module access</p>
+
+        <div class="mt-4 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <div class="text-xs font-semibold text-slate-700 flex items-center gap-2">
+            <i class="fa-solid fa-building text-slate-400"></i>
+            <span id="changeTypeCompanyName" class="font-bold text-slate-900 text-sm">Company Name</span>
+          </div>
+          <p class="text-[11px] text-slate-600 leading-relaxed">
+            Changing company operating type instantly updates available dashboards, menus, and APIs without deleting any catalogs, requirements, inquiries, or credit balances.
+          </p>
+        </div>
+
+        <form id="changeTypeForm" method="POST" action="" class="mt-5 space-y-4">
+          {% csrf_token %}
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Select Operating Workspace Type</label>
+            <div class="space-y-2">
+              <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                <input type="radio" name="company_type" value="BUYER" id="radioTypeBuyer" class="text-blue-600 focus:ring-blue-500">
+                <div>
+                  <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Buyer Only
+                  </div>
+                  <div class="text-[10px] text-slate-500">Access to procurement requirements, supplier discovery, price comparison, RFQs</div>
+                </div>
+              </label>
+
+              <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                <input type="radio" name="company_type" value="SELLER" id="radioTypeSeller" class="text-blue-600 focus:ring-blue-500">
+                <div>
+                  <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-purple-500"></span> Seller Only
+                  </div>
+                  <div class="text-[10px] text-slate-500">Access to product catalog, buyer discovery, lead pipeline, inquiry quotes</div>
+                </div>
+              </label>
+
+              <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                <input type="radio" name="company_type" value="BOTH" id="radioTypeBoth" class="text-blue-600 focus:ring-blue-500">
+                <div>
+                  <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> Dual Buyer &amp; Seller (BOTH)
+                  </div>
+                  <div class="text-[10px] text-slate-500">Enables dynamic workspace switching and combined platform analytics</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-3">
+            <button type="button" onclick="closeChangeTypeModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-check"></i>
+              <span>Save Type</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -282,6 +432,54 @@ function openSoftDeleteModal(companyId, companyName) {
 
 function closeSoftDeleteModal() {
   document.getElementById('softDeleteModal').classList.add('hidden');
+}
+
+function openChangeTypeModal(companyId, companyName, currentType) {
+  const form = document.getElementById('changeTypeForm');
+  form.action = `/admin-panel/companies/${companyId}/change-type/`;
+  document.getElementById('changeTypeCompanyName').textContent = companyName;
+  if (currentType === 'BUYER') {
+    document.getElementById('radioTypeBuyer').checked = true;
+  } else if (currentType === 'SELLER') {
+    document.getElementById('radioTypeSeller').checked = true;
+  } else if (currentType === 'BOTH') {
+    document.getElementById('radioTypeBoth').checked = true;
+  }
+  document.getElementById('changeTypeModal').classList.remove('hidden');
+}
+
+function closeChangeTypeModal() {
+  document.getElementById('changeTypeModal').classList.add('hidden');
+}
+
+function toggleAllCompanies(master) {
+  const checkboxes = document.querySelectorAll('.company-checkbox');
+  checkboxes.forEach(cb => { cb.checked = master.checked; });
+  updateBulkCompanyBar();
+}
+
+function updateBulkCompanyBar() {
+  const selected = document.querySelectorAll('.company-checkbox:checked');
+  const bar = document.getElementById('bulkCompanyBar');
+  const countSpan = document.getElementById('bulkCompanyCount');
+  if (selected.length > 0) {
+    countSpan.textContent = selected.length;
+    bar.classList.remove('hidden');
+    bar.classList.add('flex');
+  } else {
+    bar.classList.add('hidden');
+    bar.classList.remove('flex');
+    const master = document.getElementById('selectAllCompanies');
+    if (master) master.checked = false;
+  }
+}
+
+function clearBulkCompanySelection() {
+  const checkboxes = document.querySelectorAll('.company-checkbox');
+  checkboxes.forEach(cb => { cb.checked = false; });
+  const master = document.getElementById('selectAllCompanies');
+  if (master) master.checked = false;
+  updateBulkCompanyBar();
 }
 </script>
 {% endblock %}

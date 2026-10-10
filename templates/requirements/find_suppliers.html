@@ -751,17 +751,48 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Show loading indicator on search submit
+  // Show Modern AI Search Progress Loader on search submit
   if (form) {
     form.addEventListener('submit', function(e) {
-      const reqId = document.getElementById('selected_requirement_id').value;
+      let reqId = document.getElementById('selected_requirement_id') ? document.getElementById('selected_requirement_id').value : '';
+      const reqSelect = document.getElementById('req_select_input');
+      if (!reqId && reqSelect && reqSelect.value) {
+        reqId = reqSelect.value;
+        const hiddenReqInput = document.getElementById('selected_requirement_id');
+        if (hiddenReqInput) hiddenReqInput.value = reqId;
+      }
+
       if (!reqId) {
         e.preventDefault();
         alert('Please choose a sourcing requirement to find matching customers.');
+        if (reqSelect) reqSelect.focus();
         return;
       }
+
+      const reqText = (reqSelect && reqSelect.selectedIndex > 0) 
+        ? reqSelect.options[reqSelect.selectedIndex].text.split('(')[0].trim() 
+        : 'Sourcing Requirement';
+      const criteriaBadge = document.getElementById('criteria_badge_count');
+      const criteriaCount = criteriaBadge ? criteriaBadge.textContent.trim() : '0 Active';
+
+      // Launch Modern AI Loader Modal
+      if (window.triggerAiSearchModernLoader) {
+        window.triggerAiSearchModernLoader({
+          targetName: reqText,
+          criteriaCount: criteriaCount,
+          type: 'supplier'
+        });
+      }
+
       const overlay = document.getElementById('search_loading_overlay');
       if (overlay) overlay.classList.remove('hidden');
+
+      const launchBtn = document.getElementById('launch_search_btn');
+      if (launchBtn) {
+        launchBtn.disabled = true;
+        launchBtn.classList.add('opacity-80', 'cursor-not-allowed');
+        launchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span>Searching & Evaluating Fit...</span>';
+      }
     });
   }
 
@@ -918,4 +949,6 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+
+{% include "components/ai_search_loader_modal.html" with loader_type="supplier" loader_color="blue" %}
 {% endblock %}

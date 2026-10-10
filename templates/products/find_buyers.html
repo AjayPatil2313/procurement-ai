@@ -175,7 +175,8 @@
           <button 
             type="submit" 
             id="launch_search_btn" 
-            class="flex-1 sm:flex-initial bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition"
+            {% if subscription and subscription.credits_remaining <= 0 %}disabled title="Search disabled: AI credits exhausted"{% endif %}
+            class="flex-1 sm:flex-initial {% if subscription and subscription.credits_remaining <= 0 %}bg-slate-300 text-slate-500 cursor-not-allowed opacity-60{% else %}bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20{% endif %} font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition"
           >
             <i class="fa-solid fa-wand-magic-sparkles"></i>
             <span>Launch AI Vendor Search</span>
@@ -542,7 +543,7 @@
         Select a product from the dropdown above and click <strong>"Launch AI Vendor Search"</strong>. Our automated web scraper will query commercial sources, parse company sites, and extract vendor contacts.
       </p>
       {% if products.first %}
-      <form method="POST" action="{% url 'find-buyers' %}" class="inline-block">
+      <form method="POST" action="{% url 'find-buyers' %}" class="inline-block" onsubmit="if(window.triggerAiSearchModernLoader){ window.triggerAiSearchModernLoader({ targetName: '{{ products.first.name|escapejs }}', criteriaCount: 'Default Criteria', type: 'vendor' }); }">
         {% csrf_token %}
         <input type="hidden" name="action" value="run_search">
         <input type="hidden" name="product_id" value="{{ products.first.id }}">
@@ -906,8 +907,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
-      // Valid product selected: activate loading UI
+      // Valid product selected: activate Modern Loader UI
       const launchBtn = document.getElementById('launch_search_btn');
+      const selectedName = (searchInput ? searchInput.value : '') || (selectedOption ? selectedOption.getAttribute('data-name') : 'Selected Product');
+      const criteriaCount = criteriaBadgeCount ? criteriaBadgeCount.textContent.trim() : '0 Active';
+
+      if (window.triggerAiSearchModernLoader) {
+        window.triggerAiSearchModernLoader({
+          targetName: selectedName,
+          criteriaCount: criteriaCount,
+          type: 'vendor'
+        });
+      }
+
       const loadingOverlay = document.getElementById('search_loading_overlay');
       if (loadingOverlay) loadingOverlay.classList.remove('hidden');
       if (launchBtn) {
@@ -1284,4 +1296,6 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+
+{% include "components/ai_search_loader_modal.html" with loader_type="vendor" loader_color="orange" %}
 {% endblock %}

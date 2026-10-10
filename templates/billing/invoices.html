@@ -31,6 +31,15 @@
         <span>Manage Subscription &amp; Credits</span>
       </a>
 
+      <a 
+        href="{% url 'company-credit-ledger' %}" 
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition cursor-pointer"
+        title="View dedicated Company Credit Ledger"
+      >
+        <i class="fa-solid fa-receipt text-amber-600"></i>
+        <span>Company Credit Ledger</span>
+      </a>
+
       <button 
         type="button" 
         onclick="openStatementExportModal()"
@@ -250,161 +259,7 @@
         {% endif %}
         <span class="px-2.5 py-1 font-bold text-slate-900 bg-white border border-slate-200 rounded-lg">{{ invoices_page.number }}</span>
         {% if invoices_page.has_next %}
-          <a href="?inv_page={{ invoices_page.next_page_number }}&inv_limit={{ inv_limit }}&inv_status={{ inv_status }}&ledger_page={{ ledger_page.number }}&ledger_limit={{ ledger_limit }}#invoices-section" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">Next &raquo;</a>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- ========================================================================= -->
-  <!-- SECTION 2: COMPANY CREDIT LEDGER & RECEIPTS (WITH CONFIGURABLE PAGINATION)-->
-  <!-- ========================================================================= -->
-  <div id="ledger-section" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-      <div>
-        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <i class="fa-solid fa-receipt text-amber-500"></i> Company Credit Ledger &amp; Receipts
-        </h3>
-        <span class="text-[11px] text-slate-500">Immutable credit ledger tracking allocations, purchases, feature deductions, and refunds</span>
-      </div>
-
-      <!-- Controls: Date Range & Page Limit -->
-      <div class="flex items-center gap-2.5 flex-wrap">
-        <!-- Date Range Filter -->
-        <form method="GET" class="inline-flex items-center gap-1.5 text-xs">
-          <input type="hidden" name="tx_type" value="{{ tx_type }}">
-          <input type="hidden" name="inv_page" value="{{ invoices_page.number }}">
-          <input type="hidden" name="inv_limit" value="{{ inv_limit }}">
-          <input type="hidden" name="ledger_limit" value="{{ ledger_limit }}">
-          <label class="text-[11px] font-semibold text-slate-500">Date:</label>
-          <select 
-            name="date_range" 
-            onchange="this.form.submit()" 
-            class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="all" {% if date_range == 'all' or not date_range %}selected{% endif %}>All Time</option>
-            <option value="7d" {% if date_range == '7d' %}selected{% endif %}>Last 7 Days</option>
-            <option value="30d" {% if date_range == '30d' %}selected{% endif %}>Last 30 Days</option>
-            <option value="90d" {% if date_range == '90d' %}selected{% endif %}>Last 90 Days</option>
-          </select>
-        </form>
-
-        <!-- Ledger Per Page Limit (Default 10) -->
-        <form method="GET" class="inline-flex items-center gap-1.5 text-xs">
-          <input type="hidden" name="tx_type" value="{{ tx_type }}">
-          <input type="hidden" name="date_range" value="{{ date_range }}">
-          <input type="hidden" name="inv_page" value="{{ invoices_page.number }}">
-          <input type="hidden" name="inv_limit" value="{{ inv_limit }}">
-          <label class="text-[11px] font-semibold text-slate-500">Show:</label>
-          <select 
-            name="ledger_limit" 
-            onchange="this.form.submit()" 
-            class="text-[11px] font-bold border border-slate-200 rounded-lg px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="10" {% if ledger_limit == 10 %}selected{% endif %}>10 per page</option>
-            <option value="25" {% if ledger_limit == 25 %}selected{% endif %}>25 per page</option>
-            <option value="50" {% if ledger_limit == 50 %}selected{% endif %}>50 per page</option>
-            <option value="100" {% if ledger_limit == 100 %}selected{% endif %}>100 per page</option>
-          </select>
-        </form>
-      </div>
-    </div>
-
-    <!-- Filter Pills Row -->
-    <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center gap-1.5 text-[11px]">
-      <span class="text-slate-400 font-bold mr-1 uppercase text-[10px]">Type:</span>
-      <a 
-        href="?tx_type=all&date_range={{ date_range }}&inv_limit={{ inv_limit }}&ledger_limit={{ ledger_limit }}#ledger-section" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'all' or not tx_type %}bg-slate-900 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >All Events</a>
-      <a 
-        href="?tx_type=deduction&date_range={{ date_range }}&inv_limit={{ inv_limit }}&ledger_limit={{ ledger_limit }}#ledger-section" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'deduction' %}bg-rose-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Deductions</a>
-      <a 
-        href="?tx_type=purchase&date_range={{ date_range }}&inv_limit={{ inv_limit }}&ledger_limit={{ ledger_limit }}#ledger-section" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'purchase' %}bg-amber-500 text-slate-950{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Top-Up Packs</a>
-      <a 
-        href="?tx_type=allocation&date_range={{ date_range }}&inv_limit={{ inv_limit }}&ledger_limit={{ ledger_limit }}#ledger-section" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'allocation' %}bg-emerald-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Plan Credits</a>
-      <a 
-        href="?tx_type=refund&date_range={{ date_range }}&inv_limit={{ inv_limit }}&ledger_limit={{ ledger_limit }}#ledger-section" 
-        class="px-2.5 py-0.5 rounded-full font-bold transition {% if tx_type == 'refund' %}bg-blue-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
-      >Refunds</a>
-    </div>
-
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-          <tr>
-            <th class="py-2.5 px-4">Receipt Ref</th>
-            <th class="py-2.5 px-3">Triggered By</th>
-            <th class="py-2.5 px-3">Type</th>
-            <th class="py-2.5 px-3">Credits</th>
-            <th class="py-2.5 px-3">Balance After</th>
-            <th class="py-2.5 px-3">Reason / Feature</th>
-            <th class="py-2.5 px-3 text-right">Timestamp</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for tx in ledger_page %}
-          <tr class="hover:bg-slate-50 transition">
-            <td class="py-3 px-4 font-mono font-bold text-blue-700">
-              #{{ tx.receipt_number|default:"RCP-00000" }}
-            </td>
-            <td class="py-3 px-3 text-slate-700 font-medium">
-              {% if tx.user %}{{ tx.user.get_full_name|default:tx.user.email }}{% else %}System Engine{% endif %}
-            </td>
-            <td class="py-3 px-3">
-              {% if tx.transaction_type == 'allocation' or tx.transaction_type == 'purchase' or tx.transaction_type == 'refund' or tx.credits > 0 %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                  <i class="fa-solid fa-plus mr-1 text-[8px]"></i> {{ tx.get_transaction_type_display }}
-                </span>
-              {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
-                  <i class="fa-solid fa-minus mr-1 text-[8px]"></i> {{ tx.get_transaction_type_display }}
-                </span>
-              {% endif %}
-            </td>
-            <td class="py-3 px-3 font-bold {% if tx.credits > 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
-              {% if tx.credits > 0 %}+{% endif %}{{ tx.credits }}
-            </td>
-            <td class="py-3 px-3 font-semibold text-slate-800">{{ tx.balance_after }}</td>
-            <td class="py-3 px-3 text-slate-600">{{ tx.notes }}</td>
-            <td class="py-3 px-3 text-right text-slate-400">{{ tx.created_at|date:"M d, Y H:i" }}</td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="7" class="py-10 text-center text-slate-400">
-              <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 text-lg mb-2">
-                <i class="fa-solid fa-receipt"></i>
-              </div>
-              <p class="font-bold text-slate-700 text-xs">No transactions matching selected criteria.</p>
-              <p class="text-[11px] text-slate-400 mt-0.5">Try resetting filters or expanding the date range.</p>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Ledger Pagination Footer -->
-    {% if ledger_page.has_other_pages %}
-    <div class="p-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 bg-slate-50/50">
-      <div>
-        Showing page <strong>{{ ledger_page.number }}</strong> of <strong>{{ ledger_page.paginator.num_pages }}</strong> 
-        ({{ ledger_page.paginator.count }} total transactions)
-      </div>
-      <div class="flex items-center gap-1.5">
-        {% if ledger_page.has_previous %}
-          <a href="?ledger_page={{ ledger_page.previous_page_number }}&ledger_limit={{ ledger_limit }}&tx_type={{ tx_type }}&date_range={{ date_range }}&inv_page={{ invoices_page.number }}&inv_limit={{ inv_limit }}#ledger-section" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">&laquo; Prev</a>
-        {% endif %}
-        <span class="px-2.5 py-1 font-bold text-slate-900 bg-white border border-slate-200 rounded-lg">{{ ledger_page.number }}</span>
-        {% if ledger_page.has_next %}
-          <a href="?ledger_page={{ ledger_page.next_page_number }}&ledger_limit={{ ledger_limit }}&tx_type={{ tx_type }}&date_range={{ date_range }}&inv_page={{ invoices_page.number }}&inv_limit={{ inv_limit }}#ledger-section" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">Next &raquo;</a>
+          <a href="?inv_page={{ invoices_page.next_page_number }}&inv_limit={{ inv_limit }}&inv_status={{ inv_status }}#invoices-section" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">Next &raquo;</a>
         {% endif %}
       </div>
     </div>

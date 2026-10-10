@@ -5,8 +5,11 @@ from django.core.exceptions import PermissionDenied
 from apps.accounts.models import User
 from apps.companies.models import Company, CompanyMember
 from apps.billing.models import Subscription, CreditTransaction
-from apps.ai_search.models import APILog
-from apps.dashboard.models import ActivityLog
+from apps.ai_search.models import APILog, SearchJob
+from apps.dashboard.models import ActivityLog, PlatformSetting
+from apps.catalog.models import Product
+from apps.requirements.models import Requirement
+from apps.leads.models import Inquiry
 
 
 class SuperAdminSuiteTestCase(TestCase):
@@ -239,8 +242,9 @@ class SuperAdminSuiteTestCase(TestCase):
         # Should contain Super Admin items
         self.assertContains(response, "Super Admin Dashboard")
         self.assertContains(response, "All Companies")
-        self.assertContains(response, "Add New Company")
-        self.assertContains(response, "Plans & Credits")
+        self.assertContains(response, "Platform Users")
+        self.assertContains(response, "Plans &amp; Credits")
+        self.assertContains(response, "Reports &amp; Exports")
         self.assertContains(response, "Audit Trail")
         self.assertNotIn("API Costs", response.content.decode("utf-8"))
 
@@ -251,9 +255,9 @@ class SuperAdminSuiteTestCase(TestCase):
         self.assertNotIn('href="/sales/products/"', content)
         self.assertNotIn('href="/sales/find-buyers/"', content)
 
-        # Should NOT contain Django Root or standalone Users in Super Admin sidebar
+        # Should NOT contain Django Root in Super Admin sidebar
         self.assertNotIn("Django Root", content)
-        self.assertNotIn('href="/admin-panel/users/"', content)
+        self.assertContains(response, 'href="/admin-panel/users/"')
 
     def test_admin_panel_company_detail_view(self):
         """Super Admin can access 360 company dossier showing members, products, plans, etc."""
@@ -489,4 +493,263 @@ class SuperAdminSuiteTestCase(TestCase):
         self.assertEqual(disable_res.status_code, 200)
         self.assertEqual(PlatformSetting.get_setting("maintenance_mode"), "false")
         self.assertContains(disable_res, "Platform Maintenance Mode has been DISABLED")
+
+    def test_change_company_type_transitions(self):
+        """Super Admin can transition company type between SELLER, BUYER, and BOTH."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        # Transition SELLER -> BUYER
+        res = self.client.post(
+            reverse("admin-panel-change-company-type", kwargs={"pk": self.company.pk}),
+            {"company_type": "BUYER"},
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+        self.company.refresh_from_db()
+        self.assertEqual(self.company.company_type, Company.CompanyType.BUYER)
+
+        # Transition BUYER -> BOTH
+        res = self.client.post(
+            reverse("admin-panel-change-company-type", kwargs={"pk": self.company.pk}),
+            {"company_type": "BOTH"},
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+        self.company.refresh_from_db()
+        self.assertEqual(self.company.company_type, Company.CompanyType.BOTH)
+
+    def test_admin_panel_platform_management_views(self):
+        """Super Admin can access all platform management views and execute moderation actions."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        # Seed data
+        prod = Product.objects.create(
+            company=self.company,
+            name="CNC Milling Machine",
+            sku="CNC-001",
+            price=250000,
+        )
+        req = Requirement.objects.create(
+            company=self.company,
+            item_name="Industrial Steel Sheets",
+            quantity=500,
+            unit="sheets",
+            created_by=self.superadmin,
+        )
+        job = SearchJob.objects.create(
+            company=self.company,
+            search_query="Industrial Steel",
+            status=SearchJob.Status.COMPLETED,
+            total_results=5,
+        )
+        inq = Inquiry.objects.create(
+            company=self.company,
+            subject="RFQ for Steel Sheets",
+            sent_to_email="sales@tatasteel.com",
+            message="Please provide quotation for 500 steel sheets.",
+            status=Inquiry.Status.SENT,
+        )
+
+        # Roles view
+        res = self.client.get(reverse("admin-panel-roles"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Roles & Responsibilities")
+
+        # Products view & moderation toggle
+        res = self.client.get(reverse("admin-panel-products"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "CNC Milling Machine")
+        toggle_res = self.client.post(
+            reverse("admin-panel-products"),
+            {"action": "toggle_deleted", "product_id": prod.pk},
+            follow=True,
+        )
+        self.assertEqual(toggle_res.status_code, 200)
+        prod.refresh_from_db()
+        self.assertTrue(prod.is_deleted)
+
+        # Requirements view
+        res = self.client.get(reverse("admin-panel-requirements"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Industrial Steel Sheets")
+
+        # AI Providers view
+        res = self.client.get(reverse("admin-panel-ai-providers"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Google Gemini")
+        self.assertContains(res, "OpenAI")
+
+        # Search Activity view
+        res = self.client.get(reverse("admin-panel-search-activity"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Industrial Steel")
+
+        # Inquiries view
+        res = self.client.get(reverse("admin-panel-inquiries"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "RFQ for Steel Sheets")
+
+        # Reports view & CSV exports
+        res = self.client.get(reverse("admin-panel-reports"))
+        self.assertEqual(res.status_code, 200)
+        for export_type in ["companies_csv", "users_csv", "searches_csv", "inquiries_csv"]:
+            csv_res = self.client.get(reverse("admin-panel-reports"), {"export": export_type})
+            self.assertEqual(csv_res.status_code, 200)
+            self.assertEqual(csv_res["Content-Type"], "text/csv; charset=utf-8")
+
+        # Settings view GET and POST
+        res = self.client.get(reverse("admin-panel-settings"))
+        self.assertEqual(res.status_code, 200)
+        post_settings = self.client.post(
+            reverse("admin-panel-settings"),
+            {
+                "app_name": "Antigravity Procurement AI",
+                "support_email": "ops@procurement.ai",
+                "default_signup_credits": "100",
+                "allow_public_signup": "true",
+                "maintenance_mode": "false",
+                "maintenance_message": "Upgrades scheduled",
+            },
+            follow=True,
+        )
+        self.assertEqual(post_settings.status_code, 200)
+        self.assertEqual(PlatformSetting.get_setting("app_name"), "Antigravity Procurement AI")
+
+    def test_direct_user_password_reset(self):
+        """Super Admin can directly reset password of any user from users management view."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        res = self.client.post(
+            reverse("admin-panel-user-reset-password-direct", kwargs={"pk": self.regular_user.pk}),
+            {"new_password": "DirectNewPassword123!"},
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        self.client.logout()
+        auth_ok = self.client.login(email="regular@vendor.com", password="DirectNewPassword123!")
+        self.assertTrue(auth_ok)
+
+    def test_super_admin_dashboard_cache_and_range(self):
+        """Super Admin dashboard supports dynamic date ranges and manual cache refresh (?refresh=1)."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        # 7d view (default)
+        res_7d = self.client.get(reverse("admin-panel-dashboard") + "?range=7d")
+        self.assertEqual(res_7d.status_code, 200)
+        self.assertEqual(res_7d.context["date_range"], "7d")
+
+        # 30d view
+        res_30d = self.client.get(reverse("admin-panel-dashboard") + "?range=30d")
+        self.assertEqual(res_30d.status_code, 200)
+        self.assertEqual(res_30d.context["date_range"], "30d")
+
+        # 90d view
+        res_90d = self.client.get(reverse("admin-panel-dashboard") + "?range=90d")
+        self.assertEqual(res_90d.status_code, 200)
+        self.assertEqual(res_90d.context["date_range"], "90d")
+
+        # YTD view
+        res_ytd = self.client.get(reverse("admin-panel-dashboard") + "?range=ytd")
+        self.assertEqual(res_ytd.status_code, 200)
+        self.assertEqual(res_ytd.context["date_range"], "ytd")
+
+        # Refresh cache
+        res_refresh = self.client.get(reverse("admin-panel-dashboard") + "?range=7d&refresh=1")
+        self.assertEqual(res_refresh.status_code, 200)
+
+    def test_super_admin_bulk_actions_companies(self):
+        """Super Admin can execute bulk operations on companies (verify, suspend, activate)."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        c2 = Company.objects.create(name="Batch Test Co", company_type=Company.CompanyType.BUYER, created_by=self.superadmin)
+        ids = [str(self.company.id), str(c2.id)]
+
+        # Bulk verify
+        res = self.client.post(reverse("admin-panel-companies"), {
+            "bulk_action": "verify",
+            "selected_ids": ids,
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.company.refresh_from_db()
+        c2.refresh_from_db()
+        self.assertTrue(self.company.is_verified)
+        self.assertTrue(c2.is_verified)
+
+        # Bulk suspend
+        res = self.client.post(reverse("admin-panel-companies"), {
+            "bulk_action": "suspend",
+            "selected_ids": ids,
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.company.refresh_from_db()
+        c2.refresh_from_db()
+        self.assertFalse(self.company.is_active)
+        self.assertFalse(c2.is_active)
+
+        # Bulk activate
+        res = self.client.post(reverse("admin-panel-companies"), {
+            "bulk_action": "activate",
+            "selected_ids": ids,
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.company.refresh_from_db()
+        c2.refresh_from_db()
+        self.assertTrue(self.company.is_active)
+        self.assertTrue(c2.is_active)
+
+    def test_super_admin_bulk_actions_users(self):
+        """Super Admin can batch deactivate users while protecting self from lockout."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        u2 = User.objects.create_user(email="testuser2@vendor.com", password="Password123!")
+        # Attempt to batch-deactivate regular users and self
+        ids = [str(self.regular_user.id), str(u2.id), str(self.superadmin.id)]
+
+        res = self.client.post(reverse("admin-panel-users"), {
+            "bulk_action": "deactivate",
+            "selected_ids": ids,
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+
+        self.regular_user.refresh_from_db()
+        u2.refresh_from_db()
+        self.superadmin.refresh_from_db()
+
+        self.assertFalse(self.regular_user.is_active)
+        self.assertFalse(u2.is_active)
+        self.assertTrue(self.superadmin.is_active)  # self-lockout prevented
+
+    def test_super_admin_requirements_moderation_toggle(self):
+        """Super Admin can delist/restore buyer requirements."""
+        self.client.login(email="superadmin@platform.ai", password="Password123!")
+
+        req = Requirement.objects.create(
+            company=self.company,
+            item_name="Precision Ball Bearings",
+            quantity=100,
+            unit="pcs",
+            created_by=self.superadmin,
+        )
+        self.assertFalse(req.is_deleted)
+
+        # Toggle to deleted
+        res = self.client.post(reverse("admin-panel-requirements"), {
+            "action": "toggle_deleted",
+            "requirement_id": req.id,
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        req.refresh_from_db()
+        self.assertTrue(req.is_deleted)
+
+        # Toggle back to active
+        res2 = self.client.post(reverse("admin-panel-requirements"), {
+            "action": "toggle_deleted",
+            "requirement_id": req.id,
+        }, follow=True)
+        self.assertEqual(res2.status_code, 200)
+        req.refresh_from_db()
+        self.assertFalse(req.is_deleted)
+
+
 

@@ -288,7 +288,7 @@
           <span class="w-2 h-2 rounded-full bg-blue-500"></span>
         </div>
         <div class="text-xl font-black text-slate-900 flex items-center justify-between">
-          <span>{{ stage_counts.new }}</span>
+          <span id="kpi_stage_new">{{ stage_counts.new }}</span>
           {% if status_filter == 'new' %}
             <i class="fa-solid fa-circle-check text-blue-500 text-sm"></i>
           {% endif %}
@@ -303,7 +303,7 @@
           <span class="w-2 h-2 rounded-full bg-amber-500"></span>
         </div>
         <div class="text-xl font-black text-slate-900 flex items-center justify-between">
-          <span>{{ stage_counts.contacted }}</span>
+          <span id="kpi_stage_contacted">{{ stage_counts.contacted }}</span>
           {% if status_filter == 'contacted' %}
             <i class="fa-solid fa-circle-check text-amber-500 text-sm"></i>
           {% endif %}
@@ -318,7 +318,7 @@
           <span class="w-2 h-2 rounded-full bg-purple-500"></span>
         </div>
         <div class="text-xl font-black text-slate-900 flex items-center justify-between">
-          <span>{{ stage_counts.negotiating }}</span>
+          <span id="kpi_stage_negotiating">{{ stage_counts.negotiating }}</span>
           {% if status_filter == 'negotiating' %}
             <i class="fa-solid fa-circle-check text-purple-500 text-sm"></i>
           {% endif %}
@@ -333,7 +333,7 @@
           <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
         </div>
         <div class="text-xl font-black text-slate-900 flex items-center justify-between">
-          <span>{{ stage_counts.interested }}</span>
+          <span id="kpi_stage_interested">{{ stage_counts.interested }}</span>
           {% if status_filter == 'interested' %}
             <i class="fa-solid fa-circle-check text-indigo-500 text-sm"></i>
           {% endif %}
@@ -348,7 +348,7 @@
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
         </div>
         <div class="text-xl font-black text-emerald-600 flex items-center justify-between">
-          <span>{{ stage_counts.won }}</span>
+          <span id="kpi_stage_won">{{ stage_counts.won }}</span>
           {% if status_filter == 'won' %}
             <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
           {% endif %}
@@ -363,7 +363,7 @@
           <span class="w-2 h-2 rounded-full bg-rose-500"></span>
         </div>
         <div class="text-xl font-black text-slate-400 flex items-center justify-between">
-          <span>{{ stage_counts.lost }}</span>
+          <span id="kpi_stage_lost">{{ stage_counts.lost }}</span>
           {% if status_filter == 'lost' %}
             <i class="fa-solid fa-circle-check text-rose-500 text-sm"></i>
           {% endif %}
@@ -1084,6 +1084,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }, 1800);
         }
 
+        updatePipelineKpis(data);
         showPipelineToast(data.message || 'Pipeline updated successfully!');
         applySavedLeadFilters();
       } else {
@@ -1097,6 +1098,22 @@ document.addEventListener('DOMContentLoaded', function() {
       showPipelineToast('Error updating lead.', false);
     });
   };
+
+  function updatePipelineKpis(data) {
+    if (!data || !data.stage_counts) return;
+    const map = {
+      'kpi_stage_new': data.stage_counts.new,
+      'kpi_stage_contacted': data.stage_counts.contacted,
+      'kpi_stage_negotiating': data.stage_counts.negotiating,
+      'kpi_stage_interested': data.stage_counts.interested,
+      'kpi_stage_won': data.stage_counts.won,
+      'kpi_stage_lost': data.stage_counts.lost
+    };
+    for (const [k, v] of Object.entries(map)) {
+      const el = document.getElementById(k);
+      if (el) el.textContent = v;
+    }
+  }
 
   // 1-Click Quick Advance Stage via AJAX (Zero Page Reload)
   window.quickAdvanceLeadStage = function(id, nextStage) {
@@ -1132,6 +1149,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         updateAdvanceButtonSlot(id, data.status);
+        updatePipelineKpis(data);
         showPipelineToast(`Lead stage advanced to ${data.status_display}!`);
         applySavedLeadFilters();
       } else {
