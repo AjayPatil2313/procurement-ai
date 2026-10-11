@@ -11,7 +11,7 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Sourcing Requirements</a>
+        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Add Product</a>
         <span>&bull;</span>
         <span class="text-slate-600 font-semibold">AI Customer Discovery</span>
       </div>
@@ -30,7 +30,7 @@
     </div>
   </div>
 
-  <!-- Requirement Search Trigger Card -->
+  <!-- Product Search Trigger Card -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
     <form method="POST" action="{% url 'find-suppliers' %}" id="find-suppliers-form" class="space-y-4">
       {% csrf_token %}
@@ -38,19 +38,19 @@
       <input type="hidden" name="has_criteria_payload" value="1">
       <input type="hidden" name="requirement_id" id="selected_requirement_id" value="{% if selected_requirement %}{{ selected_requirement.id }}{% elif selected_requirement_id %}{{ selected_requirement_id }}{% endif %}">
 
-      <!-- Top Row: Requirement Selector + Apply Criteria + Launch Button -->
+      <!-- Top Row: Product Selector + Apply Criteria + Launch Button -->
       <div class="flex flex-col md:flex-row items-stretch md:items-end justify-between gap-3">
         <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 flex-1">
           
-          <!-- Requirement Selector -->
+          <!-- Product Selector -->
           <div class="w-full sm:w-80 md:w-96 relative shrink-0">
             <label for="req_select_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
               <span class="flex items-center gap-1.5">
                 <i class="fa-solid fa-cart-shopping text-blue-600"></i>
-                <span>Select Sourcing Requirement</span>
+                <span>Select Product</span>
               </span>
               <span class="text-[11px] text-slate-400 font-medium normal-case">
-                {{ requirements|length }} Requirements
+                {{ requirements|length }} Products
               </span>
             </label>
             <select 
@@ -59,7 +59,7 @@
               onchange="if(this.value){ window.location.href='{% url 'find-suppliers' %}?requirement_id=' + this.value; } else { window.location.href='{% url 'find-suppliers' %}'; }"
               class="w-full text-xs font-semibold rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-slate-800"
             >
-              <option value="">-- Choose Sourcing Requirement --</option>
+              <option value="">-- Choose Product --</option>
               {% for req in requirements %}
               <option value="{{ req.id }}" {% if selected_requirement_id == req.id or selected_requirement and selected_requirement.id == req.id %}selected{% endif %}>
                 {{ req.item_name }} ({{ req.quantity }} {{ req.unit }}) — {% if req.target_price %}₹{{ req.target_price }}{% else %}Open RFQ{% endif %}
@@ -764,14 +764,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (!reqId) {
         e.preventDefault();
-        alert('Please choose a sourcing requirement to find matching customers.');
+        alert('Please choose a product to find matching customers.');
         if (reqSelect) reqSelect.focus();
         return;
       }
 
       const reqText = (reqSelect && reqSelect.selectedIndex > 0) 
         ? reqSelect.options[reqSelect.selectedIndex].text.split('(')[0].trim() 
-        : 'Sourcing Requirement';
+        : 'Product';
       const criteriaBadge = document.getElementById('criteria_badge_count');
       const criteriaCount = criteriaBadge ? criteriaBadge.textContent.trim() : '0 Active';
 

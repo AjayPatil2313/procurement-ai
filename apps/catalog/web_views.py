@@ -155,7 +155,7 @@ def products_list_view(request):
         "selected_category": category_id,
         "selected_availability": availability_val,
         "availability_choices": Product.Availability.choices,
-        "page_title": "Archived Products" if is_archived_view else "Products Catalog",
+        "page_title": "Archived Requirements" if is_archived_view else "Add Requirement",
     })
 
 
@@ -288,9 +288,9 @@ def product_create_view(request):
             )
 
         if duplicate_exists:
-            messages.warning(request, f"Product '{name}' created. Note: Another product with this exact name already exists in your catalog.")
+            messages.warning(request, f"Requirement '{name}' created. Note: Another item with this exact name already exists in your catalog.")
         else:
-            messages.success(request, f"Product '{name}' was created successfully!")
+            messages.success(request, f"Requirement '{name}' was created successfully!")
         return redirect("product-detail", pk=product.pk)
 
     return render(request, "products/create.html", {
@@ -299,7 +299,7 @@ def product_create_view(request):
         "rbac": rbac,
         "form_data": form_data,
         "availability_choices": Product.Availability.choices,
-        "page_title": "Add Product",
+        "page_title": "Add Requirement",
     })
 
 

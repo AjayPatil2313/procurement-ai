@@ -11,7 +11,7 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Products</a>
+        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Add Requirement</a>
         <span>&bull;</span>
         <span class="text-slate-600 font-semibold">{{ product.name|truncatechars:35 }}</span>
       </div>
@@ -46,7 +46,7 @@
 
       {% if can_edit %}
       <a href="{% url 'product-edit' product.id %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center shadow-md shadow-blue-500/20 transition">
-        <i class="fa-solid fa-pen-to-square mr-2"></i> Edit Product
+        <i class="fa-solid fa-pen-to-square mr-2"></i> Edit Requirement
       </a>
       {% endif %}
 

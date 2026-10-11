@@ -11,7 +11,7 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Sourcing Requirements</a>
+        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Add Product</a>
         <span>&bull;</span>
         <a href="{% url 'requirement-detail' requirement.id %}" class="hover:text-blue-600 transition">{{ requirement.item_name|truncatechars:20 }}</a>
         <span>&bull;</span>
@@ -19,7 +19,7 @@
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
         <i class="fa-solid fa-pen-to-square text-blue-600"></i>
-        <span>Edit Requirement</span>
+        <span>Edit Product</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">Update specifications and parameters for {{ requirement.item_name }}</p>
     </div>

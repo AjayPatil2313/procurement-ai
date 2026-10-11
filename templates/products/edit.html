@@ -11,7 +11,7 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Products</a>
+        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Add Requirement</a>
         <span>&bull;</span>
         <a href="{% url 'product-detail' product.id %}" class="hover:text-blue-600 transition">{{ product.name|truncatechars:20 }}</a>
         <span>&bull;</span>
@@ -19,7 +19,7 @@
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <i class="fa-solid fa-pen-to-square text-blue-600"></i>
-        <span>Edit Product</span>
+        <span>Edit Requirement</span>
       </h1>
       <p class="text-xs text-slate-500 mt-0.5">
         Update catalog specifications and commercial terms for: <strong class="text-slate-700">{{ product.name }}</strong>
@@ -180,7 +180,7 @@
           type="submit" 
           class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl flex items-center shadow-md shadow-blue-500/20 transition"
         >
-          <i class="fa-solid fa-check mr-2"></i> Update Product
+          <i class="fa-solid fa-check mr-2"></i> Update Requirement
         </button>
       </div>
 

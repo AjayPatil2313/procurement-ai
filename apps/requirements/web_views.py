@@ -167,7 +167,7 @@ def requirements_list_view(request):
         "selected_scope": scope_val,
         "status_choices": Requirement.Status.choices,
         "scope_choices": Requirement.SearchScope.choices,
-        "page_title": "Archived Sourcing Requirements" if is_archived_view else "Sourcing Requirements",
+        "page_title": "Archived Products" if is_archived_view else "Add Product",
     })
 
 
@@ -600,7 +600,7 @@ def requirement_create_view(request):
                 "categories": categories,
                 "company": company,
                 "rbac": rbac,
-                "page_title": "Create Requirement",
+                "page_title": "Add Product",
             })
 
         try:
@@ -646,14 +646,14 @@ def requirement_create_view(request):
             is_deleted=False,
         )
 
-        messages.success(request, f"Requirement '{req.item_name}' created successfully!")
+        messages.success(request, f"Product '{req.item_name}' added successfully!")
         return redirect("requirement-detail", pk=req.id)
 
     return render(request, "requirements/create.html", {
         "categories": categories,
         "company": company,
         "rbac": rbac,
-        "page_title": "Create Requirement",
+        "page_title": "Add Product",
     })
 
 

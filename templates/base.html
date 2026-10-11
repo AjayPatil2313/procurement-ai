@@ -80,9 +80,9 @@
             <i class="fa-solid fa-cart-shopping text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
-            <a href="{% url 'requirements-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/requirements/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+            <a href="{% url 'requirements-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/requirements/' or '/procurement/requirements/' in request.path %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-clipboard-list w-5 text-center mr-2.5 text-xs"></i> Sourcing Requirements
+                <i class="fa-solid fa-cart-plus w-5 text-center mr-2.5 text-xs"></i> Add Product
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
@@ -130,7 +130,7 @@
           <div class="space-y-0.5">
             <a href="{% url 'products-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/products/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
-                <i class="fa-solid fa-box-open w-5 text-center mr-2.5 text-xs"></i> Products
+                <i class="fa-solid fa-clipboard-list w-5 text-center mr-2.5 text-xs"></i> Add Requirement
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>

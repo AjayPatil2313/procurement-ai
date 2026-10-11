@@ -95,7 +95,7 @@
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
       <div class="space-y-2">
         <span class="text-xs font-semibold text-slate-500 tracking-wide">
-          {% if active_workspace == 'buyer' %}Active Requirements{% elif active_workspace == 'seller' %}Saved Pipeline Leads{% else %}Sourcing Requirements{% endif %}
+          {% if active_workspace == 'buyer' %}Active Products{% elif active_workspace == 'seller' %}Saved Pipeline Leads{% else %}Active Products{% endif %}
         </span>
         <div class="text-3xl font-extrabold text-slate-900 tracking-tight">
           {% if active_workspace == 'combined' %}{{ metrics.real_requirements_count }}{% else %}{{ metrics.active_leads }}{% endif %}
@@ -108,7 +108,7 @@
         </div>
       </div>
       <div class="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
-        <i class="fa-solid {% if active_workspace == 'buyer' or active_workspace == 'combined' %}fa-clipboard-list{% else %}fa-user-group{% endif %} text-lg"></i>
+        <i class="fa-solid {% if active_workspace == 'buyer' or active_workspace == 'combined' %}fa-cart-plus{% else %}fa-user-group{% endif %} text-lg"></i>
       </div>
     </div>
 
@@ -145,11 +145,11 @@
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       
-      <!-- Buyer Actions: Create Requirement & Find Suppliers (AI) -->
+      <!-- Buyer Actions: Add Product & Find Suppliers (AI) -->
       {% if rbac.can_view_buyer or rbac.is_super_admin %}
       <a href="{% url 'requirements-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
-        <i class="fa-solid fa-file-circle-plus mr-2 text-sm"></i>
-        <span>Create Requirement</span>
+        <i class="fa-solid fa-cart-plus mr-2 text-sm"></i>
+        <span>Add Product</span>
       </a>
 
       <a href="{% url 'find-suppliers' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
@@ -158,11 +158,11 @@
       </a>
       {% endif %}
 
-      <!-- Seller Actions: Add Product/Service & Find Vendors (AI) -->
+      <!-- Seller Actions: Add Requirement & Find Vendors (AI) -->
       {% if rbac.can_view_seller or rbac.is_super_admin %}
       <a href="{% url 'products-create' %}" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
-        <i class="fa-solid fa-box-open mr-2 text-sm"></i>
-        <span>Add Product/Service</span>
+        <i class="fa-solid fa-clipboard-list mr-2 text-sm"></i>
+        <span>Add Requirement</span>
       </a>
 
       <a href="{% url 'find-buyers' %}" class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
