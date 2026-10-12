@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Reports & Analytics — {% if is_seller_context %}AI Sales{% else %}AI Procurement{% endif %}{% endblock %}
+{% block title %}Export Reports — {% if is_seller_context %}AI Sales{% else %}AI Procurement{% endif %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -108,13 +108,13 @@
           {% if is_seller_context %}Sales{% else %}Procurement{% endif %}
         </a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">Dynamic Reports</span>
+        <span class="text-slate-600 font-semibold">Export Reports</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl {% if is_seller_context %}bg-orange-100 text-orange-600{% else %}bg-blue-100 text-blue-600{% endif %} flex items-center justify-center text-sm shrink-0">
-          <i class="fa-solid fa-chart-pie"></i>
+          <i class="fa-solid fa-download"></i>
         </span>
-        <span>Dynamic Reports</span>
+        <span>Export Reports</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         Product-specific commercial intelligence dossiers, vendor fit analytics, and formal executive audit exports.

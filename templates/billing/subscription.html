@@ -11,7 +11,7 @@
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
     <div>
       <div class="flex items-center gap-2 mb-1">
-        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Subscription &amp; AI Credits</h1>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Subscription &amp; Credits</h1>
         {% if rbac.is_company_admin or rbac.is_super_admin %}
           <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
             <i class="fa-solid fa-crown text-[10px]"></i> Company Admin View
@@ -62,14 +62,6 @@
           <span>Auto-Pay: {% if subscription.auto_renew %}Active{% else %}Paused{% endif %}</span>
         </button>
 
-        <a 
-          href="{% url 'company-invoices' %}" 
-          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-black text-white transition shadow-sm cursor-pointer"
-          title="View Invoices, Receipts & Download Statements"
-        >
-          <i class="fa-solid fa-file-invoice-dollar text-emerald-400"></i>
-          <span>Invoices &amp; Statements</span>
-        </a>
       {% else %}
         <button 
           type="button" 
@@ -700,6 +692,22 @@
       {% csrf_token %}
       <input type="hidden" name="action" value="buy_credits">
 
+      <!-- Company Wallet Balance Preview -->
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-wallet"></i>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase font-bold text-slate-400">Company Prepaid Wallet</div>
+            <div class="text-xs font-black text-slate-800">₹{{ company_wallet.available_balance|floatformat:2|default:"0.00" }} <span class="font-normal text-[10px] text-slate-500">Available</span></div>
+          </div>
+        </div>
+        <button type="button" onclick="closeBuyCreditsModal(); openRechargeWalletModal();" class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition cursor-pointer">
+          <i class="fa-solid fa-plus text-[9px] mr-0.5"></i> Recharge
+        </button>
+      </div>
+
       <div class="space-y-2.5">
         <label class="block font-bold text-slate-700 uppercase tracking-wider">Select Credit Top-Up Pack</label>
         
@@ -764,8 +772,8 @@
           <i class="fa-solid fa-shield-check"></i>
         </div>
         <div>
-          <h3 class="text-sm font-bold text-slate-900">Confirm Credit Purchase</h3>
-          <p class="text-xs text-slate-500">Review payment &amp; credit allocation summary</p>
+          <h3 class="text-sm font-bold text-slate-900">Confirm Credit Top-Up</h3>
+          <p class="text-xs text-slate-500">Deduct from company wallet &amp; credit AI search units</p>
         </div>
       </div>
       <button type="button" onclick="closeConfirmBuyCreditsModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
@@ -777,14 +785,28 @@
       <!-- Itemized Receipt Box -->
       <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
         <div class="flex justify-between items-center">
+          <span class="text-slate-500 font-medium">Account / Company:</span>
+          <span class="font-extrabold text-slate-900 text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-800 border border-slate-300">{{ company.name }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-500 font-medium">Payment Source:</span>
+          <span class="font-bold text-emerald-700 inline-flex items-center gap-1">
+            <i class="fa-solid fa-wallet text-[10px]"></i> Prepaid Company Wallet
+          </span>
+        </div>
+        <div class="flex justify-between text-slate-600">
+          <span>Available Wallet Balance:</span>
+          <span class="font-bold text-slate-800">₹{{ company_wallet.available_balance|floatformat:2|default:"0.00" }}</span>
+        </div>
+        <div class="flex justify-between items-center border-t border-slate-200/80 pt-2">
           <span class="text-slate-500 font-medium">Top-Up Package:</span>
-          <span class="font-extrabold text-slate-900 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200" id="confirmPackName">500 Search Credits</span>
+          <span class="font-extrabold text-amber-900 text-xs px-2 py-0.5 rounded bg-amber-100 border border-amber-200" id="confirmPackName">500 Search Credits</span>
         </div>
         <div class="flex justify-between text-slate-600">
           <span>AI Search Credits:</span>
           <span class="font-bold text-blue-600" id="confirmPackCredits">+500 Credits</span>
         </div>
-        <div class="flex justify-between text-slate-600 border-t border-slate-200/80 pt-2">
+        <div class="flex justify-between text-slate-600">
           <span>Base Net Amount:</span>
           <span class="font-medium text-slate-800" id="confirmPackBase">₹9,999.00</span>
         </div>
@@ -793,19 +815,44 @@
           <span class="font-medium text-slate-800" id="confirmPackGst">₹1,799.82</span>
         </div>
         <div class="flex justify-between border-t border-slate-200 pt-2 text-sm font-black">
-          <span class="text-slate-900">Total Payable Amount:</span>
+          <span class="text-slate-900">Total Deductible Amount:</span>
           <span class="text-amber-600 font-black text-base" id="confirmPackTotal">₹11,798.82</span>
+        </div>
+        <div class="flex justify-between text-slate-600 border-t border-dashed border-slate-200/80 pt-2" id="confirmPackPostBalanceRow">
+          <span class="font-semibold text-slate-700">Remaining Wallet Balance:</span>
+          <span class="font-black text-emerald-600 text-xs" id="confirmPackPostBalance">₹0.00</span>
         </div>
       </div>
 
-      <!-- Trust & Policy Notice -->
-      <div class="p-3 rounded-xl bg-blue-50/70 border border-blue-200/70 space-y-1 text-[11px] text-blue-900">
+      <!-- Insufficient Balance Alert (Hidden when balance sufficient) -->
+      <div id="insufficientWalletAlert" class="hidden p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 space-y-2 text-[11px]">
+        <div class="flex items-center gap-1.5 font-bold text-rose-800">
+          <i class="fa-solid fa-triangle-exclamation text-rose-600 text-xs"></i>
+          <span>Insufficient Wallet Balance</span>
+        </div>
+        <p class="leading-relaxed text-rose-800">
+          Aapke company wallet me paryapt balance nahi hai. 
+          Is top-up pack ke liye <strong id="shortfallAmount">₹0.00</strong> ka shortfall hai.
+          Pehle company wallet recharge karein, uske baad top-up purchase karein.
+        </p>
+        <button 
+          type="button" 
+          onclick="redirectFromTopupToRecharge()" 
+          class="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <i class="fa-solid fa-wallet"></i>
+          <span>Recharge Wallet Now (₹) &rarr;</span>
+        </button>
+      </div>
+
+      <!-- Trust Notice (Shown when balance sufficient) -->
+      <div id="sufficientWalletNotice" class="p-3 rounded-xl bg-blue-50/70 border border-blue-200/70 space-y-1 text-[11px] text-blue-900">
         <div class="flex items-center gap-1.5 font-bold">
           <i class="fa-solid fa-circle-check text-blue-600"></i>
           <span>Instant Allocation &amp; Official Tax Invoice</span>
         </div>
         <p class="text-blue-700 leading-relaxed">
-          Purchased credits never expire and carry over billing cycles. An official GST invoice (SAC 998313) will be generated and credits added immediately to your company wallet.
+          Amount will be deducted from your prepaid wallet. Purchased credits never expire and carry over monthly. An official GST invoice (SAC 998313) will be logged automatically.
         </p>
       </div>
 
@@ -820,11 +867,12 @@
         </button>
         <button 
           type="button" 
-          onclick="submitBuyCreditsForm()" 
-          class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-2"
+          id="confirmBuyCreditsSubmitBtn"
+          onclick="promptConfirmBuyCredits()" 
+          class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2.5 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-2"
         >
-          <i class="fa-solid fa-shield-halved"></i>
-          <span>Confirm &amp; Recharge Now</span>
+          <i class="fa-solid fa-wallet"></i>
+          <span>Confirm &amp; Deduct from Wallet</span>
         </button>
       </div>
     </div>
@@ -1109,14 +1157,141 @@
           Cancel
         </button>
         <button 
-          type="submit" 
+          type="button" 
+          onclick="showConfirmRechargeWalletModal()"
           class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-2"
         >
-          <i class="fa-solid fa-check"></i>
-          <span>Confirm &amp; Recharge</span>
+          <span>Continue to Confirm</span>
+          <i class="fa-solid fa-arrow-right text-xs"></i>
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: MODERN CONFIRM WALLET RECHARGE BOX                                 -->
+<!-- ========================================================================= -->
+<div id="confirmRechargeWalletModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base border border-emerald-200">
+          <i class="fa-solid fa-shield-check"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Confirm Wallet Recharge</h3>
+          <p class="text-xs text-slate-500">Review payment &amp; wallet credit summary</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeConfirmRechargeWalletModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="p-5 space-y-4 text-xs">
+      <!-- Itemized Receipt & Balance Preview Box -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
+        <div class="flex justify-between items-center">
+          <span class="text-slate-500 font-medium">Account / Company:</span>
+          <span class="font-extrabold text-slate-900 text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-800 border border-slate-300">{{ company.name }}</span>
+        </div>
+        <div class="flex justify-between text-slate-600">
+          <span>Current Wallet Balance:</span>
+          <span class="font-bold text-slate-700">₹{{ company_wallet.available_balance|floatformat:2|default:"0.00" }}</span>
+        </div>
+        <div class="flex justify-between text-slate-600 border-t border-slate-200/80 pt-2">
+          <span>Net Recharge Credit:</span>
+          <span class="font-bold text-emerald-700 text-xs px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 rounded" id="confirmRechargeCredit">+₹1,000.00</span>
+        </div>
+        <div class="flex justify-between text-slate-600">
+          <span>GST (18% - SAC 998313):</span>
+          <span class="font-medium text-slate-800" id="confirmRechargeTax">₹180.00</span>
+        </div>
+        <div class="flex justify-between border-t border-slate-200 pt-2 text-sm font-black">
+          <span class="text-slate-900">Total Payable Amount:</span>
+          <span class="text-emerald-700 font-black text-base" id="confirmRechargeTotal">₹1,180.00</span>
+        </div>
+        <div class="flex justify-between text-slate-600 border-t border-dashed border-slate-200/80 pt-2">
+          <span class="font-semibold text-slate-700">New Available Balance:</span>
+          <span class="font-black text-emerald-600 text-xs" id="confirmRechargeNewBalance">₹1,000.00</span>
+        </div>
+      </div>
+
+      <!-- Trust & Policy Notice -->
+      <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/70 space-y-1 text-[11px] text-emerald-950">
+        <div class="flex items-center gap-1.5 font-bold text-emerald-800">
+          <i class="fa-solid fa-circle-check text-emerald-600"></i>
+          <span>Instant Wallet Credit &amp; Official GST Receipt</span>
+        </div>
+        <p class="text-emerald-700 leading-relaxed">
+          The recharge amount will be credited instantly to your company wallet with an immutable ledger audit entry. An official GST tax invoice will be generated automatically.
+        </p>
+      </div>
+
+      <!-- Actions -->
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button 
+          type="button" 
+          onclick="backToRechargeWalletModal()" 
+          class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer"
+        >
+          &larr; Back / Edit Amount
+        </button>
+        <button 
+          type="button" 
+          id="finalRechargeSubmitBtn"
+          onclick="promptConfirmRechargeWallet()" 
+          class="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-5 py-2.5 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-2"
+        >
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Confirm &amp; Recharge Now</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: MODERN CONFIRMATION POP-UP BOX (FOR RECHARGE & BUY CREDITS)       -->
+<!-- ========================================================================= -->
+<div id="actionConfirmPopupModal" class="fixed inset-0 z-[60] hidden bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-sm w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 text-center space-y-4">
+      <!-- Icon Badge -->
+      <div id="actionPopupIconWrap" class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-2xl shadow-inner">
+        <i id="actionPopupIcon" class="fa-solid fa-shield-check"></i>
+      </div>
+
+      <!-- Title & Subtitle -->
+      <div>
+        <h3 id="actionPopupTitle" class="text-base font-extrabold text-slate-900">Confirm Action</h3>
+        <p id="actionPopupSubtitle" class="text-xs text-slate-500 mt-1">Please confirm this transaction to proceed</p>
+      </div>
+
+      <!-- Itemized Summary Card -->
+      <div id="actionPopupSummaryBox" class="bg-slate-50 rounded-xl p-3.5 border border-slate-200/90 text-left text-xs space-y-2">
+        <!-- Injected via JavaScript -->
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2.5 pt-2">
+        <button 
+          type="button" 
+          onclick="closeActionConfirmPopup()" 
+          class="w-1/2 py-2.5 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold transition cursor-pointer text-xs"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button" 
+          id="actionPopupConfirmBtn"
+          class="w-1/2 py-2.5 px-3 rounded-xl font-black transition shadow-sm cursor-pointer text-xs flex items-center justify-center gap-1.5"
+        >
+          <span>Yes, Confirm</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1206,10 +1381,13 @@ function closeBuyCreditsModal() {
 }
 
 /* Modern Confirmation Modal Handling */
+var currentWalletBalance = parseFloat('{{ company_wallet.available_balance|default:"0.00" }}') || 0;
+var currentSelectedPackTotal = 0;
+
 var packDetailsMap = {
-  '100': { name: '100 Search Credits', credits: '+100 Credits', base: '₹2,499.00', gst: '₹449.82', total: '₹2,948.82' },
-  '500': { name: '500 Search Credits', credits: '+500 Credits', base: '₹9,999.00', gst: '₹1,799.82', total: '₹11,798.82' },
-  '1000': { name: '1,000 Search Credits', credits: '+1,000 Credits', base: '₹17,999.00', gst: '₹3,239.82', total: '₹21,238.82' }
+  '100': { name: '100 Search Credits', credits: '+100 Credits', base: '₹2,499.00', gst: '₹449.82', total: '₹2,948.82', numTotal: 2948.82 },
+  '500': { name: '500 Search Credits', credits: '+500 Credits', base: '₹9,999.00', gst: '₹1,799.82', total: '₹11,798.82', numTotal: 11798.82 },
+  '1000': { name: '1,000 Search Credits', credits: '+1,000 Credits', base: '₹17,999.00', gst: '₹3,239.82', total: '₹21,238.82', numTotal: 21238.82 }
 };
 
 function showConfirmBuyCreditsModal() {
@@ -1223,11 +1401,48 @@ function showConfirmBuyCreditsModal() {
   }
 
   var pack = packDetailsMap[selectedPack] || packDetailsMap['500'];
+  currentSelectedPackTotal = pack.numTotal;
+
   document.getElementById('confirmPackName').textContent = pack.name;
   document.getElementById('confirmPackCredits').textContent = pack.credits;
   document.getElementById('confirmPackBase').textContent = pack.base;
   document.getElementById('confirmPackGst').textContent = pack.gst;
   document.getElementById('confirmPackTotal').textContent = pack.total;
+
+  var postBalanceRow = document.getElementById('confirmPackPostBalanceRow');
+  var postBalanceEl = document.getElementById('confirmPackPostBalance');
+  var alertEl = document.getElementById('insufficientWalletAlert');
+  var noticeEl = document.getElementById('sufficientWalletNotice');
+  var submitBtn = document.getElementById('confirmBuyCreditsSubmitBtn');
+  var shortfallEl = document.getElementById('shortfallAmount');
+
+  if (currentWalletBalance >= pack.numTotal) {
+    // Sufficient funds
+    var rem = currentWalletBalance - pack.numTotal;
+    if (postBalanceEl) {
+      postBalanceEl.textContent = '₹' + rem.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    if (postBalanceRow) postBalanceRow.classList.remove('hidden');
+    if (alertEl) alertEl.classList.add('hidden');
+    if (noticeEl) noticeEl.classList.remove('hidden');
+    if (submitBtn) {
+      submitBtn.classList.remove('hidden');
+      submitBtn.disabled = false;
+    }
+  } else {
+    // Insufficient funds
+    var shortfall = pack.numTotal - currentWalletBalance;
+    if (shortfallEl) {
+      shortfallEl.textContent = '₹' + shortfall.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    if (postBalanceRow) postBalanceRow.classList.add('hidden');
+    if (alertEl) alertEl.classList.remove('hidden');
+    if (noticeEl) noticeEl.classList.add('hidden');
+    if (submitBtn) {
+      submitBtn.classList.add('hidden');
+      submitBtn.disabled = true;
+    }
+  }
 
   document.getElementById('buyCreditsModal').classList.add('hidden');
   document.getElementById('confirmBuyCreditsModal').classList.remove('hidden');
@@ -1242,8 +1457,93 @@ function backToBuyCreditsModal() {
   document.getElementById('buyCreditsModal').classList.remove('hidden');
 }
 
+function redirectFromTopupToRecharge() {
+  closeConfirmBuyCreditsModal();
+  openRechargeWalletModal();
+  if (currentSelectedPackTotal > 0 && currentWalletBalance < currentSelectedPackTotal) {
+    var shortfall = Math.ceil(currentSelectedPackTotal - currentWalletBalance);
+    var rounded = Math.ceil(shortfall / 100) * 100;
+    if (rounded < 100) rounded = 100;
+    var input = document.getElementById('rechargeWalletAmountInput');
+    if (input) {
+      input.value = rounded;
+      calculateWalletGst();
+    }
+  }
+}
+
+var isBuyCreditsSubmitting = false;
+
+function closeActionConfirmPopup() {
+  document.getElementById('actionConfirmPopupModal').classList.add('hidden');
+}
+
+function promptConfirmBuyCredits() {
+  var selectedPack = '500';
+  var radios = document.getElementsByName('credits_pack');
+  for (var i = 0; i < radios.length; i++) {
+    if (radios[i].checked) {
+      selectedPack = radios[i].value;
+      break;
+    }
+  }
+  var pack = packDetailsMap[selectedPack] || packDetailsMap['500'];
+
+  if (currentWalletBalance < pack.numTotal) {
+    redirectFromTopupToRecharge();
+    return;
+  }
+
+  var remaining = Math.round((currentWalletBalance - pack.numTotal) * 100) / 100;
+
+  var iconWrap = document.getElementById('actionPopupIconWrap');
+  iconWrap.className = 'w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-2xl shadow-inner bg-amber-100 text-amber-700 border border-amber-200';
+  document.getElementById('actionPopupIcon').className = 'fa-solid fa-bolt text-amber-600';
+
+  document.getElementById('actionPopupTitle').textContent = 'Confirm Credit Purchase?';
+  document.getElementById('actionPopupSubtitle').textContent = pack.credits + ' will be added to your company account.';
+
+  var summaryHtml = `
+    <div class="flex justify-between text-slate-600">
+      <span>Top-Up Package:</span>
+      <strong class="text-amber-900 font-bold">${pack.name}</strong>
+    </div>
+    <div class="flex justify-between text-slate-600">
+      <span>Credits Added:</span>
+      <strong class="text-blue-600 font-bold">${pack.credits}</strong>
+    </div>
+    <div class="flex justify-between border-t border-slate-200 pt-1.5 font-extrabold text-slate-900">
+      <span>Deduct from Wallet:</span>
+      <span class="text-rose-600 font-black">-₹${pack.numTotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+    </div>
+    <div class="flex justify-between border-t border-dashed border-slate-200/80 pt-1.5 text-[11px] text-slate-500">
+      <span>Remaining Balance:</span>
+      <strong class="text-emerald-600 font-black">₹${remaining.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+    </div>
+  `;
+  document.getElementById('actionPopupSummaryBox').innerHTML = summaryHtml;
+
+  var confirmBtn = document.getElementById('actionPopupConfirmBtn');
+  confirmBtn.className = 'w-1/2 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black transition shadow-sm cursor-pointer text-xs flex items-center justify-center gap-1.5';
+  confirmBtn.innerHTML = '<i class="fa-solid fa-wallet"></i><span>Yes, Deduct &amp; Buy</span>';
+  confirmBtn.onclick = function() {
+    closeActionConfirmPopup();
+    submitBuyCreditsForm();
+  };
+
+  document.getElementById('actionConfirmPopupModal').classList.remove('hidden');
+}
+
 function submitBuyCreditsForm() {
-  document.getElementById('buyCreditsForm').submit();
+  if (isBuyCreditsSubmitting) return;
+  isBuyCreditsSubmitting = true;
+  var submitBtn = document.getElementById('confirmBuyCreditsSubmitBtn');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i><span>Deducting & Purchasing...</span>';
+  }
+  var form = document.getElementById('buyCreditsForm');
+  if (form) form.submit();
 }
 
 function openRequestTopupModal() {
@@ -1253,5 +1553,129 @@ function openRequestTopupModal() {
 function closeRequestTopupModal() {
   document.getElementById('requestTopupModal').classList.add('hidden');
 }
+
+/* Modern Confirm Wallet Recharge Modal Handlers */
+var isRechargeSubmitting = false;
+
+function showConfirmRechargeWalletModal() {
+  var input = document.getElementById('rechargeWalletAmountInput');
+  var base = parseFloat(input ? input.value : 0) || 0;
+  if (base < 100) {
+    alert('Please enter a recharge amount of at least ₹100.00');
+    if (input) input.focus();
+    return;
+  }
+  var tax = Math.round(base * 0.18 * 100) / 100;
+  var total = Math.round((base + tax) * 100) / 100;
+  var currentBalance = parseFloat('{{ company_wallet.available_balance|default:"0.00" }}') || 0;
+  var newBalance = Math.round((currentBalance + base) * 100) / 100;
+
+  var creditEl = document.getElementById('confirmRechargeCredit');
+  var taxEl = document.getElementById('confirmRechargeTax');
+  var totalEl = document.getElementById('confirmRechargeTotal');
+  var newBalEl = document.getElementById('confirmRechargeNewBalance');
+
+  if (creditEl) creditEl.textContent = '+₹' + base.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (taxEl) taxEl.textContent = '₹' + tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (totalEl) totalEl.textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (newBalEl) newBalEl.textContent = '₹' + newBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  document.getElementById('rechargeWalletModal').classList.add('hidden');
+  document.getElementById('confirmRechargeWalletModal').classList.remove('hidden');
+}
+
+function closeConfirmRechargeWalletModal() {
+  document.getElementById('confirmRechargeWalletModal').classList.add('hidden');
+}
+
+function backToRechargeWalletModal() {
+  document.getElementById('confirmRechargeWalletModal').classList.add('hidden');
+  document.getElementById('rechargeWalletModal').classList.remove('hidden');
+}
+
+function promptConfirmRechargeWallet() {
+  var input = document.getElementById('rechargeWalletAmountInput');
+  var base = parseFloat(input ? input.value : 0) || 0;
+  if (base < 100) {
+    alert('Please enter a recharge amount of at least ₹100.00');
+    if (input) input.focus();
+    return;
+  }
+  var tax = Math.round(base * 0.18 * 100) / 100;
+  var total = Math.round((base + tax) * 100) / 100;
+  var currentBalance = parseFloat('{{ company_wallet.available_balance|default:"0.00" }}') || 0;
+  var newBalance = Math.round((currentBalance + base) * 100) / 100;
+
+  var iconWrap = document.getElementById('actionPopupIconWrap');
+  iconWrap.className = 'w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-2xl shadow-inner bg-emerald-100 text-emerald-700 border border-emerald-200';
+  document.getElementById('actionPopupIcon').className = 'fa-solid fa-wallet text-emerald-600';
+
+  document.getElementById('actionPopupTitle').textContent = 'Confirm Wallet Recharge?';
+  document.getElementById('actionPopupSubtitle').textContent = '₹' + base.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' will be credited to your company wallet.';
+
+  var summaryHtml = `
+    <div class="flex justify-between text-slate-600">
+      <span>Recharge Credit:</span>
+      <strong class="text-emerald-700 font-bold">+₹${base.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+    </div>
+    <div class="flex justify-between text-slate-600">
+      <span>GST (18% - SAC 998313):</span>
+      <span class="font-medium text-slate-700">₹${tax.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+    </div>
+    <div class="flex justify-between border-t border-slate-200 pt-1.5 font-extrabold text-slate-900">
+      <span>Total Payable:</span>
+      <span class="text-emerald-700 font-black">₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+    </div>
+    <div class="flex justify-between border-t border-dashed border-slate-200/80 pt-1.5 text-[11px] text-slate-500">
+      <span>New Available Balance:</span>
+      <strong class="text-emerald-600 font-black">₹${newBalance.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+    </div>
+  `;
+  document.getElementById('actionPopupSummaryBox').innerHTML = summaryHtml;
+
+  var confirmBtn = document.getElementById('actionPopupConfirmBtn');
+  confirmBtn.className = 'w-1/2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black transition shadow-sm cursor-pointer text-xs flex items-center justify-center gap-1.5';
+  confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i><span>Yes, Recharge</span>';
+  confirmBtn.onclick = function() {
+    closeActionConfirmPopup();
+    submitRechargeWalletForm();
+  };
+
+  document.getElementById('actionConfirmPopupModal').classList.remove('hidden');
+}
+
+function submitRechargeWalletForm() {
+  if (isRechargeSubmitting) return;
+  isRechargeSubmitting = true;
+  var btn = document.getElementById('finalRechargeSubmitBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Processing Recharge...</span>';
+  }
+  var form = document.getElementById('rechargeWalletForm');
+  if (form) form.submit();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var rechargeForm = document.getElementById('rechargeWalletForm');
+  if (rechargeForm) {
+    rechargeForm.addEventListener('submit', function(e) {
+      if (!isRechargeSubmitting) {
+        e.preventDefault();
+        showConfirmRechargeWalletModal();
+      }
+    });
+  }
+
+  var buyForm = document.getElementById('buyCreditsForm');
+  if (buyForm) {
+    buyForm.addEventListener('submit', function(e) {
+      if (!isBuyCreditsSubmitting) {
+        e.preventDefault();
+        showConfirmBuyCreditsModal();
+      }
+    });
+  }
+});
 </script>
 {% endblock %}

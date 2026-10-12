@@ -815,13 +815,26 @@ def subscription_billing_web_view(request):
             pack_base_price = price_map.get(credits_pack, Decimal(credits_pack * 25))
             subtotal, tax, total_amount = CreditWalletService.calculate_gst_breakdown(pack_base_price)
 
+            ref_id = f"TOPUP-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+            success, msg, wallet_tx = CompanyWalletService.debit_wallet_for_purchase(
+                company=company,
+                amount=total_amount,
+                description=f"Credit Top-Up Pack purchase (+{credits_pack} Credits)",
+                user=request.user,
+                reference_id=ref_id,
+            )
+
+            if not success:
+                messages.error(request, msg)
+                return redirect("subscription-billing-web")
+
             payment = Payment.objects.create(
                 company=company,
                 subscription=subscription,
                 amount=total_amount,
                 currency="INR",
-                provider="Development Gateway / Credit Top-up",
-                provider_reference=f"TOPUP-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                provider="Company Prepaid Wallet",
+                provider_reference=ref_id,
                 status=Payment.Status.SUCCESS,
                 payment_date=timezone.now(),
             )
@@ -847,7 +860,11 @@ def subscription_billing_web_view(request):
                 reason=f"Credit Top-Up Pack (+{credits_pack} credits)",
                 admin_user=request.user,
             )
-            messages.success(request, f"Successfully purchased {credits_pack} credits! Total ₹{total_amount} (incl. 18% GST). Balance updated immediately.")
+            wallet = CompanyWalletService.get_or_create_wallet(company)
+            messages.success(
+                request,
+                f"Successfully purchased {credits_pack} credits! ₹{total_amount:.2f} deducted from company wallet. New wallet balance: ₹{wallet.available_balance:.2f}."
+            )
             return redirect("subscription-billing-web")
 
         # 3. RENEW PLAN (with 18% GST calculation)

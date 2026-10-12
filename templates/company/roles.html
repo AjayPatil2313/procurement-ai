@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Role Management & Responsibilities — Platform{% endblock %}
+{% block title %}Roles & Responsibilities — Platform{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -19,7 +19,7 @@
         <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-user-shield"></i>
         </span>
-        <span>Role Management</span>
+        <span>Roles &amp; Responsibilities</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         Configure organizational roles and assign module-by-module permission matrix (Read, Write, Edit, Delete, Admin).
@@ -27,21 +27,12 @@
     </div>
 
     <div class="flex items-center gap-2.5">
-      <button 
-        type="button" 
-        onclick="openAddRoleModal()"
-        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20 cursor-pointer"
+      <a 
+        href="{% url 'seller-role-create' %}" 
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20"
       >
         <i class="fa-solid fa-plus"></i>
         <span>Add New Role</span>
-      </button>
-      <a 
-        href="{% url 'seller-role-create' %}" 
-        class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs px-3.5 py-2.5 rounded-xl transition shadow-2xs"
-        title="Open Full-Page Role Designer Form"
-      >
-        <i class="fa-solid fa-up-right-from-square text-[11px] text-slate-400"></i>
-        <span class="hidden md:inline">Full-Page Form</span>
       </a>
     </div>
   </div>

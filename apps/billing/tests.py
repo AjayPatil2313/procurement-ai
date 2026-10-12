@@ -306,7 +306,7 @@ class BillingMultiRoleWorkflowTestCase(TestCase):
         url = reverse("admin-panel-plans")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Subscription & Credits Governance")
+        self.assertContains(response, "Plans &amp; Credits")
         self.assertContains(response, "Alpha Corp")
         self.assertContains(response, "Beta Ltd")
 
@@ -372,7 +372,7 @@ class BillingMultiRoleWorkflowTestCase(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Available Credits")
-        self.assertContains(response, "Invoices &amp; Statements")
+        self.assertContains(response, "View Invoices")
         self.assertContains(response, "Available Subscription Tiers")
 
     def test_company_admin_upgrade_plan(self):
@@ -395,7 +395,13 @@ class BillingMultiRoleWorkflowTestCase(TestCase):
         self.assertEqual(invoice.status, Invoice.Status.PAID)
 
     def test_company_admin_buy_credits_topup(self):
-        """Company Admin can purchase credit top-up packs."""
+        """Company Admin can purchase credit top-up packs deducted from company prepaid wallet."""
+        from apps.billing.services.wallet import CompanyWalletService
+        wallet = CompanyWalletService.get_or_create_wallet(self.company_a)
+        wallet.available_balance = Decimal("20000.00")
+        wallet.total_credited = Decimal("20000.00")
+        wallet.save()
+
         self.client.login(email="admin@alpha.com", password="Password123!")
         url = reverse("subscription-billing-web")
         response = self.client.post(url, {
@@ -413,6 +419,47 @@ class BillingMultiRoleWorkflowTestCase(TestCase):
         self.assertEqual(invoice.subtotal, Decimal("9999.00"))
         self.assertEqual(invoice.tax, Decimal("1799.82"))
         self.assertEqual(invoice.total_amount, Decimal("11798.82"))
+
+        # Verify wallet deduction: 20000 - 11798.82 = 8201.18
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("8201.18"))
+        self.assertEqual(wallet.total_spent, Decimal("11798.82"))
+
+        # Verify transaction
+        from apps.billing.models import WalletTransaction
+        tx = WalletTransaction.objects.filter(company=self.company_a, transaction_type=WalletTransaction.TransactionType.USAGE_DEBIT).first()
+        self.assertIsNotNone(tx)
+        self.assertEqual(tx.amount, Decimal("-11798.82"))
+
+    def test_company_admin_buy_credits_insufficient_wallet_balance(self):
+        """Top-up purchase must fail and prompt wallet recharge if wallet balance is insufficient."""
+        from apps.billing.services.wallet import CompanyWalletService
+        wallet = CompanyWalletService.get_or_create_wallet(self.company_a)
+        wallet.available_balance = Decimal("500.00")  # Insufficient for 500 credits (requires ₹11,798.82)
+        wallet.save()
+
+        self.client.login(email="admin@alpha.com", password="Password123!")
+        url = reverse("subscription-billing-web")
+        response = self.client.post(url, {
+            "action": "buy_credits",
+            "credits_pack": "500",
+        }, follow=True)
+        self.assertRedirects(response, reverse("subscription-billing-web"))
+
+        # No credits granted
+        self.wallet_a.refresh_from_db()
+        self.assertEqual(self.wallet_a.purchased_credits, 0)
+
+        # Wallet balance unchanged
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("500.00"))
+
+        # No invoice created
+        self.assertFalse(Invoice.objects.filter(company=self.company_a).exists())
+
+        # Error message delivered
+        messages = list(response.context["messages"])
+        self.assertTrue(any("Insufficient wallet balance" in str(m) for m in messages))
 
     # ----------------------------------------------------
     # Company User Tests

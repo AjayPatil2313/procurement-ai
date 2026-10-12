@@ -1151,6 +1151,62 @@ class CompanyWalletService:
         return tx
 
     @classmethod
+    def debit_wallet_for_purchase(
+        cls,
+        company,
+        amount: Decimal | float | int | str,
+        description: str,
+        user=None,
+        reference_id: str = "",
+    ) -> tuple[bool, str, WalletTransaction | None]:
+        """
+        Atomically debits the company currency wallet for purchases like Credit Top-Up Packs.
+        Returns: (success: bool, message: str, transaction: WalletTransaction or None)
+        """
+        amount_decimal = Decimal(str(amount))
+        if amount_decimal <= Decimal("0.00"):
+            return False, "Purchase amount must be positive.", None
+
+        with transaction.atomic():
+            wallet = CompanyWallet.objects.select_for_update().filter(company=company).first()
+            if not wallet:
+                wallet = cls.get_or_create_wallet(company)
+                wallet = CompanyWallet.objects.select_for_update().filter(company=company).first()
+
+            if wallet.status != CompanyWallet.WalletStatus.ACTIVE:
+                return False, f"Wallet is currently {wallet.get_status_display().lower()}.", None
+
+            if wallet.available_balance < amount_decimal:
+                cls._trigger_low_balance_notification(company, wallet)
+                return False, (
+                    f"Insufficient wallet balance! Required ₹{amount_decimal:.2f}, "
+                    f"but available balance is only ₹{wallet.available_balance:.2f}. "
+                    f"Please recharge your company wallet first before purchasing top-up credits."
+                ), None
+
+            wallet.available_balance -= amount_decimal
+            wallet.total_spent += amount_decimal
+            wallet.last_transaction_at = timezone.now()
+            wallet.save(update_fields=["available_balance", "total_spent", "last_transaction_at", "updated_at"])
+
+            tx = WalletTransaction.objects.create(
+                wallet=wallet,
+                company=company,
+                transaction_type=WalletTransaction.TransactionType.USAGE_DEBIT,
+                amount=-amount_decimal,
+                balance_after=wallet.available_balance,
+                reference_id=reference_id,
+                status=WalletTransaction.TransactionStatus.COMPLETED,
+                description=description,
+                created_by=user,
+            )
+
+            if wallet.is_low_balance:
+                cls._trigger_low_balance_notification(company, wallet)
+
+        return True, "Payment successful.", tx
+
+    @classmethod
     def adjust_balance_admin(
         cls,
         company,

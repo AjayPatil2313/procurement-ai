@@ -10,12 +10,14 @@
     <div>
       <div class="flex items-center gap-2.5 flex-wrap">
         <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-          {% if rbac.is_buyer_only %}
-            Buyer Procurement Dashboard
+          {% if rbac.is_super_admin %}
+            Super Admin Dashboard
+          {% elif rbac.is_buyer_only %}
+            Buyer Dashboard
           {% elif rbac.is_seller_only %}
-            Seller Sales Dashboard
+            Seller Dashboard
           {% else %}
-            {% if active_workspace == 'buyer' %}Buyer Procurement Workspace{% elif active_workspace == 'seller' %}Seller Sales Workspace{% else %}Enterprise Overview Dashboard{% endif %}
+            Dashboard
           {% endif %}
         </h1>
         {% if rbac.is_both %}

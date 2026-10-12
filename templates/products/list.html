@@ -17,17 +17,7 @@
       </p>
     </div>
     <div class="flex items-center flex-wrap gap-2">
-      {% if can_export %}
-      <a href="{% url 'products-export-csv' %}" class="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 flex items-center shadow-xs transition" title="Export product catalog to CSV">
-        <i class="fa-solid fa-file-csv text-emerald-600 mr-2 text-sm"></i> Export CSV
-      </a>
-      {% endif %}
 
-      {% if can_import %}
-      <button type="button" onclick="openImportModal()" class="bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 flex items-center shadow-xs transition cursor-pointer" title="Bulk import products from CSV file">
-        <i class="fa-solid fa-file-import text-blue-600 mr-2 text-sm"></i> Bulk Import (CSV)
-      </button>
-      {% endif %}
 
       {% if can_create %}
       <a href="{% url 'products-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center shadow-md shadow-blue-500/20 transition">
