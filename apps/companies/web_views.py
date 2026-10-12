@@ -6,7 +6,6 @@ from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from apps.companies.models import (
     Company,
@@ -17,14 +16,12 @@ from apps.companies.models import (
     RolePermission,
 )
 from decimal import Decimal
-from django.db.models import Sum, Count, Q
-from apps.companies.rbac import get_user_rbac_context, company_admin_required, ensure_default_permissions
+from django.db.models import Sum, Count
+from apps.companies.rbac import get_user_rbac_context, ensure_default_permissions
 from apps.accounts.models import User
 from apps.billing.models import (
     Subscription,
     SubscriptionPlan,
-    CompanyCreditWallet,
-    FeatureCreditCost,
     CreditTransaction,
     UsageRecord,
     Payment,

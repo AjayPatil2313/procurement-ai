@@ -1,5 +1,5 @@
-from decimal import Decimal
 import json
+from decimal import Decimal
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -207,6 +207,25 @@ class DynamicInquiriesAndReportsTestCase(TestCase):
         self.assertEqual(inq_res.status_code, 200)
         self.assertEqual(inq_res.context["report_type"], "inquiries")
         self.assertIn("preview_records", inq_res.context)
+
+    def test_vendor_list_initial_empty_state_and_product_selection(self):
+        """Test Vendor List shows no vendors initially and only displays vendors when 1 product is selected."""
+        url = reverse("leads-list")
+
+        # 1. Initial page load without product_id
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vendor List")
+        self.assertEqual(len(response.context["leads"]), 0)
+        self.assertFalse(response.context["is_single_product"])
+        self.assertContains(response, "Select a Product to View Vendors")
+
+        # 2. Filtered by product_id
+        filtered_res = self.client.get(url + f"?product_id={self.product.id}")
+        self.assertEqual(filtered_res.status_code, 200)
+        self.assertTrue(filtered_res.context["is_single_product"])
+        self.assertGreaterEqual(len(filtered_res.context["leads"]), 1)
+        self.assertContains(filtered_res, "Global Manufacturing Corp")
 
     def test_export_reports_csv_and_json(self):
         """Test product-scoped CSV download and redirection when no product is chosen."""
@@ -755,6 +774,70 @@ class BuyerProcurementPipelineAndComparisonTestCase(TestCase):
         self.assertEqual(specs_res["Content-Type"], "text/csv; charset=utf-8")
         self.assertIn("Requirement_Specifications", specs_res["Content-Disposition"])
         self.assertIn("High-Pressure Gate Valves", specs_res.content.decode("utf-8"))
+
+    def test_customers_list_view_and_filtering(self):
+        """Test Customer List page renders requirement-wise discovered customers and executive KPIs."""
+        url = reverse("customers-list")
+
+        # 1. Landing view without requirement filter (no customer data shown initially)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Customer List")
+        self.assertIn("requirements", response.context)
+        self.assertEqual(response.context["total_customers_count"], 2)
+        self.assertEqual(len(response.context["customers"]), 0)
+        self.assertFalse(response.context["is_single_requirement"])
+        self.assertContains(response, "Select a Product to View Customers")
+
+        # 2. View filtered by requirement_id
+        filtered_url = reverse("customers-list") + f"?requirement_id={self.requirement.id}"
+        filtered_res = self.client.get(filtered_url)
+        self.assertEqual(filtered_res.status_code, 200)
+        self.assertContains(filtered_res, "Precision Valve Corp")
+        self.assertTrue(filtered_res.context["is_single_requirement"])
+        self.assertEqual(filtered_res.context["total_customers_view_count"], 2)
+        self.assertEqual(filtered_res.context["high_fit_count"], 2)
+    def test_login_page_no_quick_sign_in_buttons(self):
+        """Test login page does not display Quick Sign-In (1-Click) dev buttons."""
+        self.client.logout()
+        url = reverse("login")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Quick Sign-In (1-Click)")
+        self.assertNotContains(response, "Dev / Demo Mode")
+        self.assertNotContains(response, "demo-role/superadmin")
+
+    def test_batch_save_suppliers_view(self):
+        """Test batch shortlisting multiple customers into SavedItem pipeline."""
+        url = reverse("batch-save-suppliers")
+
+        # 1. Batch save two customers
+        payload = {"result_ids": [self.search_result1.id, self.search_result2.id]}
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["saved_count"], 2)
+        self.assertEqual(SavedItem.objects.filter(company=self.company).count(), 2)
+
+        # 2. Re-saving same results reports already saved
+        dup_res = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(dup_res.status_code, 200)
+        dup_data = dup_res.json()
+        self.assertTrue(dup_data["success"])
+        self.assertEqual(dup_data["saved_count"], 0)
+        self.assertEqual(dup_data["already_saved_count"], 2)
+
 
 
 

@@ -4,7 +4,6 @@ import time
 from django.core.cache import cache
 from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
-from django.shortcuts import redirect
 
 logger = logging.getLogger(__name__)
 

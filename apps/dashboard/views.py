@@ -3,7 +3,7 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q, Sum
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -19,7 +19,7 @@ from apps.billing.models import Subscription
 from apps.catalog.models import Product
 from django.contrib import messages
 from django.utils.timesince import timesince
-from apps.companies.rbac import get_user_rbac_context, HasModulePermission, superadmin_required
+from apps.companies.rbac import get_user_rbac_context, superadmin_required
 from apps.dashboard.models import ActivityLog, SupportTicket, Notification, FAQ
 from apps.dashboard.services.notification_service import notify_support_ticket, create_notification
 from apps.leads.models import SavedItem, Inquiry

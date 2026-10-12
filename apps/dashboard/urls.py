@@ -17,7 +17,7 @@ urlpatterns = [
     path("switch-company/", switch_company_view, name="switch-company"),
     path("demo-role/<str:role_name>/", demo_login_as_view, name="demo-login-as"),
     path("demo-login/<str:role_name>/", demo_login_as_view, name="demo-login-as-alias"),
-    path("search/", global_search_view, name="global-search"),
+    path("search/", global_search_view, name="dashboard-search"),
 
     # Real-Time Notification Center Endpoints
     path("notifications/", notifications_list_api, name="notifications-list-api"),

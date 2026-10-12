@@ -6,7 +6,7 @@ from apps.accounts.utils import generate_password_reset_token
 from apps.companies.models import Company, CompanyMember, CompanyPermission, MemberPermission
 from apps.billing.models import Subscription
 from apps.requirements.models import Requirement
-from apps.catalog.models import Product, Category, ProductImage
+from apps.catalog.models import Product, Category
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany
 from apps.leads.models import SavedItem, Inquiry
 from apps.dashboard.models import SupportTicket, Notification

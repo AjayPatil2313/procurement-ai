@@ -39,17 +39,47 @@
 
   <!-- Product Filter & Selector Bar -->
   <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3.5">
-    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
       
-      <!-- Searchable Combobox Dropdown -->
-      <div class="flex-1 relative" id="leads-product-combobox">
-        <label for="product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+      <!-- Option A: Standard 1-Click Dropdown -->
+      <div class="md:col-span-6">
+        <label for="leads_product_select" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
           <span class="flex items-center gap-1.5">
-            <i class="fa-solid fa-filter text-orange-500"></i>
-            <span>Filter Vendors by Product</span>
+            <i class="fa-solid fa-list-check text-orange-500"></i>
+            <span>Select Product (1-Click)</span>
           </span>
           <span class="text-slate-400 font-medium normal-case">
-            {{ products|length }} Products &bull; A-Z
+            {{ products|length }} Products
+          </span>
+        </label>
+        <select 
+          id="leads_product_select" 
+          onchange="if(this.value) window.location.href=this.value;" 
+          class="w-full text-xs font-semibold rounded-xl border border-slate-300 py-2.5 px-3 bg-slate-50 hover:bg-white focus:bg-white focus:ring-2 focus:ring-orange-500 text-slate-800 transition cursor-pointer"
+        >
+          <option value="">-- Choose a Product to View Vendors --</option>
+          {% for p in products %}
+          <option value="{% url 'leads-list' %}?product_id={{ p.id }}" {% if selected_product and selected_product.id == p.id %}selected{% endif %}>
+            {{ p.name }} &bull; {{ p.category.name|default:"General" }} ({{ p.lead_count }} Vendors)
+          </option>
+          {% endfor %}
+          {% if unassigned_count > 0 %}
+          <option value="{% url 'leads-list' %}?product_id=unassigned" {% if is_unassigned_view %}selected{% endif %}>
+            Other / Custom Search Vendors ({{ unassigned_count }} Vendors)
+          </option>
+          {% endif %}
+        </select>
+      </div>
+
+      <!-- Option B: Type-to-Search Combobox -->
+      <div class="md:col-span-6 relative" id="leads-product-combobox">
+        <label for="product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-magnifying-glass text-orange-500"></i>
+            <span>Search & Filter Product</span>
+          </span>
+          <span class="text-slate-400 font-normal normal-case text-[10px]">
+            Press Enter to select
           </span>
         </label>
 
@@ -62,9 +92,9 @@
             type="text" 
             id="product_filter_input" 
             autocomplete="off"
-            placeholder="Type product name or category to filter vendors (A-Z)..."
+            placeholder="Type product name or category (e.g. Cotton, Steel)..."
             value="{% if selected_product %}{{ selected_product.name }}{% endif %}"
-            class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
+            class="w-full pl-9 pr-16 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition text-slate-800 placeholder-slate-400"
           >
 
           <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
@@ -90,7 +120,7 @@
             <button 
               type="button" 
               id="toggle_leads_dropdown_btn" 
-              class="text-slate-400 hover:text-orange-600 p-1 rounded-md transition"
+              class="text-slate-400 hover:text-orange-600 p-1 rounded-md transition cursor-pointer"
               title="Toggle product list"
             >
               <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200" id="leads_chevron"></i>
@@ -103,26 +133,6 @@
           id="leads_dropdown_menu" 
           class="hidden absolute z-30 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
         >
-          <!-- All Products Option -->
-          <a 
-            href="{% url 'leads-list' %}" 
-            class="leads-product-option px-3.5 py-2.5 hover:bg-orange-50/70 flex items-center justify-between transition group {% if not selected_product and not is_unassigned_view %}bg-orange-50 text-orange-950 font-bold{% endif %}"
-            data-name="all products grouped"
-            data-category=""
-          >
-            <div class="flex items-center space-x-2.5 min-w-0">
-              <span class="w-6 h-6 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
-                <i class="fa-solid fa-layer-group"></i>
-              </span>
-              <span class="text-xs font-bold text-slate-800 group-hover:text-orange-600 transition">
-                All Products (Grouped by Product)
-              </span>
-            </div>
-            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-orange-100 text-orange-700">
-              {{ total_leads_count }} Leads
-            </span>
-          </a>
-
           {% for p in products %}
           <a 
             href="{% url 'leads-list' %}?product_id={{ p.id }}" 
@@ -150,11 +160,11 @@
               </span>
               {% if p.lead_count > 0 %}
               <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                {{ p.lead_count }} Leads
+                {{ p.lead_count }} Vendors
               </span>
               {% else %}
               <span class="text-[10px] px-1.5 py-0.5 rounded text-slate-400 bg-slate-50">
-                0 Leads
+                0 Vendors
               </span>
               {% endif %}
             </div>
@@ -195,36 +205,22 @@
 
     </div>
 
-    <!-- Quick Filter Pills Bar (Products that have Leads) -->
+    <!-- Quick Filter Pills Bar (Products with Vendors) -->
     <div class="pt-2 border-t border-slate-100 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
       <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-        Quick Tabs:
+        Quick Select:
       </span>
 
-      <!-- All Grouped Tab -->
-      <a 
-        href="{% url 'leads-list' %}" 
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if not selected_product and not is_unassigned_view %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
-      >
-        <i class="fa-solid fa-layer-group text-[10px]"></i>
-        <span>All Products (Grouped)</span>
-        <span class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full {% if not selected_product and not is_unassigned_view %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
-          {{ total_leads_count }}
-        </span>
-      </a>
-
       {% for p in products %}
-      {% if p.lead_count > 0 %}
       <a 
         href="{% url 'leads-list' %}?product_id={{ p.id }}" 
         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 {% if selected_product and selected_product.id == p.id %}bg-orange-500 text-white shadow-sm shadow-orange-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}"
       >
         <span class="truncate max-w-[150px]">{{ p.name }}</span>
-        <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if selected_product and selected_product.id == p.id %}bg-white/20 text-white{% else %}bg-slate-200 text-slate-600{% endif %}">
+        <span class="text-[10px] px-1.5 py-0.2 rounded-full {% if selected_product and selected_product.id == p.id %}bg-white/20 text-white{% elif p.lead_count > 0 %}bg-emerald-100 text-emerald-800{% else %}bg-slate-200 text-slate-600{% endif %}">
           {{ p.lead_count }}
         </span>
       </a>
-      {% endif %}
       {% endfor %}
 
       {% if unassigned_count > 0 %}
@@ -372,27 +368,27 @@
             >
           </div>
 
-          <!-- Layout Toggle: Table View (Default) vs Compact Cards -->
+          <!-- Layout Toggle: Cards View (Default) vs Table View -->
           <div class="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
-            <button 
-              type="button" 
-              onclick="switchVendorLayout('table')" 
-              id="viewBtnTable" 
-              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-orange-600 shadow-xs cursor-pointer"
-              title="Spreadsheet Table View (Default Full-Size)"
-            >
-              <i class="fa-solid fa-table-list"></i>
-              <span>Table</span>
-            </button>
             <button 
               type="button" 
               onclick="switchVendorLayout('cards')" 
               id="viewBtnCards" 
-              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
-              title="Compact Cards View"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-white text-orange-600 shadow-xs cursor-pointer"
+              title="Compact Cards View (Default)"
             >
               <i class="fa-solid fa-grip"></i>
               <span>Cards</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="switchVendorLayout('table')" 
+              id="viewBtnTable" 
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
+              title="Spreadsheet Table View"
+            >
+              <i class="fa-solid fa-table-list"></i>
+              <span>Table</span>
             </button>
           </div>
         </div>
@@ -424,8 +420,8 @@
       {% endif %}
     </div>
 
-    <!-- Filtered Leads Table View (Default Full-Size Spreadsheet View) -->
-    <div class="vendor-view-table bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
+    <!-- Filtered Leads Table View (Hidden by default, available via toggle) -->
+    <div class="vendor-view-table hidden bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
       <div class="overflow-x-auto w-full">
         <table class="w-full text-left text-xs min-w-full">
           <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
@@ -603,8 +599,8 @@
         </table>
     </div>
 
-    <!-- Filtered Leads Compact Cards Grid (Toggle View) -->
-    <div class="vendor-view-cards hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+    <!-- Filtered Leads Compact Cards Grid (Default View) -->
+    <div class="vendor-view-cards grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
       {% for lead in leads %}
         {% include "components/vendor_compact_card.html" with lead=lead %}
       {% empty %}
@@ -640,22 +636,66 @@
       </button>
     </div>
 
-  <!-- VIEW 2: NO PRODUCT SELECTED PROMPT CARD -->
+  <!-- VIEW 2: NO PRODUCT SELECTED — INITIAL PROMPT & 1-CLICK PRODUCT SELECTION GRID -->
   {% else %}
-  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
-    <div class="max-w-2xl mx-auto space-y-4">
-      <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
+  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+    <div class="max-w-2xl mx-auto text-center space-y-3 mb-8">
+      <div class="w-16 h-16 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
         <i class="fa-solid fa-users-viewfinder"></i>
       </div>
-      <div>
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 mb-2">
-          <i class="fa-solid fa-layer-group text-[11px]"></i> Vendor List Intelligence
-        </span>
-        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to View Discovered Vendors</h2>
-        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
-          The Vendor List organizes all qualified commercial buyers and enterprise procurement leads extracted by the AI discovery engine. Review company names, verified contacts, match scores, and procurement intent signals. <strong>Please select a product from the filter above to view its vendors.</strong>
-        </p>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200">
+        <i class="fa-solid fa-arrow-pointer text-[11px]"></i> Step 1: Select a Product
+      </span>
+      <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Product to View Vendors</h2>
+      <p class="text-xs text-slate-500 leading-relaxed max-w-lg mx-auto">
+        Please select a product from the dropdown above or click any product card below. Discovered vendor cards will display company name, location, contact, email, website, and technical match score.
+      </p>
+    </div>
+
+    <!-- 1-Click Product Selection Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {% for p in products %}
+      <a 
+        href="{% url 'leads-list' %}?product_id={{ p.id }}" 
+        class="bg-slate-50/70 hover:bg-white rounded-2xl p-4 border border-slate-200 hover:border-orange-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col justify-between text-left group"
+      >
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-2.5">
+            <span class="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 group-hover:bg-orange-500 group-hover:text-white flex items-center justify-center text-xs font-bold transition">
+              <i class="fa-solid fa-box"></i>
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {% if p.lead_count > 0 %}bg-emerald-100 text-emerald-800 border border-emerald-200{% else %}bg-slate-200 text-slate-600{% endif %}">
+              {{ p.lead_count }} Vendors
+            </span>
+          </div>
+          <h3 class="font-bold text-slate-900 text-xs group-hover:text-orange-600 transition truncate" title="{{ p.name }}">
+            {{ p.name }}
+          </h3>
+          <p class="text-[11px] text-slate-400 mt-0.5 truncate">
+            {{ p.category.name|default:"General Category" }}
+          </p>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">MOQ: {{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"pcs" }}</span>
+          <span class="text-orange-600 font-bold flex items-center gap-1 group-hover:translate-x-1 transition">
+            <span>View Vendors</span>
+            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </span>
+        </div>
+      </a>
+      {% empty %}
+      <div class="col-span-full py-10 text-center text-slate-400">
+        <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2 text-base">
+          <i class="fa-solid fa-box-open"></i>
+        </div>
+        <p class="font-bold text-slate-700 text-sm">No products in catalog</p>
+        <p class="text-xs text-slate-400 mt-1">Please add a product in your catalog first to view vendors.</p>
+        <a href="{% url 'create-product' %}" class="inline-flex items-center gap-1.5 mt-3 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md">
+          <i class="fa-solid fa-plus"></i>
+          <span>Add Product</span>
+        </a>
       </div>
+      {% endfor %}
     </div>
   </div>
   {% endif %}
@@ -837,9 +877,9 @@ function switchVendorLayout(mode) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  let savedMode = 'table';
+  let savedMode = 'cards';
   try {
-    savedMode = localStorage.getItem('vendor_list_layout') || 'table';
+    savedMode = localStorage.getItem('vendor_list_layout') || 'cards';
   } catch(e) {}
   switchVendorLayout(savedMode);
 
@@ -917,6 +957,12 @@ document.addEventListener('DOMContentLoaded', function() {
     filterInput.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
         closeDropdown();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const firstVisible = options.find(opt => !opt.classList.contains('hidden'));
+        if (firstVisible && firstVisible.href) {
+          window.location.href = firstVisible.href;
+        }
       }
     });
   }
@@ -943,7 +989,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function applyVendorFilters() {
     const query = (vendorSearchInput ? vendorSearchInput.value : '').trim().toLowerCase();
-    let visibleCount = 0;
+    let visibleCardCount = 0;
+    let visibleRowCount = 0;
 
     // Filter Cards
     vendorCards.forEach(card => {
@@ -951,11 +998,21 @@ document.addEventListener('DOMContentLoaded', function() {
       const location = (card.getAttribute('data-company-location') || '').toLowerCase();
       const industry = (card.getAttribute('data-company-industry') || '').toLowerCase();
       const score = parseInt(card.getAttribute('data-match-score') || '0', 10);
-      const email = (card.getAttribute('data-company-email') || '').trim();
-      const phone = (card.getAttribute('data-company-phone') || '').trim();
+      const email = (card.getAttribute('data-company-email') || '').toLowerCase().trim();
+      const phone = (card.getAttribute('data-company-phone') || '').toLowerCase().trim();
+      const website = (card.getAttribute('data-company-website') || '').toLowerCase().trim();
+      const cardText = (card.textContent || '').toLowerCase();
       const isSaved = card.getAttribute('data-is-saved') === 'true';
 
-      const matchesQuery = !query || name.includes(query) || location.includes(query) || industry.includes(query);
+      const matchesQuery = !query || 
+        name.includes(query) || 
+        location.includes(query) || 
+        industry.includes(query) || 
+        email.includes(query) || 
+        phone.includes(query) || 
+        website.includes(query) || 
+        cardText.includes(query);
+
       let matchesChip = true;
       if (activeVendorFilter === 'fit_90') matchesChip = score >= 90;
       else if (activeVendorFilter === 'fit_80') matchesChip = score >= 80;
@@ -965,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (matchesQuery && matchesChip) {
         card.classList.remove('hidden');
-        visibleCount++;
+        visibleCardCount++;
       } else {
         card.classList.add('hidden');
       }
@@ -977,11 +1034,21 @@ document.addEventListener('DOMContentLoaded', function() {
       const location = (row.getAttribute('data-company-location') || '').toLowerCase();
       const industry = (row.getAttribute('data-company-industry') || '').toLowerCase();
       const score = parseInt(row.getAttribute('data-match-score') || '0', 10);
-      const email = (row.getAttribute('data-company-email') || '').trim();
-      const phone = (row.getAttribute('data-company-phone') || '').trim();
+      const email = (row.getAttribute('data-company-email') || '').toLowerCase().trim();
+      const phone = (row.getAttribute('data-company-phone') || '').toLowerCase().trim();
+      const website = (row.getAttribute('data-company-website') || '').toLowerCase().trim();
+      const rowText = (row.textContent || '').toLowerCase();
       const isSaved = row.getAttribute('data-is-saved') === 'true';
 
-      const matchesQuery = !query || name.includes(query) || location.includes(query) || industry.includes(query);
+      const matchesQuery = !query || 
+        name.includes(query) || 
+        location.includes(query) || 
+        industry.includes(query) || 
+        email.includes(query) || 
+        phone.includes(query) || 
+        website.includes(query) || 
+        rowText.includes(query);
+
       let matchesChip = true;
       if (activeVendorFilter === 'fit_90') matchesChip = score >= 90;
       else if (activeVendorFilter === 'fit_80') matchesChip = score >= 80;
@@ -991,18 +1058,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (matchesQuery && matchesChip) {
         row.classList.remove('hidden');
+        visibleRowCount++;
       } else {
         row.classList.add('hidden');
       }
     });
 
+    const activeCount = vendorCards.length > 0 ? visibleCardCount : visibleRowCount;
     if (visibleVendorsCount) {
-      visibleVendorsCount.textContent = visibleCount;
+      visibleVendorsCount.textContent = activeCount;
     }
 
     if (noMatchingPlaceholder) {
       const totalItems = vendorCards.length || vendorRows.length;
-      if (visibleCount === 0 && totalItems > 0) {
+      if (activeCount === 0 && totalItems > 0) {
         noMatchingPlaceholder.classList.remove('hidden');
       } else {
         noMatchingPlaceholder.classList.add('hidden');

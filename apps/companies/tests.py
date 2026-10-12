@@ -1,6 +1,5 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from django.core.exceptions import PermissionDenied
 
 from apps.accounts.models import User
 from apps.companies.models import Company, CompanyMember

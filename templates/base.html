@@ -92,6 +92,12 @@
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>
+            <a href="{% url 'customers-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/customers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <span class="flex items-center">
+                <i class="fa-solid fa-users-viewfinder w-5 text-center mr-2.5 text-xs"></i> Customer list
+              </span>
+              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            </a>
             <a href="{% url 'saved-suppliers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/saved-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Saved Customers
@@ -101,12 +107,6 @@
             <a href="{% url 'inquiries-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <span class="flex items-center">
                 <i class="fa-regular fa-paper-plane w-5 text-center mr-2.5 text-xs"></i> {% if rbac.is_both %}Supplier Inquiries{% else %}Inquiries{% endif %}
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
-            </a>
-            <a href="{% url 'price-comparison' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/price-comparison/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-chart-line w-5 text-center mr-2.5 text-xs"></i> Price Comparison
               </span>
               <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
             </a>

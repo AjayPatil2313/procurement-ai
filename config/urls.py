@@ -88,6 +88,8 @@ from apps.leads.web_views import (
     delete_saved_supplier_view,
     export_saved_suppliers_csv_view,
     send_rfq_view,
+    customers_list_view,
+    batch_save_suppliers_view,
 )
 from apps.companies.admin_views import (
     admin_panel_dashboard_view,
@@ -166,7 +168,6 @@ urlpatterns = [
     path("company/roles/<int:role_id>/delete/", seller_role_delete_view, name="company-role-delete"),
     path("company/rbac/", company_rbac_web_view, name="company-rbac-web"),
     path("company/billing/", subscription_billing_web_view, name="subscription-billing-web"),
-    path("company/billing/", subscription_billing_web_view, name="company-billing"),
     path("company/invoices/", company_invoices_web_view, name="company-invoices"),
     path("company/credit-ledger/", company_credit_ledger_web_view, name="company-credit-ledger"),
     path("company/invoices/export-statement/", export_statement_csv_view, name="export-statement-csv"),
@@ -174,6 +175,8 @@ urlpatterns = [
     # Buyer / Procurement (Web)
     path("procurement/find-suppliers/", find_suppliers_view, name="find-suppliers"),
     path("procurement/find-suppliers/export/", export_discovered_suppliers_csv_view, name="export-discovered-suppliers-csv"),
+    path("procurement/customers/", customers_list_view, name="customers-list"),
+    path("procurement/customers/batch-save/", batch_save_suppliers_view, name="batch-save-suppliers"),
     path("procurement/requirements/", requirements_list_view, name="requirements-list"),
     path("procurement/requirements/create/", requirement_create_view, name="requirements-create"),
     path("procurement/requirements/new/", requirement_create_view, name="requirement-create"),

@@ -2,13 +2,12 @@ import logging
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.utils import timezone
-from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany, APILog, MatchingParameter, ensure_default_parameters_for_company
+from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany, APILog, ensure_default_parameters_for_company
 from apps.ai_search.services.search_provider import WebSearchProvider
 from apps.ai_search.services.web_scraper import CompanyWebScraper
 from apps.ai_search.services.ai_matcher import AIMatcher
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
-from apps.billing.models import Subscription, CreditTransaction
 from apps.billing.services.wallet import CreditWalletService
 
 logger = logging.getLogger(__name__)

@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 from apps.leads.models import SavedItem, Inquiry, PriceHistory, InquiryMessage
 from apps.leads.services.email_service import send_inquiry_email
-from apps.ai_search.models import SearchResult, ExternalCompany
+from apps.ai_search.models import SearchResult
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
 from apps.companies.rbac import get_user_rbac_context
@@ -649,43 +649,11 @@ def leads_list_view(request):
                 seen_cids.add(cid)
             leads.append(l)
     else:
-        # Group by product so it is NOT "all-in-one"
-        for p in products:
-            if p.lead_count > 0:
-                raw_leads = list(base_leads_qs.filter(search_job__product=p))
-                seen_cids = set()
-                p_leads = []
-                for l in raw_leads:
-                    cid = l.external_company_id
-                    if cid and cid in seen_cids:
-                        continue
-                    if cid:
-                        seen_cids.add(cid)
-                    p_leads.append(l)
-
-                product_groups.append({
-                    "product": p,
-                    "leads": p_leads,
-                    "count": len(p_leads),
-                })
-
-        if unassigned_count > 0:
-            raw_leads = list(base_leads_qs.filter(search_job__product__isnull=True))
-            seen_cids = set()
-            unassigned_leads = []
-            for l in raw_leads:
-                cid = l.external_company_id
-                if cid and cid in seen_cids:
-                    continue
-                if cid:
-                    seen_cids.add(cid)
-                unassigned_leads.append(l)
-
-            unassigned_group = {
-                "title": "Other / Custom Search Leads",
-                "leads": unassigned_leads,
-                "count": len(unassigned_leads),
-            }
+        # Initial page load with no product selected:
+        # No vendor data is loaded until the user explicitly selects 1 product.
+        leads = []
+        product_groups = []
+        unassigned_group = None
 
     saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
@@ -724,8 +692,236 @@ def leads_list_view(request):
 
 
 # ============================================================
-# BUYER SIDE: SUPPLIER SHORTLIST & RFQ INQUIRY WORKFLOW
+# BUYER SIDE: CUSTOMER / SUPPLIER DISCOVERY & RFQ WORKFLOW
 # ============================================================
+
+@login_required
+def customers_list_view(request):
+    """
+    Buyer Customers Discovery List (Product-Wise):
+    Organizes and filters discovered supplier/customer partners by product (requirement).
+    Supports:
+    1. Product filter (?requirement_id=<id> or ?product_id=<id>) to view only customers for that product.
+    2. Grouped product view when no id is specified (product-by-product sections).
+    3. Searchable Combobox & quick-filter tabs for fast product switching.
+    4. Executive KPI metrics: Total Customers, Top-Tier Matches (>=85%), Reachability Rate, In Pipeline/Saved.
+    5. Spreadsheet Table View (default full-size) & Cards View.
+    6. Batch saving to Saved Customers.
+    7. Send RFQ modal integration.
+    8. Company 360 Dossier modal integration.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Customer list is only available for Buyer accounts.")
+        return redirect("dashboard")
+
+    # Fetch company requirements (displayed as products) sorted strictly alphabetically A to Z
+    requirements = list(Requirement.objects.filter(company=company, is_deleted=False).order_by(Lower("item_name"))) if company else []
+
+    # Base query of all qualified customer / supplier results for this company
+    base_customers_qs = SearchResult.objects.filter(
+        search_job__company=company,
+        result_type=SearchResult.ResultType.SUPPLIER,
+    ).filter(
+        Q(search_job__requirement__is_deleted=False) | Q(search_job__requirement__isnull=True)
+    ).select_related(
+        "external_company",
+        "search_job",
+        "search_job__requirement",
+        "search_job__requirement__category",
+    ).order_by("-match_score", "-created_at")
+
+    # Customer counts by requirement (deduplicated by external company)
+    customer_counts = (
+        base_customers_qs
+        .order_by()
+        .filter(search_job__requirement__isnull=False)
+        .values("search_job__requirement_id")
+        .annotate(total=Count("external_company_id", distinct=True))
+    )
+    counts_map = {item["search_job__requirement_id"]: item["total"] for item in customer_counts}
+    for r in requirements:
+        r.customer_count = counts_map.get(r.id, 0)
+        r.lead_count = r.customer_count
+        r.name = r.item_name
+
+    unassigned_count = (
+        base_customers_qs
+        .order_by()
+        .filter(search_job__requirement__isnull=True)
+        .values("external_company_id")
+        .distinct()
+        .count()
+    )
+    total_customers_count = sum(r.customer_count for r in requirements) + unassigned_count
+
+    req_id_str = request.GET.get("requirement_id", "").strip() or request.GET.get("product_id", "").strip()
+    selected_requirement = None
+    is_unassigned_view = False
+    is_single_requirement = False
+    customers = []
+    requirement_groups = []
+    unassigned_group = None
+
+    if req_id_str and req_id_str.isdigit():
+        selected_requirement = Requirement.objects.filter(id=int(req_id_str), company=company, is_deleted=False).first()
+        if selected_requirement:
+            selected_requirement.name = selected_requirement.item_name
+            is_single_requirement = True
+            raw_customers = list(base_customers_qs.filter(search_job__requirement=selected_requirement))
+            seen_cids = set()
+            for c in raw_customers:
+                cid = c.external_company_id
+                if cid and cid in seen_cids:
+                    continue
+                if cid:
+                    seen_cids.add(cid)
+                customers.append(c)
+    elif req_id_str == "unassigned":
+        is_unassigned_view = True
+        is_single_requirement = True
+        raw_customers = list(base_customers_qs.filter(search_job__requirement__isnull=True))
+        seen_cids = set()
+        for c in raw_customers:
+            cid = c.external_company_id
+            if cid and cid in seen_cids:
+                continue
+            if cid:
+                seen_cids.add(cid)
+            customers.append(c)
+    else:
+        # Initial page load with no product selected:
+        # No customer data is loaded until the user explicitly selects 1 product.
+        customers = []
+        requirement_groups = []
+        unassigned_group = None
+
+    saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
+
+    display_customers = customers if is_single_requirement else []
+
+    # Executive KPI metrics calculation for current view
+    total_customers_view_count = len(display_customers)
+    high_fit_count = sum(1 for c in display_customers if c.match_score >= 85)
+    verified_contact_count = sum(1 for c in display_customers if (c.external_company and (c.external_company.email or c.external_company.phone)))
+    contact_coverage_pct = round((verified_contact_count / total_customers_view_count * 100)) if total_customers_view_count > 0 else 0
+    saved_in_pipeline_count = sum(1 for c in display_customers if c.id in saved_result_ids)
+
+    # Requirements with active customers for landing view summary cards
+    requirements_with_customers = [r for r in requirements if getattr(r, "customer_count", 0) > 0]
+
+    return render(request, "leads/customers_list.html", {
+        "requirements": requirements,
+        "products": requirements,
+        "selected_requirement": selected_requirement,
+        "selected_product": selected_requirement,
+        "selected_requirement_id": int(req_id_str) if req_id_str and req_id_str.isdigit() else None,
+        "selected_product_id": int(req_id_str) if req_id_str and req_id_str.isdigit() else None,
+        "is_unassigned_view": is_unassigned_view,
+        "is_single_requirement": is_single_requirement,
+        "is_single_product": is_single_requirement,
+        "requirement_groups": requirement_groups,
+        "product_groups": requirement_groups,
+        "unassigned_group": unassigned_group,
+        "unassigned_count": unassigned_count,
+        "total_customers_count": total_customers_count,
+        "total_leads_count": total_customers_count,
+        "customers": display_customers,
+        "leads": display_customers,
+        "saved_result_ids": saved_result_ids,
+        "total_customers_view_count": total_customers_view_count,
+        "total_vendors_count": total_customers_view_count,
+        "high_fit_count": high_fit_count,
+        "verified_contact_count": verified_contact_count,
+        "contact_coverage_pct": contact_coverage_pct,
+        "saved_in_pipeline_count": saved_in_pipeline_count,
+        "requirements_with_customers": requirements_with_customers,
+        "products_with_leads": requirements_with_customers,
+        "company": company,
+        "rbac": rbac,
+        "page_title": f"Customer List - {selected_requirement.item_name}" if selected_requirement else "Customer List (Product-Wise)",
+    })
+
+
+@login_required
+def batch_save_suppliers_view(request):
+    """
+    Batch Save Customers / Suppliers Action for Procurement (AJAX):
+    Accepts POST with list of result_ids and bookmarks them to shortlisted customers.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+        return JsonResponse({"success": False, "message": "Permission denied: Buyer module access required."}, status=403)
+
+    if request.method != "POST":
+        return JsonResponse({"success": False, "message": "Method not allowed. Use POST."}, status=405)
+
+    result_ids = []
+    if request.content_type == "application/json":
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+            result_ids = data.get("result_ids", [])
+        except Exception:
+            result_ids = []
+    else:
+        result_ids = request.POST.getlist("result_ids[]") or request.POST.getlist("result_ids")
+
+    if not result_ids:
+        return JsonResponse({"success": False, "message": "No customers selected for saving."}, status=400)
+
+    cleaned_ids = []
+    for rid in result_ids:
+        try:
+            cleaned_ids.append(int(rid))
+        except (ValueError, TypeError):
+            continue
+
+    if not cleaned_ids:
+        return JsonResponse({"success": False, "message": "Invalid identifiers provided."}, status=400)
+
+    results_qs = SearchResult.objects.filter(id__in=cleaned_ids).select_related("external_company", "search_job", "search_job__requirement")
+    if not (rbac["is_super_admin"] and not company):
+        results_qs = results_qs.filter(search_job__company=company)
+
+    saved_count = 0
+    already_saved_count = 0
+
+    for res in results_qs:
+        target_req = res.search_job.requirement if res.search_job else None
+        existing_saved = SavedItem.objects.filter(
+            company=company,
+            search_result__external_company=res.external_company,
+            search_result__search_job__requirement=target_req,
+        ).first()
+
+        if existing_saved:
+            already_saved_count += 1
+        else:
+            SavedItem.objects.create(
+                company=company,
+                search_result=res,
+                status=SavedItem.Status.INTERESTED,
+            )
+            saved_count += 1
+
+    msg = f"Successfully added {saved_count} customer(s) to your saved list."
+    if already_saved_count > 0:
+        msg += f" ({already_saved_count} already existed in list)."
+
+    return JsonResponse({
+        "success": True,
+        "saved_count": saved_count,
+        "already_saved_count": already_saved_count,
+        "total_processed": len(cleaned_ids),
+        "message": msg,
+    })
+
 
 @login_required
 def save_supplier_toggle_view(request, result_id):

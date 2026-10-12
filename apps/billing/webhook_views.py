@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 
 from apps.companies.context_processors import get_user_rbac_context
-from apps.billing.models import Payment, Invoice
+from apps.billing.models import Payment
 from apps.billing.services.payment_gateway import PaymentGatewayService
 
 logger = logging.getLogger(__name__)

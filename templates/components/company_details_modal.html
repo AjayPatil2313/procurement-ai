@@ -188,9 +188,9 @@
           Close
         </button>
 
-        <button type="button" onclick="triggerProposalFromDetails()" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-2 transition cursor-pointer">
-          <i class="fa-solid fa-envelope"></i>
-          <span>Contact & Inquire</span>
+        <button type="button" onclick="triggerProposalFromDetails()" id="cdm_contact_btn" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-2 transition cursor-pointer">
+          <i class="fa-solid fa-envelope" id="cdm_contact_btn_icon"></i>
+          <span id="cdm_contact_btn_text">Contact & Inquire</span>
         </button>
       </div>
     </div>
@@ -341,6 +341,34 @@ function openCompanyDetailsFromElement(el) {
     commercialBox.classList.add('hidden');
   }
 
+  const isBuyerContext = window.location.pathname.includes('/procurement/') || d.companyRole === 'Customer' || d.companyRole === 'Supplier';
+  const cdmAvatar = document.getElementById('cdm_avatar');
+  const contactBtn = document.getElementById('cdm_contact_btn');
+  const contactBtnIcon = document.getElementById('cdm_contact_btn_icon');
+  const contactBtnText = document.getElementById('cdm_contact_btn_text');
+
+  if (cdmAvatar) {
+    if (isBuyerContext) {
+      cdmAvatar.className = 'w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-lg font-black shrink-0 shadow-sm border border-blue-200/60';
+      cdmAvatar.innerHTML = '<i class="fa-solid fa-building"></i>';
+    } else {
+      cdmAvatar.className = 'w-11 h-11 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-lg font-black shrink-0 shadow-sm border border-orange-200/60';
+      cdmAvatar.innerHTML = '<i class="fa-solid fa-industry"></i>';
+    }
+  }
+
+  if (contactBtn && contactBtnIcon && contactBtnText) {
+    if (isBuyerContext) {
+      contactBtn.className = 'px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center gap-2 transition cursor-pointer';
+      contactBtnIcon.className = 'fa-solid fa-paper-plane';
+      contactBtnText.textContent = 'Send RFQ';
+    } else {
+      contactBtn.className = 'px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-2 transition cursor-pointer';
+      contactBtnIcon.className = 'fa-solid fa-envelope';
+      contactBtnText.textContent = 'Contact & Inquire';
+    }
+  }
+
   // Save form
   const saveForm = document.getElementById('cdm_save_form');
   const saveBtn = document.getElementById('cdm_save_btn');
@@ -350,11 +378,11 @@ function openCompanyDetailsFromElement(el) {
     saveForm.action = d.saveUrl;
     if (currentCdmLead.isSaved) {
       saveBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-700 font-bold text-xs flex items-center gap-1.5';
-      saveBtnText.textContent = 'In Sales Pipeline';
+      saveBtnText.textContent = isBuyerContext ? 'Saved to Customers' : 'In Sales Pipeline';
       saveBtn.disabled = true;
     } else {
       saveBtn.className = 'px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer';
-      saveBtnText.textContent = 'Save Lead';
+      saveBtnText.textContent = isBuyerContext ? 'Save Customer' : 'Save Lead';
       saveBtn.disabled = false;
     }
     saveForm.classList.remove('hidden');

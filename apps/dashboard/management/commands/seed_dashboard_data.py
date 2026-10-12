@@ -1,13 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from apps.accounts.models import User
 from apps.companies.models import Company, CompanyMember, CompanyPermission, MemberPermission
-from apps.billing.models import Subscription, CreditTransaction
+from apps.billing.models import Subscription
 from apps.catalog.models import Category, Product
 from apps.requirements.models import Requirement
-from apps.ai_search.models import SearchJob, ExternalCompany, SearchResult, APILog
-from apps.leads.models import SavedItem, Inquiry, PriceHistory
+from apps.ai_search.models import SearchJob, ExternalCompany, SearchResult
 from apps.dashboard.models import ActivityLog
 
 

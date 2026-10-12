@@ -1,7 +1,4 @@
 from decimal import Decimal
-import json
-import csv
-import io
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -10,7 +7,6 @@ from apps.companies.models import Company, CompanyMember
 from apps.catalog.models import Category
 from apps.requirements.models import Requirement
 from apps.ai_search.models import SearchJob, SearchResult, ExternalCompany, MatchingParameter
-from apps.leads.models import SavedItem
 
 User = get_user_model()
 

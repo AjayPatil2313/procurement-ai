@@ -23,11 +23,9 @@ from apps.accounts.models import User
 from apps.billing.models import (
     Subscription,
     SubscriptionPlan,
-    CompanyCreditWallet,
     FeatureCreditCost,
     CreditTransaction,
     UsageRecord,
-    Payment,
     Invoice,
 )
 from apps.billing.services.wallet import CreditWalletService

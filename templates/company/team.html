@@ -269,7 +269,7 @@
 
                 <!-- Roles & Responsibilities Quick Link -->
                 <a 
-                  href="{% url 'seller-roles-web' %}" 
+                  href="{% url 'company-roles-web' %}" 
                   class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-slate-200 hover:border-blue-200 transition inline-flex items-center justify-center"
                   title="Configure Roles & Responsibilities"
                 >
@@ -494,7 +494,7 @@
           </div>
           {% empty %}
           <div class="p-4 text-center text-slate-400 text-xs">
-            No roles configured. Create roles under <a href="{% url 'seller-roles-web' %}" class="text-blue-600 font-bold underline">Roles & Responsibilities</a>.
+            No roles configured. Create roles under <a href="{% url 'company-roles-web' %}" class="text-blue-600 font-bold underline">Roles & Responsibilities</a>.
           </div>
           {% endfor %}
           <div id="addRoleNoMatch" class="hidden p-4 text-center text-slate-400 text-xs">

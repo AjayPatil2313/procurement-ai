@@ -7,7 +7,6 @@ from rest_framework.views import APIView
 
 from django.db import models
 from .models import (
-    Company,
     CompanyMember,
     CompanyPermission,
     MemberPermission,

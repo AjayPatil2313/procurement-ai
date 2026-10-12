@@ -8,7 +8,6 @@ from apps.companies.models import Company, CompanyMember
 from apps.billing.models import (
     SubscriptionPlan,
     Subscription,
-    CompanyCreditWallet,
     FeatureCreditCost,
     CreditTransaction,
     UsageRecord,

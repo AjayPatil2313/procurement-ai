@@ -1,6 +1,5 @@
 import hashlib
 import hmac
-import json
 import logging
 import time
 from decimal import Decimal
@@ -10,11 +9,8 @@ from django.conf import settings
 from django.utils import timezone
 
 from apps.billing.models import (
-    CompanyCreditWallet,
-    CreditTransaction,
     Invoice,
     Payment,
-    Subscription,
     SubscriptionPlan,
 )
 from apps.billing.services.wallet import CreditWalletService
