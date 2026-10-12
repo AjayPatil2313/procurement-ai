@@ -27,8 +27,11 @@ from apps.billing.models import (
     CreditTransaction,
     UsageRecord,
     Invoice,
+    CompanyWallet,
+    WalletTransaction,
+    ServicePricing,
 )
-from apps.billing.services.wallet import CreditWalletService
+from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
 from apps.ai_search.models import SearchJob
 from apps.dashboard.models import ActivityLog, SupportTicket, PlatformSetting
 from apps.leads.models import Inquiry
@@ -917,6 +920,7 @@ def admin_panel_plans_view(request):
     """
     CreditWalletService.ensure_default_plans_and_costs()
     CreditWalletService.process_subscription_lifecycle()
+    CompanyWalletService.ensure_default_service_pricing()
 
     # Global Credit Ledger CSV Export
     if request.GET.get("export") == "global_ledger_csv":
@@ -939,8 +943,29 @@ def admin_panel_plans_view(request):
             ])
         return response
 
+    # Global Prepaid Wallet Ledger CSV Export
+    if request.GET.get("export") == "global_wallet_ledger_csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response["Content-Disposition"] = f'attachment; filename="Global_Wallet_Ledger_{today_str}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["Reference ID", "Company", "Triggered By", "Transaction Type", "Amount (INR)", "Balance After", "Service / Description", "Date Time"])
+        for tx in WalletTransaction.objects.select_related("company", "created_by").order_by("-created_at")[:2000]:
+            user_str = tx.created_by.get_full_name() or tx.created_by.email if tx.created_by else "System Engine"
+            writer.writerow([
+                tx.reference_id,
+                tx.company.name,
+                user_str,
+                tx.get_transaction_type_display(),
+                f"+₹{tx.amount:.2f}" if tx.amount > 0 else f"₹{tx.amount:.2f}",
+                f"₹{tx.balance_after:.2f}",
+                tx.description,
+                tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ])
+        return response
+
     subscriptions = (
-        Subscription.objects.select_related("company", "plan_tier")
+        Subscription.objects.select_related("company", "company__wallet", "plan_tier")
         .order_by("-updated_at")
     )
 
@@ -959,6 +984,11 @@ def admin_panel_plans_view(request):
     if status_filter != "all":
         subscriptions = subscriptions.filter(status=status_filter)
 
+    # Ensure all listed companies have a CompanyWallet
+    for sub in subscriptions:
+        if not hasattr(sub.company, "wallet"):
+            CompanyWalletService.get_or_create_wallet(sub.company)
+
     # Platform overview KPIs
     total_companies = Company.objects.filter(is_active=True).count()
     active_subs_count = Subscription.objects.filter(status=Subscription.Status.ACTIVE).count()
@@ -969,10 +999,13 @@ def admin_panel_plans_view(request):
     total_used = Subscription.objects.aggregate(t=Sum("credits_used"))["t"] or 0
     total_revenue = Invoice.objects.filter(status=Invoice.Status.PAID).aggregate(s=Sum("total_amount"))["s"] or Decimal("0.00")
     failed_jobs_count = UsageRecord.objects.filter(status=UsageRecord.ProcessingStatus.FAILED).count()
+    total_prepaid_wallet_balance = CompanyWallet.objects.aggregate(s=Sum("available_balance"))["s"] or Decimal("0.00")
 
     plans_catalog = list(SubscriptionPlan.objects.all().order_by("order", "price"))
     feature_costs = list(FeatureCreditCost.objects.all().order_by("feature_code"))
+    service_pricing_rules = list(ServicePricing.objects.all().order_by("service_code"))
     recent_transactions = list(CreditTransaction.objects.select_related("company", "user").order_by("-created_at")[:30])
+    recent_wallet_transactions = list(WalletTransaction.objects.select_related("company", "created_by").order_by("-created_at")[:30])
     recent_invoices = list(Invoice.objects.select_related("company").order_by("-created_at")[:25])
     all_companies = list(Company.objects.filter(is_active=True).order_by("name"))
 
@@ -981,7 +1014,9 @@ def admin_panel_plans_view(request):
         "subscriptions": subscriptions,
         "plans_catalog": plans_catalog,
         "feature_costs": feature_costs,
+        "service_pricing_rules": service_pricing_rules,
         "recent_transactions": recent_transactions,
+        "recent_wallet_transactions": recent_wallet_transactions,
         "recent_invoices": recent_invoices,
         "all_companies": all_companies,
         "q": q,
@@ -996,7 +1031,82 @@ def admin_panel_plans_view(request):
         "total_remaining": max(0, total_allocated - total_used),
         "total_revenue": total_revenue,
         "failed_jobs_count": failed_jobs_count,
+        "total_prepaid_wallet_balance": total_prepaid_wallet_balance,
     })
+
+
+@login_required
+@superadmin_required
+def admin_panel_adjust_wallet_view(request, company_id):
+    """
+    POST action for Super Admin to manually credit or debit a company's prepaid currency wallet.
+    Requires mandatory audited reason.
+    """
+    if request.method == "POST":
+        company = get_object_or_404(Company, pk=company_id)
+        raw_delta = request.POST.get("amount", "0").strip()
+        reason = request.POST.get("reason", "").strip()
+
+        if not reason:
+            messages.error(request, "A mandatory audit reason is required for manual balance adjustments.")
+            return redirect("admin-panel-plans")
+
+        try:
+            delta = Decimal(raw_delta)
+            if delta == Decimal("0.00"):
+                messages.error(request, "Adjustment amount must be non-zero.")
+                return redirect("admin-panel-plans")
+        except Exception:
+            messages.error(request, "Invalid adjustment amount specified.")
+            return redirect("admin-panel-plans")
+
+        try:
+            tx = CompanyWalletService.adjust_balance_admin(
+                company=company,
+                delta_amount=delta,
+                reason=reason,
+                admin_user=request.user,
+            )
+            sign = "+" if delta > 0 else ""
+            messages.success(request, f"Successfully adjusted wallet for {company.name} by {sign}₹{delta:.2f}. Ref: #{tx.reference_id}.")
+        except ValueError as ve:
+            messages.error(request, str(ve))
+        except Exception as e:
+            messages.error(request, f"Adjustment failed: {e}")
+
+    return redirect("admin-panel-plans")
+
+
+@login_required
+@superadmin_required
+def admin_panel_service_pricing_update_view(request):
+    """
+    POST action for Super Admin to update currency pricing per service.
+    """
+    if request.method == "POST":
+        service_code = request.POST.get("service_code", "").strip()
+        raw_price = request.POST.get("price", "0").strip()
+
+        try:
+            new_price = Decimal(raw_price)
+            if new_price < Decimal("0.00"):
+                messages.error(request, "Price cannot be negative.")
+                return redirect("admin-panel-plans")
+        except Exception:
+            messages.error(request, "Invalid price amount specified.")
+            return redirect("admin-panel-plans")
+
+        pricing = ServicePricing.objects.filter(service_code=service_code).first()
+        if pricing:
+            pricing.price = new_price
+            pricing.updated_by = request.user
+            pricing.save(update_fields=["price", "updated_by", "updated_at"])
+            cache.delete(f"srv_price:{service_code}")
+            messages.success(request, f"Updated rate for '{pricing.display_name}' to ₹{new_price:.2f}.")
+        else:
+            messages.error(request, f"Service pricing rule for '{service_code}' not found.")
+
+    return redirect("admin-panel-plans")
 
 
 @login_required

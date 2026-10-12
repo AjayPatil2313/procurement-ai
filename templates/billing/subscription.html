@@ -36,6 +36,15 @@
       {% if rbac.is_company_admin or rbac.is_super_admin %}
         <button 
           type="button" 
+          onclick="openRechargeWalletModal()"
+          class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm cursor-pointer"
+        >
+          <i class="fa-solid fa-wallet"></i>
+          <span>Recharge Wallet (₹)</span>
+        </button>
+
+        <button 
+          type="button" 
           onclick="openBuyCreditsModal()"
           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition shadow-sm cursor-pointer"
         >
@@ -79,11 +88,54 @@
   <!-- ========================================================================= -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
     
-    <!-- 1. Current Plan Card -->
+    <!-- 1. Prepaid Company Wallet Balance (Cash INR) -->
     <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
       <div class="flex items-start justify-between">
         <div>
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Current Plan</span>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Prepaid Wallet Balance</span>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl font-black text-emerald-600">₹{{ company_wallet.available_balance|floatformat:2 }}</span>
+            <span class="text-xs text-slate-400 font-semibold">INR</span>
+          </div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg border border-emerald-100">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+      </div>
+      <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Credited: <strong class="text-slate-800">₹{{ company_wallet.total_credited|floatformat:0 }}</strong></span>
+        <span>Hold: <strong class="text-amber-600">₹{{ company_wallet.reserved_balance|floatformat:0 }}</strong></span>
+        <span class="inline-flex items-center gap-1 font-bold {% if company_wallet.status == 'active' %}text-emerald-700{% else %}text-rose-700{% endif %}">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {{ company_wallet.get_status_display }}
+        </span>
+      </div>
+    </div>
+
+    <!-- 2. Cumulative Spend & Consumption -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Cumulative AI Spend</span>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl font-black text-slate-900">₹{{ company_wallet.total_spent|floatformat:2 }}</span>
+            <span class="text-xs text-slate-400 font-semibold">INR</span>
+          </div>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg border border-purple-100">
+          <i class="fa-solid fa-chart-pie"></i>
+        </div>
+      </div>
+      <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <span>Available Credits: <strong class="text-amber-600">{{ wallet.total_available }}</strong></span>
+        <span>Consumed: <strong>{{ wallet.credits_consumed }}</strong></span>
+      </div>
+    </div>
+
+    <!-- 3. Current Subscription Tier -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Subscription Tier</span>
           <h2 class="text-xl font-black text-slate-900">{{ subscription.get_plan_display }}</h2>
         </div>
         <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg border border-amber-100">
@@ -102,58 +154,12 @@
           </span>
           <span class="text-slate-500">
             {% if subscription.auto_renew %}
-              Renews: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"Auto-monthly" }}</strong>
+              Renews: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"Auto" }}</strong>
             {% else %}
-              Active till: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"N/A" }}</strong>
+              Till: <strong>{{ subscription.valid_till|date:"M d, Y"|default:"N/A" }}</strong>
             {% endif %}
           </span>
         {% endif %}
-      </div>
-    </div>
-
-    <!-- 2. Available Credit Balance -->
-    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
-      <div class="flex items-start justify-between">
-        <div>
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Available Credits</span>
-          <div class="flex items-baseline gap-1.5">
-            <span class="text-2xl font-black text-blue-600">{{ wallet.total_available }}</span>
-            <span class="text-xs text-slate-400 font-semibold">/ {{ wallet.total_pool }} pool</span>
-          </div>
-        </div>
-        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg border border-blue-100">
-          <i class="fa-solid fa-coins"></i>
-        </div>
-      </div>
-      <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-[11px] text-slate-500">
-        <span>Plan: <strong>{{ wallet.subscription_credits }}</strong></span>
-        <span>Top-up: <strong>{{ wallet.purchased_credits }}</strong></span>
-        <span>Hold: <strong>{{ wallet.reserved_credits }}</strong></span>
-      </div>
-    </div>
-
-    <!-- 3. Credit Consumption & Progress -->
-    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
-      <div class="flex items-start justify-between">
-        <div>
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Company Consumed</span>
-          <div class="flex items-baseline gap-1.5">
-            <span class="text-2xl font-black text-slate-800">{{ wallet.credits_consumed }}</span>
-            <span class="text-xs text-slate-400 font-semibold">credits</span>
-          </div>
-        </div>
-        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg border border-purple-100">
-          <i class="fa-solid fa-chart-pie"></i>
-        </div>
-      </div>
-      <div class="mt-3 space-y-1">
-        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-          <div class="bg-blue-600 h-2 rounded-full" style="width: {{ wallet.usage_percentage }}%"></div>
-        </div>
-        <div class="flex justify-between text-[10px] text-slate-400">
-          <span>{{ wallet.usage_percentage }}% utilized</span>
-          <span>{{ wallet.total_available }} remaining</span>
-        </div>
       </div>
     </div>
 
@@ -199,6 +205,26 @@
     {% endif %}
 
   </div>
+
+  <!-- Low Wallet Balance Alert Banner -->
+  {% if company_wallet.is_low_balance %}
+  <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-base">
+        <i class="fa-solid fa-wallet text-amber-600"></i>
+      </div>
+      <div>
+        <h4 class="text-xs font-bold">Low Prepaid Wallet Balance: Only ₹{{ company_wallet.available_balance|floatformat:2 }} remaining</h4>
+        <p class="text-[11px] text-amber-700">AI discovery jobs will pause if your company wallet reaches ₹0.00. Recharge now to ensure uninterrupted operations.</p>
+      </div>
+    </div>
+    {% if rbac.is_company_admin or rbac.is_super_admin %}
+    <button type="button" onclick="openRechargeWalletModal()" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs whitespace-nowrap cursor-pointer">
+      Recharge Wallet Now
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
 
   <!-- Low Credit Alert Banner (if balance <= 50) -->
   {% if wallet.total_available <= 50 %}
@@ -425,6 +451,159 @@
         </div>
       </div>
       {% endfor %}
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- PREPAID WALLET TRANSACTIONS (IMMUTABLE CURRENCY LEDGER)                   -->
+  <!-- ========================================================================= -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+      <div>
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-wallet text-emerald-600"></i>
+          <span>Company Wallet Ledger (INR ₹)</span>
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">
+          Immutable audit record of prepaid recharges, atomic usage debits, and automated refunds.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a 
+          href="{% url 'subscription-billing-web' %}?export=wallet_ledger_csv" 
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition shadow-xs cursor-pointer"
+          title="Download Company Wallet Ledger (CSV)"
+        >
+          <i class="fa-solid fa-download text-[11px] text-slate-500"></i>
+          <span>Export CSV</span>
+        </a>
+        <span class="text-xs text-slate-500 font-medium">Available: <strong class="text-emerald-700">₹{{ company_wallet.available_balance|floatformat:2 }}</strong></span>
+        <button 
+          type="button" 
+          onclick="openRechargeWalletModal()"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-xs cursor-pointer"
+        >
+          <i class="fa-solid fa-plus text-[10px]"></i>
+          <span>Recharge</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-2.5 px-4">Ref ID</th>
+            <th class="py-2.5 px-3">Type</th>
+            <th class="py-2.5 px-3">Amount</th>
+            <th class="py-2.5 px-3">Balance After</th>
+            <th class="py-2.5 px-4">Service / Description</th>
+            <th class="py-2.5 px-3">Triggered By</th>
+            <th class="py-2.5 px-3 text-right">Date &amp; Time</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for tx in company_wallet_transactions %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-slate-800">
+              <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[11px]">
+                {{ tx.reference_id }}
+              </span>
+            </td>
+            <td class="py-3 px-3">
+              {% if tx.transaction_type == 'recharge' or tx.transaction_type == 'refund' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-plus text-[8px] mr-1"></i> {{ tx.get_transaction_type_display }}
+                </span>
+              {% elif tx.transaction_type == 'reserve' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                  <i class="fa-solid fa-lock text-[8px] mr-1"></i> RESERVED
+                </span>
+              {% elif tx.transaction_type == 'adjustment' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                  <i class="fa-solid fa-sliders text-[8px] mr-1"></i> ADJUSTMENT
+                </span>
+              {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                  <i class="fa-solid fa-minus text-[8px] mr-1"></i> USAGE DEBIT
+                </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 font-bold {% if tx.transaction_type == 'recharge' or tx.transaction_type == 'refund' or tx.amount > 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
+              {% if tx.transaction_type == 'recharge' or tx.transaction_type == 'refund' %}+{% elif tx.amount < 0 %}-{% endif %}₹{{ tx.amount|floatformat:2 }}
+            </td>
+            <td class="py-3 px-3 font-semibold text-slate-800">₹{{ tx.balance_after|floatformat:2 }}</td>
+            <td class="py-3 px-4 text-slate-600 max-w-xs truncate" title="{{ tx.description }}">
+              {{ tx.description }}
+            </td>
+            <td class="py-3 px-3 text-slate-600">
+              {% if tx.created_by %}
+                {{ tx.created_by.get_full_name|default:tx.created_by.email }}
+              {% else %}
+                <span class="text-slate-400 italic">System Engine</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-3 text-right text-slate-400 whitespace-nowrap">{{ tx.created_at|date:"M d, Y H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-8 text-center text-slate-400">
+              <i class="fa-solid fa-wallet text-2xl mb-1 text-slate-300 block"></i>
+              No wallet transactions recorded yet. Click "Recharge" to add prepaid funds.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- AI SERVICE PRICING RATE CARD                                              -->
+  <!-- ========================================================================= -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-5">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+      <div>
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-tags text-indigo-600"></i>
+          <span>AI Service Pricing Rate Card</span>
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">
+          Configured platform rates deducted atomically from your company wallet upon successful job execution.
+        </p>
+      </div>
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200">
+        <i class="fa-solid fa-shield-check text-emerald-600"></i>
+        <span>Zero-Result Protection Guarantee</span>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {% for sp in service_pricing_rules %}
+      <div class="p-3.5 rounded-xl border border-slate-200/90 bg-slate-50/60 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">{{ sp.service_code }}</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500" title="Active"></span>
+          </div>
+          <h4 class="text-xs font-bold text-slate-900 mb-1">{{ sp.display_name }}</h4>
+          <p class="text-[11px] text-slate-500 leading-tight mb-2">{{ sp.description|default:"Charged per successful operation." }}</p>
+        </div>
+        <div class="pt-2 border-t border-slate-200/80 flex items-baseline justify-between">
+          <span class="text-lg font-black text-slate-900">₹{{ sp.price|floatformat:2 }}</span>
+          <span class="text-[10px] text-slate-400 font-medium">/ {{ sp.charging_unit|default:"job" }}</span>
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-span-5 p-4 text-center text-xs text-slate-400">Default rate card active: ₹20 Discovery, ₹5 Match, ₹2 Lead.</div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-4 p-3 rounded-xl bg-blue-50/60 border border-blue-200/70 text-[11px] text-blue-900 flex items-start gap-2.5">
+      <i class="fa-solid fa-circle-info text-blue-600 mt-0.5 text-xs"></i>
+      <div>
+        <strong class="font-bold">Transparent Usage Guarantee:</strong> Search operations reserve funds on start. If a search returns 0 candidates or encounters a scraper timeout, funds are <strong>100% automatically refunded immediately</strong>. You only pay for successful results.
+      </div>
     </div>
   </div>
 
@@ -748,22 +927,52 @@
           <span>Current Billing Cycle End:</span>
           <span class="font-bold text-slate-900">{{ subscription.valid_till|date:"M d, Y"|default:"End of Month" }}</span>
         </div>
+        <div class="flex justify-between text-slate-600">
+          <span>Auto-Pay Source:</span>
+          <span class="font-bold text-emerald-700"><i class="fa-solid fa-wallet mr-1"></i> Prepaid Company Wallet</span>
+        </div>
+        {% if renewal_total > 0 %}
+        <div class="flex justify-between text-slate-600 pt-2 border-t border-slate-200">
+          <span>Renewal Amount (incl. 18% GST):</span>
+          <span class="font-bold text-slate-900">₹{{ renewal_total|floatformat:2 }}</span>
+        </div>
+        <div class="flex justify-between text-slate-600">
+          <span>Available Wallet Balance:</span>
+          <span class="font-bold {% if is_wallet_sufficient_for_autopay %}text-emerald-700{% else %}text-rose-600{% endif %}">₹{{ company_wallet.available_balance|floatformat:2 }}</span>
+        </div>
+        {% endif %}
       </div>
 
-      <!-- Policy / Grace Period Notice -->
+      <!-- Policy / Auto-Pay Status Notice -->
+      {% if subscription.auto_renew and not is_wallet_sufficient_for_autopay and renewal_total > 0 %}
+      <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 space-y-1.5 text-[11px]">
+        <div class="flex items-center gap-1.5 font-bold text-rose-800">
+          <i class="fa-solid fa-triangle-exclamation text-rose-600"></i>
+          <span>Action Required: Insufficient Wallet Balance</span>
+        </div>
+        <p class="leading-relaxed text-rose-800">
+          Your wallet is short by <strong>₹{{ wallet_autopay_deficit|floatformat:2 }}</strong> for the upcoming renewal on <strong>{{ subscription.valid_till|date:"M d, Y" }}</strong>.
+          <br/><strong>Important Policy:</strong> If wallet balance remains insufficient on {{ subscription.valid_till|date:"M d, Y" }}, <strong>Auto-Pay will be automatically cancelled</strong> and your subscription will expire.
+        </p>
+        <button type="button" onclick="closeAutopayModal(); openRechargeWalletModal();" class="mt-1 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition inline-flex items-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-wallet text-[10px]"></i> Recharge Wallet Now &rarr;
+        </button>
+      </div>
+      {% else %}
       <div class="p-3.5 rounded-xl {% if subscription.auto_renew %}bg-emerald-50/70 border border-emerald-200 text-emerald-900{% else %}bg-amber-50/70 border border-amber-200 text-amber-900{% endif %} space-y-1 text-[11px]">
         <div class="flex items-center gap-1.5 font-bold">
           <i class="fa-solid {% if subscription.auto_renew %}fa-circle-check text-emerald-600{% else %}fa-triangle-exclamation text-amber-600{% endif %}"></i>
-          <span>{% if subscription.auto_renew %}Automatic Monthly Renewal{% else %}Grace Period Active Until Expiry{% endif %}</span>
+          <span>{% if subscription.auto_renew %}Automatic Renewal from Prepaid Wallet{% else %}Grace Period Active Until Expiry{% endif %}</span>
         </div>
         <p class="leading-relaxed {% if subscription.auto_renew %}text-emerald-700{% else %}text-amber-800{% endif %}">
           {% if subscription.auto_renew %}
-            Your plan will automatically renew on <strong>{{ subscription.valid_till|date:"M d, Y" }}</strong>. New plan credits will be loaded and an official GST invoice generated seamlessly.
+            Your plan will automatically renew on <strong>{{ subscription.valid_till|date:"M d, Y" }}</strong> by deducting ₹{{ renewal_total|floatformat:2 }} from your company wallet. New plan credits will be reloaded and an official tax invoice generated seamlessly.
           {% else %}
-            Auto-Pay is paused. <strong>You will retain 100% full access to all features until {{ subscription.valid_till|date:"M d, Y" }}</strong>. After this date, paid operations will be paused until manually renewed.
+            Auto-Pay is paused. <strong>You will retain full access until {{ subscription.valid_till|date:"M d, Y" }}</strong>. After this date, paid operations will pause until renewed manually.
           {% endif %}
         </p>
       </div>
+      {% endif %}
 
       <!-- Action Form -->
       <form method="POST" class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -801,7 +1010,152 @@
   </div>
 </div>
 
+<!-- ========================================================================= -->
+<!-- MODAL: RECHARGE PREPAID COMPANY WALLET (WITH 18% GST BREAKDOWN)           -->
+<!-- ========================================================================= -->
+<div id="rechargeWalletModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base border border-emerald-200">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Recharge Company Wallet</h3>
+          <p class="text-xs text-slate-500">Atomic balance for AI discovery &amp; matching jobs (18% GST)</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeRechargeWalletModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition cursor-pointer">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" id="rechargeWalletForm" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="recharge_wallet">
+
+      <div>
+        <label class="block font-bold text-slate-700 uppercase tracking-wider mb-2">Select or Enter Recharge Amount (INR ₹)</label>
+        
+        <!-- Preset Amount Chips -->
+        <div class="grid grid-cols-4 gap-2 mb-3">
+          <button type="button" onclick="selectWalletPreset(500)" class="wallet-preset-btn py-2 rounded-xl border border-slate-200 text-slate-800 font-bold hover:border-emerald-500 hover:bg-emerald-50 text-xs transition cursor-pointer text-center">
+            ₹500
+          </button>
+          <button type="button" onclick="selectWalletPreset(1000)" class="wallet-preset-btn py-2 rounded-xl border-2 border-emerald-500 text-emerald-800 bg-emerald-50 font-bold text-xs transition cursor-pointer text-center">
+            ₹1,000
+          </button>
+          <button type="button" onclick="selectWalletPreset(2500)" class="wallet-preset-btn py-2 rounded-xl border border-slate-200 text-slate-800 font-bold hover:border-emerald-500 hover:bg-emerald-50 text-xs transition cursor-pointer text-center">
+            ₹2,500
+          </button>
+          <button type="button" onclick="selectWalletPreset(5000)" class="wallet-preset-btn py-2 rounded-xl border border-slate-200 text-slate-800 font-bold hover:border-emerald-500 hover:bg-emerald-50 text-xs transition cursor-pointer text-center">
+            ₹5,000
+          </button>
+        </div>
+
+        <!-- Custom Input -->
+        <div class="relative">
+          <span class="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">₹</span>
+          <input 
+            type="number" 
+            name="amount" 
+            id="rechargeWalletAmountInput" 
+            value="1000" 
+            min="100" 
+            step="50"
+            oninput="calculateWalletGst()"
+            class="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 font-black text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="1000"
+            required
+          >
+        </div>
+        <span class="text-[10px] text-slate-400 mt-1 block">Minimum recharge amount is ₹100.00</span>
+      </div>
+
+      <!-- Itemized Tax Invoice Breakdown -->
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+        <div class="flex justify-between items-center text-slate-600">
+          <span>Net Recharge Credit:</span>
+          <span class="font-bold text-slate-900" id="walletModalBase">₹1,000.00</span>
+        </div>
+        <div class="flex justify-between items-center text-slate-600">
+          <span>GST (18% - SAC 998313):</span>
+          <span class="font-bold text-slate-900" id="walletModalTax">₹180.00</span>
+        </div>
+        <div class="flex justify-between items-center border-t border-slate-200 pt-2 text-sm font-black">
+          <span class="text-slate-900">Total Payable Amount:</span>
+          <span class="text-emerald-700 text-base" id="walletModalTotal">₹1,180.00</span>
+        </div>
+      </div>
+
+      <!-- Zero-Risk Notice -->
+      <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/70 text-[11px] text-emerald-950 space-y-1">
+        <div class="flex items-center gap-1.5 font-bold text-emerald-800">
+          <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+          <span>Instant Balance &amp; Official Tax Receipt</span>
+        </div>
+        <p class="text-emerald-700 leading-relaxed">
+          Recharge amount is immediately credited to your company wallet. A GST-compliant tax invoice will be generated and logged permanently in your account.
+        </p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button 
+          type="button" 
+          onclick="closeRechargeWalletModal()" 
+          class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button 
+          type="submit" 
+          class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow-sm cursor-pointer inline-flex items-center gap-2"
+        >
+          <i class="fa-solid fa-check"></i>
+          <span>Confirm &amp; Recharge</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+function openRechargeWalletModal() {
+  document.getElementById('rechargeWalletModal').classList.remove('hidden');
+  calculateWalletGst();
+}
+
+function closeRechargeWalletModal() {
+  document.getElementById('rechargeWalletModal').classList.add('hidden');
+}
+
+function selectWalletPreset(amt) {
+  var input = document.getElementById('rechargeWalletAmountInput');
+  input.value = amt;
+  // Update button visual styles
+  var buttons = document.querySelectorAll('.wallet-preset-btn');
+  buttons.forEach(function(b) {
+    if (b.textContent.trim() === '₹' + amt.toLocaleString('en-IN')) {
+      b.className = 'wallet-preset-btn py-2 rounded-xl border-2 border-emerald-500 text-emerald-800 bg-emerald-50 font-bold text-xs transition cursor-pointer text-center';
+    } else {
+      b.className = 'wallet-preset-btn py-2 rounded-xl border border-slate-200 text-slate-800 font-bold hover:border-emerald-500 hover:bg-emerald-50 text-xs transition cursor-pointer text-center';
+    }
+  });
+  calculateWalletGst();
+}
+
+function calculateWalletGst() {
+  var input = document.getElementById('rechargeWalletAmountInput');
+  var base = parseFloat(input.value) || 0;
+  if (base < 0) base = 0;
+  var tax = Math.round(base * 0.18 * 100) / 100;
+  var total = Math.round((base + tax) * 100) / 100;
+
+  document.getElementById('walletModalBase').textContent = '₹' + base.toFixed(2);
+  document.getElementById('walletModalTax').textContent = '₹' + tax.toFixed(2);
+  document.getElementById('walletModalTotal').textContent = '₹' + total.toFixed(2);
+}
 function openAutopayModal() {
   document.getElementById('autopayModal').classList.remove('hidden');
 }

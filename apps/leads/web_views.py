@@ -1083,8 +1083,12 @@ def saved_suppliers_view(request):
     team_members = []
     if company:
         team_members = [
-            m.user for m in company.members.filter(is_active=True).select_related("user") if m.user
+            m.user
+            for m in company.members.filter(is_active=True).select_related("user").order_by("user__first_name", "user__email")
+            if m.user
         ]
+        if not team_members and request.user.is_authenticated:
+            team_members = [request.user]
 
     return render(request, "leads/saved_suppliers.html", {
         "requirements": requirements,
@@ -1104,6 +1108,7 @@ def saved_suppliers_view(request):
         "negotiating_count": negotiating_count,
         "status_choices": SavedItem.Status.choices,
         "current_status": status_filter,
+        "current_assigned": assigned_filter,
         "team_members": team_members,
         "search_query": q,
         "company": company,
@@ -2558,19 +2563,32 @@ def export_reports_view(request):
             messages.warning(request, f"Please select a {'product' if is_seller_context else 'requirement'} first to generate and download the export.")
             return redirect(f"{request.path}?report_type={report_type}")
 
-        # Credit reservation for report export
+        # Credit / Prepaid Wallet reservation for report export
         usage_rec = None
         if company:
-            from apps.billing.services.wallet import CreditWalletService
-            ok, msg, usage_rec = CreditWalletService.reserve_credits(
-                company=company,
-                user=request.user,
-                feature_code="export_reports",
-                quantity=1,
-                idempotency_key=f"export_report:{company.id}:{request.user.id}:{report_type}:{selected_item.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
-            )
+            from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
+            credit_wallet = getattr(company, "credit_wallet", None)
+            credits_avail = credit_wallet.total_available if credit_wallet else (company.subscription.credits_remaining if hasattr(company, "subscription") else 0)
+
+            if credits_avail > 0:
+                ok, msg, usage_rec = CreditWalletService.reserve_credits(
+                    company=company,
+                    user=request.user,
+                    feature_code="export_reports",
+                    quantity=1,
+                    idempotency_key=f"export_report:{company.id}:{request.user.id}:{report_type}:{selected_item.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                )
+            else:
+                ok, msg, usage_rec = CompanyWalletService.reserve_funds(
+                    company=company,
+                    user=request.user,
+                    service_code="report_export",
+                    quantity=1,
+                    idempotency_key=f"export_report:{company.id}:{request.user.id}:{report_type}:{selected_item.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                )
+
             if not ok:
-                messages.error(request, f"Cannot export report: {msg} Please top up your wallet.")
+                messages.error(request, f"Cannot export report: {msg} Please recharge your company wallet or top up credits.")
                 return redirect(f"{request.path}?report_type={report_type}&product_id={selected_item.id}")
 
         response = HttpResponse(content_type="text/csv; charset=utf-8")
@@ -2666,8 +2684,12 @@ def export_reports_view(request):
                 ])
 
         if usage_rec:
-            from apps.billing.services.wallet import CreditWalletService
-            CreditWalletService.commit_usage(usage_rec)
+            if getattr(usage_rec, "wallet_id", None):
+                from apps.billing.services.wallet import CompanyWalletService
+                CompanyWalletService.commit_usage(usage_rec)
+            else:
+                from apps.billing.services.wallet import CreditWalletService
+                CreditWalletService.commit_usage(usage_rec)
 
         return response
 

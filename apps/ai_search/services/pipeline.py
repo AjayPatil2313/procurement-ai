@@ -8,7 +8,7 @@ from apps.ai_search.services.web_scraper import CompanyWebScraper
 from apps.ai_search.services.ai_matcher import AIMatcher
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
-from apps.billing.services.wallet import CreditWalletService
+from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
 
 logger = logging.getLogger(__name__)
 
@@ -178,16 +178,27 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
     location = product.location or (company.city if company else "India")
     query = f"{product.name} {category_name} industrial buyers procurement rfq {location}".strip()
 
-    # Credit enforcement & atomic reservation via CreditWalletService
+    # Prepaid Wallet / Credit enforcement & atomic reservation
     usage_rec = None
     if company:
-        ok, msg, usage_rec = CreditWalletService.reserve_credits(
-            company=company,
-            user=user,
-            feature_code="vendor_discovery",
-            quantity=1,
-            idempotency_key=f"buyer_search:{company.id}:{user.id if user else 0}:{product.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
-        )
+        wallet = CompanyWalletService.get_or_create_wallet(company)
+        wallet_ok, _, needed_cash = CompanyWalletService.check_balance(company, "buyer_discovery", quantity=1)
+        if wallet_ok and wallet and wallet.available_balance >= needed_cash:
+            ok, msg, usage_rec = CompanyWalletService.reserve_funds(
+                company=company,
+                user=user,
+                service_code="buyer_discovery",
+                quantity=1,
+                idempotency_key=f"buyer_search:{company.id}:{user.id if user else 0}:{product.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            )
+        else:
+            ok, msg, usage_rec = CreditWalletService.reserve_credits(
+                company=company,
+                user=user,
+                feature_code="vendor_discovery",
+                quantity=1,
+                idempotency_key=f"buyer_search:{company.id}:{user.id if user else 0}:{product.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            )
         if not ok:
             return SearchJob.objects.create(
                 company=company,
@@ -278,11 +289,20 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
         job.finished_at = timezone.now()
         job.save()
 
-        # Commit AI search credit deduction
+        # Commit or refund based on results found
         if usage_rec:
             usage_rec.search_job = job
             usage_rec.save(update_fields=["search_job"])
-            CreditWalletService.commit_usage(usage_rec)
+            if saved_results == 0:
+                if getattr(usage_rec, "wallet_id", None):
+                    CompanyWalletService.refund_funds(usage_rec, reason="Zero candidates discovered")
+                else:
+                    CreditWalletService.refund_or_release(usage_rec, reason="Zero candidates discovered")
+            else:
+                if getattr(usage_rec, "wallet_id", None):
+                    CompanyWalletService.commit_usage(usage_rec)
+                else:
+                    CreditWalletService.commit_usage(usage_rec)
 
         APILog.objects.create(
             provider="WebSearchProvider & Scraper (Parallel)",
@@ -294,7 +314,10 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
     except Exception as e:
         logger.exception(f"Error during find_buyers_search: {e}")
         if usage_rec:
-            CreditWalletService.refund_or_release(usage_rec, reason=str(e))
+            if getattr(usage_rec, "wallet_id", None):
+                CompanyWalletService.refund_funds(usage_rec, reason=str(e))
+            else:
+                CreditWalletService.refund_or_release(usage_rec, reason=str(e))
         job.status = SearchJob.Status.FAILED
         job.error_message = str(e)
         job.finished_at = timezone.now()
@@ -316,16 +339,27 @@ def run_find_suppliers_search(requirement: Requirement, user, company, criteria_
     country = requirement.delivery_country or "India"
     query = f"{requirement.item_name} {category_name} manufacturers suppliers exporters {country}".strip()
 
-    # Credit enforcement & atomic reservation via CreditWalletService
+    # Prepaid Wallet / Credit enforcement & atomic reservation
     usage_rec = None
     if company:
-        ok, msg, usage_rec = CreditWalletService.reserve_credits(
-            company=company,
-            user=user,
-            feature_code="vendor_discovery",
-            quantity=1,
-            idempotency_key=f"supplier_search:{company.id}:{user.id if user else 0}:{requirement.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
-        )
+        wallet = CompanyWalletService.get_or_create_wallet(company)
+        wallet_ok, _, needed_cash = CompanyWalletService.check_balance(company, "supplier_discovery", quantity=1)
+        if wallet_ok and wallet and wallet.available_balance >= needed_cash:
+            ok, msg, usage_rec = CompanyWalletService.reserve_funds(
+                company=company,
+                user=user,
+                service_code="supplier_discovery",
+                quantity=1,
+                idempotency_key=f"supplier_search:{company.id}:{user.id if user else 0}:{requirement.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            )
+        else:
+            ok, msg, usage_rec = CreditWalletService.reserve_credits(
+                company=company,
+                user=user,
+                feature_code="vendor_discovery",
+                quantity=1,
+                idempotency_key=f"supplier_search:{company.id}:{user.id if user else 0}:{requirement.id}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            )
         if not ok:
             return SearchJob.objects.create(
                 company=company,
@@ -423,11 +457,20 @@ def run_find_suppliers_search(requirement: Requirement, user, company, criteria_
             requirement.status = Requirement.Status.SEARCHING
             requirement.save(update_fields=["status"])
 
-        # Commit AI search credit deduction
+        # Commit or refund based on results found
         if usage_rec:
             usage_rec.search_job = job
             usage_rec.save(update_fields=["search_job"])
-            CreditWalletService.commit_usage(usage_rec)
+            if saved_results == 0:
+                if getattr(usage_rec, "wallet_id", None):
+                    CompanyWalletService.refund_funds(usage_rec, reason="Zero candidates discovered")
+                else:
+                    CreditWalletService.refund_or_release(usage_rec, reason="Zero candidates discovered")
+            else:
+                if getattr(usage_rec, "wallet_id", None):
+                    CompanyWalletService.commit_usage(usage_rec)
+                else:
+                    CreditWalletService.commit_usage(usage_rec)
 
         APILog.objects.create(
             provider="WebSearchProvider & Scraper (Parallel)",
@@ -439,7 +482,10 @@ def run_find_suppliers_search(requirement: Requirement, user, company, criteria_
     except Exception as e:
         logger.exception(f"Error during find_suppliers_search: {e}")
         if usage_rec:
-            CreditWalletService.refund_or_release(usage_rec, reason=str(e))
+            if getattr(usage_rec, "wallet_id", None):
+                CompanyWalletService.refund_funds(usage_rec, reason=str(e))
+            else:
+                CreditWalletService.refund_or_release(usage_rec, reason=str(e))
         job.status = SearchJob.Status.FAILED
         job.error_message = str(e)
         job.finished_at = timezone.now()

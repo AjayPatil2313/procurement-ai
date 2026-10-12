@@ -13,8 +13,11 @@ from apps.billing.models import (
     UsageRecord,
     Invoice,
     Payment,
+    CompanyWallet,
+    WalletTransaction,
+    ServicePricing,
 )
-from apps.billing.services.wallet import CreditWalletService
+from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
 
 
 class CreditWalletServiceUnitTestCase(TestCase):
@@ -964,6 +967,578 @@ class SubscriptionScenariosAndInvoicesWebTestCase(TestCase):
         self.assertEqual(ledger_res.status_code, 200)
         self.assertContains(ledger_res, "Company Credit Ledger")
         self.assertContains(ledger_res, "Itemized Transaction History")
+
+
+class CompanyPrepaidWalletAndLedgerTestCase(TestCase):
+    """
+    Comprehensive test suite for the Company Wallet, Immutable Ledger, Usage Billing,
+    and Super Admin Governance system:
+    1. Wallet auto-initialization at ₹0.00 upon company creation.
+    2. Recharge adds balance and creates immutable WalletTransaction with balance snapshot.
+    3. Concurrency-safe reservation and atomic usage deduction.
+    4. Insufficient balance rejection (fails safely with 0 risk of negative balance).
+    5. Zero-result & error protection: 100% automated refund to wallet.
+    6. Super Admin manual adjustments with mandatory audit reason and ledger entry.
+    7. Multi-tenant isolation: strict barrier preventing cross-company spending.
+    8. Webhook & reservation idempotency preventing duplicate charges.
+    9. REST API endpoints for wallet, recharge, pricing, and admin adjustment.
+    10. RBAC permissions: Company User cannot recharge or adjust wallet.
+    """
+
+    def setUp(self):
+        CompanyWalletService.ensure_default_service_pricing()
+
+        self.superadmin = User.objects.create_superuser(
+            email="superadmin@platform.ai",
+            password="Password123!",
+            first_name="Super",
+            last_name="Admin",
+        )
+        self.company_a = Company.objects.create(
+            name="Ajay Packaging Pvt Ltd",
+            company_type=Company.CompanyType.SELLER,
+            industry="Packaging",
+            country="India",
+            is_active=True,
+            created_by=self.superadmin,
+        )
+        self.company_b = Company.objects.create(
+            name="ABC Industries",
+            company_type=Company.CompanyType.BUYER,
+            industry="Manufacturing",
+            country="India",
+            is_active=True,
+            created_by=self.superadmin,
+        )
+        self.admin_user_a = User.objects.create_user(
+            email="admin@ajaypkg.com",
+            password="Password123!",
+            first_name="Ajay",
+            last_name="Admin",
+        )
+        self.member_admin_a = CompanyMember.objects.create(
+            company=self.company_a,
+            user=self.admin_user_a,
+            role=CompanyMember.Role.ADMIN,
+        )
+        self.regular_user_a = User.objects.create_user(
+            email="user@ajaypkg.com",
+            password="Password123!",
+            first_name="Ajay",
+            last_name="User",
+        )
+        self.member_user_a = CompanyMember.objects.create(
+            company=self.company_a,
+            user=self.regular_user_a,
+            role=CompanyMember.Role.USER,
+        )
+
+    def test_01_wallet_auto_initialization(self):
+        """Verify that every new company automatically receives a dedicated prepaid wallet initialized at ₹0.00."""
+        wallet = CompanyWallet.objects.filter(company=self.company_a).first()
+        self.assertIsNotNone(wallet)
+        self.assertEqual(wallet.available_balance, Decimal("0.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("0.00"))
+        self.assertEqual(wallet.total_credited, Decimal("0.00"))
+        self.assertEqual(wallet.total_spent, Decimal("0.00"))
+        self.assertEqual(wallet.currency, "INR")
+        self.assertEqual(wallet.status, CompanyWallet.WalletStatus.ACTIVE)
+
+    def test_02_wallet_recharge_creates_ledger_entry(self):
+        """Verify recharging wallet adds available funds and logs an immutable ledger transaction."""
+        tx = CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("1000.00"),
+            user=self.admin_user_a,
+            notes="Initial bank transfer recharge",
+        )
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("1000.00"))
+        self.assertEqual(wallet.total_credited, Decimal("1000.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("0.00"))
+
+        # Verify immutable ledger entry
+        self.assertIsNotNone(tx)
+        self.assertEqual(tx.transaction_type, WalletTransaction.TransactionType.RECHARGE)
+        self.assertEqual(tx.amount, Decimal("1000.00"))
+        self.assertEqual(tx.balance_after, Decimal("1000.00"))
+        self.assertTrue(tx.reference_id.startswith("TXN-"))
+        self.assertEqual(tx.created_by, self.admin_user_a)
+
+    def test_03_atomic_reserve_and_commit_usage(self):
+        """Verify atomic reservation holds funds and commit deducts them atomically."""
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("1000.00"),
+            user=self.admin_user_a,
+        )
+
+        # 1. Reserve ₹20.00 for supplier discovery
+        ok, msg, usage_rec = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="find_suppliers",
+            quantity=1,
+            idempotency_key="job-supplier-search-001",
+        )
+        self.assertTrue(ok)
+        self.assertIsNotNone(usage_rec)
+        self.assertEqual(usage_rec.amount_charged, Decimal("20.00"))
+        self.assertEqual(usage_rec.status, UsageRecord.ProcessingStatus.RESERVED)
+
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("980.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("20.00"))
+
+        # 2. Commit usage after search job succeeds
+        commit_tx = CompanyWalletService.commit_usage(usage_rec)
+        self.assertIsNotNone(commit_tx)
+        self.assertEqual(commit_tx.transaction_type, WalletTransaction.TransactionType.USAGE_DEBIT)
+        self.assertEqual(commit_tx.amount, Decimal("-20.00"))
+        self.assertEqual(commit_tx.balance_after, Decimal("980.00"))
+
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("980.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("0.00"))
+        self.assertEqual(wallet.total_spent, Decimal("20.00"))
+
+    def test_04_insufficient_balance_rejection(self):
+        """Verify that operations are rejected when wallet balance is insufficient, preventing overdrafts."""
+        # Initial balance is ₹0.00
+        ok, msg, usage_rec = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="find_suppliers",
+            quantity=1,
+        )
+        self.assertFalse(ok)
+        self.assertIn("Insufficient wallet balance", msg)
+        self.assertIsNone(usage_rec)
+
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("0.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("0.00"))
+
+    def test_05_zero_results_and_failure_auto_refund(self):
+        """Verify funds are 100% refunded when a discovery job returns zero candidates or fails."""
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("500.00"),
+            user=self.admin_user_a,
+        )
+
+        ok, msg, usage_rec = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="find_buyers",
+            quantity=1,
+        )
+        self.assertTrue(ok)
+
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("480.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("20.00"))
+
+        # Zero results returned before charge -> release hold back to available balance
+        CompanyWalletService.refund_funds(
+            usage_record=usage_rec,
+            reason="Zero candidates discovered",
+        )
+        usage_rec.refresh_from_db()
+        self.assertEqual(usage_rec.status, UsageRecord.ProcessingStatus.FAILED)
+
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("500.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("0.00"))
+        self.assertEqual(wallet.total_spent, Decimal("0.00"))
+
+        # Also verify refunding an already committed charge:
+        ok2, _, rec2 = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="find_buyers",
+        )
+        CompanyWalletService.commit_usage(rec2)
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("480.00"))
+
+        refund_tx2 = CompanyWalletService.refund_funds(
+            usage_record=rec2,
+            reason="Scraper job timeout refund",
+        )
+        self.assertIsNotNone(refund_tx2)
+        self.assertEqual(refund_tx2.transaction_type, WalletTransaction.TransactionType.REFUND)
+        self.assertEqual(refund_tx2.amount, Decimal("20.00"))
+
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("500.00"))
+
+    def test_06_superadmin_manual_adjustment_with_audit_reason(self):
+        """Verify Super Admin manual adjustments enforce mandatory reason and create audit logs."""
+        # 1. Reject without reason
+        with self.assertRaises(ValueError):
+            CompanyWalletService.adjust_balance_admin(
+                company=self.company_a,
+                delta_amount=Decimal("250.00"),
+                reason="",
+                admin_user=self.superadmin,
+            )
+
+        # 2. Valid positive adjustment
+        tx_credit = CompanyWalletService.adjust_balance_admin(
+            company=self.company_a,
+            delta_amount=Decimal("250.00"),
+            reason="Customer success onboarding credit",
+            admin_user=self.superadmin,
+        )
+        self.assertEqual(tx_credit.amount, Decimal("250.00"))
+        self.assertEqual(tx_credit.balance_after, Decimal("250.00"))
+
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("250.00"))
+
+        # 3. Valid negative adjustment
+        tx_debit = CompanyWalletService.adjust_balance_admin(
+            company=self.company_a,
+            delta_amount=Decimal("-50.00"),
+            reason="Billing dispute correction",
+            admin_user=self.superadmin,
+        )
+        self.assertEqual(tx_debit.amount, Decimal("-50.00"))
+        self.assertEqual(tx_debit.balance_after, Decimal("200.00"))
+
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("200.00"))
+
+    def test_07_tenant_isolation_no_cross_company_spending(self):
+        """Verify strict multi-tenant isolation: Company A's balance cannot be accessed by Company B."""
+        # Credit Company A with ₹1,000
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("1000.00"),
+            user=self.admin_user_a,
+        )
+
+        # Company B has ₹0.00
+        wallet_b = CompanyWallet.objects.get(company=self.company_b)
+        self.assertEqual(wallet_b.available_balance, Decimal("0.00"))
+
+        # Attempting operation for Company B must be rejected
+        ok, msg, usage_rec = CompanyWalletService.reserve_funds(
+            company=self.company_b,
+            user=self.admin_user_a,
+            service_code="find_suppliers",
+        )
+        self.assertFalse(ok)
+        self.assertIn("Insufficient wallet balance", msg)
+
+        # Company A's balance must remain untouched
+        wallet_a = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet_a.available_balance, Decimal("1000.00"))
+
+    def test_08_idempotency_prevents_duplicate_deductions(self):
+        """Verify idempotency key prevents duplicate charges for the same job."""
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("500.00"),
+            user=self.admin_user_a,
+        )
+
+        key = "job-dedup-key-xyz-123"
+        ok1, msg1, rec1 = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="find_buyers",
+            idempotency_key=key,
+        )
+        self.assertTrue(ok1)
+
+        # Second reserve with identical key returns existing record without second deduction
+        ok2, msg2, rec2 = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="find_buyers",
+            idempotency_key=key,
+        )
+        self.assertTrue(ok2)
+        self.assertEqual(rec1.id, rec2.id)
+
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        # Deducted once (₹20), not twice (₹40)
+        self.assertEqual(wallet.available_balance, Decimal("480.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("20.00"))
+
+    def test_09_reconciliation_verifies_ledger_integrity(self):
+        """Verify wallet balance matches sum of transactions in reconciliation check."""
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("1000.00"),
+            user=self.admin_user_a,
+        )
+        ok, _, rec = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="find_suppliers",
+        )
+        CompanyWalletService.commit_usage(rec)
+
+        rec_data = CompanyWalletService.reconcile_wallet(self.company_a)
+        self.assertTrue(rec_data["is_balanced"])
+        self.assertEqual(rec_data["discrepancy"], Decimal("0.00"))
+        self.assertEqual(rec_data["wallet_available_balance"], Decimal("980.00"))
+
+    def test_10_rest_api_wallet_and_recharge(self):
+        """Verify REST API /api/billing/wallet/ and /api/billing/recharge/ endpoints."""
+        self.client.force_login(self.admin_user_a)
+        session = self.client.session
+        session["active_company_id"] = self.company_a.id
+        session.save()
+
+        # 1. GET wallet API
+        res = self.client.get(reverse("billing-wallet-api"))
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["wallet"]["currency"], "INR")
+        self.assertEqual(Decimal(str(data["wallet"]["available_balance"])), Decimal("0.00"))
+
+        # 2. POST recharge API (initializes order via gateway)
+        res_rech = self.client.post(
+            reverse("billing-recharge-api"),
+            data={"amount": 1000.0, "notes": "API test recharge"},
+            content_type="application/json",
+        )
+        self.assertEqual(res_rech.status_code, 200)
+        data_rech = res_rech.json()
+        self.assertTrue(data_rech["success"])
+        self.assertEqual(data_rech["order"]["action_type"], "recharge_wallet")
+        self.assertEqual(data_rech["order"]["currency"], "INR")
+
+        # Recharging directly simulates successful fulfillment
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("1000.00"),
+            user=self.admin_user_a,
+            notes="API verified recharge",
+        )
+
+        # 3. GET transactions API
+        res_tx = self.client.get(reverse("billing-transactions-api"))
+        self.assertEqual(res_tx.status_code, 200)
+        data_tx = res_tx.json()
+        self.assertEqual(len(data_tx["transactions"]), 1)
+        self.assertEqual(data_tx["transactions"][0]["transaction_type"], "recharge")
+
+    def test_11_rbac_company_user_restrictions(self):
+        """Verify regular company users cannot recharge wallet or access admin adjustments."""
+        self.client.force_login(self.regular_user_a)
+        session = self.client.session
+        session["active_company_id"] = self.company_a.id
+        session.save()
+
+        # Regular user attempting POST recharge via web is blocked
+        res = self.client.post(reverse("subscription-billing-web"), {
+            "action": "recharge_wallet",
+            "amount": "1000",
+        })
+        self.assertEqual(res.status_code, 302)  # Redirect with error
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("0.00"))
+
+        # Regular user attempting admin adjustment is denied (redirects to login/restricted)
+        res_adj = self.client.post(
+            reverse("admin-panel-adjust-wallet", kwargs={"company_id": self.company_a.id}),
+            {"amount": "500", "reason": "Unauthorized"},
+        )
+        self.assertNotEqual(res_adj.status_code, 200)
+
+    def test_12_auto_pay_renewal_success(self):
+        """Auto-Pay renewal successfully debits wallet, creates payment & invoice, extends validity, reloads credits."""
+        CreditWalletService.ensure_default_plans_and_costs()
+        plan = SubscriptionPlan.objects.get(code="pro")
+        subtotal, tax, total_needed = CreditWalletService.calculate_gst_breakdown(plan.price)
+
+        # Recharge wallet with more than total_needed
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=total_needed + Decimal("500.00"),
+            user=self.admin_user_a,
+            notes="Initial wallet funding",
+        )
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        initial_balance = wallet.available_balance
+
+        today = timezone.now().date()
+        subscription = Subscription.objects.create(
+            company=self.company_a,
+            plan_tier=plan,
+            plan=plan.code,
+            status=Subscription.Status.ACTIVE,
+            valid_till=today,
+            auto_renew=True,
+        )
+
+        ok, msg, tx = CompanyWalletService.execute_auto_pay_renewal(self.company_a, subscription)
+        self.assertTrue(ok)
+        self.assertIn("Auto-Pay successfully processed", msg)
+
+        # Verify wallet deducted by exact total_needed
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, initial_balance - total_needed)
+        self.assertEqual(wallet.total_spent, total_needed)
+
+        # Verify transaction logged
+        self.assertIsNotNone(tx)
+        self.assertEqual(tx.transaction_type, WalletTransaction.TransactionType.USAGE_DEBIT)
+        self.assertEqual(tx.amount, -total_needed)
+
+        # Verify payment & invoice
+        payment = Payment.objects.filter(company=self.company_a, subscription=subscription).first()
+        self.assertIsNotNone(payment)
+        self.assertEqual(payment.amount, total_needed)
+        self.assertEqual(payment.status, Payment.Status.SUCCESS)
+
+        invoice = Invoice.objects.filter(company=self.company_a, subscription=subscription).first()
+        self.assertIsNotNone(invoice)
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.total_amount, total_needed)
+
+        # Verify subscription extended
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.status, Subscription.Status.ACTIVE)
+        self.assertTrue(subscription.auto_renew)
+        self.assertEqual(subscription.valid_till, today + timezone.timedelta(days=30))
+        self.assertFalse(subscription.expiry_warning_5d_sent)
+
+    def test_13_auto_pay_renewal_insufficient_balance_cancels_autopay(self):
+        """Auto-Pay renewal with insufficient wallet balance cancels auto-renew, expires plan, and alerts admin."""
+        from apps.dashboard.models import Notification
+        CreditWalletService.ensure_default_plans_and_costs()
+        plan = SubscriptionPlan.objects.get(code="pro")
+
+        today = timezone.now().date()
+        subscription = Subscription.objects.create(
+            company=self.company_a,
+            plan_tier=plan,
+            plan=plan.code,
+            status=Subscription.Status.ACTIVE,
+            valid_till=today,
+            auto_renew=True,
+        )
+
+        # Wallet has ₹0.00
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("0.00"))
+
+        ok, msg, tx = CompanyWalletService.execute_auto_pay_renewal(self.company_a, subscription)
+        self.assertFalse(ok)
+        self.assertIn("Insufficient wallet balance", msg)
+        self.assertIsNone(tx)
+
+        # Subscription auto-renew should be cancelled and status expired
+        subscription.refresh_from_db()
+        self.assertFalse(subscription.auto_renew)
+        self.assertIsNotNone(subscription.cancelled_at)
+        self.assertEqual(subscription.status, Subscription.Status.EXPIRED)
+
+        # Check notification dispatched to admin
+        notif = Notification.objects.filter(
+            company=self.company_a,
+            user=self.admin_user_a,
+            title__icontains="Auto-Pay Cancelled",
+        ).first()
+        self.assertIsNotNone(notif)
+        self.assertIn("insufficient wallet balance", notif.message.lower())
+
+    def test_14_subscription_lifecycle_advance_deficit_warning(self):
+        """Subscriptions with auto-pay approaching expiry with insufficient wallet balance trigger shortfall alert."""
+        from apps.dashboard.models import Notification
+        CreditWalletService.ensure_default_plans_and_costs()
+        plan = SubscriptionPlan.objects.get(code="pro")
+
+        # Set valid_till to 3 days in the future
+        future_date = timezone.now().date() + timezone.timedelta(days=3)
+        subscription = Subscription.objects.create(
+            company=self.company_a,
+            plan_tier=plan,
+            plan=plan.code,
+            status=Subscription.Status.ACTIVE,
+            valid_till=future_date,
+            auto_renew=True,
+        )
+
+        # Wallet has ₹0.00
+        CreditWalletService.process_subscription_lifecycle()
+
+        # Check notification dispatched
+        notif = Notification.objects.filter(
+            company=self.company_a,
+            user=self.admin_user_a,
+            title__icontains="Recharge Wallet for Auto-Pay",
+        ).first()
+        self.assertIsNotNone(notif)
+        self.assertIn("shortfall", notif.message.lower())
+        self.assertIn("recharge your company wallet before", notif.message.lower())
+
+    def test_15_release_stale_reservations(self):
+        """Stale reservations older than timeout are automatically released and returned to available balance."""
+        # Recharge ₹1,000
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("1000.00"),
+            user=self.admin_user_a,
+        )
+        wallet = CompanyWallet.objects.get(company=self.company_a)
+        self.assertEqual(wallet.available_balance, Decimal("1000.00"))
+
+        # Reserve funds for 1 supplier discovery (₹20 default)
+        ok, msg, usage = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="supplier_discovery",
+            quantity=1,
+        )
+        self.assertTrue(ok)
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("980.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("20.00"))
+
+        # Artificially set usage started_at to 40 minutes ago
+        UsageRecord.objects.filter(id=usage.id).update(
+            started_at=timezone.now() - timezone.timedelta(minutes=40)
+        )
+
+        reaped = CompanyWalletService.release_stale_reservations(timeout_minutes=30)
+        self.assertEqual(reaped, 1)
+
+        wallet.refresh_from_db()
+        self.assertEqual(wallet.available_balance, Decimal("1000.00"))
+        self.assertEqual(wallet.reserved_balance, Decimal("0.00"))
+
+    def test_16_reconcile_wallet_with_reserved_balance(self):
+        """Reconciliation verifies (available + reserved) == ledger transactions sum."""
+        CompanyWalletService.recharge_wallet(
+            company=self.company_a,
+            amount=Decimal("500.00"),
+            user=self.admin_user_a,
+        )
+        # Hold funds for 1 supplier discovery (₹20) in reservation
+        ok, msg, usage = CompanyWalletService.reserve_funds(
+            company=self.company_a,
+            user=self.admin_user_a,
+            service_code="supplier_discovery",
+            quantity=1,
+        )
+        self.assertTrue(ok)
+
+        # Reconcile wallet
+        rec = CompanyWalletService.reconcile_wallet(self.company_a)
+        self.assertTrue(rec["is_balanced"])
+        self.assertEqual(rec["wallet_available_balance"], Decimal("480.00"))
+        self.assertEqual(rec["wallet_reserved_balance"], Decimal("20.00"))
+        self.assertEqual(rec["total_balance"], Decimal("500.00"))
+        self.assertEqual(rec["ledger_sum"], Decimal("500.00"))
+        self.assertEqual(rec["discrepancy"], Decimal("0.00"))
 
 
 

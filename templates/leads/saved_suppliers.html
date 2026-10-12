@@ -276,7 +276,15 @@
           {% endfor %}
         </select>
 
-        {% if search_query or current_status %}
+        <select name="assigned_to" onchange="this.form.submit()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-blue-500 transition">
+          <option value="">All Assigned Members</option>
+          <option value="unassigned" {% if current_assigned == 'unassigned' %}selected{% endif %}>Unassigned</option>
+          {% for member in team_members %}
+          <option value="{{ member.id }}" {% if current_assigned == member.id|stringformat:"s" %}selected{% endif %}>{{ member.get_full_name|default:member.email }}</option>
+          {% endfor %}
+        </select>
+
+        {% if search_query or current_status or current_assigned %}
         <a href="{% url 'saved-suppliers' %}{% if selected_requirement %}?requirement_id={{ selected_requirement.id }}{% endif %}" class="text-xs text-slate-400 hover:text-rose-600 font-semibold px-2 py-1 transition" title="Clear Filters">
           <i class="fa-solid fa-xmark mr-1"></i> Clear
         </a>
@@ -358,18 +366,31 @@
               </select>
             </td>
 
-            <!-- Assigned Rep -->
-            <td class="py-3.5 px-4 whitespace-nowrap text-slate-600" id="assigned-text-{{ item.id }}">
-              {% if item.assigned_to %}
-                <span class="font-medium text-slate-800 flex items-center gap-1.5">
-                  <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] flex items-center justify-center font-bold">
-                    {{ item.assigned_to.first_name|first|default:"U" }}
-                  </span>
-                  <span>{{ item.assigned_to.get_full_name|default:item.assigned_to.email }}</span>
+            <!-- Assigned Member Dropdown -->
+            <td class="py-3.5 px-4 whitespace-nowrap text-slate-600" id="assigned-cell-{{ item.id }}">
+              <div class="inline-flex items-center gap-1.5">
+                <select 
+                  onchange="updateSupplierAssignedMember({{ item.id }}, this.value)"
+                  id="assigned_select_{{ item.id }}"
+                  class="text-[11px] font-semibold rounded-lg px-2.5 py-1 border transition cursor-pointer bg-slate-50 hover:bg-white focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800 border-slate-300 shadow-2xs"
+                  title="Assign Company Member"
+                >
+                  <option value="">Unassigned</option>
+                  {% for member in team_members %}
+                  <option value="{{ member.id }}" {% if item.assigned_to_id == member.id %}selected{% endif %}>
+                    {{ member.get_full_name|default:member.email }}
+                  </option>
+                  {% endfor %}
+                  {% if item.assigned_to and item.assigned_to not in team_members %}
+                  <option value="{{ item.assigned_to.id }}" selected>
+                    {{ item.assigned_to.get_full_name|default:item.assigned_to.email }} (Previous)
+                  </option>
+                  {% endif %}
+                </select>
+                <span id="assigned_status_indicator_{{ item.id }}" class="hidden text-emerald-600 text-xs transition" title="Assigned">
+                  <i class="fa-solid fa-circle-check"></i>
                 </span>
-              {% else %}
-                <span class="text-slate-400 italic">Unassigned</span>
-              {% endif %}
+              </div>
             </td>
 
             <!-- Notes Preview -->
@@ -597,7 +618,12 @@ function openManageSupplierModal(itemId, name, status, assignedId, notes) {
   form.action = `/procurement/saved-suppliers/${itemId}/update/`;
   subtitle.textContent = name;
   statusSelect.value = status;
-  assignedSelect.value = assignedId || '';
+  const currentTableSelect = document.getElementById(`assigned_select_${itemId}`);
+  if (currentTableSelect) {
+    assignedSelect.value = currentTableSelect.value;
+  } else {
+    assignedSelect.value = assignedId || '';
+  }
   notesText.value = notes || '';
 
   modal.classList.remove('hidden');
@@ -609,7 +635,7 @@ function closeManageSupplierModal() {
 
 // Inline AJAX Stage Update
 function updateSupplierStage(itemId, newStage) {
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
   const formData = new FormData();
   formData.append('status', newStage);
 
@@ -624,8 +650,49 @@ function updateSupplierStage(itemId, newStage) {
   .then(res => res.json())
   .then(data => {
     if (data.success) {
-      // Reload or update visually
+      if (typeof showToastNotification === 'function') {
+        showToastNotification('Stage Updated', `Pipeline stage moved to ${data.status_display}`, 'fa-layer-group', 'blue');
+      }
     }
+  });
+}
+
+// Inline AJAX Assigned Member Update
+function updateSupplierAssignedMember(itemId, newMemberId) {
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+  const formData = new FormData();
+  formData.append('assigned_to', newMemberId);
+
+  const selectEl = document.getElementById(`assigned_select_${itemId}`);
+  const indicator = document.getElementById(`assigned_status_indicator_${itemId}`);
+  if (selectEl) selectEl.classList.add('opacity-60');
+
+  fetch(`/procurement/saved-suppliers/${itemId}/update/`, {
+    method: 'POST',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-CSRFToken': csrfToken
+    },
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (selectEl) selectEl.classList.remove('opacity-60');
+    if (data.success) {
+      if (indicator) {
+        indicator.classList.remove('hidden');
+        setTimeout(() => indicator.classList.add('hidden'), 2000);
+      }
+      if (typeof showToastNotification === 'function') {
+        showToastNotification('Assigned Member Updated', data.message || `Assigned to ${data.assigned_to_name}`, 'fa-user-check', 'blue');
+      }
+    } else {
+      alert(data.error || 'Failed to update assigned member');
+    }
+  })
+  .catch(err => {
+    console.error('Error updating assigned member:', err);
+    if (selectEl) selectEl.classList.remove('opacity-60');
   });
 }
 

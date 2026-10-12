@@ -768,8 +768,18 @@ def find_buyers_view(request):
         prod_id = request.POST.get("product_id")
         target_prod = Product.objects.filter(id=prod_id, company=company, is_deleted=False).first()
         if target_prod:
-            if subscription and subscription.credits_remaining <= 0:
-                messages.error(request, f"Search blocked: AI credits exhausted ({subscription.credits_used}/{subscription.credits_total}). Please contact Super Admin to top up credits.")
+            # Check both credits and prepaid wallet balance before blocking
+            wallet = CompanyWalletService.get_or_create_wallet(company)
+            wallet_ok, _, needed_cash = CompanyWalletService.check_balance(company, "buyer_discovery", quantity=1)
+            credits_avail = subscription.credits_remaining if subscription else 0
+
+            if credits_avail <= 0 and not wallet_ok:
+                messages.error(
+                    request,
+                    f"Search blocked: Insufficient wallet balance (Available: ₹{wallet.available_balance:.2f}, Required: ₹{needed_cash:.2f}) "
+                    f"and AI credits exhausted ({subscription.credits_used if subscription else 0}/{subscription.credits_total if subscription else 0}). "
+                    f"Please recharge your company wallet to proceed."
+                )
                 return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
 
             # If payload has criteria fields, sync them
@@ -782,7 +792,8 @@ def find_buyers_view(request):
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
             else:
-                messages.success(request, f"Found {job.total_results} buyer leads with contact details for '{target_prod.name}' evaluated against {len(active_params)} criteria! (1 AI credit debited)")
+                deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
+                messages.success(request, f"Found {job.total_results} buyer leads with contact details for '{target_prod.name}' evaluated against {len(active_params)} criteria! ({deduction_notice})")
             return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
         else:
             messages.error(request, "Please select a valid product to search for buyers.")
@@ -792,15 +803,26 @@ def find_buyers_view(request):
     if request.GET.get("run_search") == "1" and product_id:
         target_prod = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
         if target_prod:
-            if subscription and subscription.credits_remaining <= 0:
-                messages.error(request, f"Search blocked: AI credits exhausted ({subscription.credits_used}/{subscription.credits_total}). Please contact Super Admin to top up credits.")
+            wallet = CompanyWalletService.get_or_create_wallet(company)
+            wallet_ok, _, needed_cash = CompanyWalletService.check_balance(company, "buyer_discovery", quantity=1)
+            credits_avail = subscription.credits_remaining if subscription else 0
+
+            if credits_avail <= 0 and not wallet_ok:
+                messages.error(
+                    request,
+                    f"Search blocked: Insufficient wallet balance (Available: ₹{wallet.available_balance:.2f}, Required: ₹{needed_cash:.2f}) "
+                    f"and AI credits exhausted ({subscription.credits_used if subscription else 0}/{subscription.credits_total if subscription else 0}). "
+                    f"Please recharge your company wallet to proceed."
+                )
                 return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
+
             active_params = list(MatchingParameter.objects.filter(company=company, is_active=True))
             job = run_find_buyers_search(target_prod, request.user, company, criteria_override=active_params)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
             else:
-                messages.success(request, f"Search completed: Discovered {job.total_results} potential buyer leads for '{target_prod.name}'! (1 AI credit debited)")
+                deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
+                messages.success(request, f"Search completed: Discovered {job.total_results} potential buyer leads for '{target_prod.name}'! ({deduction_notice})")
             return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
 
     leads_qs = SearchResult.objects.filter(

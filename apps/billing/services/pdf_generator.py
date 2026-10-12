@@ -183,10 +183,15 @@ class PDFReportGenerator:
 
         # 4. Itemized Charges Table
         item_title = "Subscription Service Allocation"
-        if invoice.subscription and invoice.subscription.plan_tier:
-            item_title = f"Procurement AI - {invoice.subscription.plan_tier.name} Plan ({invoice.subscription.plan_tier.get_billing_cycle_display()})"
+        if invoice.payment and "AUTOPAY" in invoice.payment.provider_reference:
+            plan_name = invoice.subscription.plan_tier.name if (invoice.subscription and invoice.subscription.plan_tier) else "Pro"
+            item_title = f"Procurement AI - Auto-Pay Subscription Renewal ({plan_name} Plan)"
+        elif invoice.payment and ("RCH" in invoice.payment.provider_reference or "recharge" in invoice.payment.provider_reference.lower()) or "recharge" in str(invoice.invoice_number).lower():
+            item_title = "Procurement AI - Prepaid Company Wallet Recharge (INR Balance)"
         elif "topup" in str(invoice.invoice_number).lower() or (invoice.payment and "TOPUP" in invoice.payment.provider_reference):
             item_title = "Procurement AI - Credit Top-Up Pack Recharge"
+        elif invoice.subscription and invoice.subscription.plan_tier:
+            item_title = f"Procurement AI - {invoice.subscription.plan_tier.name} Plan ({invoice.subscription.plan_tier.get_billing_cycle_display()})"
 
         subtotal = invoice.subtotal
         cgst_rate = Decimal("9.00")

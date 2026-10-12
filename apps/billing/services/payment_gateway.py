@@ -13,7 +13,7 @@ from apps.billing.models import (
     Payment,
     SubscriptionPlan,
 )
-from apps.billing.services.wallet import CreditWalletService
+from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,17 @@ class PaymentGatewayService:
             order_desc = f"Purchase Top-Up Pack (+{credits_pack} Credits)"
             metadata["credits_pack"] = credits_pack
 
+        elif action_type in ("recharge_wallet", "wallet_recharge"):
+            try:
+                base_price = Decimal(str(item_id_or_pack))
+            except (ValueError, TypeError):
+                base_price = Decimal("1000.00")
+            if base_price < Decimal("100.00"):
+                raise ValueError("Minimum wallet recharge amount is ₹100.00.")
+            currency = "INR"
+            order_desc = f"Prepaid Company Wallet Recharge (₹{base_price:.2f})"
+            metadata["recharge_amount"] = str(base_price)
+
         else:
             raise ValueError(f"Unsupported payment action: '{action_type}'")
 
@@ -158,6 +169,7 @@ class PaymentGatewayService:
         # 6. Provider-specific gateway order initialization
         gateway_order_id = receipt_ref
         client_payload = {
+            "action_type": action_type,
             "provider": active_provider,
             "order_id": receipt_ref,
             "payment_id": payment.id,
@@ -288,7 +300,22 @@ class PaymentGatewayService:
         sub = payment.subscription or getattr(company, "subscription", None)
 
         # Determine fulfillment type
-        if "TOPUP" in ref or "credits_pack" in notes:
+        if "RECHARGE" in ref or "recharge" in ref.lower() or "recharge" in notes.lower():
+            recharge_val = Decimal("1000.00")
+            if invoice and invoice.subtotal > 0:
+                recharge_val = invoice.subtotal
+            elif payment.amount > 0:
+                recharge_val = round(payment.amount / Decimal("1.18"), 2) if payment.amount >= 118 else payment.amount
+            CompanyWalletService.recharge_wallet(
+                company=company,
+                amount=recharge_val,
+                payment=payment,
+                user=user,
+                notes=f"Gateway Recharge ({payment.provider}) - {payment.currency} {recharge_val:.2f}",
+            )
+            logger.info("Fulfilled currency wallet recharge for %s: +₹%s", company.name, recharge_val)
+
+        elif "TOPUP" in ref or "credits_pack" in notes:
             # Extract credits pack quantity if available
             credits = 100
             for pack in [1000, 500, 100]:

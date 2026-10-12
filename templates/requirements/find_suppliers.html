@@ -24,11 +24,33 @@
       <p class="text-xs text-slate-500 mt-1">Live web search and scraping engine discovering verified customer and manufacturer matches, factory pricing, contact info, and MOQ.</p>
     </div>
     <div class="flex items-center gap-2">
+      {% if current_company.wallet %}
+      <a href="{% url 'subscription-billing-web' %}" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold {% if current_company.wallet.available_balance >= 100 %}bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200/70{% else %}bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200/70{% endif %} shadow-sm transition" title="Prepaid Company Wallet Balance (Click to recharge)">
+        <i class="fa-solid fa-wallet mr-1.5 text-emerald-600"></i> ₹{{ current_company.wallet.available_balance|floatformat:2 }}
+      </a>
+      {% endif %}
+      {% if current_company.subscription %}
+      <a href="{% url 'subscription-billing-web' %}" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold {% if current_company.subscription.credits_remaining > 5 %}bg-purple-100 text-purple-800 border border-purple-200 hover:bg-purple-200/70{% elif current_company.subscription.credits_remaining > 0 %}bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200/70{% else %}bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200/70{% endif %} shadow-sm transition" title="Remaining AI Search Quota (Click to view billing)">
+        <i class="fa-solid fa-coins mr-1.5 text-purple-600"></i> {{ current_company.subscription.credits_remaining }} Credits Left
+      </a>
+      {% endif %}
       <a href="{% url 'saved-suppliers' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
         <i class="fa-solid fa-bookmark mr-1.5 text-blue-600"></i> Saved Customers
       </a>
     </div>
   </div>
+
+  {% if current_company.subscription and current_company.subscription.credits_remaining <= 0 and current_company.wallet.available_balance < 20 %}
+  <div class="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl flex items-center justify-between text-xs">
+    <div class="flex items-center gap-2">
+      <i class="fa-solid fa-triangle-exclamation text-rose-600 text-base"></i>
+      <span><strong>AI Search Balance Low:</strong> You have 0 credits remaining and your company wallet balance (₹{{ current_company.wallet.available_balance|floatformat:2 }}) is insufficient. Please recharge your company wallet to run searches.</span>
+    </div>
+    <a href="{% url 'subscription-billing-web' %}" class="px-3 py-1.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition shrink-0">
+      Recharge Wallet
+    </a>
+  </div>
+  {% endif %}
 
   <!-- Product Search Trigger Card -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">

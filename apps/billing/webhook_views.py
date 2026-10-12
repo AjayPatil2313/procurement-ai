@@ -27,9 +27,9 @@ def create_payment_order_api(request):
     except Exception:
         data = request.POST
 
-    action_type = data.get("action", "").strip()
-    item_key = data.get("item_key", "").strip()
-    provider = data.get("provider", "auto").strip()
+    action_type = str(data.get("action", "")).strip()
+    item_key = str(data.get("item_key") or data.get("amount") or "").strip()
+    provider = str(data.get("provider", "auto")).strip()
 
     active_comp_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=active_comp_id)

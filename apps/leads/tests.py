@@ -603,22 +603,27 @@ class BuyerProcurementPipelineAndComparisonTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Precision Valve Corp")
         self.assertEqual(response.context["total_saved_count"], 1)
+        self.assertIn("team_members", response.context)
+        self.assertContains(response, f'id="assigned_select_{saved_item.id}"')
 
-        # 2. Update status and notes via AJAX
+        # 2. Update status, notes, and assigned_to via AJAX
         update_url = reverse("update-saved-supplier", kwargs={"item_id": saved_item.id})
         update_res = self.client.post(update_url, {
             "status": "contacted",
             "notes": "Sent formal RFQ inquiry for 100 units.",
+            "assigned_to": str(self.user.id),
         }, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         self.assertEqual(update_res.status_code, 200)
         data = update_res.json()
         self.assertTrue(data["success"])
         self.assertEqual(data["status"], "contacted")
         self.assertEqual(data["notes"], "Sent formal RFQ inquiry for 100 units.")
+        self.assertEqual(data["assigned_to_id"], self.user.id)
 
         saved_item.refresh_from_db()
         self.assertEqual(saved_item.status, SavedItem.Status.CONTACTED)
         self.assertEqual(saved_item.notes, "Sent formal RFQ inquiry for 100 units.")
+        self.assertEqual(saved_item.assigned_to, self.user)
 
     def test_export_saved_suppliers_csv(self):
         """Test 1-click CSV export for shortlisted suppliers."""

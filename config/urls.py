@@ -36,6 +36,11 @@ from apps.companies.web_views import (
     seller_role_edit_view,
     seller_role_delete_view,
 )
+from apps.billing.api_views import (
+    admin_wallets_list_api,
+    admin_manual_adjustment_api,
+    admin_service_pricing_config_api,
+)
 from apps.requirements.web_views import (
     requirements_list_view,
     requirement_create_view,
@@ -106,6 +111,8 @@ from apps.companies.admin_views import (
     admin_panel_update_subscription_view,
     admin_panel_plan_save_view,
     admin_panel_feature_cost_update_view,
+    admin_panel_adjust_wallet_view,
+    admin_panel_service_pricing_update_view,
     admin_panel_users_view,
     admin_panel_toggle_user_active_view,
     admin_panel_reset_company_user_password_view,
@@ -262,6 +269,8 @@ urlpatterns = [
     path("admin-panel/plans/<int:company_id>/update/", admin_panel_update_subscription_view, name="admin-panel-update-subscription"),
     path("admin-panel/plans/save/", admin_panel_plan_save_view, name="admin-panel-plan-save"),
     path("admin-panel/feature-costs/update/", admin_panel_feature_cost_update_view, name="admin-panel-feature-cost-update"),
+    path("admin-panel/billing/adjust-wallet/<int:company_id>/", admin_panel_adjust_wallet_view, name="admin-panel-adjust-wallet"),
+    path("admin-panel/billing/pricing/update/", admin_panel_service_pricing_update_view, name="admin-panel-service-pricing-update"),
     path("admin-panel/users/", admin_panel_users_view, name="admin-panel-users"),
     path("admin-panel/users/<int:pk>/toggle-active/", admin_panel_toggle_user_active_view, name="admin-panel-toggle-user-active"),
     path("admin-panel/users/<int:pk>/reset-password/", admin_panel_user_reset_password_direct_view, name="admin-panel-user-reset-password-direct"),
@@ -285,6 +294,9 @@ urlpatterns = [
     path("api/catalog/", include("apps.catalog.urls")),
     path("api/leads/", include("apps.leads.urls")),
     path("api/billing/", include("apps.billing.urls")),
+    path("api/admin/billing/wallets/", admin_wallets_list_api, name="api-admin-billing-wallets"),
+    path("api/admin/billing/adjustments/", admin_manual_adjustment_api, name="api-admin-billing-adjustments"),
+    path("api/admin/billing/pricing/", admin_service_pricing_config_api, name="api-admin-billing-pricing"),
 ]
 
 if settings.DEBUG:

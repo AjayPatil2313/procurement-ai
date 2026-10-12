@@ -30,7 +30,7 @@
   </div>
 
   <!-- KPI Overview Grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
     <!-- Total Companies -->
     <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
       <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
@@ -57,13 +57,23 @@
     <!-- Platform Credit Pool -->
     <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
       <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
-        <span>Credits in Circulation</span>
+        <span>Credits in Pool</span>
         <i class="fa-solid fa-coins text-amber-500 text-sm"></i>
       </div>
       <div class="text-2xl font-black text-amber-600">{{ total_remaining|default:0 }}</div>
       <div class="text-[11px] text-slate-500 mt-1">
-        <span>{{ total_allocated }} allocated / {{ total_used }} consumed</span>
+        <span>{{ total_allocated }} alloc / {{ total_used }} used</span>
       </div>
+    </div>
+
+    <!-- Total Prepaid Wallet Balance (Cash INR) -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1.5">
+        <span>Prepaid Wallets</span>
+        <i class="fa-solid fa-wallet text-emerald-500 text-sm"></i>
+      </div>
+      <div class="text-2xl font-black text-emerald-600">₹{{ total_prepaid_wallet_balance|floatformat:2 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Total active tenant balance</div>
     </div>
 
     <!-- Revenue Collected -->
@@ -173,6 +183,7 @@
               <th class="py-3 px-4">Company</th>
               <th class="py-3 px-4">Plan Tier</th>
               <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Prepaid Wallet (₹)</th>
               <th class="py-3 px-4">Total Pool</th>
               <th class="py-3 px-4">Credits Remaining</th>
               <th class="py-3 px-4">Usage %</th>
@@ -218,6 +229,16 @@
                 </span>
               </td>
 
+              <!-- Prepaid Wallet (Cash Currency) -->
+              <td class="py-3.5 px-4">
+                <div>
+                  <span class="font-bold text-emerald-600">₹{{ sub.company.wallet.available_balance|default:"0.00"|floatformat:2 }}</span>
+                  <div class="text-[10px] text-slate-400">
+                    Hold: ₹{{ sub.company.wallet.reserved_balance|default:"0.00"|floatformat:2 }}
+                  </div>
+                </div>
+              </td>
+
               <!-- Total Credits -->
               <td class="py-3.5 px-4 font-semibold text-slate-700">{{ sub.credits_total }} credits</td>
 
@@ -253,15 +274,18 @@
               </td>
 
               <!-- Action Button -->
-              <td class="py-3.5 px-4 text-right">
-                <button type="button" onclick="openPlanModal('{{ sub.company.id }}', '{{ sub.company.name|escapejs }}', '{{ sub.plan }}', '{{ sub.credits_total }}', '{{ sub.credits_remaining }}', '{{ sub.valid_till|date:'Y-m-d'|default:'' }}', '{{ sub.status }}')" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm cursor-pointer">
-                  <i class="fa-solid fa-pen-to-square mr-1.5"></i> Adjust Plan & Credits
+              <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                <button type="button" onclick="openPlanModal('{{ sub.company.id }}', '{{ sub.company.name|escapejs }}', '{{ sub.plan }}', '{{ sub.credits_total }}', '{{ sub.credits_remaining }}', '{{ sub.valid_till|date:'Y-m-d'|default:'' }}', '{{ sub.status }}')" class="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-xs cursor-pointer">
+                  <i class="fa-solid fa-pen-to-square mr-1"></i> Credits
+                </button>
+                <button type="button" onclick="openAdjustWalletModal('{{ sub.company.id }}', '{{ sub.company.name|escapejs }}', '{{ sub.company.wallet.available_balance|default:0 }}')" class="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition shadow-xs cursor-pointer ml-1" title="Credit or debit prepaid currency wallet with audit trail">
+                  <i class="fa-solid fa-wallet mr-1"></i> Wallet (₹)
                 </button>
               </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="8" class="py-12 text-center text-slate-400">
+              <td colspan="9" class="py-12 text-center text-slate-400">
                 <i class="fa-solid fa-credit-card text-3xl mb-2 text-slate-300 block"></i>
                 No company subscriptions found matching your query.
               </td>
@@ -419,10 +443,62 @@
         </table>
       </div>
     </div>
+
+    <!-- AI Service Currency Rate Card (INR ₹) -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-5">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-indian-rupee-sign text-emerald-600 mr-2"></i> AI Service Currency Rate Card (Prepaid Wallet Billing)
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Control live per-job or per-item charges (INR ₹) deducted atomically from company prepaid wallets.</p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Service Code</th>
+              <th class="py-3 px-4">Service Name</th>
+              <th class="py-3 px-4">Charging Unit</th>
+              <th class="py-3 px-4">Price (INR ₹)</th>
+              <th class="py-3 px-4">Description</th>
+              <th class="py-3 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for sp in service_pricing_rules %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-mono font-bold text-slate-800">{{ sp.service_code }}</td>
+              <td class="py-3 px-4 font-bold text-slate-900">{{ sp.display_name }}</td>
+              <td class="py-3 px-4 font-mono text-slate-600">{{ sp.charging_unit }}</td>
+              <td class="py-3 px-4">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-200">
+                  ₹{{ sp.price|floatformat:2 }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-slate-600 max-w-xs truncate">{{ sp.description }}</td>
+              <td class="py-3 px-4 text-right">
+                <button type="button" onclick="openEditServicePricingModal('{{ sp.service_code }}', '{{ sp.display_name|escapejs }}', '{{ sp.price }}', '{{ sp.charging_unit }}')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition cursor-pointer">
+                  <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Rate (₹)
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400">No currency pricing rules configured yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
-  <!-- TAB 4: Global Credit Ledger -->
-  <div id="tabContent-ledger" class="admin-tab-content hidden space-y-4">
+  <!-- TAB 4: Global Credit Ledger & Wallet Ledger -->
+  <div id="tabContent-ledger" class="admin-tab-content hidden space-y-6">
+    <!-- Credit Ledger -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
         <div>
@@ -433,8 +509,8 @@
         </div>
         <div class="flex items-center gap-2.5">
           <a href="?export=global_ledger_csv" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer" title="Download global credit ledger as CSV">
-            <i class="fa-solid fa-file-csv text-emerald-600"></i>
-            <span>Export CSV</span>
+            <i class="fa-solid fa-file-csv text-indigo-600"></i>
+            <span>Export Credits CSV</span>
           </a>
           <span class="text-xs text-slate-500">Showing last {{ recent_transactions|length }} records</span>
         </div>
@@ -495,6 +571,86 @@
             {% empty %}
             <tr>
               <td colspan="8" class="py-8 text-center text-slate-400">No transactions recorded in the platform ledger yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Prepaid Currency Wallet Ledger (INR ₹) -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-wallet text-emerald-600 mr-2"></i> Global Prepaid Wallet Transactions Ledger (INR ₹)
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Immutable audit record of all cash recharges, search deductions, and super admin balance adjustments.</p>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <a href="?export=global_wallet_ledger_csv" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs transition cursor-pointer" title="Download global prepaid wallet ledger as CSV">
+            <i class="fa-solid fa-file-csv text-emerald-600"></i>
+            <span>Export Wallet CSV</span>
+          </a>
+          <span class="text-xs text-slate-500">Showing last {{ recent_wallet_transactions|length }} records</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Company</th>
+              <th class="py-3 px-3">Reference ID</th>
+              <th class="py-3 px-3">Type</th>
+              <th class="py-3 px-3">Amount</th>
+              <th class="py-3 px-3">Balance After</th>
+              <th class="py-3 px-4">Description / Audit Reason</th>
+              <th class="py-3 px-3">Triggered By</th>
+              <th class="py-3 px-4 text-right">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for tx in recent_wallet_transactions %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-bold text-slate-900">{{ tx.company.name }}</td>
+              <td class="py-3 px-3 font-mono font-bold text-slate-800">
+                <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[11px]">
+                  {{ tx.reference_id }}
+                </span>
+              </td>
+              <td class="py-3 px-3">
+                {% if tx.transaction_type == 'recharge' or tx.transaction_type == 'refund' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    <i class="fa-solid fa-plus text-[8px] mr-1"></i> {{ tx.get_transaction_type_display }}
+                  </span>
+                {% elif tx.transaction_type == 'reserve' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                    <i class="fa-solid fa-lock text-[8px] mr-1"></i> RESERVED
+                  </span>
+                {% elif tx.transaction_type == 'adjustment' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                    <i class="fa-solid fa-sliders text-[8px] mr-1"></i> ADJUSTMENT
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                    <i class="fa-solid fa-minus text-[8px] mr-1"></i> USAGE DEBIT
+                  </span>
+                {% endif %}
+              </td>
+              <td class="py-3 px-3 font-bold {% if tx.transaction_type == 'recharge' or tx.transaction_type == 'refund' or tx.amount > 0 %}text-emerald-600{% else %}text-rose-600{% endif %}">
+                {% if tx.transaction_type == 'recharge' or tx.transaction_type == 'refund' %}+{% elif tx.amount < 0 %}-{% endif %}₹{{ tx.amount|floatformat:2 }}
+              </td>
+              <td class="py-3 px-3 font-semibold text-slate-800">₹{{ tx.balance_after|floatformat:2 }}</td>
+              <td class="py-3 px-4 text-slate-600 max-w-xs truncate" title="{{ tx.description }}">{{ tx.description }}</td>
+              <td class="py-3 px-3 text-slate-600">
+                {% if tx.created_by %}{{ tx.created_by.get_full_name|default:tx.created_by.email }}{% else %}<span class="text-slate-400 italic">System Engine</span>{% endif %}
+              </td>
+              <td class="py-3 px-4 text-right text-slate-400 whitespace-nowrap">{{ tx.created_at|date:"M d, Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="py-8 text-center text-slate-400">No prepaid wallet transactions recorded in the platform ledger yet.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -847,6 +1003,130 @@
   </div>
 </div>
 
+<!-- MODAL 5: Manual Prepaid Wallet Adjustment (Audited) -->
+<div id="adjustWalletModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200 text-xs">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Adjust Company Wallet Balance</h3>
+          <p class="text-[11px] text-slate-500" id="adjustWalletCompanyName">Tenant Company</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeAdjustWalletModal()" class="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="adjustWalletForm" method="POST" action="" class="space-y-4 pt-4">
+      {% csrf_token %}
+
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
+        <span class="text-slate-500 font-medium">Current Available Balance:</span>
+        <span class="font-black text-emerald-600 text-sm" id="adjustWalletCurrentBalance">₹0.00</span>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Adjustment Amount (INR ₹)</label>
+        <div class="relative">
+          <span class="absolute left-3 top-2.5 text-slate-400 font-bold">₹</span>
+          <input 
+            type="number" 
+            step="0.50" 
+            name="amount" 
+            id="adjustWalletAmount" 
+            placeholder="e.g. 500.00 for credit, -50.00 for debit" 
+            class="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500" 
+            required
+          >
+        </div>
+        <span class="text-[10px] text-slate-400 mt-1 block">Positive number credits funds; negative number debits funds.</span>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Mandatory Audit Reason <span class="text-rose-500">*</span></label>
+        <textarea 
+          name="reason" 
+          id="adjustWalletReason" 
+          rows="2.5" 
+          placeholder="e.g. Offline bank transfer settlement, verified invoice correction, goodwill credit..." 
+          class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500" 
+          required
+        ></textarea>
+        <span class="text-[10px] text-slate-400 mt-0.5 block">Permanent ledger entry will be recorded with your administrator identity.</span>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="closeAdjustWalletModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm cursor-pointer inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-check"></i>
+          <span>Save Adjustment</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL 6: Edit Service Pricing Rate -->
+<div id="servicePricingModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200 text-xs">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div>
+        <h3 class="text-base font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-indian-rupee-sign text-emerald-600 mr-2"></i> Update Service Pricing Rate
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5" id="servicePricingModalTitle">Service Rule</p>
+      </div>
+      <button type="button" onclick="closeServicePricingModal()" class="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'admin-panel-service-pricing-update' %}" class="space-y-4 pt-4">
+      {% csrf_token %}
+      <input type="hidden" name="service_code" id="servicePricingCode" value="">
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Service Name</label>
+        <input type="text" id="servicePricingName" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs font-bold text-slate-800 outline-none">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Price (INR ₹)</label>
+          <input 
+            type="number" 
+            step="0.50" 
+            min="0" 
+            name="price" 
+            id="servicePricingPrice" 
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500" 
+            required
+          >
+        </div>
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Charging Unit</label>
+          <input type="text" id="servicePricingUnit" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-xl text-xs text-slate-600 outline-none">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button type="button" onclick="closeServicePricingModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm cursor-pointer">
+          <i class="fa-solid fa-check mr-1.5"></i> Update Rate (₹)
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 // Tab Switching Logic
 function switchAdminTab(tabKey) {
@@ -962,6 +1242,35 @@ function openInvoiceDetailsModal(invNumber, compName, amount, status, date, paid
 
 function closeInvoiceDetailsModal() {
   document.getElementById('invoiceDetailsModal').classList.add('hidden');
+}
+
+// Adjust Wallet Modal
+function openAdjustWalletModal(companyId, companyName, currentBalance) {
+  document.getElementById('adjustWalletCompanyName').textContent = companyName;
+  var balFloat = parseFloat(currentBalance) || 0;
+  document.getElementById('adjustWalletCurrentBalance').textContent = '₹' + balFloat.toFixed(2);
+  document.getElementById('adjustWalletAmount').value = '';
+  document.getElementById('adjustWalletReason').value = '';
+  document.getElementById('adjustWalletForm').action = '/admin-panel/billing/adjust-wallet/' + companyId + '/';
+  document.getElementById('adjustWalletModal').classList.remove('hidden');
+}
+
+function closeAdjustWalletModal() {
+  document.getElementById('adjustWalletModal').classList.add('hidden');
+}
+
+// Edit Service Pricing Modal
+function openEditServicePricingModal(serviceCode, displayName, price, chargingUnit) {
+  document.getElementById('servicePricingModalTitle').textContent = displayName + ' (' + serviceCode + ')';
+  document.getElementById('servicePricingCode').value = serviceCode;
+  document.getElementById('servicePricingName').value = displayName;
+  document.getElementById('servicePricingPrice').value = parseFloat(price) || 0;
+  document.getElementById('servicePricingUnit').value = chargingUnit || 'per_job';
+  document.getElementById('servicePricingModal').classList.remove('hidden');
+}
+
+function closeServicePricingModal() {
+  document.getElementById('servicePricingModal').classList.add('hidden');
 }
 </script>
 {% endblock %}

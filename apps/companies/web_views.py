@@ -26,8 +26,11 @@ from apps.billing.models import (
     UsageRecord,
     Payment,
     Invoice,
+    CompanyWallet,
+    WalletTransaction,
+    ServicePricing,
 )
-from apps.billing.services.wallet import CreditWalletService
+from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
 
 
 def ensure_company_default_roles(company):
@@ -663,6 +666,30 @@ def subscription_billing_web_view(request):
             ])
         return response
 
+    if request.GET.get("export") == "wallet_ledger_csv":
+        if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
+            messages.error(request, "Permission denied: Company administrator privileges required to export wallet ledger.")
+            return redirect("subscription-billing-web")
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        clean_comp_name = company.name.replace(" ", "_").replace("/", "_")
+        response["Content-Disposition"] = f'attachment; filename="Wallet_Ledger_{clean_comp_name}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["Reference ID", "Triggered By", "Transaction Type", "Amount (INR)", "Balance After", "Service / Description", "Date Time"])
+
+        for tx in WalletTransaction.objects.filter(company=company).select_related("created_by").order_by("-created_at"):
+            user_str = tx.created_by.get_full_name() or tx.created_by.email if tx.created_by else "System Engine"
+            writer.writerow([
+                tx.reference_id,
+                user_str,
+                tx.get_transaction_type_display(),
+                f"+₹{tx.amount:.2f}" if tx.amount > 0 else f"₹{tx.amount:.2f}",
+                f"₹{tx.balance_after:.2f}",
+                tx.description,
+                tx.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ])
+        return response
+
     if request.method == "POST":
         action = request.POST.get("action")
 
@@ -682,6 +709,53 @@ def subscription_billing_web_view(request):
         # Admin-only operations below
         if not (rbac["is_company_admin"] or rbac["is_super_admin"]):
             messages.error(request, "Only Company Admin has permission to modify subscription plans or purchase credits.")
+            return redirect("subscription-billing-web")
+
+        # 0.1 PREPAID WALLET RECHARGE
+        if action == "recharge_wallet":
+            amount_raw = request.POST.get("amount", "1000").strip()
+            try:
+                recharge_amount = Decimal(amount_raw)
+                if recharge_amount < Decimal("100.00"):
+                    messages.error(request, "Minimum recharge amount is ₹100.00.")
+                    return redirect("subscription-billing-web")
+            except Exception:
+                messages.error(request, "Invalid recharge amount specified.")
+                return redirect("subscription-billing-web")
+
+            subtotal, tax, total_amount = CreditWalletService.calculate_gst_breakdown(recharge_amount)
+            payment = Payment.objects.create(
+                company=company,
+                subscription=subscription,
+                amount=total_amount,
+                currency="INR",
+                provider="Sandbox Instant Checkout / Dev Gateway",
+                provider_reference=f"RCH-{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                status=Payment.Status.SUCCESS,
+                payment_date=timezone.now(),
+            )
+            Invoice.objects.create(
+                company=company,
+                subscription=subscription,
+                payment=payment,
+                billing_period_start=timezone.now().date(),
+                billing_period_end=timezone.now().date() + timedelta(days=365),
+                subtotal=subtotal,
+                tax=tax,
+                total_amount=total_amount,
+                currency="INR",
+                status=Invoice.Status.PAID,
+                issue_date=timezone.now().date(),
+                due_date=timezone.now().date(),
+            )
+            CompanyWalletService.recharge_wallet(
+                company=company,
+                amount=recharge_amount,
+                payment=payment,
+                user=request.user,
+                notes=f"Prepaid Wallet Recharge (+₹{recharge_amount:.2f})",
+            )
+            messages.success(request, f"Wallet successfully recharged with ₹{recharge_amount:.2f}! Total paid: ₹{total_amount:.2f} (incl. 18% GST).")
             return redirect("subscription-billing-web")
 
         # 1. UPGRADE / CHANGE PLAN (with 18% GST calculation)
@@ -959,14 +1033,35 @@ def subscription_billing_web_view(request):
             "button_label": button_label,
         })
 
+    company_wallet = CompanyWalletService.get_or_create_wallet(company)
+    wallet_transactions_list = list(
+        WalletTransaction.objects.filter(company=company)
+        .select_related("created_by")
+        .order_by("-created_at")[:50]
+    )
+    service_pricing_rules = list(ServicePricing.objects.filter(is_active=True).order_by("service_code"))
+
+    renewal_total = Decimal("0.00")
+    if current_tier and current_tier.code != "free" and current_tier.price > Decimal("0.00"):
+        _, _, renewal_total = CreditWalletService.calculate_gst_breakdown(current_tier.price)
+
+    is_wallet_sufficient_for_autopay = bool(company_wallet.available_balance >= renewal_total)
+    wallet_autopay_deficit = max(Decimal("0.00"), renewal_total - company_wallet.available_balance)
+
     return render(request, "billing/subscription.html", {
         "company": company,
         "subscription": subscription,
         "wallet": wallet,
+        "company_wallet": company_wallet,
+        "company_wallet_transactions": wallet_transactions_list,
+        "service_pricing_rules": service_pricing_rules,
         "available_plans": available_plans,
         "annotated_plans": annotated_plans,
         "is_expired": is_expired,
         "has_chosen_paid_plan": has_chosen_paid_plan,
+        "renewal_total": renewal_total,
+        "is_wallet_sufficient_for_autopay": is_wallet_sufficient_for_autopay,
+        "wallet_autopay_deficit": wallet_autopay_deficit,
         "team_usage": team_usage,
         "company_transactions": company_transactions_page,
         "invoices": invoices,
@@ -979,7 +1074,7 @@ def subscription_billing_web_view(request):
         "tx_type": tx_type,
         "date_range": date_range,
         "rbac": rbac,
-        "page_title": "Subscription & Credits",
+        "page_title": "Company Wallet & Subscription Billing",
     })
 
 

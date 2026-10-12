@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -359,6 +360,14 @@ class UsageRecord(models.Model):
     )
     usage_quantity = models.PositiveIntegerField(default=1)
     credits_charged = models.PositiveIntegerField(default=1)
+    amount_charged = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"), help_text="Cash amount charged in INR")
+    wallet = models.ForeignKey(
+        "CompanyWallet",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usage_records",
+    )
     status = models.CharField(
         max_length=20,
         choices=ProcessingStatus.choices,
@@ -502,3 +511,242 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f"{self.invoice_number} - {self.company.name} - {self.currency} {self.total_amount} ({self.status})"
+
+
+class CompanyWallet(models.Model):
+    """
+    Dedicated multi-tenant prepaid currency wallet holding available and reserved balance in INR.
+    Guarantees strict company-level isolation (no cross-company spending).
+    """
+    class WalletStatus(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SUSPENDED = "suspended", "Suspended"
+        FROZEN = "frozen", "Frozen"
+
+    company = models.OneToOneField(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="wallet",
+    )
+    available_balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Unreserved liquid prepaid funds available for procurement and sales AI usage",
+    )
+    reserved_balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Funds temporarily held during active discovery or analysis jobs",
+    )
+    total_credited = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Cumulative total of all verified wallet recharges and promotional grants",
+    )
+    total_spent = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Cumulative total of all committed AI operation fees deducted",
+    )
+    currency = models.CharField(max_length=10, default="INR")
+    status = models.CharField(
+        max_length=20,
+        choices=WalletStatus.choices,
+        default=WalletStatus.ACTIVE,
+    )
+    low_balance_threshold = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("100.00"),
+        help_text="Balance below which low-credit warnings and recharge prompts are shown",
+    )
+    last_transaction_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Company Wallet"
+        verbose_name_plural = "Company Wallets"
+
+    @property
+    def total_balance(self):
+        """Sum of available liquid balance and currently reserved hold."""
+        return self.available_balance + self.reserved_balance
+
+    @property
+    def is_low_balance(self):
+        """Returns True if available balance is at or below the warning threshold."""
+        return self.available_balance <= self.low_balance_threshold
+
+    def __str__(self):
+        return f"{self.company.name} Wallet: {self.currency} {self.available_balance} (Hold: {self.currency} {self.reserved_balance})"
+
+
+class WalletTransaction(models.Model):
+    """
+    Append-only, immutable financial ledger recording every balance modification:
+    recharges, AI usage deductions, failed-job refunds, and Super Admin audited adjustments.
+    """
+    class TransactionType(models.TextChoices):
+        RECHARGE = "recharge", "Wallet Recharge"
+        USAGE_DEBIT = "usage_debit", "AI Usage Debit"
+        REFUND = "refund", "Job Refund"
+        ADMIN_ADJUSTMENT = "adjustment", "Admin Adjustment"
+        REVERSAL = "reversal", "Ledger Reversal"
+
+    class TransactionStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        COMPLETED = "completed", "Completed"
+        REVERSED = "reversed", "Reversed"
+
+    wallet = models.ForeignKey(
+        CompanyWallet,
+        on_delete=models.CASCADE,
+        related_name="transactions",
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="wallet_transactions",
+    )
+    transaction_type = models.CharField(
+        max_length=30,
+        choices=TransactionType.choices,
+        default=TransactionType.USAGE_DEBIT,
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Signed Decimal amount: positive for credits/refunds, negative for debits",
+    )
+    balance_after = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Snapshot of wallet available balance immediately after this transaction",
+    )
+    reference_id = models.CharField(
+        max_length=100,
+        blank=True,
+        db_index=True,
+        help_text="Payment provider ref, gateway order ID, or generated receipt number",
+    )
+    idempotency_key = models.CharField(
+        max_length=120,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="Prevents duplicate ledger deductions and redundant webhook processing",
+    )
+    service_code = models.CharField(
+        max_length=60,
+        blank=True,
+        help_text="Service type code e.g. supplier_discovery, buyer_discovery, ai_matching",
+    )
+    search_job = models.ForeignKey(
+        SearchJob,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="wallet_transactions",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=TransactionStatus.choices,
+        default=TransactionStatus.COMPLETED,
+    )
+    description = models.CharField(max_length=255)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="wallet_transactions_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Wallet Transaction"
+        verbose_name_plural = "Wallet Transactions"
+        indexes = [
+            models.Index(fields=["company", "-created_at"]),
+            models.Index(fields=["wallet", "-created_at"]),
+            models.Index(fields=["transaction_type", "created_at"]),
+            models.Index(fields=["reference_id"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.reference_id:
+            import random
+            import string
+            prefix = "TXN"
+            if self.transaction_type == self.TransactionType.RECHARGE:
+                prefix = "TXN-RCH"
+            elif self.transaction_type == self.TransactionType.REFUND:
+                prefix = "TXN-RFD"
+            elif self.transaction_type == self.TransactionType.ADMIN_ADJUSTMENT:
+                prefix = "TXN-ADJ"
+            elif self.transaction_type == self.TransactionType.USAGE_DEBIT:
+                prefix = "TXN-USE"
+            code = "".join(random.choices(string.digits, k=6))
+            self.reference_id = f"{prefix}-{timezone.now().strftime('%Y%m%d')}-{code}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        sign = "+" if self.amount > 0 else ""
+        return f"{self.reference_id} - {self.company.name} - {self.transaction_type}: {sign}{self.amount} (After: {self.balance_after})"
+
+
+class ServicePricing(models.Model):
+    """
+    Super Admin configurable rate card for AI procurement and sales platform services.
+    Stored in Rupee currency (INR) with Decimal precision.
+    """
+    class ChargingUnit(models.TextChoices):
+        PER_JOB = "per_job", "Per Search Job"
+        PER_LEAD = "per_lead", "Per Enriched Lead"
+        PER_MATCH = "per_match", "Per AI Match"
+        PER_EXPORT = "per_export", "Per Report Export"
+
+    service_code = models.CharField(
+        max_length=60,
+        unique=True,
+        help_text="Unique slug e.g. supplier_discovery, buyer_discovery, ai_matching, lead_enrichment, report_export",
+    )
+    display_name = models.CharField(max_length=120)
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("20.00"),
+        help_text="Charge in INR per unit",
+    )
+    currency = models.CharField(max_length=10, default="INR")
+    charging_unit = models.CharField(
+        max_length=30,
+        choices=ChargingUnit.choices,
+        default=ChargingUnit.PER_JOB,
+    )
+    is_active = models.BooleanField(default=True)
+    description = models.TextField(blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="service_pricing_updates",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["service_code"]
+        verbose_name = "Service Pricing"
+        verbose_name_plural = "Service Pricing Rules"
+
+    def __str__(self):
+        return f"{self.display_name} — {self.currency} {self.price} / {self.get_charging_unit_display()}"
+
