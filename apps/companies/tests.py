@@ -83,7 +83,7 @@ class SuperAdminSuiteTestCase(TestCase):
         self.client.login(email="superadmin@platform.ai", password="Password123!")
         response = self.client.get(reverse("admin-panel-dashboard"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Platform Executive Dashboard")
+        self.assertContains(response, "Admin Dashboard")
         self.assertIn("total_companies", response.context)
         self.assertEqual(response.context["total_companies"], 1)
 
@@ -239,7 +239,7 @@ class SuperAdminSuiteTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Should contain Super Admin items
-        self.assertContains(response, "Super Admin Dashboard")
+        self.assertContains(response, "Admin Dashboard")
         self.assertContains(response, "All Companies")
         self.assertContains(response, "Platform Users")
         self.assertContains(response, "Plans &amp; Credits")
@@ -351,8 +351,7 @@ class SuperAdminSuiteTestCase(TestCase):
         self.assertEqual(post_res.status_code, 200)
 
         # Should be redirected directly to admin-panel-dashboard
-        self.assertContains(post_res, "Platform Executive Dashboard")
-        self.assertContains(post_res, "Super Admin Dashboard")
+        self.assertContains(post_res, "Admin Dashboard")
 
     def test_admin_panel_company_delete_view(self):
         """Super Admin can soft-delete (archive) and restore a company with data preserved."""

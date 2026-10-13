@@ -67,7 +67,7 @@
         <div>
           <a href="{% if rbac.is_super_admin %}{% url 'admin-panel-dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" class="flex items-center px-3 py-2.5 rounded-lg text-sm font-semibold transition {% if rbac.is_super_admin %}{% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600 text-white shadow-md shadow-red-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}{% else %}{% if request.path == '/dashboard/' or request.path == '/' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}{% endif %}">
             <i class="fa-solid {% if rbac.is_super_admin %}fa-chart-line{% else %}fa-house{% endif %} w-5 text-center mr-2.5"></i>
-            <span>{% if rbac.is_super_admin %}Super Admin Dashboard{% elif rbac.is_buyer_only %}Sales Dashboard{% elif rbac.is_seller_only %}Vendor Dashboard{% else %}Dashboard{% endif %}</span>
+            <span>{% if rbac.is_super_admin %}Admin Dashboard{% elif rbac.is_buyer_only %}Sales Dashboard{% elif rbac.is_seller_only %}Vendor Dashboard{% else %}Dashboard{% endif %}</span>
           </a>
         </div>
 
