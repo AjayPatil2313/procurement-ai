@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "apps.leads",
     "apps.billing",
     "apps.dashboard",
+    "apps.notifications",
 ]
 
 

@@ -1148,6 +1148,30 @@ class CompanyWalletService:
             )
 
         logger.info("Successfully recharged wallet for %s by ₹%s. New balance: ₹%s", company.name, amount_decimal, wallet.available_balance)
+
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            trigger_email_notification(
+                event_key="billing.wallet_recharged",
+                company=company,
+                user=user,
+                context={
+                    "amount": f"{amount_decimal:,.2f}",
+                    "transaction_ref": tx.reference_id or f"TXN-{tx.id}",
+                    "new_balance": f"{wallet.available_balance:,.2f}",
+                    "cta_url": "/company/billing/",
+                    "details": {
+                        "Credited Amount": f"₹{amount_decimal:,.2f}",
+                        "New Balance": f"₹{wallet.available_balance:,.2f}",
+                        "Transaction Ref": tx.reference_id or f"TXN-{tx.id}",
+                        "Date": tx.created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(tx, 'created_at') else "",
+                    },
+                },
+                idempotency_key=f"email_rch_{tx.id}",
+            )
+        except Exception as exc:
+            logger.warning(f"Failed to trigger wallet recharge email: {exc}")
+
         return tx
 
     @classmethod
@@ -1484,4 +1508,24 @@ class CompanyWalletService:
                     icon="fa-wallet",
                     color="amber",
                 )
+
+            try:
+                from apps.notifications.services.email_engine import trigger_email_notification
+                trigger_email_notification(
+                    event_key="billing.low_balance",
+                    company=company,
+                    context={
+                        "current_balance": f"{wallet.available_balance:,.2f}",
+                        "cta_url": "/company/billing/",
+                        "details": {
+                            "Remaining Balance": f"₹{wallet.available_balance:,.2f}",
+                            "Threshold": f"₹{wallet.low_balance_threshold:,.2f}",
+                            "Action": "Recharge required to maintain active discovery",
+                        },
+                    },
+                    severity="WARNING",
+                    idempotency_key=f"email_lowbal_{company.id}_{timezone.now().strftime('%Y%m%d')}",
+                )
+            except Exception as exc:
+                logger.warning(f"Failed to trigger low balance email: {exc}")
 

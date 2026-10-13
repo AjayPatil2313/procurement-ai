@@ -1,0 +1,21 @@
+<!-- Email Management Sub-navigation Tabs -->
+<div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 mb-6">
+  <a href="{% url 'admin-panel-email-overview' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'overview' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-chart-line text-[11px]"></i> Operations Overview
+  </a>
+  <a href="{% url 'admin-panel-email-templates' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'templates' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-file-code text-[11px]"></i> Templates
+  </a>
+  <a href="{% url 'admin-panel-email-triggers' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'triggers' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-bolt text-[11px]"></i> Event Triggers &amp; Routing
+  </a>
+  <a href="{% url 'admin-panel-email-smtp' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'smtp' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-server text-[11px]"></i> SMTP Settings
+  </a>
+  <a href="{% url 'admin-panel-email-logs' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'logs' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-clock-rotate-left text-[11px]"></i> Delivery Logs (Outbox)
+  </a>
+  <a href="{% url 'admin-panel-email-alerts' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'alerts' %}bg-red-600 text-white shadow-sm shadow-red-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-triangle-exclamation text-[11px]"></i> Platform Alerts
+  </a>
+</div>

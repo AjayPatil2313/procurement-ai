@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Platform Alert Policies — Super Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 mb-3">
+        <i class="fa-solid fa-triangle-exclamation mr-1.5 text-rose-400"></i> Platform Health &amp; Escalations
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Platform Alert Policies &amp; Incidents</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        High-severity and critical automated alerts: AI provider failures, delivery retries exhausted, security suspensions, and abnormal billing activities.
+      </p>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  {% include "admin_panel/email/nav_tabs.html" %}
+
+  <!-- Alert Policies Matrix Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+        <h4 class="font-bold text-xs text-slate-900 uppercase tracking-wider">Critical Escalations</h4>
+      </div>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Instant dispatch to Super Admins on provider API outage, account suspensions, or security credential overrides.
+      </p>
+      <div class="text-[11px] font-mono text-slate-400 pt-1">
+        Keys: <code>admin.ai_provider_error</code>, <code>admin.company_suspended</code>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+        <h4 class="font-bold text-xs text-slate-900 uppercase tracking-wider">Warning Alerts</h4>
+      </div>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Dispatched when company wallet balances drop below operating thresholds or when an email delivery requires retry.
+      </p>
+      <div class="text-[11px] font-mono text-slate-400 pt-1">
+        Keys: <code>billing.low_balance</code>, <code>admin.delivery_retry_exhausted</code>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+        <h4 class="font-bold text-xs text-slate-900 uppercase tracking-wider">Operational Notices</h4>
+      </div>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Standard informative events for company onboarding, verification submissions, and transaction confirmations.
+      </p>
+      <div class="text-[11px] font-mono text-slate-400 pt-1">
+        Keys: <code>admin.company_registered</code>, <code>admin.verification_requested</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- Incident & Alert Audit Stream -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+      <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+        <i class="fa-solid fa-shield-halved text-rose-500"></i> High-Severity Alert Dispatches
+      </h3>
+      <span class="text-xs text-slate-400">Past 50 records</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="p-3.5">Severity</th>
+            <th class="p-3.5">Event Key</th>
+            <th class="p-3.5">Subject</th>
+            <th class="p-3.5">Recipient</th>
+            <th class="p-3.5">Status</th>
+            <th class="p-3.5">Dispatched At</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for log in alert_logs %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="p-3.5 whitespace-nowrap">
+              {% if log.severity == 'CRITICAL' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                  CRITICAL
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                  WARNING
+                </span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 font-mono text-slate-600 font-bold">
+              {{ log.event_key }}
+            </td>
+            <td class="p-3.5 font-medium text-slate-900 max-w-sm truncate" title="{{ log.subject }}">
+              {{ log.subject }}
+            </td>
+            <td class="p-3.5 whitespace-nowrap">
+              {{ log.recipient_email }}
+            </td>
+            <td class="p-3.5 whitespace-nowrap">
+              {% if log.status == 'SENT' %}
+                <span class="text-emerald-600 font-bold">Delivered</span>
+              {% elif log.status == 'FAILED' %}
+                <span class="text-rose-600 font-bold" title="{{ log.last_error }}">Failed</span>
+              {% else %}
+                <span class="text-amber-600 font-bold">{{ log.status }}</span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 text-slate-500 whitespace-nowrap text-[11px]">
+              {{ log.created_at|date:"d M Y, H:i" }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="p-8 text-center text-slate-400">
+              <i class="fa-solid fa-circle-check text-2xl text-emerald-500 mb-2 block"></i>
+              <p class="font-medium">No critical alerts or transmission warnings logged.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

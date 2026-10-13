@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Seller Dashboard Governance — Super Admin Panel{% endblock %}
+{% block title %}Vendor Dashboard Governance — Super Admin Panel{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,22 +11,22 @@
       <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 mb-3">
         <i class="fa-solid fa-crown mr-1.5 text-emerald-400"></i> Platform Super Admin Control Center
       </div>
-      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Seller Dashboard &amp; Module Governance</h1>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Vendor Dashboard &amp; Module Governance</h1>
       <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
-        Govern Seller sales modules, customize seller KPI layouts, and supervise multi-tenant sales operations and lead pipelines across all vendor companies.
+        Govern Vendor sales modules, customize vendor KPI layouts, and supervise multi-tenant sales operations and lead pipelines across all vendor companies.
       </p>
     </div>
 
     <!-- Quick Action Shortcut Buttons -->
     <div class="flex flex-wrap items-center gap-2">
       <a href="{% url 'dashboard' %}?workspace=seller" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
-        <i class="fa-solid fa-up-right-from-square mr-1.5"></i> Live Seller View
+        <i class="fa-solid fa-up-right-from-square mr-1.5"></i> Live Vendor View
       </a>
       <a href="{% url 'admin-panel-modules' %}?tab=seller" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
         <i class="fa-solid fa-cubes mr-1.5 text-emerald-400"></i> Module Matrix
       </a>
       <a href="{% url 'admin-panel-companies' %}?type=SELLER" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
-        <i class="fa-solid fa-sitemap mr-1.5 text-emerald-400"></i> Seller Companies
+        <i class="fa-solid fa-sitemap mr-1.5 text-emerald-400"></i> Vendor Companies
       </a>
     </div>
   </div>
@@ -36,14 +36,14 @@
     <!-- Total Seller Companies -->
     <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
       <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
-        <span>Seller Tenants</span>
+        <span>Vendor Tenants</span>
         <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
           <i class="fa-solid fa-building"></i>
         </span>
       </div>
       <div class="text-2xl font-black text-slate-900">{{ total_seller_companies }}</div>
       <div class="text-[11px] text-slate-500 mt-1">
-        <span class="text-emerald-600 font-bold">{{ seller_only_companies }} Seller</span> &bull; 
+        <span class="text-emerald-600 font-bold">{{ seller_only_companies }} Vendor</span> &bull; 
         <span class="text-purple-600 font-bold">{{ both_companies }} Both</span>
       </div>
     </div>
@@ -128,7 +128,7 @@
         <i class="fa-solid fa-chart-pie"></i> Executive Overview
       </a>
       <a href="?tab=modules" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'modules' %}border-emerald-600 text-emerald-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
-        <i class="fa-solid fa-cubes"></i> Seller Modules Matrix
+        <i class="fa-solid fa-cubes"></i> Vendor Modules Matrix
         <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800">{{ modules|length }}</span>
       </a>
       <a href="?tab=layout" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'layout' %}border-emerald-600 text-emerald-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
@@ -150,7 +150,7 @@
       <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h3 class="text-sm font-bold text-slate-900">Seller Modules Live Availability</h3>
+            <h3 class="text-sm font-bold text-slate-900">Vendor Modules Live Availability</h3>
             <p class="text-xs text-slate-500">Enable or disable modules platform-wide with real-time effect on menus, routes, and backend APIs</p>
           </div>
           <a href="?tab=modules" class="text-xs font-bold text-emerald-600 hover:underline">Manage All</a>
@@ -184,7 +184,7 @@
     <!-- Right Col: Live Seller Activity Stream -->
     <div class="space-y-6">
       <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-        <h3 class="text-sm font-bold text-slate-900 mb-1">Recent Seller Tenant Activity</h3>
+        <h3 class="text-sm font-bold text-slate-900 mb-1">Recent Vendor Tenant Activity</h3>
         <p class="text-xs text-slate-500 mb-4">Live audit stream of sales and catalog actions</p>
 
         <div class="space-y-3">
@@ -200,7 +200,7 @@
             </div>
           </div>
           {% empty %}
-          <div class="text-center py-6 text-slate-400 text-xs">No recent seller actions recorded.</div>
+          <div class="text-center py-6 text-slate-400 text-xs">No recent vendor actions recorded.</div>
           {% endfor %}
         </div>
       </div>
@@ -213,8 +213,8 @@
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h3 class="text-base font-bold text-slate-900">Seller Modules Management Matrix</h3>
-        <p class="text-xs text-slate-500 mt-0.5">Configure module parameters, access tier requirements, and immediate availability across all seller accounts</p>
+        <h3 class="text-base font-bold text-slate-900">Vendor Modules Management Matrix</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Configure module parameters, access tier requirements, and immediate availability across all vendor accounts</p>
       </div>
       <div class="text-xs text-slate-500">
         Changes apply instantly to company menus, permissions, and backend endpoints.
@@ -300,8 +300,8 @@
   {% if active_tab == 'layout' %}
   <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-4xl">
     <div class="border-b border-slate-200 pb-4 mb-6">
-      <h3 class="text-base font-bold text-slate-900">Seller Dashboard Layout &amp; Card Switches</h3>
-      <p class="text-xs text-slate-500 mt-1">Configure which KPI metrics and analytical widgets render on the live Seller Dashboard (/dashboard/?workspace=seller)</p>
+      <h3 class="text-base font-bold text-slate-900">Vendor Dashboard Layout &amp; Card Switches</h3>
+      <p class="text-xs text-slate-500 mt-1">Configure which KPI metrics and analytical widgets render on the live Vendor Dashboard (/dashboard/?workspace=seller)</p>
     </div>
 
     <form method="POST" action="{% url 'admin-panel-seller-layout-update' %}" class="space-y-6">
@@ -421,7 +421,7 @@
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h3 class="text-base font-bold text-slate-900">Seller &amp; Hybrid Tenants Directory</h3>
+        <h3 class="text-base font-bold text-slate-900">Vendor &amp; Hybrid Tenants Directory</h3>
         <p class="text-xs text-slate-500">Enterprises authorized for sales &amp; catalog operations</p>
       </div>
       <form method="GET" class="flex items-center gap-2">
@@ -489,12 +489,13 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="9" class="text-center py-8 text-slate-400">No seller companies matching query.</td>
+            <td colspan="9" class="text-center py-8 text-slate-400">No vendor companies matching query.</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% include "admin_panel/includes/pagination.html" %}
   </div>
   {% endif %}
 
@@ -504,7 +505,7 @@
 <div id="editModuleModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
   <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
     <div class="p-6 border-b border-slate-200 flex items-center justify-between">
-      <h3 class="text-base font-bold text-slate-900">Configure Seller Module</h3>
+      <h3 class="text-base font-bold text-slate-900">Configure Vendor Module</h3>
       <button type="button" onclick="closeEditModuleModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
     </div>
     <form id="editModuleForm" method="POST" action="" class="p-6 space-y-4">
@@ -546,7 +547,7 @@
       <div>
         <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
           <input type="checkbox" id="modal_is_visible_on_sidebar" name="is_visible_on_sidebar" class="rounded text-emerald-600 focus:ring-emerald-500">
-          <span>Visible on Seller Sidebar Navigation</span>
+          <span>Visible on Vendor Sidebar Navigation</span>
         </label>
       </div>
       <div>

@@ -20,6 +20,7 @@ from apps.ai_search.models import (
     ensure_default_parameters_for_company,
 )
 from apps.ai_search.services.pipeline import run_find_buyers_search
+from apps.billing.services.wallet import CompanyWalletService, CreditWalletService
 from apps.catalog.models import Category, Product, ProductImage
 from apps.companies.rbac import get_user_rbac_context, module_permission_required
 from apps.leads.models import SavedItem
@@ -128,8 +129,15 @@ def products_list_view(request):
     total_count = queryset.count()
     categories = Category.objects.all().order_by("name")
 
-    # Server-side pagination (20 items per page)
-    paginator = Paginator(queryset.order_by("-created_at"), 20)
+    # Server-side pagination (default 10 items per page)
+    per_page = 10
+    requested_per_page = request.GET.get("per_page")
+    if requested_per_page:
+        try:
+            per_page = max(5, min(100, int(requested_per_page)))
+        except ValueError:
+            pass
+    paginator = Paginator(queryset.order_by("-created_at"), per_page)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
@@ -292,6 +300,30 @@ def product_create_view(request):
             messages.warning(request, f"Requirement '{name}' created. Note: Another item with this exact name already exists in your catalog.")
         else:
             messages.success(request, f"Requirement '{name}' was created successfully!")
+
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            trigger_email_notification(
+                event_key="seller.product_created",
+                company=company,
+                user=request.user,
+                context={
+                    "product_title": product.name,
+                    "category": product.category.name if product.category else "Catalog Item",
+                    "price": f"{product.currency} {product.price:,.2f}" if product.price else "On Quotation",
+                    "cta_url": request.build_absolute_uri(reverse("product-detail", kwargs={"pk": product.pk})),
+                    "details": {
+                        "Product Name": product.name,
+                        "Category": product.category.name if product.category else "General",
+                        "Price": f"{product.currency} {product.price:,.2f}" if product.price else "On Quotation",
+                        "MOQ": f"{product.moq} {product.unit}",
+                    },
+                },
+                idempotency_key=f"prod_create_{product.id}",
+            )
+        except Exception:
+            pass
+
         return redirect("product-detail", pk=product.pk)
 
     return render(request, "products/create.html", {
@@ -666,9 +698,39 @@ STATIC_CRITERIA_METADATA = [
 STATIC_CRITERIA_KEYS = {m["key"] for m in STATIC_CRITERIA_METADATA}
 
 
-def _sync_company_matching_criteria(company, post_data):
+def get_criteria_metadata_for_domain(domain="VENDOR"):
+    """
+    Returns dynamic criteria metadata dictionary list from PlatformMatchingCriteria.
+    Supports filtering by domain: 'VENDOR' (Find Buyers) or 'SALES' (Find Suppliers) or 'BOTH'.
+    Falls back gracefully to STATIC_CRITERIA_METADATA if no database records exist.
+    """
+    try:
+        from apps.ai_search.models import PlatformMatchingCriteria
+        qs = PlatformMatchingCriteria.get_criteria_for_domain(domain=domain)
+        if qs.exists():
+            return [
+                {
+                    "key": c.parameter_key,
+                    "name": c.name,
+                    "default_value": c.default_value,
+                    "description": c.description,
+                    "icon": c.icon or "fa-sliders",
+                    "color": c.color or "blue",
+                    "rule_type": c.rule_type,
+                    "weight_percentage": c.weight_percentage,
+                    "order": c.order,
+                }
+                for c in qs
+            ]
+    except Exception:
+        pass
+    return STATIC_CRITERIA_METADATA
+
+
+def _sync_company_matching_criteria(company, post_data, domain="VENDOR"):
     """
     Synchronizes static checkboxes and custom key-value dynamic rows from form POST.
+    Reads active platform criteria dynamically from Super Admin configuration.
     Ensures persistence per company and returns the list of active MatchingParameter objects.
     """
     if not company:
@@ -677,9 +739,12 @@ def _sync_company_matching_criteria(company, post_data):
     ensure_default_parameters_for_company(company)
     all_params = {p.parameter_key: p for p in MatchingParameter.objects.filter(company=company)}
 
+    active_meta = get_criteria_metadata_for_domain(domain=domain)
+    active_keys = {m["key"] for m in active_meta}
+
     # 1. Update static parameters
     static_keys_checked = set(post_data.getlist("static_criteria"))
-    for meta in STATIC_CRITERIA_METADATA:
+    for meta in active_meta:
         key = meta["key"]
         p = all_params.get(key)
         submitted_val = post_data.get(f"static_val_{key}", "").strip()
@@ -689,7 +754,9 @@ def _sync_company_matching_criteria(company, post_data):
         if p:
             p.criteria_value = val[:255]
             p.is_active = is_active
-            p.save(update_fields=["criteria_value", "is_active", "updated_at"])
+            p.name = meta["name"]
+            p.description = meta["description"]
+            p.save(update_fields=["criteria_value", "is_active", "name", "description", "updated_at"])
         else:
             MatchingParameter.objects.create(
                 company=company,
@@ -697,8 +764,8 @@ def _sync_company_matching_criteria(company, post_data):
                 parameter_key=key,
                 criteria_value=val[:255],
                 description=meta["description"],
-                rule_type=MatchingParameter.RuleType.WEIGHTED,
-                weight_percentage=10,
+                rule_type=meta.get("rule_type", MatchingParameter.RuleType.WEIGHTED),
+                weight_percentage=meta.get("weight_percentage", 10),
                 is_active=is_active,
             )
 
@@ -707,7 +774,7 @@ def _sync_company_matching_criteria(company, post_data):
     custom_vals = post_data.getlist("custom_criteria_val[]")
 
     # Clean existing custom parameters not in static list
-    existing_custom = MatchingParameter.objects.filter(company=company).exclude(parameter_key__in=STATIC_CRITERIA_KEYS)
+    existing_custom = MatchingParameter.objects.filter(company=company).exclude(parameter_key__in=active_keys)
     existing_custom.delete()
 
     for k, v in zip(custom_keys, custom_vals):
@@ -792,9 +859,42 @@ def find_buyers_view(request):
             job = run_find_buyers_search(target_prod, request.user, company, criteria_override=active_params)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="admin.ai_provider_error",
+                        context={
+                            "service_name": "Buyer Leads Discovery Pipeline",
+                            "error_message": job.error_message,
+                            "cta_url": request.build_absolute_uri("/admin-panel/ai-providers/"),
+                        },
+                        severity="CRITICAL",
+                    )
+                except Exception:
+                    pass
             else:
                 deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
                 messages.success(request, f"Found {job.total_results} buyer leads with contact details for '{target_prod.name}' evaluated against {len(active_params)} criteria! ({deduction_notice})")
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="seller.search_completed",
+                        company=company,
+                        user=request.user,
+                        context={
+                            "query_title": target_prod.name,
+                            "count": str(job.total_results),
+                            "cta_url": request.build_absolute_uri(f"{reverse('find-buyers')}?product_id={target_prod.id}"),
+                            "details": {
+                                "Catalog Product": target_prod.name,
+                                "Buyer Leads Found": str(job.total_results),
+                                "Billing Method": deduction_notice,
+                            },
+                        },
+                        idempotency_key=f"search_leads_{job.id}",
+                    )
+                except Exception:
+                    pass
             return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
         else:
             messages.error(request, "Please select a valid product to search for buyers.")
@@ -821,9 +921,42 @@ def find_buyers_view(request):
             job = run_find_buyers_search(target_prod, request.user, company, criteria_override=active_params)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="admin.ai_provider_error",
+                        context={
+                            "service_name": "Buyer Leads Discovery Pipeline",
+                            "error_message": job.error_message,
+                            "cta_url": request.build_absolute_uri("/admin-panel/ai-providers/"),
+                        },
+                        severity="CRITICAL",
+                    )
+                except Exception:
+                    pass
             else:
                 deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
                 messages.success(request, f"Search completed: Discovered {job.total_results} potential buyer leads for '{target_prod.name}'! ({deduction_notice})")
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="seller.search_completed",
+                        company=company,
+                        user=request.user,
+                        context={
+                            "query_title": target_prod.name,
+                            "count": str(job.total_results),
+                            "cta_url": request.build_absolute_uri(f"{reverse('find-buyers')}?product_id={target_prod.id}"),
+                            "details": {
+                                "Catalog Product": target_prod.name,
+                                "Buyer Leads Found": str(job.total_results),
+                                "Billing Method": deduction_notice,
+                            },
+                        },
+                        idempotency_key=f"search_leads_{job.id}",
+                    )
+                except Exception:
+                    pass
             return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
 
     leads_qs = SearchResult.objects.filter(
@@ -850,24 +983,27 @@ def find_buyers_view(request):
 
     saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
-    # Load and organize criteria for this company
+    # Load and organize criteria for this company dynamically from Super Admin config
     company_params = ensure_default_parameters_for_company(company) if company else []
     params_by_key = {p.parameter_key: p for p in company_params}
 
+    criteria_meta = get_criteria_metadata_for_domain("VENDOR")
+    criteria_keys = {m["key"] for m in criteria_meta}
+
     static_criteria_list = []
-    for meta in STATIC_CRITERIA_METADATA:
+    for meta in criteria_meta:
         p = params_by_key.get(meta["key"])
         static_criteria_list.append({
             "key": meta["key"],
             "name": meta["name"],
             "description": meta["description"],
-            "icon": meta["icon"],
-            "color": meta["color"],
+            "icon": meta.get("icon", "fa-sliders"),
+            "color": meta.get("color", "blue"),
             "is_active": p.is_active if p else True,
             "criteria_value": p.criteria_value if (p and p.criteria_value) else meta["default_value"],
         })
 
-    custom_criteria_list = [p for p in company_params if p.parameter_key not in STATIC_CRITERIA_KEYS]
+    custom_criteria_list = [p for p in company_params if p.parameter_key not in criteria_keys]
     active_criteria_count = sum(1 for sc in static_criteria_list if sc["is_active"]) + sum(1 for cc in custom_criteria_list if cc.is_active)
 
     latest_job_qs = SearchJob.objects.filter(company=company, job_type=SearchJob.JobType.FIND_BUYERS)

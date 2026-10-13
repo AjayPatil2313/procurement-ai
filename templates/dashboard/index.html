@@ -13,16 +13,16 @@
           {% if rbac.is_super_admin %}
             Super Admin Dashboard
           {% elif rbac.is_buyer_only %}
-            Buyer Dashboard
+            Sales Dashboard
           {% elif rbac.is_seller_only %}
-            Seller Dashboard
+            Vendor Dashboard
           {% else %}
             Dashboard
           {% endif %}
         </h1>
         {% if rbac.is_both %}
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-          <i class="fa-solid fa-arrows-split-up-and-left mr-1.5 text-indigo-500"></i> Hybrid (Buyer + Seller)
+          <i class="fa-solid fa-arrows-split-up-and-left mr-1.5 text-indigo-500"></i> Hybrid (Sales + Vendor)
         </span>
         {% endif %}
       </div>
@@ -40,11 +40,11 @@
       </a>
       <a href="?workspace=buyer" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 {% if active_workspace == 'buyer' %}bg-white text-blue-700 shadow-sm border border-slate-200/60{% else %}text-slate-600 hover:text-slate-900{% endif %}">
         <i class="fa-solid fa-cart-shopping text-emerald-600"></i>
-        <span>Buyer Procurement</span>
+        <span>Sales</span>
       </a>
       <a href="?workspace=seller" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 {% if active_workspace == 'seller' %}bg-white text-indigo-700 shadow-sm border border-slate-200/60{% else %}text-slate-600 hover:text-slate-900{% endif %}">
         <i class="fa-solid fa-bullhorn text-purple-600"></i>
-        <span>Seller Sales</span>
+        <span>Vendor</span>
       </a>
     </div>
     {% endif %}

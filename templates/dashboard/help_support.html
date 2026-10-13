@@ -235,7 +235,7 @@
         </div>
 
         <!-- Filter Form -->
-        <form method="GET" action="{% url 'help-support' %}" class="flex flex-wrap items-center gap-2 text-xs">
+        <form method="GET" action="{% if is_super_admin %}{% url 'admin-panel-support' %}{% else %}{% url 'help-support' %}{% endif %}" class="flex flex-wrap items-center gap-2 text-xs">
           <!-- Keyword Search -->
           <div class="relative min-w-[200px]">
             <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -270,7 +270,7 @@
             Filter
           </button>
           {% if query_search or status_filter != 'all' or priority_filter != 'all' %}
-          <a href="{% url 'help-support' %}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition">
+          <a href="{% if is_super_admin %}{% url 'admin-panel-support' %}{% else %}{% url 'help-support' %}{% endif %}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition">
             Reset
           </a>
           {% endif %}
@@ -1157,7 +1157,7 @@
         <input 
           type="text" 
           name="question" 
-          placeholder="e.g. How do I switch between Buyer and Seller workspaces?" 
+          placeholder="e.g. How do I switch between Sales and Vendor workspaces?" 
           required
           class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 font-semibold text-slate-900 text-xs"
         >

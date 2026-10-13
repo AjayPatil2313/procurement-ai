@@ -189,19 +189,7 @@
     </div>
 
     <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-      <div>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-      <div class="flex items-center gap-1">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Previous</a>
-        {% endif %}
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Next</a>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
+    {% include "admin_panel/includes/pagination.html" %}
   </div>
 
 </div>

@@ -216,24 +216,80 @@ Sent via AI Procurement & Sales Platform on behalf of {company_name}.
 """
 
     try:
+        from apps.notifications.services.smtp_service import (
+            get_active_email_connection,
+            get_default_from_email,
+        )
+        from apps.notifications.models import NotificationLog, EmailDeliveryAttempt
+        from django.utils import timezone
+
+        connection, _ = get_active_email_connection()
+        configured_from = get_default_from_email()
+
+        # Record in centralized NotificationLog outbox
+        log_obj = NotificationLog.objects.create(
+            event_key="seller.inquiry_received" if is_seller else "buyer.inquiry_sent",
+            company=inquiry.company,
+            user=user,
+            recipient_email=to_email,
+            recipient_name=to_email.split("@")[0],
+            subject=subject,
+            html_body=html_content,
+            text_body=text_content.strip(),
+            has_attachments=bool(attached_content and attached_filename),
+            attachment_names=[attached_filename] if attached_filename else [],
+            status=NotificationLog.Status.SENDING,
+        )
+
         msg = EmailMultiAlternatives(
             subject=subject,
             body=text_content.strip(),
-            from_email=from_email,
+            from_email=configured_from,
             to=[to_email],
             reply_to=reply_to,
+            connection=connection,
         )
         msg.attach_alternative(html_content, "text/html")
 
         if attached_content and attached_filename:
             msg.attach(attached_filename, attached_content, attached_mimetype)
 
-        msg.send(fail_silently=False)
-        logger.info(f"Inquiry #{inquiry.id} successfully sent to {to_email} via configured email backend (attachment: {attached_filename})")
-        return True, "Email successfully dispatched to recipient."
+        # Deliverability tracking headers
+        msg.extra_headers["X-Entity-Ref-ID"] = f"TC-INQ-{inquiry.id}"
+
+        sent_count = msg.send(fail_silently=False)
+
+        if sent_count > 0:
+            log_obj.status = NotificationLog.Status.SENT
+            log_obj.sent_at = timezone.now()
+            log_obj.attempts_count = 1
+            log_obj.save(update_fields=["status", "sent_at", "attempts_count"])
+
+            EmailDeliveryAttempt.objects.create(
+                log=log_obj,
+                attempt_number=1,
+                status=EmailDeliveryAttempt.Status.SUCCESS,
+            )
+            logger.info(f"Inquiry #{inquiry.id} successfully sent to {to_email} via configured email backend (attachment: {attached_filename})")
+            return True, "Email successfully dispatched to recipient."
+        else:
+            raise RuntimeError("Backend sent 0 messages.")
+
     except Exception as exc:
-        logger.warning(f"Failed to dispatch email for inquiry #{inquiry.id} to {to_email}: {exc}")
-        return False, str(exc)
+        err_msg = str(exc)
+        logger.warning(f"Failed to dispatch email for inquiry #{inquiry.id} to {to_email}: {err_msg}")
+        if 'log_obj' in locals():
+            log_obj.status = NotificationLog.Status.FAILED
+            log_obj.last_error = err_msg
+            log_obj.attempts_count = 1
+            log_obj.save(update_fields=["status", "last_error", "attempts_count"])
+            EmailDeliveryAttempt.objects.create(
+                log=log_obj,
+                attempt_number=1,
+                status=EmailDeliveryAttempt.Status.FAILED,
+                error_message=err_msg,
+            )
+        return False, err_msg
 
 
 def send_inquiry_followup_email(inquiry_message, user=None):

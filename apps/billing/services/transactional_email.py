@@ -28,7 +28,13 @@ class TransactionalEmailService:
             logger.info("No valid email recipients for subject: '%s'. Skipping delivery.", subject)
             return False
 
-        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "Procurement AI <noreply@procurement-ai.com>")
+        from apps.notifications.services.smtp_service import (
+            get_active_email_connection,
+            get_default_from_email,
+        )
+
+        connection, _ = get_active_email_connection()
+        from_email = get_default_from_email()
         text_content = strip_tags(html_content)
 
         try:
@@ -37,6 +43,7 @@ class TransactionalEmailService:
                 body=text_content,
                 from_email=from_email,
                 to=valid_recipients,
+                connection=connection,
             )
             msg.attach_alternative(html_content, "text/html")
 
@@ -166,11 +173,30 @@ class TransactionalEmailService:
     def send_low_credit_alert_email(cls, company, available_credits: int) -> bool:
         """
         Alerts Company Admins when available credit balance is critically low.
+        Routes through central notification engine with fallback.
         """
+        from apps.notifications.services.email_engine import trigger_email_notification
+        logs = trigger_email_notification(
+            event_key="billing.low_wallet_balance",
+            context={
+                "summary": f"Your company {company.name} has only {available_credits} search/AI credits remaining in your wallet.",
+                "details": {
+                    "Company": company.name,
+                    "Remaining Credits": str(available_credits),
+                    "Threshold": "Depleted Threshold",
+                },
+                "cta_url": "/company/billing/",
+                "cta_text": "Top Up Credits Now",
+            },
+            company=company,
+            severity="WARNING",
+            async_dispatch=False if getattr(settings, "TESTING", False) else True,
+        )
+        if logs:
+            return True
+
         recipients = cls._get_admin_emails(company)
-
         subject = f"[Action Required] Low Credit Balance Alert for {company.name}"
-
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #fed7aa; border-radius: 8px; overflow: hidden; color: #334155;">
             <div style="background-color: #ea580c; padding: 20px; color: #ffffff; text-align: center;">
@@ -182,16 +208,11 @@ class TransactionalEmailService:
                     Your company <b>{company.name}</b> has only <b>{available_credits} search/AI credits</b> remaining in your wallet.
                     Once credits are depleted, autonomous vendor discovery and report exports will be temporarily paused.
                 </p>
-
                 <div style="text-align: center; margin: 24px 0;">
                     <a href="/company/billing/" style="background-color: #2563eb; color: #ffffff; padding: 10px 22px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">
                         Top Up Credits Now
                     </a>
                 </div>
-
-                <p style="font-size: 12px; color: #64748b;">
-                    Choose from 100, 500, or 1000 credit top-up packages, or upgrade your monthly tier for increased allocations.
-                </p>
             </div>
         </div>
         """
@@ -201,11 +222,31 @@ class TransactionalEmailService:
     def send_subscription_expiry_reminder_email(cls, company, subscription, days_left: int) -> bool:
         """
         Sends advance subscription renewal warning email to Company Admins.
+        Routes through central notification engine with fallback.
         """
+        from apps.notifications.services.email_engine import trigger_email_notification
+        logs = trigger_email_notification(
+            event_key="billing.subscription_expiring",
+            context={
+                "summary": f"Your {subscription.get_plan_display()} subscription for {company.name} is scheduled to renew or expire on {subscription.valid_till} (in {days_left} days).",
+                "details": {
+                    "Company": company.name,
+                    "Subscription Plan": subscription.get_plan_display(),
+                    "Days Remaining": str(days_left),
+                    "Expiry Date": str(subscription.valid_till),
+                },
+                "cta_url": "/company/billing/",
+                "cta_text": "Renew Subscription",
+            },
+            company=company,
+            severity="WARNING",
+            async_dispatch=False if getattr(settings, "TESTING", False) else True,
+        )
+        if logs:
+            return True
+
         recipients = cls._get_admin_emails(company)
-
         subject = f"[Reminder] Subscription for {company.name} expires in {days_left} day{'s' if days_left > 1 else ''}"
-
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #fed7aa; border-radius: 8px; overflow: hidden; color: #334155;">
             <div style="background-color: #f59e0b; padding: 20px; color: #ffffff; text-align: center;">
@@ -216,7 +257,6 @@ class TransactionalEmailService:
                 <p style="font-size: 14px; line-height: 1.5;">
                     Your <b>{subscription.get_plan_display()}</b> plan for <b>{company.name}</b> is scheduled to renew or expire on <b>{subscription.valid_till}</b> (in {days_left} days).
                 </p>
-
                 <div style="text-align: center; margin: 24px 0;">
                     <a href="/company/billing/" style="background-color: #2563eb; color: #ffffff; padding: 10px 22px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">
                         Renew Subscription
@@ -232,14 +272,9 @@ class TransactionalEmailService:
         """
         Emails official Tax Invoice directly to the Company Admin upon payment completion.
         Attaches vector PDF invoice if provided or generates it dynamically.
+        Routes through central notification engine with fallback.
         """
         company = invoice.company
-        recipients = cls._get_admin_emails(company)
-        if not recipients and company.email:
-            recipients = [company.email]
-
-        subject = f"Tax Invoice {invoice.invoice_number} from Procurement AI (₹{invoice.total_amount})"
-
         if not pdf_bytes:
             from apps.billing.services.pdf_generator import PDFReportGenerator
             try:
@@ -251,6 +286,32 @@ class TransactionalEmailService:
         if pdf_bytes:
             attachments.append((f"{invoice.invoice_number}.pdf", pdf_bytes, "application/pdf"))
 
+        from apps.notifications.services.email_engine import trigger_email_notification
+        logs = trigger_email_notification(
+            event_key="billing.invoice_generated",
+            context={
+                "summary": f"An official tax invoice has been generated for your recent payment of {invoice.currency} {invoice.total_amount}.",
+                "details": {
+                    "Invoice Number": invoice.invoice_number,
+                    "Total Amount": f"{invoice.currency} {invoice.total_amount}",
+                    "Billing Period": f"{invoice.billing_period_start} to {invoice.billing_period_end}",
+                    "GST (18%)": f"{invoice.currency} {invoice.tax}",
+                },
+                "cta_url": "/company/invoices/",
+                "cta_text": "Download PDF Invoice",
+            },
+            company=company,
+            attachments=attachments,
+            async_dispatch=False if getattr(settings, "TESTING", False) else True,
+        )
+        if logs:
+            return True
+
+        recipients = cls._get_admin_emails(company)
+        if not recipients and company.email:
+            recipients = [company.email]
+
+        subject = f"Tax Invoice {invoice.invoice_number} from Procurement AI (₹{invoice.total_amount})"
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; color: #334155;">
             <div style="background-color: #0f172a; padding: 20px; color: #ffffff; text-align: center;">
@@ -261,7 +322,6 @@ class TransactionalEmailService:
                 <p style="font-size: 14px; line-height: 1.5;">
                     Thank you for your business. We have successfully processed your payment and updated your company credit balance.
                 </p>
-
                 <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 6px; margin: 18px 0;">
                     <p style="margin: 0 0 6px; font-size: 13px;"><b>Invoice Number:</b> {invoice.invoice_number}</p>
                     <p style="margin: 0 0 6px; font-size: 13px;"><b>Billing Period:</b> {invoice.billing_period_start} to {invoice.billing_period_end}</p>
@@ -269,10 +329,6 @@ class TransactionalEmailService:
                     <p style="margin: 0 0 6px; font-size: 13px;"><b>18% GST (SAC 998313):</b> {invoice.currency} {invoice.tax}</p>
                     <p style="margin: 0; font-size: 15px; color: #0f172a;"><b>Total Paid:</b> {invoice.currency} {invoice.total_amount}</p>
                 </div>
-
-                <p style="font-size: 13px; color: #64748b;">
-                    Your official GST tax invoice is attached as a PDF to this email. You can also view or download it anytime from your Billing Dashboard.
-                </p>
             </div>
         </div>
         """

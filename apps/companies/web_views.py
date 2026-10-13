@@ -959,7 +959,14 @@ def subscription_billing_web_view(request):
         elif date_range == "90d":
             tx_qs = tx_qs.filter(created_at__gte=timezone.now() - timedelta(days=90))
 
-        paginator = Paginator(tx_qs.order_by("-created_at"), 20)
+        per_page = 10
+        requested_per_page = request.GET.get("per_page")
+        if requested_per_page:
+            try:
+                per_page = max(5, min(100, int(requested_per_page)))
+            except ValueError:
+                pass
+        paginator = Paginator(tx_qs.order_by("-created_at"), per_page)
         page_num = request.GET.get("page", 1)
         company_transactions_page = paginator.get_page(page_num)
 

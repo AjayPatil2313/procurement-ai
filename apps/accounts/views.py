@@ -35,23 +35,38 @@ class RegisterAPIView(APIView):
 
         token = generate_email_verification_token(user)
 
-        verification_url = (
-            f"http://127.0.0.1:8000/api/auth/verify-email/"
-            f"?token={token}"
-        )
+        from apps.notifications.services.email_engine import trigger_email_notification, ensure_absolute_url
+        verification_url = ensure_absolute_url(f"/api/auth/verify-email/?token={token}")
 
-        send_mail(
-            subject="Verify your Procurement AI account",
-            message=(
-                f"Hello {user.first_name or 'User'},\n\n"
-                f"Please verify your email address by opening this link:\n\n"
-                f"{verification_url}\n\n"
-                f"This verification link is valid for 24 hours."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
+        logs = trigger_email_notification(
+            event_key="auth.welcome_registration",
+            user=user,
+            context={
+                "user_name": user.get_full_name() or user.first_name or "User",
+                "verification_url": verification_url,
+                "cta_url": verification_url,
+                "summary": "Please verify your email address to activate all TradeConnect platform features.",
+                "details": {
+                    "Account Email": user.email,
+                    "Validity": "24 Hours",
+                    "Security Action": "Email Verification",
+                },
+            },
+            async_dispatch=False if getattr(settings, "TESTING", False) else True,
         )
+        if not logs:
+            send_mail(
+                subject="Verify your Procurement AI account",
+                message=(
+                    f"Hello {user.first_name or 'User'},\n\n"
+                    f"Please verify your email address by opening this link:\n\n"
+                    f"{verification_url}\n\n"
+                    f"This verification link is valid for 24 hours."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
 
         return Response(
             {
@@ -200,23 +215,40 @@ class ForgotPasswordAPIView(APIView):
 
         token = generate_password_reset_token(user)
 
-        reset_url = (
-            "http://127.0.0.1:8000/api/auth/reset-password/"
-            f"?token={token}"
-        )
+        from apps.notifications.services.email_engine import trigger_email_notification, ensure_absolute_url
+        reset_url = ensure_absolute_url(f"/reset-password/?token={token}")
 
-        send_mail(
-            subject="Reset your Procurement AI password",
-            message=(
-                f"Hello {user.first_name or 'User'},\n\n"
-                f"Use the following link to reset your password:\n\n"
-                f"{reset_url}\n\n"
-                f"This link is valid for 1 hour."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
+        logs = trigger_email_notification(
+            event_key="auth.password_reset",
+            user=user,
+            context={
+                "user_name": user.get_full_name() or user.first_name or "User",
+                "reset_url": reset_url,
+                "cta_url": reset_url,
+                "summary": "We received a security request to reset your TradeConnect enterprise password.",
+                "details": {
+                    "Account Email": user.email,
+                    "Link Validity": "60 Minutes",
+                    "Security Action": "Password Reset",
+                },
+            },
+            severity="WARNING",
+            priority="URGENT",
+            async_dispatch=False if getattr(settings, "TESTING", False) else True,
         )
+        if not logs:
+            send_mail(
+                subject="Reset your Procurement AI password",
+                message=(
+                    f"Hello {user.first_name or 'User'},\n\n"
+                    f"Use the following link to reset your password:\n\n"
+                    f"{reset_url}\n\n"
+                    f"This link is valid for 1 hour."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
 
         return Response(
             {

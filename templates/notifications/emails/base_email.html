@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>{{ email_subject|default:"TradeConnect Notification" }}</title>
+  <!--[if mso]>
+  <style>
+    * { font-family: sans-serif !important; }
+  </style>
+  <![endif]-->
+  <style>
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; }
+    @media only screen and (max-width: 640px) {
+      .email-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
+      .mobile-padding { padding-left: 18px !important; padding-right: 18px !important; }
+      .stack-column { display: block !important; width: 100% !important; max-width: 100% !important; }
+      .stack-column-center { display: block !important; width: 100% !important; text-align: center !important; }
+      .hide-mobile { display: none !important; }
+      .banner-icon-cell { padding-right: 12px !important; }
+      .banner-icon-box { width: 52px !important; height: 52px !important; line-height: 52px !important; }
+      .banner-title { font-size: 20px !important; }
+    }
+  </style>
+</head>
+<body style="background-color: #f1f5f9; margin: 0; padding: 24px 0;">
+
+  <!-- Outer Canvas -->
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td align="center" style="padding: 12px;">
+
+        <!-- Main Card Container (Max Width 640px) -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="email-container" style="max-width: 640px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.04);">
+
+          <!-- ======================================================== -->
+          <!-- 1. STANDARD HEADER (FIXED ACROSS ALL TEMPLATES)          -->
+          <!-- ======================================================== -->
+          <tr>
+            <td style="background-color: #ffffff; padding: 24px 32px 20px; border-bottom: 1px solid #f1f5f9;" class="mobile-padding">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <!-- Left: Brand Logo & Tagline -->
+                  <td align="left" style="vertical-align: middle;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="vertical-align: middle; padding-right: 12px;">
+                          <!-- TradeConnect Geometric Logo Icon -->
+                          <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%); text-align: center; line-height: 38px; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
+                            <span style="color: #ffffff; font-size: 20px; font-weight: 900; line-height: 38px; display: inline-block;">&#9650;</span>
+                          </div>
+                        </td>
+                        <td style="vertical-align: middle;">
+                          <span style="font-size: 21px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; display: block; line-height: 1.1;">TradeConnect</span>
+                          <span style="font-size: 10px; font-weight: 700; color: #0284c7; letter-spacing: 1px; text-transform: uppercase; display: block; margin-top: 2px;">Buy &bull; Sell &bull; Grow</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+
+                  <!-- Right: Platform Slogan -->
+                  <td align="right" style="vertical-align: middle;" class="hide-mobile">
+                    <span style="font-size: 12px; font-weight: 700; color: #334155; display: block; line-height: 1.2;">B2B Procurement &amp; Sales Platform</span>
+                    <span style="font-size: 10px; color: #64748b; display: block; margin-top: 2px;">Smarter Sourcing. Stronger Partnerships.</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ======================================================== -->
+          <!-- 2. EVENT-SPECIFIC HERO BANNER                            -->
+          <!-- ======================================================== -->
+          <tr>
+            <td style="background: {{ banner_gradient|default:'linear-gradient(135deg, #094a9a 0%, #0d5cb6 50%, #1e40af 100%)' }}; padding: 32px 32px 28px; color: #ffffff;" class="mobile-padding">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <!-- Circular White Icon Container -->
+                  <td width="72" style="vertical-align: middle; padding-right: 18px;" class="banner-icon-cell">
+                    <div class="banner-icon-box" style="width: 64px; height: 64px; border-radius: 50%; background: #ffffff; text-align: center; line-height: 64px; box-shadow: 0 4px 14px rgba(0,0,0,0.18);">
+                      {% if banner_icon_html %}
+                        {{ banner_icon_html|safe }}
+                      {% else %}
+                        <span style="font-size: 28px; color: {{ banner_icon_color|default:'#0284c7' }}; line-height: 64px;">&#9993;</span>
+                      {% endif %}
+                    </div>
+                  </td>
+
+                  <!-- Title & Subtitle Text -->
+                  <td style="vertical-align: middle;">
+                    <h1 class="banner-title" style="margin: 0 0 6px 0; font-size: 23px; font-weight: 900; color: #ffffff; line-height: 1.2; letter-spacing: -0.5px;">
+                      {{ banner_title|default:"New Notification" }} <span style="color: {{ banner_highlight_color|default:'#38bdf8' }};">{{ banner_highlight|default:"Alert!" }}</span>
+                    </h1>
+                    <p style="margin: 0; font-size: 13px; color: #e0f2fe; line-height: 1.45; font-weight: 500;">
+                      {{ banner_subtitle|default:"Here are the operational details regarding your account." }}
+                    </p>
+                  </td>
+
+                  <!-- Subtle Watermark Graphic (Desktop) -->
+                  <td width="60" align="right" style="vertical-align: middle; opacity: 0.18;" class="hide-mobile">
+                    <span style="font-size: 46px; line-height: 1;">&#129309;</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ======================================================== -->
+          <!-- 3. DYNAMIC BODY CONTENT (CHANGES PER EVENT)              -->
+          <!-- ======================================================== -->
+          <tr>
+            <td style="padding: 32px 32px 24px; background-color: #ffffff;" class="mobile-padding">
+              {% block email_body %}
+                {{ email_body|safe }}
+              {% endblock %}
+            </td>
+          </tr>
+
+          <!-- ======================================================== -->
+          <!-- 4. TRUST BADGES ROW (FIXED ACROSS ALL TEMPLATES)         -->
+          <!-- ======================================================== -->
+          <tr>
+            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 18px 24px;" class="mobile-padding">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <!-- Badge 1: Secure & Verified -->
+                  <td width="33%" align="center" style="vertical-align: middle; border-right: 1px solid #e2e8f0; padding: 4px 8px;">
+                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">&#128737;</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">Secure &amp; Verified</span>
+                  </td>
+
+                  <!-- Badge 2: Trusted B2B Platform -->
+                  <td width="34%" align="center" style="vertical-align: middle; border-right: 1px solid #e2e8f0; padding: 4px 8px;">
+                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">&#9745;</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">Trusted B2B Platform</span>
+                  </td>
+
+                  <!-- Badge 3: 24/7 Dedicated Support -->
+                  <td width="33%" align="center" style="vertical-align: middle; padding: 4px 8px;">
+                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">&#127911;</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">24/7 Support</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ======================================================== -->
+          <!-- 5. DARK BRAND FOOTER (FIXED ACROSS ALL TEMPLATES)        -->
+          <!-- ======================================================== -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 24px 32px; color: #94a3b8; font-size: 11px;" class="mobile-padding">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <!-- Left: Links & Brand -->
+                  <td align="left" style="vertical-align: middle;">
+                    <span style="color: #ffffff; font-weight: 800; font-size: 13px;">TradeConnect</span>
+                    <span style="color: #475569; margin: 0 8px;">|</span>
+                    <a href="https://tradeconnect.com" style="color: #94a3b8; text-decoration: none;">www.tradeconnect.com</a>
+                    <span style="color: #475569; margin: 0 8px;">|</span>
+                    <a href="mailto:support@tradeconnect.com" style="color: #94a3b8; text-decoration: none;">support@tradeconnect.com</a>
+                  </td>
+
+                  <!-- Right: Social Channels -->
+                  <td align="right" style="vertical-align: middle;" class="hide-mobile">
+                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">in</span>
+                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">fb</span>
+                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">yt</span>
+                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">&#120143;</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding-top: 14px; border-top: 1px solid #1e293b; margin-top: 12px; color: #64748b; font-size: 10px; line-height: 1.5;">
+                    You received this operational email because your company account is registered on the <strong>TradeConnect B2B AI Procurement &amp; Sales Platform</strong>.<br>
+                    Manage your <a href="{{ preferences_url|default:'#' }}" style="color: #38bdf8; text-decoration: underline;">notification preferences</a> or <a href="{{ unsubscribe_url|default:'#' }}" style="color: #38bdf8; text-decoration: underline;">unsubscribe</a>.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Main Card Container -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

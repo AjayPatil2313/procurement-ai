@@ -143,6 +143,7 @@ from apps.companies.admin_views import (
     admin_panel_permissions_view,
     admin_panel_transactions_view,
     admin_panel_wallets_view,
+    admin_panel_matching_criteria_view,
 )
 from apps.ai_search.web_views import (
     matching_parameters_view,
@@ -294,6 +295,7 @@ urlpatterns = [
     path("admin-panel/products/", admin_panel_products_view, name="admin-panel-products"),
     path("admin-panel/requirements/", admin_panel_requirements_view, name="admin-panel-requirements"),
     path("admin-panel/ai-providers/", admin_panel_ai_providers_view, name="admin-panel-ai-providers"),
+    path("admin-panel/matching-criteria/", admin_panel_matching_criteria_view, name="admin-panel-matching-criteria"),
     path("admin-panel/search-activity/", admin_panel_search_activity_view, name="admin-panel-search-activity"),
     path("admin-panel/inquiries/", admin_panel_inquiries_view, name="admin-panel-inquiries"),
     path("admin-panel/reports/", admin_panel_reports_view, name="admin-panel-reports"),
@@ -301,6 +303,7 @@ urlpatterns = [
     path("admin-panel/maintenance/toggle/", admin_panel_toggle_maintenance_view, name="admin-panel-toggle-maintenance"),
     path("admin-panel/api-logs/", admin_panel_apilogs_view, name="admin-panel-apilogs"),
     path("admin-panel/audit-logs/", admin_panel_auditlogs_view, name="admin-panel-auditlogs"),
+    path("admin-panel/support/", help_support_view, name="admin-panel-support"),
 
     # Super Admin Dashboard & Module Governance
     path("admin-panel/buyer-dashboard/", admin_panel_buyer_dashboard_view, name="admin-panel-buyer-dashboard"),
@@ -322,6 +325,9 @@ urlpatterns = [
     path("admin-panel/transactions/", admin_panel_transactions_view, name="admin-panel-transactions"),
     path("admin-panel/invoices/", admin_panel_transactions_view, name="admin-panel-invoices"),
     path("admin-panel/billing/wallets/", admin_panel_wallets_view, name="admin-panel-wallets"),
+
+    # Notifications & Email Management (Super Admin + User Preferences)
+    path("", include("apps.notifications.urls")),
 
     # REST APIs
     path("api/auth/", include("apps.accounts.urls")),

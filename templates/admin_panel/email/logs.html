@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Email Outbox Logs — Super Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 mb-3">
+        <i class="fa-solid fa-clock-rotate-left mr-1.5 text-blue-400"></i> Outbox Audit Ledger
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Email Delivery Audit Trail</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Inspect transmission attempts, diagnose SMTP delivery errors, review rendered payloads, and manually trigger outbox retries.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <form method="POST" action="{% url 'admin-panel-email-logs-retry-all' %}" onsubmit="return confirm('Are you sure you want to re-queue all failed emails from the past 24 hours for automated background delivery?');">
+        {% csrf_token %}
+        <input type="hidden" name="hours" value="24">
+        <button type="submit" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md flex items-center gap-2 transition font-bold">
+          <i class="fa-solid fa-arrows-rotate"></i> Retry All Failed (24h)
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  {% include "admin_panel/email/nav_tabs.html" %}
+
+  <!-- Filters Toolbar -->
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Status:</span>
+      <a href="{% url 'admin-panel-email-logs' %}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if not selected_status %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        All
+      </a>
+      {% for code, label in statuses %}
+      <a href="?status={{ code }}{% if search_query %}&q={{ search_query }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}{% if from_date %}&from_date={{ from_date }}{% endif %}{% if to_date %}&to_date={{ to_date }}{% endif %}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_status == code %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        {{ label }}
+      </a>
+      {% endfor %}
+    </div>
+
+    <form method="GET" class="flex flex-wrap items-center gap-2">
+      {% if selected_status %}
+      <input type="hidden" name="status" value="{{ selected_status }}">
+      {% endif %}
+      {% if selected_severity %}
+      <input type="hidden" name="severity" value="{{ selected_severity }}">
+      {% endif %}
+      <div class="flex items-center gap-1.5 text-xs text-slate-500">
+        <span>From:</span>
+        <input type="date" name="from_date" value="{{ from_date }}" class="px-2 py-1 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <span>To:</span>
+        <input type="date" name="to_date" value="{{ to_date }}" class="px-2 py-1 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient, event..." class="pl-8 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-40 sm:w-52">
+      </div>
+      <button type="submit" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition">
+        Filter
+      </button>
+      {% if search_query or selected_status or selected_severity or from_date or to_date %}
+      <a href="{% url 'admin-panel-email-logs' %}" class="px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-800 transition" title="Clear Filters">
+        <i class="fa-solid fa-xmark"></i>
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Logs Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="p-3.5">Log ID / Event</th>
+            <th class="p-3.5">Recipient</th>
+            <th class="p-3.5">Subject</th>
+            <th class="p-3.5">Company</th>
+            <th class="p-3.5">Status</th>
+            <th class="p-3.5">Attempts</th>
+            <th class="p-3.5">Dispatched At</th>
+            <th class="p-3.5 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for log in logs %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="p-3.5 whitespace-nowrap">
+              <span class="font-mono font-bold text-slate-900">#{{ log.id }}</span>
+              <span class="block font-mono text-[10px] text-slate-400">{{ log.event_key }}</span>
+            </td>
+            <td class="p-3.5">
+              <span class="font-semibold text-slate-900 block">{{ log.recipient_email }}</span>
+              {% if log.recipient_name %}
+              <span class="text-[10px] text-slate-500">{{ log.recipient_name }}</span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 font-medium text-slate-800 max-w-xs truncate" title="{{ log.subject }}">
+              {{ log.subject }}
+            </td>
+            <td class="p-3.5">
+              {% if log.company %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                  {{ log.company.name|truncatechars:18 }}
+                </span>
+              {% else %}
+                <span class="text-slate-400">Platform</span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 whitespace-nowrap">
+              {% if log.status == 'SENT' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-check mr-1"></i> Sent
+                </span>
+              {% elif log.status == 'FAILED' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800" title="{{ log.last_error }}">
+                  <i class="fa-solid fa-circle-xmark mr-1"></i> Failed
+                </span>
+              {% elif log.status == 'QUEUED' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                  <i class="fa-solid fa-clock mr-1"></i> Queued
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                  {{ log.status }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 whitespace-nowrap font-mono text-xs">
+              <span class="{% if log.attempts_count >= log.max_attempts and log.status == 'FAILED' %}text-rose-600 font-bold{% else %}text-slate-600{% endif %}">
+                {{ log.attempts_count }} / {{ log.max_attempts }}
+              </span>
+            </td>
+            <td class="p-3.5 text-slate-500 whitespace-nowrap text-[11px]">
+              {{ log.created_at|date:"d M Y, H:i" }}
+            </td>
+            <td class="p-3.5 text-right whitespace-nowrap space-x-1">
+              <button onclick="inspectLog({{ log.id }})" class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" title="Inspect Log Payload">
+                <i class="fa-solid fa-magnifying-glass mr-1 text-slate-500"></i> Inspect
+              </button>
+              {% if log.status == 'FAILED' or log.status == 'QUEUED' %}
+              <form action="{% url 'admin-panel-email-log-retry' log.id %}" method="POST" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition" title="Retry Delivery">
+                  <i class="fa-solid fa-rotate-right mr-1"></i> Retry
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="p-8 text-center text-slate-400">
+              <p class="font-medium">No email logs matching current search criteria.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 bg-slate-50">
+      <span>Showing Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="flex items-center gap-1">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">&larr; Prev</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">Next &rarr;</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Modal: Log Inspection Details -->
+<div id="inspectModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div>
+        <h3 id="inspectLogTitle" class="font-bold text-sm text-slate-900">Delivery Log Inspection</h3>
+        <p id="inspectLogMeta" class="text-xs text-slate-500 font-mono"></p>
+      </div>
+      <button onclick="closeInspectModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-500">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="p-4 overflow-y-auto flex-1 space-y-4 text-xs">
+      <div>
+        <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-1">Subject</h4>
+        <div id="inspectSubject" class="p-2.5 bg-slate-50 rounded-xl font-medium text-slate-900 border border-slate-200"></div>
+      </div>
+
+      <div id="inspectLastErrorBox" class="hidden">
+        <h4 class="font-bold text-rose-700 uppercase tracking-wider text-[10px] mb-1">Last Transmission Error</h4>
+        <div id="inspectLastError" class="p-2.5 bg-rose-50 text-rose-800 rounded-xl font-mono text-[11px] border border-rose-200"></div>
+      </div>
+
+      <div>
+        <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-1">Transmission Attempts History</h4>
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 text-[10px]">
+              <tr>
+                <th class="p-2">#</th>
+                <th class="p-2">Status</th>
+                <th class="p-2">Timestamp</th>
+                <th class="p-2">Diagnostic Error</th>
+              </tr>
+            </thead>
+            <tbody id="inspectAttemptsTable" class="divide-y divide-slate-100">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-1">Rendered HTML Payload</h4>
+        <div id="inspectHtmlContainer" class="p-3 bg-white rounded-xl border border-slate-200 max-h-60 overflow-y-auto"></div>
+      </div>
+    </div>
+    <div class="p-3 border-t border-slate-200 bg-white flex justify-end">
+      <button onclick="closeInspectModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 transition">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function inspectLog(logId) {
+  document.getElementById("inspectLogTitle").textContent = "Log #" + logId;
+  document.getElementById("inspectLogMeta").textContent = "Fetching diagnostic payload...";
+  document.getElementById("inspectModal").classList.remove("hidden");
+
+  fetch(`/admin-panel/email/logs/${logId}/detail/`)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("inspectLogTitle").textContent = `Log #${data.id} - ${data.recipient_email}`;
+      document.getElementById("inspectLogMeta").textContent = `Event: ${data.event_key} | Status: ${data.status} | Created: ${data.created_at}`;
+      document.getElementById("inspectSubject").textContent = data.subject;
+
+      const errBox = document.getElementById("inspectLastErrorBox");
+      if (data.last_error) {
+        errBox.classList.remove("hidden");
+        document.getElementById("inspectLastError").textContent = data.last_error;
+      } else {
+        errBox.classList.add("hidden");
+      }
+
+      const tbody = document.getElementById("inspectAttemptsTable");
+      tbody.innerHTML = "";
+      if (data.attempts && data.attempts.length > 0) {
+        data.attempts.forEach(att => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td class="p-2 font-bold">${att.attempt_number}</td>
+            <td class="p-2 font-semibold ${att.status === 'SUCCESS' ? 'text-emerald-600' : 'text-rose-600'}">${att.status}</td>
+            <td class="p-2 text-slate-500">${att.timestamp}</td>
+            <td class="p-2 font-mono text-[11px] text-slate-600">${att.error_message || 'None / Delivered'}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } else {
+        tbody.innerHTML = `<tr><td colspan="4" class="p-2 text-center text-slate-400">No attempt records logged yet.</td></tr>`;
+      }
+
+      document.getElementById("inspectHtmlContainer").innerHTML = data.html_body;
+    })
+    .catch(err => {
+      document.getElementById("inspectLogMeta").textContent = "Failed to load log details.";
+    });
+}
+
+function closeInspectModal() {
+  document.getElementById("inspectModal").classList.add("hidden");
+}
+</script>
+{% endblock %}

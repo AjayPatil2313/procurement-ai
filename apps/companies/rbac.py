@@ -122,10 +122,10 @@ class HasModulePermission(BasePermission):
         # 2. Company-level type restriction & Super Admin module configuration
         if required_module:
             if required_module in self.BUYER_MODULES and company.company_type == Company.CompanyType.SELLER:
-                self.message = "Access restricted: This module is only available for Buyer accounts."
+                self.message = "Access restricted: This module is only available for Sales accounts."
                 return False
             if required_module in self.SELLER_MODULES and company.company_type == Company.CompanyType.BUYER:
-                self.message = "Access restricted: This module is only available for Seller accounts."
+                self.message = "Access restricted: This module is only available for Vendor accounts."
                 return False
             if not is_platform_module_enabled(required_module, company.company_type):
                 self.message = f"Access restricted: Module '{required_module}' is disabled by Platform Administrator."
@@ -268,9 +268,9 @@ def get_user_rbac_context(user, company_id=None):
                 elif has_seller_perm and not has_buyer_perm:
                     role_label = "Seller"
                 elif company and company.company_type == Company.CompanyType.BUYER:
-                    role_label = "Buyer"
+                    role_label = "Sales"
                 elif company and company.company_type == Company.CompanyType.SELLER:
-                    role_label = "Seller"
+                    role_label = "Vendor"
                 else:
                     role_label = "Company User"
 
@@ -334,20 +334,20 @@ def get_user_rbac_context(user, company_id=None):
     navigation = {}
     if is_buyer_only:
         b_nav_items = [
-            {"name": "Buyer Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "buyer_dashboard"},
+            {"name": "Sales Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "buyer_dashboard"},
             {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list", "key": "my_requirements"},
-            {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
-            {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
+            {"name": "Find Customers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
+            {"name": "Saved Customers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
             {"name": "Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane", "key": "inquiries"},
         ]
         navigation = {
-            "title": "Buyer Dashboard",
+            "title": "Sales Dashboard",
             "modules": [item for item in b_nav_items if buyer_modules_map.get(item["key"], True)],
         }
     elif is_seller_only:
         s_nav_items = [
-            {"name": "Seller Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "seller_dashboard"},
-            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open", "key": "my_products"},
+            {"name": "Vendor Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "seller_dashboard"},
+            {"name": "Add Requirement", "url": "/sales/products/", "icon": "fa-clipboard-list", "key": "my_products"},
             {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs", "key": "find_buyers"},
             {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder", "key": "buyer_leads"},
             {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark", "key": "saved_buyers"},
@@ -356,22 +356,22 @@ def get_user_rbac_context(user, company_id=None):
         if (is_company_admin or is_super_admin) and seller_modules_map.get("seller_roles", True):
             s_nav_items.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield", "key": "seller_roles"})
         navigation = {
-            "title": "Seller Dashboard",
+            "title": "Vendor Dashboard",
             "modules": [item for item in s_nav_items if seller_modules_map.get(item["key"], True)],
         }
     else:  # BOTH or Super Admin
         b_both_items = [
             {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list", "key": "my_requirements"},
-            {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
-            {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
-            {"name": "Supplier Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane", "key": "inquiries"},
+            {"name": "Find Customers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
+            {"name": "Saved Customers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
+            {"name": "Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane", "key": "inquiries"},
         ]
         s_both_items = [
-            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open", "key": "my_products"},
+            {"name": "Add Requirement", "url": "/sales/products/", "icon": "fa-clipboard-list", "key": "my_products"},
             {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs", "key": "find_buyers"},
             {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder", "key": "buyer_leads"},
             {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark", "key": "saved_buyers"},
-            {"name": "Buyer Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane", "key": "seller_inquiries"},
+            {"name": "Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane", "key": "seller_inquiries"},
         ]
         if (is_company_admin or is_super_admin) and seller_modules_map.get("seller_roles", True):
             s_both_items.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield", "key": "seller_roles"})
@@ -380,11 +380,11 @@ def get_user_rbac_context(user, company_id=None):
             "title": "Overview",
             "sections": [
                 {
-                    "title": "BUYER",
+                    "title": "SALES",
                     "modules": [item for item in b_both_items if buyer_modules_map.get(item["key"], True)],
                 },
                 {
-                    "title": "SELLER",
+                    "title": "VENDOR",
                     "modules": [item for item in s_both_items if seller_modules_map.get(item["key"], True)],
                 },
             ],
@@ -452,9 +452,9 @@ def module_permission_required(module, permission_type="READ"):
                 if company and not company.is_active:
                     raise PermissionDenied("Your company account has been suspended by Platform Administrator.")
                 if module in BUYER_MODULES and not rbac["can_view_buyer"]:
-                    raise PermissionDenied("Access restricted: This module is only available for Buyer accounts.")
+                    raise PermissionDenied("Access restricted: This module is only available for Sales accounts.")
                 if module in SELLER_MODULES and not rbac["can_view_seller"]:
-                    raise PermissionDenied("Access restricted: This module is only available for Seller accounts.")
+                    raise PermissionDenied("Access restricted: This module is only available for Vendor accounts.")
                 if not is_platform_module_enabled(module, company.company_type if company else None):
                     raise PermissionDenied(f"Access restricted: Module '{module}' has been disabled by Platform Administrator.")
 

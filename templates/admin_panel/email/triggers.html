@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Event Triggers & Routing — Super Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-3">
+        <i class="fa-solid fa-bolt mr-1.5 text-amber-400"></i> Event Automation Rules
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Event Triggers &amp; Routing Matrix</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Configure automated trigger policies, recipient resolution strategies, priority escalation, and global rule enable/disable switches.
+      </p>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  {% include "admin_panel/email/nav_tabs.html" %}
+
+  <!-- Filters Toolbar -->
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Module:</span>
+      <a href="{% url 'admin-panel-email-triggers' %}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if not selected_module %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        All Modules
+      </a>
+      {% for code, label in modules %}
+      <a href="?module={{ code }}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_module == code %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        {{ label }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Rules Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="p-3.5">Module</th>
+            <th class="p-3.5">Trigger Rule / Event Key</th>
+            <th class="p-3.5">Recipient Strategy</th>
+            <th class="p-3.5">Linked Template</th>
+            <th class="p-3.5">Severity</th>
+            <th class="p-3.5">Status</th>
+            <th class="p-3.5 text-right">Toggle Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for r in rules %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="p-3.5 whitespace-nowrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
+                {{ r.get_module_display }}
+              </span>
+            </td>
+            <td class="p-3.5">
+              <span class="font-bold text-slate-900 block text-xs">{{ r.name }}</span>
+              <code class="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{{ r.event_key }}</code>
+            </td>
+            <td class="p-3.5 whitespace-nowrap">
+              <span class="inline-flex items-center text-xs font-semibold text-slate-800">
+                <i class="fa-solid fa-users text-slate-400 mr-1.5 text-[11px]"></i>
+                {{ r.get_recipient_type_display }}
+              </span>
+            </td>
+            <td class="p-3.5">
+              {% if r.template %}
+              <a href="{% url 'admin-panel-email-template-edit' r.template.id %}" class="text-blue-600 hover:underline font-medium">
+                {{ r.template.name }}
+              </a>
+              {% else %}
+              <span class="text-slate-400">None</span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 whitespace-nowrap">
+              {% if r.severity == 'CRITICAL' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                  CRITICAL
+                </span>
+              {% elif r.severity == 'WARNING' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                  WARNING
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                  INFO
+                </span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 whitespace-nowrap">
+              {% if r.is_enabled %}
+                <span class="inline-flex items-center text-[11px] font-bold text-emerald-600">
+                  <i class="fa-solid fa-circle-check mr-1"></i> Active
+                </span>
+              {% else %}
+                <span class="inline-flex items-center text-[11px] font-bold text-slate-400">
+                  <i class="fa-solid fa-circle-pause mr-1"></i> Disabled
+                </span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 text-right whitespace-nowrap">
+              <form action="{% url 'admin-panel-email-trigger-toggle' r.id %}" method="POST" class="inline">
+                {% csrf_token %}
+                {% if r.is_enabled %}
+                <button type="submit" class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                  <i class="fa-solid fa-pause mr-1 text-[10px]"></i> Disable
+                </button>
+                {% else %}
+                <button type="submit" class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition">
+                  <i class="fa-solid fa-play mr-1 text-[10px]"></i> Enable
+                </button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="p-8 text-center text-slate-400">
+              <p class="font-medium">No event triggers configured for this module.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 bg-slate-50">
+      <span>Showing Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="flex items-center gap-1">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">&larr; Prev</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">Next &rarr;</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

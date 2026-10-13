@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Email Operations Overview — Super Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 mb-3">
+        <i class="fa-solid fa-envelope mr-1.5 text-blue-400"></i> Platform Communications &amp; Notifications
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Email Notification Operations</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Monitor delivery health, configure automated event triggers, design branded email templates, and manage SMTP routing.
+      </p>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{% url 'admin-panel-email-templates' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-file-code mr-1.5"></i> Manage Templates
+      </a>
+      <a href="{% url 'admin-panel-email-triggers' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-bolt mr-1.5 text-amber-400"></i> Event Rules
+      </a>
+      <a href="{% url 'admin-panel-email-smtp' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-server mr-1.5 text-emerald-400"></i> SMTP Config
+      </a>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  {% include "admin_panel/email/nav_tabs.html" %}
+
+  <!-- KPI Overview Metrics -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Sent / Delivered -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Delivered / Accepted</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ sent_count }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-emerald-600 mt-1">
+          <i class="fa-solid fa-check mr-1"></i> {{ sent_24h }} in last 24h
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-envelope-circle-check"></i>
+      </div>
+    </div>
+
+    <!-- Delivery Rate -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Delivery Rate</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ delivery_rate }}%</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-slate-500 mt-1">
+          Total logs: {{ total_logs }}
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-chart-pie"></i>
+      </div>
+    </div>
+
+    <!-- Queued in Outbox -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Queued in Outbox</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ queued_count }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-amber-600 mt-1">
+          <i class="fa-solid fa-clock mr-1"></i> {% if retry_pending_count %}{{ retry_pending_count }} in backoff{% else %}Ready for worker{% endif %}
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-hourglass-half"></i>
+      </div>
+    </div>
+
+    <!-- Failed Deliveries -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Delivery Failures</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ failed_count }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold {% if failed_24h > 0 %}text-rose-600{% else %}text-slate-500{% endif %} mt-1">
+          <i class="fa-solid fa-triangle-exclamation mr-1"></i> {{ failed_24h }} in last 24h
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-circle-xmark"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Operational Configuration Status -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Active SMTP Health Card -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+          <i class="fa-solid fa-server text-blue-600"></i> Active Outbound Mailer
+        </h3>
+        {% if active_smtp %}
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+            Database Config Active
+          </span>
+        {% else %}
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+            Django Environment Fallback
+          </span>
+        {% endif %}
+      </div>
+      
+      <div class="space-y-2 text-xs text-slate-600">
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400">Sender Identity:</span>
+          <span class="font-semibold text-slate-800">{% if active_smtp %}{{ active_smtp.sender_name }} ({{ active_smtp.sender_email }}){% else %}Procurement AI (noreply@procurement-ai.com){% endif %}</span>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400">SMTP Host / Port:</span>
+          <span class="font-semibold text-slate-800">{% if active_smtp %}{{ active_smtp.host }}:{{ active_smtp.port }}{% else %}settings.EMAIL_HOST{% endif %}</span>
+        </div>
+        <div class="flex justify-between py-1 border-b border-slate-100">
+          <span class="text-slate-400">RFC 8058 Unsubscribe:</span>
+          <span class="font-semibold text-emerald-600">1-Click Headers Active</span>
+        </div>
+        <div class="flex justify-between py-1">
+          <span class="text-slate-400">Outbox Driver:</span>
+          <span class="font-semibold text-blue-600">Thread Dispatch &amp; Outbox Worker</span>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <a href="{% url 'admin-panel-email-smtp' %}" class="block w-full text-center px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+          <i class="fa-solid fa-wrench mr-1"></i> Configure SMTP Settings
+        </a>
+      </div>
+    </div>
+
+    <!-- Rules & Routing Overview -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+          <i class="fa-solid fa-bolt text-amber-500"></i> Event Triggers &amp; Policies
+        </h3>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+          {{ active_rules_count }} Active Rules
+        </span>
+      </div>
+      
+      <p class="text-xs text-slate-500 leading-relaxed">
+        Event rules automatically bind core procurement, catalog, inquiry, and financial actions to recipients and templates without blocking transactional requests.
+      </p>
+
+      <div class="space-y-2 text-xs">
+        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+          <span class="font-medium text-slate-700">Buyer (Sales) Triggers:</span>
+          <span class="font-bold text-blue-600">RFQs, Quotes, Sourcing Matches</span>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+          <span class="font-medium text-slate-700">Seller (Vendor) Triggers:</span>
+          <span class="font-bold text-emerald-600">New Leads, Inbound Inquiries</span>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+          <span class="font-medium text-slate-700">Financial &amp; Admin:</span>
+          <span class="font-bold text-purple-600">Recharge, Low Balance, Alerts</span>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <a href="{% url 'admin-panel-email-triggers' %}" class="block w-full text-center px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+          <i class="fa-solid fa-sliders mr-1"></i> Manage Event Trigger Matrix
+        </a>
+      </div>
+    </div>
+
+    <!-- Template Inventory -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+          <i class="fa-solid fa-file-lines text-indigo-600"></i> Template Registry
+        </h3>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800">
+          {{ active_templates_count }} Ready
+        </span>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        {% for cat in template_categories %}
+        <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+          <span class="text-slate-600 font-medium">{{ cat.category }}</span>
+          <span class="px-2 py-0.5 rounded-full bg-slate-100 font-bold text-slate-800">{{ cat.count }}</span>
+        </div>
+        {% empty %}
+        <p class="text-slate-400">No templates found.</p>
+        {% endfor %}
+      </div>
+
+      <div class="pt-2">
+        <a href="{% url 'admin-panel-email-templates' %}" class="block w-full text-center px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+          <i class="fa-solid fa-code mr-1"></i> Edit Email Templates &amp; Content
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Deliveries Outbox Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-blue-600"></i> Recent Dispatched Notifications
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">Live audit stream of outgoing platform communications</p>
+      </div>
+      <a href="{% url 'admin-panel-email-logs' %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+        View Complete Outbox Logs &rarr;
+      </a>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="p-3.5">ID / Event</th>
+            <th class="p-3.5">Recipient</th>
+            <th class="p-3.5">Subject</th>
+            <th class="p-3.5">Company</th>
+            <th class="p-3.5">Status</th>
+            <th class="p-3.5">Dispatched At</th>
+            <th class="p-3.5 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700 font-normal">
+          {% for log in recent_logs %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="p-3.5">
+              <span class="font-mono font-bold text-slate-900">#{{ log.id }}</span>
+              <span class="block font-mono text-[10px] text-slate-400">{{ log.event_key }}</span>
+            </td>
+            <td class="p-3.5">
+              <span class="font-semibold text-slate-900">{{ log.recipient_email }}</span>
+              {% if log.recipient_name %}
+              <span class="block text-[10px] text-slate-500">{{ log.recipient_name }}</span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 font-medium text-slate-800 max-w-xs truncate" title="{{ log.subject }}">
+              {{ log.subject }}
+            </td>
+            <td class="p-3.5">
+              {% if log.company %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                  {{ log.company.name|truncatechars:20 }}
+                </span>
+              {% else %}
+                <span class="text-slate-400">Platform</span>
+              {% endif %}
+            </td>
+            <td class="p-3.5">
+              {% if log.status == 'SENT' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-check mr-1"></i> Sent
+                </span>
+              {% elif log.status == 'FAILED' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                  <i class="fa-solid fa-circle-xmark mr-1"></i> Failed
+                </span>
+              {% elif log.status == 'QUEUED' %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                  <i class="fa-solid fa-clock mr-1"></i> Queued
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                  {{ log.status }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 text-slate-500 whitespace-nowrap">
+              {{ log.created_at|date:"d M Y, H:i" }}
+            </td>
+            <td class="p-3.5 text-right whitespace-nowrap">
+              {% if log.status == 'FAILED' %}
+              <form action="{% url 'admin-panel-email-log-retry' log.id %}" method="POST" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-2 py-1 rounded text-[11px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition" title="Retry Transmission">
+                  <i class="fa-solid fa-rotate-right mr-1"></i> Retry
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="p-8 text-center text-slate-400">
+              <i class="fa-solid fa-inbox text-3xl mb-2 text-slate-300"></i>
+              <p class="font-medium">No email notifications dispatched yet.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

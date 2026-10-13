@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}Email Templates — Super Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 mb-3">
+        <i class="fa-solid fa-file-code mr-1.5 text-blue-400"></i> Branded Communication Assets
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Notification Templates</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Customize subjects, responsive HTML layouts, and merge tags for Buyer, Seller, Billing, and Admin alerts.
+      </p>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  {% include "admin_panel/email/nav_tabs.html" %}
+
+  <!-- Filters & Search Toolbar -->
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Category:</span>
+      <a href="{% url 'admin-panel-email-templates' %}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if not selected_category %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        All
+      </a>
+      {% for code, label in categories %}
+      <a href="?category={{ code }}{% if search_query %}&q={{ search_query }}{% endif %}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_category == code %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        {{ label }}
+      </a>
+      {% endfor %}
+    </div>
+
+    <form method="GET" class="flex items-center gap-2">
+      {% if selected_category %}
+      <input type="hidden" name="category" value="{{ selected_category }}">
+      {% endif %}
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search templates..." class="pl-8 pr-3 py-1.5 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-64">
+      </div>
+      <button type="submit" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition">
+        Filter
+      </button>
+      {% if search_query or selected_category %}
+      <a href="{% url 'admin-panel-email-templates' %}" class="px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-800 transition" title="Clear Filters">
+        <i class="fa-solid fa-xmark"></i>
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Templates Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+          <tr>
+            <th class="p-3.5">Category</th>
+            <th class="p-3.5">Template Name / Event Key</th>
+            <th class="p-3.5">Subject Line</th>
+            <th class="p-3.5">Status</th>
+            <th class="p-3.5">Version</th>
+            <th class="p-3.5 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for t in templates %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="p-3.5 whitespace-nowrap">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold {% if t.category == 'BUYER' %}bg-blue-100 text-blue-800{% elif t.category == 'SELLER' %}bg-emerald-100 text-emerald-800{% elif t.category == 'BILLING' %}bg-purple-100 text-purple-800{% elif t.category == 'ADMIN' %}bg-rose-100 text-rose-800{% else %}bg-slate-100 text-slate-800{% endif %}">
+                {{ t.get_category_display }}
+              </span>
+            </td>
+            <td class="p-3.5">
+              <span class="font-bold text-slate-900 block text-xs">{{ t.name }}</span>
+              <code class="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{{ t.event_key }}</code>
+              {% if t.is_system %}
+              <span class="inline-flex items-center text-[10px] font-semibold text-amber-600 ml-1.5" title="System Critical Template">
+                <i class="fa-solid fa-shield-halved mr-0.5"></i> System
+              </span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 font-medium text-slate-800 max-w-sm truncate" title="{{ t.subject }}">
+              {{ t.subject }}
+            </td>
+            <td class="p-3.5 whitespace-nowrap">
+              {% if t.is_active %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <i class="fa-solid fa-circle-check mr-1"></i> Active
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
+                  <i class="fa-solid fa-pause mr-1"></i> Disabled
+                </span>
+              {% endif %}
+            </td>
+            <td class="p-3.5 font-mono text-slate-500">
+              v{{ t.version }}
+            </td>
+            <td class="p-3.5 text-right whitespace-nowrap space-x-1.5">
+              <button onclick="openPreviewModal({{ t.id }}, '{{ t.name|escapejs }}')" class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" title="Preview Rendered Email">
+                <i class="fa-solid fa-eye mr-1 text-slate-500"></i> Preview
+              </button>
+              <button onclick="openTestModal({{ t.id }}, '{{ t.name|escapejs }}')" class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 transition" title="Send Test Email">
+                <i class="fa-solid fa-paper-plane mr-1 text-blue-500"></i> Test
+              </button>
+              <a href="{% url 'admin-panel-email-template-edit' t.id %}" class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition" title="Edit Template">
+                <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="p-8 text-center text-slate-400">
+              <p class="font-medium">No templates match the current filter.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 bg-slate-50">
+      <span>Showing Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="flex items-center gap-1">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">&larr; Prev</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">Next &rarr;</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Modal: Live Preview -->
+<div id="previewModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div id="previewModalBox" class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden transition-all duration-200">
+    <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 gap-4">
+      <div>
+        <h3 id="previewModalTitle" class="font-bold text-sm text-slate-900">Email Preview</h3>
+        <p id="previewModalSubject" class="text-xs text-slate-500 font-medium"></p>
+      </div>
+
+      <!-- Viewport Switcher -->
+      <div class="flex items-center gap-1 bg-slate-200/80 p-1 rounded-xl">
+        <button type="button" onclick="setPreviewViewport('desktop')" id="btnViewportDesktop" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-desktop"></i> Desktop (640px)
+        </button>
+        <button type="button" onclick="setPreviewViewport('mobile')" id="btnViewportMobile" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-mobile-screen"></i> Mobile (375px)
+        </button>
+      </div>
+
+      <button onclick="closePreviewModal()" class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-500">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="p-4 overflow-y-auto flex-1 bg-slate-100">
+      <div id="previewContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 p-2 min-h-[300px]">
+        <div class="flex items-center justify-center h-48 text-slate-400">
+          <i class="fa-solid fa-spinner fa-spin text-2xl mr-2"></i> Rendering preview...
+        </div>
+      </div>
+    </div>
+    <div class="p-3 border-t border-slate-200 bg-white flex justify-end">
+      <button onclick="closePreviewModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 transition">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Test Send -->
+<div id="testModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden">
+    <form id="testSendForm" method="POST" action="">
+      {% csrf_token %}
+      <div class="p-5 border-b border-slate-200 bg-slate-50">
+        <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-paper-plane text-blue-600"></i> Dispatch Test Email
+        </h3>
+        <p id="testModalTemplateName" class="text-xs text-slate-500 mt-0.5"></p>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Recipient Email Address</label>
+          <input type="email" name="target_email" value="{{ request.user.email }}" required class="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <span class="text-[11px] text-slate-400 mt-1 block">Sends a fully rendered test instance using active SMTP settings.</span>
+        </div>
+      </div>
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeTestModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700 transition">
+          Cancel
+        </button>
+        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm">
+          Send Test Email
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openPreviewModal(templateId, templateName) {
+  document.getElementById("previewModalTitle").textContent = templateName;
+  document.getElementById("previewModalSubject").textContent = "Loading preview...";
+  const container = document.getElementById("previewContainer");
+  container.innerHTML = '<div class="flex items-center justify-center h-48 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl mr-2"></i> Rendering preview...</div>';
+  document.getElementById("previewModal").classList.remove("hidden");
+
+  fetch(`/admin-panel/email/templates/${templateId}/preview/`, {
+    method: "POST",
+    headers: {
+      "X-CSRFToken": "{{ csrf_token }}",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === "success") {
+      document.getElementById("previewModalSubject").textContent = "Subject: " + data.subject;
+      const iframe = document.createElement("iframe");
+      iframe.style.width = "100%";
+      iframe.style.height = "600px";
+      iframe.style.border = "none";
+      iframe.style.borderRadius = "8px";
+      iframe.srcdoc = data.html;
+      container.innerHTML = "";
+      container.appendChild(iframe);
+    } else {
+      container.innerHTML = '<p class="text-rose-600 text-center py-8">Failed to generate preview.</p>';
+    }
+  })
+  .catch(err => {
+    container.innerHTML = '<p class="text-rose-600 text-center py-8">Error contacting preview endpoint.</p>';
+  });
+}
+
+function setPreviewViewport(mode) {
+  const modalBox = document.getElementById("previewModalBox");
+  const btnDesktop = document.getElementById("btnViewportDesktop");
+  const btnMobile = document.getElementById("btnViewportMobile");
+  if (mode === "mobile") {
+    modalBox.classList.remove("max-w-2xl");
+    modalBox.classList.add("max-w-[420px]");
+    btnMobile.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm flex items-center gap-1.5 transition";
+    btnDesktop.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition";
+  } else {
+    modalBox.classList.remove("max-w-[420px]");
+    modalBox.classList.add("max-w-2xl");
+    btnDesktop.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm flex items-center gap-1.5 transition";
+    btnMobile.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1.5 transition";
+  }
+}
+
+function closePreviewModal() {
+  document.getElementById("previewModal").classList.add("hidden");
+  setPreviewViewport('desktop');
+}
+
+function openTestModal(templateId, templateName) {
+  document.getElementById("testModalTemplateName").textContent = templateName;
+  document.getElementById("testSendForm").action = `/admin-panel/email/templates/${templateId}/test-send/`;
+  document.getElementById("testModal").classList.remove("hidden");
+}
+
+function closeTestModal() {
+  document.getElementById("testModal").classList.add("hidden");
+}
+</script>
+{% endblock %}

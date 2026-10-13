@@ -663,14 +663,14 @@ def update_support_ticket_view(request, pk):
     Updates status and resolution notes of a support query/ticket.
     Super Admins can update any ticket; Company users can update their company's tickets.
     """
-    if request.method == "POST":
-        selected_company_id = request.session.get("active_company_id")
-        rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
-        if rbac["is_super_admin"]:
-            ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
-        else:
-            ticket = get_object_or_404(SupportTicket, pk=pk, company=rbac["company"], is_deleted=False)
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    if rbac["is_super_admin"]:
+        ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
+    else:
+        ticket = get_object_or_404(SupportTicket, pk=pk, company=rbac["company"], is_deleted=False)
 
+    if request.method == "POST":
         new_status = request.POST.get("status")
         resolution = request.POST.get("resolution", "").strip()
 
@@ -680,20 +680,19 @@ def update_support_ticket_view(request, pk):
             ticket.resolution = resolution
         ticket.save()
 
-        # In-app notification to company members
-        create_notification(
-            user=ticket.user,
-            company=ticket.company,
-            notification_type=Notification.NotificationType.TICKET_UPDATE,
-            title=f"Support Ticket #{ticket.ticket_number} Updated: {ticket.get_status_display()}",
-            message=f"Status: {ticket.get_status_display()}. {resolution or ''}",
-            link="/help/",
-            icon="fa-headset",
-            color="blue",
+        # Dispatches in-app notification and email update to ticket creator
+        notify_support_ticket(
+            ticket,
+            event_type="resolved" if ticket.status in [SupportTicket.Status.RESOLVED, SupportTicket.Status.CLOSED] else "updated",
+            user=request.user,
         )
 
         messages.success(request, f"Ticket #{ticket.ticket_number} status updated to {ticket.get_status_display()}.")
-    return redirect("help-support")
+
+    referer = request.META.get("HTTP_REFERER")
+    if referer and ("admin-panel" in referer or "help" in referer):
+        return redirect(referer)
+    return redirect("admin-panel-support" if rbac["is_super_admin"] else "help-support")
 
 
 @login_required
@@ -726,7 +725,11 @@ def create_faq_view(request):
             messages.success(request, "New FAQ added successfully.")
         else:
             messages.error(request, "Both Question and Answer are required.")
-    return redirect("help-support")
+
+    referer = request.META.get("HTTP_REFERER")
+    if referer and ("admin-panel" in referer or "help" in referer):
+        return redirect(referer)
+    return redirect("admin-panel-support")
 
 
 @login_required
@@ -749,7 +752,11 @@ def edit_faq_view(request, pk):
         faq.is_active = bool(request.POST.get("is_active", True))
         faq.save()
         messages.success(request, f"FAQ '{faq.question[:35]}...' updated successfully.")
-    return redirect("help-support")
+
+    referer = request.META.get("HTTP_REFERER")
+    if referer and ("admin-panel" in referer or "help" in referer):
+        return redirect(referer)
+    return redirect("admin-panel-support")
 
 
 @login_required
@@ -763,7 +770,11 @@ def delete_faq_view(request, pk):
         q_title = faq.question[:35]
         faq.delete()
         messages.success(request, f"FAQ '{q_title}...' deleted.")
-    return redirect("help-support")
+
+    referer = request.META.get("HTTP_REFERER")
+    if referer and ("admin-panel" in referer or "help" in referer):
+        return redirect(referer)
+    return redirect("admin-panel-support")
 
 
 @login_required
@@ -830,9 +841,15 @@ def create_support_ticket_view(request):
             })
 
         messages.success(request, f"Support Ticket {ticket.ticket_number} created successfully! Our engineering team will review it shortly.")
-        return redirect("help-support")
+        referer = request.META.get("HTTP_REFERER")
+        if referer and ("admin-panel" in referer or "help" in referer):
+            return redirect(referer)
+        return redirect("admin-panel-support" if rbac["is_super_admin"] else "help-support")
 
-    return redirect("help-support")
+    referer = request.META.get("HTTP_REFERER")
+    if referer and ("admin-panel" in referer or "help" in referer):
+        return redirect(referer)
+    return redirect("admin-panel-support" if rbac["is_super_admin"] else "help-support")
 
 
 @login_required
@@ -907,7 +924,10 @@ def edit_support_ticket_view(request, pk):
 
         messages.success(request, f"Support Ticket #{ticket.ticket_number} updated successfully.")
 
-    return redirect("help-support")
+    referer = request.META.get("HTTP_REFERER")
+    if referer and ("admin-panel" in referer or "help" in referer):
+        return redirect(referer)
+    return redirect("admin-panel-support" if rbac["is_super_admin"] else "help-support")
 
 
 @login_required
@@ -915,11 +935,11 @@ def delete_support_ticket_view(request, pk):
     """
     Soft-deletes a support ticket (sets is_deleted=True, deleted_at=now).
     """
-    if request.method == "POST":
-        selected_company_id = request.session.get("active_company_id")
-        rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
-        company = rbac["company"]
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
 
+    if request.method == "POST":
         if rbac["is_super_admin"]:
             ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
         else:
@@ -929,7 +949,10 @@ def delete_support_ticket_view(request, pk):
         ticket.soft_delete()
         messages.success(request, f"Support Ticket #{ticket_number} has been deleted successfully.")
 
-    return redirect("help-support")
+    referer = request.META.get("HTTP_REFERER")
+    if referer and ("admin-panel" in referer or "help" in referer):
+        return redirect(referer)
+    return redirect("admin-panel-support" if rbac["is_super_admin"] else "help-support")
 
 
 

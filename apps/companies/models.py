@@ -5,9 +5,9 @@ from django.db import models
 class Company(models.Model):
 
     class CompanyType(models.TextChoices):
-        BUYER = "BUYER", "Buyer"
-        SELLER = "SELLER", "Seller"
-        BOTH = "BOTH", "Buyer & Seller"
+        BUYER = "BUYER", "Sales"
+        SELLER = "SELLER", "Vendor"
+        BOTH = "BOTH", "Sales & Vendor"
 
     class CompanySize(models.TextChoices):
         SMALL_1_10 = "1-10", "1-10"

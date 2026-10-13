@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}AI Search Matching Criteria Governance — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-indigo-400"></i> Platform Super Admin Control Center
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Dynamic AI Search Matching Criteria Governance</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+        Centralized governance engine for AI discovery evaluation parameters. Configure dynamic criteria, domain routing (<span class="text-blue-300 font-semibold">Sales</span> vs <span class="text-orange-300 font-semibold">Vendor</span> vs <span class="text-purple-300 font-semibold">Both</span>), scoring weights, benchmark defaults, and real-time visibility across the entire platform.
+      </p>
+    </div>
+
+    <!-- Quick Action Shortcut Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" onclick="openCreateModal()" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm cursor-pointer">
+        <i class="fa-solid fa-plus-circle mr-1.5"></i> Add New Criterion
+      </button>
+      <form method="POST" action="{% url 'admin-panel-matching-criteria' %}" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reset_defaults">
+        <button type="submit" onclick="return confirm('Restore/verify standard recommended B2B matching parameters? Existing criteria will not be removed.')" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm cursor-pointer" title="Auto-seed missing standard B2B matching parameters">
+          <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Restore Defaults
+        </button>
+      </form>
+      <a href="{% url 'admin-panel-ai-providers' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-purple-400"></i> AI Engines
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Aggregate Metrics -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Criteria</div>
+        <div class="text-2xl font-black text-slate-900">{{ total_criteria }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Configured in platform database</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-sliders"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Active in Real-Time</div>
+        <div class="text-2xl font-black text-emerald-600">{{ active_criteria }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Live in discovery algorithms</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-circle-check"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Sales Domain (Suppliers)</div>
+        <div class="text-2xl font-black text-blue-600">{{ sales_criteria }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Active in Find Suppliers drawer</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-cart-shopping"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Vendor Domain (Buyers)</div>
+        <div class="text-2xl font-black text-orange-600">{{ vendor_criteria }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Active in Find Buyers drawer</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-store"></i>
+      </span>
+    </div>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" action="{% url 'admin-panel-matching-criteria' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <!-- Search Input -->
+      <div class="lg:col-span-2 relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input 
+          type="text" 
+          name="q" 
+          value="{{ q }}" 
+          placeholder="Search criteria name, slug key, benchmark..." 
+          class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+        >
+      </div>
+
+      <!-- Domain Filter -->
+      <div>
+        <select name="domain" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+          <option value="ALL" {% if domain_filter == "ALL" %}selected{% endif %}>All Domains (Universal)</option>
+          <option value="BOTH" {% if domain_filter == "BOTH" %}selected{% endif %}>Both (Sales &amp; Vendor)</option>
+          <option value="SALES" {% if domain_filter == "SALES" %}selected{% endif %}>Sales Only (Find Suppliers)</option>
+          <option value="VENDOR" {% if domain_filter == "VENDOR" %}selected{% endif %}>Vendor Only (Find Buyers)</option>
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div>
+        <select name="status" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+          <option value="all" {% if status_filter == "all" %}selected{% endif %}>All Statuses</option>
+          <option value="active" {% if status_filter == "active" %}selected{% endif %}>Active Only</option>
+          <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>Inactive Only</option>
+        </select>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2">
+        <button type="submit" class="w-full px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs">
+          Filter
+        </button>
+        {% if q or domain_filter != "ALL" or status_filter != "all" or rule_filter != "all" %}
+        <a href="{% url 'admin-panel-matching-criteria' %}" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Clear Filters">
+          <i class="fa-solid fa-xmark"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Matching Criteria Registry Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-base font-black text-slate-900 tracking-tight">Matching Criteria Governance Registry</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Parameters are evaluated in priority sequence during AI company scoring</p>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <span>Showing {{ page_obj.paginator.count }} criteria (Default 10 per page)</span>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4 w-12 text-center">Priority</th>
+            <th class="py-3 px-4">Criterion &amp; Slug Key</th>
+            <th class="py-3 px-4">Target Domain</th>
+            <th class="py-3 px-4">Rule Type &amp; Weight</th>
+            <th class="py-3 px-4">Default Benchmark Value</th>
+            <th class="py-3 px-4 text-center">Status</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700">
+          {% for crit in page_obj %}
+          <tr class="hover:bg-slate-50/70 transition">
+            <!-- Priority Order -->
+            <td class="py-3.5 px-4 text-center font-mono font-bold text-slate-400">
+              #{{ crit.order }}
+            </td>
+
+            <!-- Criterion & Key -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-start gap-3">
+                <span class="w-8 h-8 rounded-xl bg-{{ crit.color }}-100 text-{{ crit.color }}-600 flex items-center justify-center shrink-0 text-xs mt-0.5 shadow-2xs">
+                  <i class="fa-solid {{ crit.icon|default:'fa-sliders' }}"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900 text-xs hover:text-indigo-600 transition">{{ crit.name }}</div>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    <code class="font-mono text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ crit.parameter_key }}</code>
+                  </div>
+                  {% if crit.description %}
+                  <p class="text-[11px] text-slate-500 mt-1 line-clamp-1 max-w-md" title="{{ crit.description }}">{{ crit.description }}</p>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+
+            <!-- Target Domain -->
+            <td class="py-3.5 px-4">
+              {% if crit.target_domain == "BOTH" %}
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                <i class="fa-solid fa-arrows-split-up-and-left text-[9px] mr-1"></i> Both (Sales &amp; Vendor)
+              </span>
+              {% elif crit.target_domain == "SALES" %}
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <i class="fa-solid fa-cart-shopping text-[9px] mr-1"></i> Sales (Find Suppliers)
+              </span>
+              {% elif crit.target_domain == "VENDOR" %}
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                <i class="fa-solid fa-store text-[9px] mr-1"></i> Vendor (Find Buyers)
+              </span>
+              {% else %}
+              <span class="text-slate-400 font-mono text-[10px]">{{ crit.target_domain }}</span>
+              {% endif %}
+            </td>
+
+            <!-- Rule Type & Weight -->
+            <td class="py-3.5 px-4">
+              <div class="space-y-1">
+                <div>
+                  {% if crit.rule_type == "mandatory" %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    <i class="fa-solid fa-shield-halved text-[9px] mr-1"></i> Mandatory
+                  </span>
+                  {% elif crit.rule_type == "bonus" %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <i class="fa-solid fa-plus text-[9px] mr-1"></i> Bonus Boost
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    <i class="fa-solid fa-scale-balanced text-[9px] mr-1"></i> Weighted
+                  </span>
+                  {% endif %}
+                </div>
+                <div class="text-[11px] font-bold text-slate-600">
+                  Weight: <span class="font-mono text-indigo-600">{{ crit.weight_percentage }}%</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Default Benchmark Value -->
+            <td class="py-3.5 px-4 max-w-xs">
+              {% if crit.default_value %}
+              <div class="text-xs text-slate-700 bg-slate-50 border border-slate-200/80 rounded-lg p-2 line-clamp-2" title="{{ crit.default_value }}">
+                {{ crit.default_value }}
+              </div>
+              {% else %}
+              <span class="text-slate-400 italic text-[11px]">No default benchmark specified</span>
+              {% endif %}
+            </td>
+
+            <!-- Status Toggle -->
+            <td class="py-3.5 px-4 text-center">
+              <button 
+                type="button" 
+                onclick="toggleCriteria('{{ crit.id }}', '{{ crit.name|escapejs }}', {{ crit.is_active|lower }})"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition {% if crit.is_active %}bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100{% else %}bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200{% endif %}"
+                title="Click to toggle real-time activation"
+              >
+                <span class="w-1.5 h-1.5 rounded-full {% if crit.is_active %}bg-emerald-500 animate-pulse{% else %}bg-slate-400{% endif %}"></span>
+                <span>{% if crit.is_active %}Active{% else %}Inactive{% endif %}</span>
+              </button>
+            </td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right">
+              <div class="inline-flex items-center gap-1.5">
+                <button 
+                  type="button" 
+                  onclick="openEditModal('{{ crit.id }}', '{{ crit.name|escapejs }}', '{{ crit.parameter_key|escapejs }}', '{{ crit.target_domain }}', '{{ crit.rule_type }}', '{{ crit.weight_percentage }}', '{{ crit.icon|escapejs }}', '{{ crit.color|escapejs }}', '{{ crit.order }}', '{{ crit.default_value|escapejs }}', '{{ crit.description|escapejs }}', {{ crit.is_active|lower }})"
+                  class="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer" 
+                  title="Edit Criterion"
+                >
+                  <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button 
+                  type="button" 
+                  onclick="confirmDelete('{{ crit.id }}', '{{ crit.name|escapejs }}')"
+                  class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer" 
+                  title="Delete Criterion"
+                >
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-12 text-center text-slate-400">
+              <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-lg">
+                <i class="fa-solid fa-sliders"></i>
+              </div>
+              <div class="font-bold text-slate-700 text-sm">No Matching Criteria Found</div>
+              <p class="text-xs text-slate-400 mt-1">Try adjusting your filters or click "Restore Defaults" to populate recommended criteria.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Server-Side Pagination Include (Default 10 items) -->
+    {% include "admin_panel/includes/pagination.html" %}
+  </div>
+
+</div>
+
+<!-- MODAL: ADD NEW CRITERION -->
+<div id="createCriteriaModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-plus-circle"></i>
+        </span>
+        <h3 class="text-base font-bold text-slate-900">Add New Matching Criterion</h3>
+      </div>
+      <button type="button" onclick="closeCreateModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'admin-panel-matching-criteria' %}" class="p-6 space-y-4 overflow-y-auto">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Criterion Name <span class="text-rose-500">*</span></label>
+        <input type="text" name="name" required placeholder="e.g. ISO 9001 Quality Certification" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Parameter Key (Slug)</label>
+          <input type="text" name="parameter_key" placeholder="e.g. iso_certification (auto-generated if blank)" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Target Domain <span class="text-rose-500">*</span></label>
+          <select name="target_domain" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            <option value="BOTH">Both (Sales &amp; Vendor)</option>
+            <option value="SALES">Sales (Find Suppliers)</option>
+            <option value="VENDOR">Vendor (Find Buyers)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Rule Type</label>
+          <select name="rule_type" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            <option value="weighted">Weighted (Scoring %)</option>
+            <option value="mandatory">Mandatory (Must Satisfy)</option>
+            <option value="bonus">Bonus (Boost Points)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Weight Percentage</label>
+          <input type="number" name="weight_percentage" value="10" min="1" max="100" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Display Priority Order</label>
+          <input type="number" name="order" value="10" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">FontAwesome Icon</label>
+          <input type="text" name="icon" value="fa-sliders" placeholder="e.g. fa-certificate, fa-industry" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Accent Badge Color</label>
+          <select name="color" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            <option value="blue">Blue</option>
+            <option value="emerald">Emerald</option>
+            <option value="amber">Amber</option>
+            <option value="indigo">Indigo</option>
+            <option value="purple">Purple</option>
+            <option value="rose">Rose</option>
+            <option value="teal">Teal</option>
+            <option value="slate">Slate</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Default Benchmark Specification</label>
+        <input type="text" name="default_value" placeholder="e.g. ISO 9001:2015, Tier-1 OEM Approved" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Guidance Description</label>
+        <textarea name="description" rows="2" placeholder="Explain the verification criteria evaluated by AI scoring..." class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></textarea>
+      </div>
+
+      <div class="flex items-center gap-2 pt-1">
+        <input type="checkbox" id="create_is_active" name="is_active" value="1" checked class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
+        <label for="create_is_active" class="text-xs font-bold text-slate-700 select-none cursor-pointer">
+          Immediately enable this criterion in active discovery engines
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+        <button type="button" onclick="closeCreateModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer">Cancel</button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition cursor-pointer">Save &amp; Activate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: EDIT CRITERION -->
+<div id="editCriteriaModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </span>
+        <h3 class="text-base font-bold text-slate-900">Edit Matching Criterion</h3>
+      </div>
+      <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'admin-panel-matching-criteria' %}" class="p-6 space-y-4 overflow-y-auto">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="edit">
+      <input type="hidden" id="edit_criteria_id" name="criteria_id" value="">
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Criterion Name <span class="text-rose-500">*</span></label>
+        <input type="text" id="edit_name" name="name" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Parameter Key (Slug)</label>
+          <input type="text" id="edit_parameter_key" disabled class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 text-xs font-mono cursor-not-allowed">
+          <p class="text-[10px] text-slate-400 mt-0.5">Immutable programmatic key identifier</p>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Target Domain <span class="text-rose-500">*</span></label>
+          <select id="edit_target_domain" name="target_domain" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            <option value="BOTH">Both (Sales &amp; Vendor)</option>
+            <option value="SALES">Sales (Find Suppliers)</option>
+            <option value="VENDOR">Vendor (Find Buyers)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Rule Type</label>
+          <select id="edit_rule_type" name="rule_type" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            <option value="weighted">Weighted (Scoring %)</option>
+            <option value="mandatory">Mandatory (Must Satisfy)</option>
+            <option value="bonus">Bonus (Boost Points)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Weight Percentage</label>
+          <input type="number" id="edit_weight_percentage" name="weight_percentage" min="1" max="100" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Display Priority Order</label>
+          <input type="number" id="edit_order" name="order" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">FontAwesome Icon</label>
+          <input type="text" id="edit_icon" name="icon" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Accent Badge Color</label>
+          <select id="edit_color" name="color" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+            <option value="blue">Blue</option>
+            <option value="emerald">Emerald</option>
+            <option value="amber">Amber</option>
+            <option value="indigo">Indigo</option>
+            <option value="purple">Purple</option>
+            <option value="rose">Rose</option>
+            <option value="teal">Teal</option>
+            <option value="slate">Slate</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Default Benchmark Specification</label>
+        <input type="text" id="edit_default_value" name="default_value" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Guidance Description</label>
+        <textarea id="edit_description" name="description" rows="2" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></textarea>
+      </div>
+
+      <div class="flex items-center gap-2 pt-1">
+        <input type="checkbox" id="edit_is_active" name="is_active" value="1" class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+        <label for="edit_is_active" class="text-xs font-bold text-slate-700 select-none cursor-pointer">
+          Active status across platform discovery engines
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+        <button type="button" onclick="closeEditModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer">Cancel</button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md transition cursor-pointer">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- HIDDEN FORM: TOGGLE STATUS -->
+<form id="toggleForm" method="POST" action="{% url 'admin-panel-matching-criteria' %}" style="display: none;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="toggle">
+  <input type="hidden" id="toggle_criteria_id" name="criteria_id" value="">
+</form>
+
+<!-- HIDDEN FORM: DELETE CRITERION -->
+<form id="deleteForm" method="POST" action="{% url 'admin-panel-matching-criteria' %}" style="display: none;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="delete">
+  <input type="hidden" id="delete_criteria_id" name="criteria_id" value="">
+</form>
+
+<script>
+function openCreateModal() {
+  document.getElementById('createCriteriaModal').classList.remove('hidden');
+}
+
+function closeCreateModal() {
+  document.getElementById('createCriteriaModal').classList.add('hidden');
+}
+
+function openEditModal(id, name, key, domain, ruleType, weight, icon, color, order, defaultValue, desc, isActive) {
+  document.getElementById('edit_criteria_id').value = id;
+  document.getElementById('edit_name').value = name;
+  document.getElementById('edit_parameter_key').value = key;
+  document.getElementById('edit_target_domain').value = domain;
+  document.getElementById('edit_rule_type').value = ruleType;
+  document.getElementById('edit_weight_percentage').value = weight;
+  document.getElementById('edit_icon').value = icon;
+  document.getElementById('edit_color').value = color;
+  document.getElementById('edit_order').value = order;
+  document.getElementById('edit_default_value').value = defaultValue;
+  document.getElementById('edit_description').value = desc;
+  document.getElementById('edit_is_active').checked = isActive;
+  document.getElementById('editCriteriaModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  document.getElementById('editCriteriaModal').classList.add('hidden');
+}
+
+function toggleCriteria(id, name, currentlyActive) {
+  const nextState = currentlyActive ? 'deactivate' : 'activate';
+  if (confirm(`Are you sure you want to ${nextState} the matching criterion "${name}"?`)) {
+    document.getElementById('toggle_criteria_id').value = id;
+    document.getElementById('toggleForm').submit();
+  }
+}
+
+function confirmDelete(id, name) {
+  if (confirm(`Are you sure you want to permanently delete the criterion "${name}"? This will remove it from all discovery drawers.`)) {
+    document.getElementById('delete_criteria_id').value = id;
+    document.getElementById('deleteForm').submit();
+  }
+}
+</script>
+{% endblock %}

@@ -52,9 +52,9 @@
       <div>
         <select name="type" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
           <option value="all" {% if type_filter == 'all' %}selected{% endif %}>All Types</option>
-          <option value="BUYER" {% if type_filter == 'BUYER' %}selected{% endif %}>Buyers (Procurement)</option>
-          <option value="SELLER" {% if type_filter == 'SELLER' %}selected{% endif %}>Sellers (Vendors)</option>
-          <option value="BOTH" {% if type_filter == 'BOTH' %}selected{% endif %}>Hybrid (Both)</option>
+          <option value="BUYER" {% if type_filter == 'BUYER' %}selected{% endif %}>Sales (Accounts)</option>
+          <option value="SELLER" {% if type_filter == 'SELLER' %}selected{% endif %}>Vendors</option>
+          <option value="BOTH" {% if type_filter == 'BOTH' %}selected{% endif %}>Hybrid (Sales &amp; Vendor)</option>
         </select>
       </div>
 
@@ -378,7 +378,7 @@
                 <input type="radio" name="company_type" value="BUYER" id="radioTypeBuyer" class="text-blue-600 focus:ring-blue-500">
                 <div>
                   <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Buyer Only
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Sales Only
                   </div>
                   <div class="text-[10px] text-slate-500">Access to procurement requirements, supplier discovery, price comparison, RFQs</div>
                 </div>
@@ -388,7 +388,7 @@
                 <input type="radio" name="company_type" value="SELLER" id="radioTypeSeller" class="text-blue-600 focus:ring-blue-500">
                 <div>
                   <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-purple-500"></span> Seller Only
+                    <span class="w-2 h-2 rounded-full bg-purple-500"></span> Vendor Only
                   </div>
                   <div class="text-[10px] text-slate-500">Access to product catalog, buyer discovery, lead pipeline, inquiry quotes</div>
                 </div>
@@ -398,7 +398,7 @@
                 <input type="radio" name="company_type" value="BOTH" id="radioTypeBoth" class="text-blue-600 focus:ring-blue-500">
                 <div>
                   <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> Dual Buyer &amp; Seller (BOTH)
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> Dual Sales &amp; Vendor (BOTH)
                   </div>
                   <div class="text-[10px] text-slate-500">Enables dynamic workspace switching and combined platform analytics</div>
                 </div>

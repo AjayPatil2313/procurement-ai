@@ -17,11 +17,13 @@ from apps.ai_search.models import (
     ensure_default_parameters_for_company,
 )
 from apps.ai_search.services.pipeline import run_find_suppliers_search
+from apps.billing.services.wallet import CompanyWalletService, CreditWalletService
 from apps.catalog.models import Category
 from apps.catalog.web_views import (
     STATIC_CRITERIA_METADATA,
     STATIC_CRITERIA_KEYS,
     _sync_company_matching_criteria,
+    get_criteria_metadata_for_domain,
 )
 from apps.companies.rbac import get_user_rbac_context, module_permission_required
 from apps.leads.models import SavedItem
@@ -136,8 +138,15 @@ def requirements_list_view(request):
     total_count = queryset.count()
     categories = Category.objects.all().order_by("name")
 
-    # Server-side pagination (20 items per page)
-    paginator = Paginator(queryset.order_by("-created_at"), 20)
+    # Server-side pagination (default 10 items per page)
+    per_page = 10
+    requested_per_page = request.GET.get("per_page")
+    if requested_per_page:
+        try:
+            per_page = max(5, min(100, int(requested_per_page)))
+        except ValueError:
+            pass
+    paginator = Paginator(queryset.order_by("-created_at"), per_page)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
@@ -646,6 +655,29 @@ def requirement_create_view(request):
             is_deleted=False,
         )
 
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            trigger_email_notification(
+                event_key="buyer.requirement_created",
+                company=company,
+                user=request.user,
+                context={
+                    "requirement_title": req.item_name,
+                    "category": req.category.name if req.category else "General Category",
+                    "quantity": f"{req.quantity} {req.unit}",
+                    "cta_url": request.build_absolute_uri(reverse("requirement-detail", kwargs={"pk": req.id})),
+                    "details": {
+                        "Requirement": req.item_name,
+                        "Category": req.category.name if req.category else "General",
+                        "Quantity": f"{req.quantity} {req.unit}",
+                        "Delivery City": f"{req.delivery_city}, {req.delivery_country}",
+                    },
+                },
+                idempotency_key=f"req_create_{req.id}",
+            )
+        except Exception as exc:
+            pass
+
         messages.success(request, f"Product '{req.item_name}' added successfully!")
         return redirect("requirement-detail", pk=req.id)
 
@@ -834,7 +866,7 @@ def find_suppliers_view(request):
 
     # AJAX criteria save action
     if request.method == "POST" and request.POST.get("action") == "save_criteria":
-        active_params = _sync_company_matching_criteria(company, request.POST)
+        active_params = _sync_company_matching_criteria(company, request.POST, domain="SALES")
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({
                 "success": True,
@@ -850,7 +882,7 @@ def find_suppliers_view(request):
     # Handle search initiation via POST or GET ?run_search=1
     if request.method == "POST" and request.POST.get("action") == "run_search":
         if request.POST.get("has_criteria_payload") == "1":
-            _sync_company_matching_criteria(company, request.POST)
+            _sync_company_matching_criteria(company, request.POST, domain="SALES")
 
         req_id = request.POST.get("requirement_id")
         target_req = Requirement.objects.filter(id=req_id, company=company, is_deleted=False).first()
@@ -899,9 +931,42 @@ def find_suppliers_view(request):
             job = run_find_suppliers_search(target_req, request.user, company)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="admin.ai_provider_error",
+                        context={
+                            "service_name": "Supplier Discovery Pipeline",
+                            "error_message": job.error_message,
+                            "cta_url": request.build_absolute_uri("/admin-panel/ai-providers/"),
+                        },
+                        severity="CRITICAL",
+                    )
+                except Exception:
+                    pass
             else:
                 deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
                 messages.success(request, f"Search completed: Identified {job.total_results} suppliers for '{target_req.item_name}'. ({deduction_notice})")
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="buyer.search_completed",
+                        company=company,
+                        user=request.user,
+                        context={
+                            "query_title": target_req.item_name,
+                            "count": str(job.total_results),
+                            "cta_url": request.build_absolute_uri(f"{reverse('find-suppliers')}?requirement_id={target_req.id}"),
+                            "details": {
+                                "Requirement": target_req.item_name,
+                                "Suppliers Discovered": str(job.total_results),
+                                "Billing Method": deduction_notice,
+                            },
+                        },
+                        idempotency_key=f"search_supp_{job.id}",
+                    )
+                except Exception:
+                    pass
             return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
 
     results_qs = SearchResult.objects.filter(
@@ -931,8 +996,11 @@ def find_suppliers_view(request):
     ensure_default_parameters_for_company(company)
     all_params = {p.parameter_key: p for p in MatchingParameter.objects.filter(company=company)} if company else {}
 
+    criteria_meta = get_criteria_metadata_for_domain("SALES")
+    criteria_keys = {m["key"] for m in criteria_meta}
+
     static_criteria_list = []
-    for meta in STATIC_CRITERIA_METADATA:
+    for meta in criteria_meta:
         p = all_params.get(meta["key"])
         val = p.criteria_value if (p and p.criteria_value) else meta["default_value"]
         is_checked = p.is_active if p else True
@@ -944,7 +1012,7 @@ def find_suppliers_view(request):
 
     custom_criteria_list = []
     if company:
-        custom_params = MatchingParameter.objects.filter(company=company).exclude(parameter_key__in=STATIC_CRITERIA_KEYS)
+        custom_params = MatchingParameter.objects.filter(company=company).exclude(parameter_key__in=criteria_keys)
         for cp in custom_params:
             custom_criteria_list.append({
                 "id": cp.id,

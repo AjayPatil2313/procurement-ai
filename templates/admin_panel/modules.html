@@ -13,17 +13,17 @@
       </div>
       <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Platform Module &amp; Feature Management</h1>
       <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
-        Centralized governance matrix across Buyer, Seller, and Hybrid (Both) modules. Super Admin controls module availability, minimum subscription tiers, credit deductions, and supported CRUD/Import/Export operations.
+        Centralized governance matrix across Sales, Vendor, and Hybrid (Both) modules. Super Admin controls module availability, minimum subscription tiers, credit deductions, and supported CRUD/Import/Export operations.
       </p>
     </div>
 
     <!-- Quick Action Shortcut Buttons -->
     <div class="flex flex-wrap items-center gap-2">
       <a href="{% url 'admin-panel-buyer-dashboard' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm">
-        <i class="fa-solid fa-cart-shopping mr-1.5"></i> Buyer Matrix
+        <i class="fa-solid fa-cart-shopping mr-1.5"></i> Sales Matrix
       </a>
       <a href="{% url 'admin-panel-seller-dashboard' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
-        <i class="fa-solid fa-bullhorn mr-1.5"></i> Seller Matrix
+        <i class="fa-solid fa-bullhorn mr-1.5"></i> Vendor Matrix
       </a>
       <a href="{% url 'admin-panel-both-dashboard' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-sm">
         <i class="fa-solid fa-arrows-split-up-and-left mr-1.5"></i> Both Matrix
@@ -89,11 +89,11 @@
         <a href="?tab=all{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'all' %}bg-slate-900 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
           All Modules ({{ total_modules }})
         </a>
-        <a href="?tab=buyer{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'buyer' %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-          Buyer Only
+        <a href="?tab=sales{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'sales' or tab == 'buyer' %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+          Sales Only
         </a>
-        <a href="?tab=seller{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'seller' %}bg-emerald-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-          Seller Only
+        <a href="?tab=vendor{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'vendor' or tab == 'seller' %}bg-emerald-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+          Vendor Only
         </a>
       </div>
 

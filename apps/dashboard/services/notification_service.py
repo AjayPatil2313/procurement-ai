@@ -78,7 +78,7 @@ def notify_proposal_sent(inquiry, user=None):
         icon = "fa-paper-plane"
         color = "blue"
 
-    return create_notification(
+    notifs = create_notification(
         user=user,
         company=company,
         notification_type=Notification.NotificationType.PROPOSAL_SENT,
@@ -89,6 +89,33 @@ def notify_proposal_sent(inquiry, user=None):
         color=color,
         notify_company_members=True,
     )
+
+    try:
+        from apps.notifications.services.email_engine import trigger_email_notification
+        event_key = "seller.inquiry_reply" if is_seller else "buyer.rfq_dispatched"
+        trigger_email_notification(
+            event_key=event_key,
+            company=company,
+            user=user,
+            context={
+                "inquiry_id": str(inquiry.id),
+                "supplier_name": target_company,
+                "product_name": product_title,
+                "buyer_company": company.name if is_seller else target_company,
+                "quantity": str(getattr(inquiry, "quantity", "1")),
+                "cta_url": link,
+                "details": {
+                    "Inquiry #": str(inquiry.id),
+                    "Product / Requirement": product_title,
+                    "Recipient": f"{target_company} ({inquiry.sent_to_email})",
+                },
+            },
+            idempotency_key=f"inq_prop_{inquiry.id}_{inquiry.updated_at.timestamp() if hasattr(inquiry, 'updated_at') else 1}",
+        )
+    except Exception as exc:
+        logger.warning(f"Failed to trigger email notification for proposal: {exc}")
+
+    return notifs
 
 
 def notify_quote_recorded(inquiry, user=None):
@@ -110,7 +137,7 @@ def notify_quote_recorded(inquiry, user=None):
     link_name = "sales-inquiry-detail" if is_seller else "inquiry-detail"
     link = reverse(link_name, kwargs={"pk": inquiry.id})
 
-    return create_notification(
+    notifs = create_notification(
         user=user,
         company=company,
         notification_type=Notification.NotificationType.QUOTE_RECEIVED,
@@ -121,6 +148,32 @@ def notify_quote_recorded(inquiry, user=None):
         color="emerald",
         notify_company_members=True,
     )
+
+    try:
+        from apps.notifications.services.email_engine import trigger_email_notification
+        trigger_email_notification(
+            event_key="buyer.quote_received",
+            company=company,
+            user=user,
+            context={
+                "inquiry_id": str(inquiry.id),
+                "supplier_name": target_company,
+                "product_name": product_title,
+                "quoted_price": price_str,
+                "moq": str(getattr(inquiry, "minimum_order_quantity", "1")),
+                "cta_url": link,
+                "details": {
+                    "Supplier": target_company,
+                    "Item": product_title,
+                    "Commercial Quote": price_str,
+                },
+            },
+            idempotency_key=f"inq_quote_{inquiry.id}_{inquiry.updated_at.timestamp() if hasattr(inquiry, 'updated_at') else 1}",
+        )
+    except Exception as exc:
+        logger.warning(f"Failed to trigger quote email: {exc}")
+
+    return notifs
 
 
 def notify_status_changed(inquiry, old_status_display, user=None):
@@ -155,7 +208,7 @@ def notify_status_changed(inquiry, old_status_display, user=None):
         icon = "fa-arrows-rotate"
         color = "blue"
 
-    return create_notification(
+    notifs = create_notification(
         user=user,
         company=company,
         notification_type=notif_type,
@@ -166,6 +219,32 @@ def notify_status_changed(inquiry, old_status_display, user=None):
         color=color,
         notify_company_members=True,
     )
+
+    try:
+        from apps.notifications.services.email_engine import trigger_email_notification
+        event_key = "seller.deal_status_changed" if is_seller else "buyer.deal_status_changed"
+        trigger_email_notification(
+            event_key=event_key,
+            company=company,
+            user=user,
+            context={
+                "inquiry_id": str(inquiry.id),
+                "counterparty_name": target_company,
+                "status_label": inquiry.get_status_display(),
+                "remarks": msg,
+                "cta_url": link,
+                "details": {
+                    "Inquiry #": str(inquiry.id),
+                    "Counterparty": target_company,
+                    "Current Stage": inquiry.get_status_display(),
+                },
+            },
+            idempotency_key=f"inq_status_{inquiry.id}_{inquiry.status}",
+        )
+    except Exception as exc:
+        logger.warning(f"Failed to trigger status change email: {exc}")
+
+    return notifs
 
 
 def notify_message_logged(inquiry, inquiry_msg, user=None):
@@ -201,7 +280,10 @@ def notify_message_logged(inquiry, inquiry_msg, user=None):
 
 
 def notify_support_ticket(ticket, event_type="created", user=None):
-    """Triggered when a support ticket is created or updated."""
+    """
+    Triggered when a support ticket is created or updated.
+    Notifies the ticket owner, active Super Admins, and triggers branded email notifications.
+    """
     company = ticket.company
     link = reverse("help-ticket-detail", kwargs={"pk": ticket.id})
 
@@ -221,7 +303,8 @@ def notify_support_ticket(ticket, event_type="created", user=None):
         icon = "fa-headset"
         color = "purple"
 
-    return create_notification(
+    # 1. In-app notification to ticket owner
+    notifs = create_notification(
         user=user or ticket.user,
         company=company,
         notification_type=Notification.NotificationType.TICKET_UPDATE,
@@ -232,3 +315,110 @@ def notify_support_ticket(ticket, event_type="created", user=None):
         color=color,
         notify_company_members=False,
     )
+
+    # 2. In-app notification to all active Super Admins when a new ticket is filed
+    if event_type == "created":
+        try:
+            from apps.accounts.models import User
+            from django.db.models import Q
+            super_admins = User.objects.filter(Q(is_superuser=True) | Q(is_staff=True), is_active=True)
+            for sa in super_admins:
+                if sa != (user or ticket.user):
+                    create_notification(
+                        user=sa,
+                        company=None,
+                        notification_type=Notification.NotificationType.TICKET_UPDATE,
+                        title=f"Support Ticket #{ticket.ticket_number} Received",
+                        message=f"[{ticket.company.name if ticket.company else 'Customer'}] {ticket.subject} ({ticket.get_priority_display()} priority)",
+                        link=reverse("admin-panel-support"),
+                        icon="fa-headset",
+                        color="rose" if ticket.priority == "URGENT" else "blue",
+                    )
+        except Exception as exc:
+            logger.warning(f"Failed to create superadmin notifications for ticket: {exc}")
+
+    # 3. Automated Branded Email Alerts
+    try:
+        from apps.notifications.services.email_engine import trigger_email_notification
+        if event_type == "created":
+            # Alert Super Admins / Platform
+            trigger_email_notification(
+                event_key="admin.ticket_filed",
+                company=company,
+                user=user or ticket.user,
+                context={
+                    "ticket_number": ticket.ticket_number,
+                    "ticket_subject": ticket.subject,
+                    "priority": ticket.get_priority_display(),
+                    "category": ticket.get_category_display(),
+                    "company_name": ticket.company.name if ticket.company else "Direct Account",
+                    "contact_email": ticket.contact_email,
+                    "contact_phone": ticket.contact_phone or "N/A",
+                    "description": ticket.description,
+                    "cta_url": reverse("admin-panel-support"),
+                    "cta_text": "Open Support Desk",
+                    "summary": f"Inbound support ticket #{ticket.ticket_number} logged under {ticket.get_category_display()}.",
+                    "details": {
+                        "Ticket #": ticket.ticket_number,
+                        "Company": ticket.company.name if ticket.company else "Direct Account",
+                        "Category": ticket.get_category_display(),
+                        "Priority": ticket.get_priority_display(),
+                        "Contact Email": ticket.contact_email,
+                        "Subject": ticket.subject,
+                    },
+                },
+                idempotency_key=f"tkt_create_admin_{ticket.id}",
+            )
+            # Confirmation to Ticket Creator
+            trigger_email_notification(
+                event_key="company.ticket_created",
+                company=company,
+                user=ticket.user,
+                context={
+                    "ticket_number": ticket.ticket_number,
+                    "ticket_subject": ticket.subject,
+                    "priority": ticket.get_priority_display(),
+                    "category": ticket.get_category_display(),
+                    "status": ticket.get_status_display(),
+                    "contact_email": ticket.contact_email,
+                    "cta_url": reverse("help-support"),
+                    "cta_text": "View Support Ticket",
+                    "summary": f"Your support ticket #{ticket.ticket_number} has been received and logged.",
+                    "details": {
+                        "Ticket #": ticket.ticket_number,
+                        "Subject": ticket.subject,
+                        "Category": ticket.get_category_display(),
+                        "Priority": ticket.get_priority_display(),
+                        "Status": ticket.get_status_display(),
+                    },
+                },
+                idempotency_key=f"tkt_create_user_{ticket.id}",
+            )
+        else:
+            # Ticket Status / Resolution Update to Creator
+            event_key = "company.ticket_resolved" if event_type == "resolved" else "company.ticket_updated"
+            trigger_email_notification(
+                event_key=event_key,
+                company=company,
+                user=ticket.user,
+                context={
+                    "ticket_number": ticket.ticket_number,
+                    "ticket_subject": ticket.subject,
+                    "status": ticket.get_status_display(),
+                    "resolution": ticket.resolution or "Updated by platform operations team.",
+                    "cta_url": reverse("help-support"),
+                    "cta_text": "View Support Ticket",
+                    "summary": f"Your support ticket #{ticket.ticket_number} status has been updated to {ticket.get_status_display()}.",
+                    "details": {
+                        "Ticket #": ticket.ticket_number,
+                        "Subject": ticket.subject,
+                        "Current Status": ticket.get_status_display(),
+                        "Resolution Notes": ticket.resolution or "In progress",
+                    },
+                },
+                idempotency_key=f"tkt_status_{ticket.id}_{ticket.status}",
+            )
+    except Exception as exc:
+        logger.warning(f"Failed to dispatch email notification for support ticket: {exc}")
+
+    return notifs

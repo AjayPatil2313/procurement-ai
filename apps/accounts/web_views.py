@@ -166,6 +166,49 @@ def register_view(request):
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         request.session["active_company_id"] = company.id
 
+        # Automated Email Notifications
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            # Welcome email to the newly registered user
+            trigger_email_notification(
+                event_key="auth.welcome_registration",
+                company=company,
+                user=user,
+                context={
+                    "user_name": user.get_full_name() or user.first_name,
+                    "company_name": company.name,
+                    "cta_url": request.build_absolute_uri("/dashboard/"),
+                    "details": {
+                        "Workspace": company.name,
+                        "Company Type": company.get_company_type_display(),
+                        "Registered Email": user.email,
+                    },
+                },
+                idempotency_key=f"welcome_{user.id}",
+            )
+            # Platform alert to Super Admins
+            trigger_email_notification(
+                event_key="admin.company_registered",
+                company=company,
+                user=user,
+                context={
+                    "company_name": company.name,
+                    "company_type": company.get_company_type_display(),
+                    "contact_email": user.email,
+                    "registered_at": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "cta_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
+                    "details": {
+                        "Company Name": company.name,
+                        "Type": company.get_company_type_display(),
+                        "Admin Contact": f"{user.get_full_name()} ({user.email})",
+                        "City / Country": f"{company.city}, {company.country}",
+                    },
+                },
+                idempotency_key=f"admin_reg_{company.id}",
+            )
+        except Exception as exc:
+            pass
+
         messages.success(
             request,
             f"Welcome to AI Procurement & Sales Platform, {user.first_name}! Your company workspace '{company.name}' is now active."
@@ -215,21 +258,35 @@ def forgot_password_view(request):
             email_sent = True
 
             try:
-                send_mail(
-                    subject="Reset your Procurement AI password",
-                    message=(
-                        f"Hello {user.first_name or 'User'},\n\n"
-                        f"We received a request to reset your password. Use the link below to set a new password:\n\n"
-                        f"{reset_url}\n\n"
-                        f"This link is valid for 1 hour.\n\n"
-                        f"If you did not request this, please ignore this email."
-                    ),
-                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@procurement.ai"),
-                    recipient_list=[user.email],
-                    fail_silently=True,
+                from apps.notifications.services.email_engine import trigger_email_notification
+                trigger_email_notification(
+                    event_key="auth.password_reset",
+                    user=user,
+                    context={
+                        "user_name": user.get_full_name() or user.first_name,
+                        "reset_url": reset_url,
+                        "platform_name": "AI Procurement & Sales Platform",
+                        "cta_url": reset_url,
+                    },
+                    severity="CRITICAL",
                 )
             except Exception:
-                pass
+                try:
+                    send_mail(
+                        subject="Reset your Procurement AI password",
+                        message=(
+                            f"Hello {user.first_name or 'User'},\n\n"
+                            f"We received a request to reset your password. Use the link below to set a new password:\n\n"
+                            f"{reset_url}\n\n"
+                            f"This link is valid for 1 hour.\n\n"
+                            f"If you did not request this, please ignore this email."
+                        ),
+                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@procurement.ai"),
+                        recipient_list=[user.email],
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
 
             messages.success(
                 request,

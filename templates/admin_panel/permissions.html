@@ -11,33 +11,40 @@
       <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-3">
         <i class="fa-solid fa-crown mr-1.5 text-indigo-400"></i> Platform Super Admin Control Center
       </div>
-      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Module-Wise Permissions Matrix</h1>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Dynamic Module-Wise Permissions Matrix Registry</h1>
       <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
-        Inspect and govern granular access rights across all platform modules. Permissions control fine-grained capability checks for view, create, edit, update, delete, search, and export operations.
+        Live RBAC capability governance engine. Inspect, register, configure, and synchronize fine-grained action tokens (<code class="font-mono text-indigo-300">&lt;module&gt;:&lt;action&gt;</code>) across all platform modules and workspaces.
       </p>
     </div>
 
     <!-- Quick Action Shortcut Buttons -->
     <div class="flex flex-wrap items-center gap-2">
-      <a href="{% url 'admin-panel-roles' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
-        <i class="fa-solid fa-user-shield mr-1.5"></i> Manage Company Roles
+      <button type="button" onclick="openRegisterModal()" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm cursor-pointer">
+        <i class="fa-solid fa-plus-circle mr-1.5"></i> Register Token
+      </button>
+      <form method="POST" action="{% url 'admin-panel-permissions' %}" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="sync_all">
+        <button type="submit" onclick="return confirm('Synchronize standard capability tokens (READ, EDIT, UPDATE, DELETE, IMPORT, EXPORT) across all registered platform modules?')" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm cursor-pointer" title="Auto-seed missing standard tokens across all modules">
+          <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Sync Standard Tokens
+        </button>
+      </form>
+      <a href="{% url 'admin-panel-roles' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-user-shield mr-1.5 text-amber-400"></i> Manage Roles
       </a>
       <a href="{% url 'admin-panel-modules' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
         <i class="fa-solid fa-cubes mr-1.5 text-indigo-400"></i> Modules Matrix
-      </a>
-      <a href="{% url 'admin-panel-users' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
-        <i class="fa-solid fa-users mr-1.5 text-blue-400"></i> Users Directory
       </a>
     </div>
   </div>
 
   <!-- Primary Aggregate Metrics -->
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
     <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
         <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Defined Permissions</div>
         <div class="text-2xl font-black text-slate-900">{{ total_perms }}</div>
-        <div class="text-[11px] text-slate-500 mt-1">Granular module operations</div>
+        <div class="text-[11px] text-slate-500 mt-1">Granular action tokens</div>
       </div>
       <span class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
         <i class="fa-solid fa-key"></i>
@@ -46,9 +53,20 @@
 
     <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Active Modules</div>
+        <div class="text-2xl font-black text-indigo-600">{{ total_modules }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Platform domains governed</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-layer-group"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
         <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Configured Roles</div>
         <div class="text-2xl font-black text-blue-600">{{ total_roles }}</div>
-        <div class="text-[11px] text-slate-500 mt-1">Tenant custom roles</div>
+        <div class="text-[11px] text-slate-500 mt-1">Tenant custom &amp; system roles</div>
       </div>
       <span class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
         <i class="fa-solid fa-id-badge"></i>
@@ -59,7 +77,7 @@
       <div>
         <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Active User Grants</div>
         <div class="text-2xl font-black text-emerald-600">{{ total_assignments }}</div>
-        <div class="text-[11px] text-slate-500 mt-1">Member-level overrides</div>
+        <div class="text-[11px] text-slate-500 mt-1">Member-level token assignments</div>
       </div>
       <span class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
         <i class="fa-solid fa-user-check"></i>
@@ -67,94 +85,321 @@
     </div>
   </div>
 
-  <!-- RBAC Architecture Reference -->
+  <!-- Dynamic Roles & Responsibilities Reference -->
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
     <div class="flex items-start gap-3.5 mb-4">
       <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 text-sm mt-0.5">
         <i class="fa-solid fa-diagram-project"></i>
       </span>
       <div>
-        <h3 class="text-sm font-bold text-slate-900">Standard Platform Roles &amp; Responsibilities</h3>
-        <p class="text-xs text-slate-500">Built-in role taxonomy enforced at controller and API layer</p>
+        <h3 class="text-sm font-bold text-slate-900">Standard Platform Roles &amp; Responsibilities Taxonomy</h3>
+        <p class="text-xs text-slate-500">Live hierarchical role taxonomy enforced at middleware and API controllers</p>
       </div>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
-          <span class="w-2 h-2 rounded-full bg-red-500"></span> Super Admin
-        </div>
-        <div class="text-[11px] text-slate-600">Unrestricted governance over all tenants, modules, wallets, and system settings.</div>
-      </div>
-
-      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
-          <span class="w-2 h-2 rounded-full bg-blue-500"></span> Company Admin
-        </div>
-        <div class="text-[11px] text-slate-600">Full administrative management over company profile, team, roles, billing &amp; recharges.</div>
-      </div>
-
-      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
-          <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Procurement Specialist
-        </div>
-        <div class="text-[11px] text-slate-600">Buyer focused: Posts requirements, runs supplier searches, dispatches inquiries &amp; RFQs.</div>
-      </div>
-
-      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Sales Executive
-        </div>
-        <div class="text-[11px] text-slate-600">Seller focused: Catalog management, runs find-buyer jobs, negotiates inquiries and leads.</div>
-      </div>
-
-      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
-          <span class="w-2 h-2 rounded-full bg-slate-400"></span> Viewer (Read-Only)
-        </div>
-        <div class="text-[11px] text-slate-600">Restricted read-only access to dashboard and reports without credit consumption permissions.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Module-Wise Permissions Grid -->
-  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="p-5 border-b border-slate-200 flex items-center justify-between">
-      <div>
-        <h3 class="text-base font-bold text-slate-900">Module Permissions Matrix Registry</h3>
-        <p class="text-xs text-slate-500">Supported fine-grained action tokens per functional domain</p>
-      </div>
-      <span class="text-xs text-slate-400 font-medium">Checked against <code class="font-mono text-indigo-600">&lt;module&gt;:&lt;action&gt;</code></span>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 p-2">
-      {% for module_name, perms_list in modules_grouped.items %}
-      <div class="p-4 hover:bg-slate-50/60 transition rounded-xl">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2">
-            <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-layer-group"></i>
-            </span>
-            <div class="font-bold text-slate-900 text-xs capitalize">{{ module_name }}</div>
+      {% for role in system_roles %}
+      <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition flex flex-col justify-between">
+        <div>
+          <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+            <span class="w-2 h-2 rounded-full {% if role.badge_color == 'rose' %}bg-rose-500{% elif role.badge_color == 'blue' %}bg-blue-500{% elif role.badge_color == 'indigo' %}bg-indigo-500{% elif role.badge_color == 'emerald' %}bg-emerald-500{% else %}bg-slate-400{% endif %}"></span>
+            {{ role.name }}
           </div>
-          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-            {{ perms_list|length }} actions
-          </span>
+          <p class="text-[11px] text-slate-600 leading-relaxed">{{ role.description }}</p>
         </div>
-
-        <div class="flex flex-wrap gap-1.5">
-          {% for perm in perms_list %}
-          <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-mono font-medium {% if perm == 'READ' %}bg-blue-50 text-blue-700 border border-blue-200{% elif perm == 'CREATE' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif perm == 'UPDATE' or perm == 'EDIT' %}bg-amber-50 text-amber-700 border border-amber-200{% elif perm == 'DELETE' %}bg-rose-50 text-rose-700 border border-rose-200{% elif perm == 'EXPORT' or perm == 'IMPORT' %}bg-purple-50 text-purple-700 border border-purple-200{% elif perm == 'SEARCH' %}bg-teal-50 text-teal-700 border border-teal-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
-            {{ perm }}
-          </span>
-          {% endfor %}
+        <div class="mt-3 pt-2 border-t border-slate-200/80 flex items-center justify-between text-[10px]">
+          <span class="text-slate-400 font-medium">Scope:</span>
+          <span class="font-bold text-slate-700">{{ role.scope }}</span>
         </div>
       </div>
-      {% empty %}
-      <div class="col-span-3 text-center py-8 text-slate-400 text-xs">No module permissions currently registered in database.</div>
       {% endfor %}
     </div>
+
+    {% if custom_roles %}
+    <div class="mt-4 pt-4 border-t border-slate-100">
+      <div class="text-xs font-bold text-slate-700 mb-2 flex items-center gap-2">
+        <i class="fa-solid fa-users-gear text-indigo-600 text-[11px]"></i>
+        <span>Tenant-Specific Custom Roles ({{ custom_roles|length }})</span>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {% for cr in custom_roles %}
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200" title="{{ cr.company.name }}: {{ cr.description }}">
+          <i class="fa-solid fa-shield text-[10px] text-blue-500"></i>
+          <strong>{{ cr.name }}</strong>
+          <span class="text-[10px] text-slate-500 font-normal">({{ cr.company.name }})</span>
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Search & Filter Controls -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-bold text-slate-700 mr-2">Filter by Domain:</span>
+      <a href="?category=all{% if q %}&q={{ q }}{% endif %}" class="px-3 py-1 rounded-xl text-xs font-bold transition {% if category_filter == 'all' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+        All ({{ total_modules }})
+      </a>
+      <a href="?category=sales{% if q %}&q={{ q }}{% endif %}" class="px-3 py-1 rounded-xl text-xs font-bold transition {% if category_filter == 'sales' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+        Sales
+      </a>
+      <a href="?category=vendor{% if q %}&q={{ q }}{% endif %}" class="px-3 py-1 rounded-xl text-xs font-bold transition {% if category_filter == 'vendor' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+        Vendor
+      </a>
+      <a href="?category=shared{% if q %}&q={{ q }}{% endif %}" class="px-3 py-1 rounded-xl text-xs font-bold transition {% if category_filter == 'shared' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+        Shared
+      </a>
+      <a href="?category=admin{% if q %}&q={{ q }}{% endif %}" class="px-3 py-1 rounded-xl text-xs font-bold transition {% if category_filter == 'admin' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+        Admin &amp; Billing
+      </a>
+    </div>
+
+    <form method="GET" class="flex items-center gap-2">
+      <input type="hidden" name="category" value="{{ category_filter }}">
+      <input type="text" name="q" value="{{ q }}" placeholder="Search module name or capability..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-64">
+      <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
+      {% if q %}
+      <a href="?category={{ category_filter }}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Dynamic Module Permissions Matrix Registry Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Module Permissions Matrix Registry</h3>
+        <p class="text-xs text-slate-500">Live matrix mapping platform functional domains to fine-grained security capability tokens</p>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <i class="fa-solid fa-check text-[10px]"></i> Active Token
+        </span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+          <i class="fa-solid fa-minus text-[10px]"></i> Not Registered
+        </span>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-600 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4 min-w-[200px]">Functional Module</th>
+            <th class="py-3 px-3 text-center">READ</th>
+            <th class="py-3 px-3 text-center">EDIT</th>
+            <th class="py-3 px-3 text-center">UPDATE</th>
+            <th class="py-3 px-3 text-center">DELETE</th>
+            <th class="py-3 px-3 text-center">IMPORT</th>
+            <th class="py-3 px-3 text-center">EXPORT</th>
+            <th class="py-3 px-3 text-center">Custom Tokens</th>
+            <th class="py-3 px-3 text-center">Grants</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for row in page_obj %}
+          <tr class="hover:bg-slate-50/80 transition">
+            <!-- Module Title & Meta -->
+            <td class="py-3.5 px-4 font-bold text-slate-900">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 text-xs">
+                  <i class="fa-solid {{ row.icon }}"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    {{ row.title }}
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold {% if row.category == 'Sales' %}bg-blue-50 text-blue-700 border border-blue-200{% elif row.category == 'Vendor' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif row.category == 'Admin' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-purple-50 text-purple-700 border border-purple-200{% endif %}">
+                      {{ row.category }}
+                    </span>
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-mono mt-0.5">
+                    <code>{{ row.module }}</code> &bull; {{ row.total_perms }} tokens
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Standard Capability Columns (READ, EDIT, UPDATE, DELETE, IMPORT, EXPORT) -->
+            {% for act in row.actions %}
+            <td class="py-3.5 px-3 text-center">
+              {% if act.is_active %}
+                <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold {% if act.action == 'READ' %}bg-blue-50 text-blue-700 border border-blue-200{% elif act.action == 'EDIT' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif act.action == 'UPDATE' %}bg-amber-50 text-amber-700 border border-amber-200{% elif act.action == 'DELETE' %}bg-rose-50 text-rose-700 border border-rose-200{% elif act.action == 'IMPORT' %}bg-purple-50 text-purple-700 border border-purple-200{% else %}bg-indigo-50 text-indigo-700 border border-indigo-200{% endif %} group relative">
+                  <i class="fa-solid fa-check text-[9px]"></i>
+                  <span>{{ act.action }}</span>
+                  {% if act.assignments_count > 0 %}
+                  <span class="text-[9px] px-1 rounded-full bg-white/90 text-slate-700 font-sans font-bold" title="{{ act.assignments_count }} active member assignments">
+                    {{ act.assignments_count }}
+                  </span>
+                  {% endif %}
+                  <!-- Quick Delete Action Button on Hover -->
+                  <button type="button" onclick="confirmDeletePerm('{{ act.perm_id }}', '{{ row.module }}:{{ act.action }}')" class="opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-slate-400 hover:text-rose-600 cursor-pointer" title="Delete token">
+                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                  </button>
+                </div>
+              {% else %}
+                <button type="button" onclick="quickRegisterPerm('{{ row.module }}', '{{ act.action }}')" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-dashed border-slate-200 hover:border-indigo-300 transition cursor-pointer font-mono" title="Register {{ act.action }} for {{ row.module }}">
+                  + {{ act.action }}
+                </button>
+              {% endif %}
+            </td>
+            {% endfor %}
+
+            <!-- Custom Tokens -->
+            <td class="py-3.5 px-3 text-center">
+              {% if row.custom_actions %}
+                <div class="flex flex-wrap justify-center gap-1">
+                  {% for c in row.custom_actions %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200 group">
+                    {{ c.action }}
+                    <button type="button" onclick="confirmDeletePerm('{{ c.perm_id }}', '{{ row.module }}:{{ c.action }}')" class="opacity-0 group-hover:opacity-100 text-teal-400 hover:text-rose-600 cursor-pointer">
+                      <i class="fa-solid fa-xmark text-[9px]"></i>
+                    </button>
+                  </span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="text-slate-300 font-mono text-[11px]">-</span>
+              {% endif %}
+            </td>
+
+            <!-- Member Grants -->
+            <td class="py-3.5 px-3 text-center font-bold text-slate-800">
+              {% if row.total_assignments > 0 %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                {{ row.total_assignments }}
+              </span>
+              {% else %}
+              <span class="text-slate-400 text-[11px]">0</span>
+              {% endif %}
+            </td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right">
+              <button type="button" onclick="openRegisterModalForModule('{{ row.module }}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition text-[11px] cursor-pointer">
+                <i class="fa-solid fa-plus text-[10px] mr-1 text-indigo-600"></i> Add Token
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center py-10 text-slate-400">
+              <i class="fa-solid fa-shield-halved text-3xl mb-2 text-slate-300 block"></i>
+              No module permissions found matching the specified filter.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Server-Side Pagination (Default 10 items per page) -->
+    {% include "admin_panel/includes/pagination.html" %}
   </div>
 
 </div>
+
+<!-- MODAL: REGISTER PERMISSION TOKEN -->
+<div id="registerPermModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-key"></i>
+        </span>
+        <h3 class="text-base font-bold text-slate-900">Register Permission Token</h3>
+      </div>
+      <button type="button" onclick="closeRegisterModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'admin-panel-permissions' %}" class="p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="register">
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Target Module <span class="text-rose-500">*</span></label>
+        <select id="modal_module_select" onchange="handleModuleSelectChange(this)" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none mb-2">
+          <option value="">-- Choose Existing Module or Custom --</option>
+          {% for m in distinct_modules %}
+          <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+          <option value="__custom__">+ Enter Custom Module Name</option>
+        </select>
+        <input type="text" id="modal_module_input" name="module" required placeholder="e.g. requirements, billing, inventory..." class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+        <p class="text-[10px] text-slate-400 mt-1">Checked at controller layer as <code class="font-mono text-indigo-600">&lt;module&gt;:&lt;action&gt;</code></p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Permission Capability <span class="text-rose-500">*</span></label>
+        <select id="modal_permission_select" name="permission" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
+          <option value="READ">READ — View &amp; inspect records</option>
+          <option value="EDIT">EDIT — Create new entities / draft</option>
+          <option value="UPDATE">UPDATE — Modify &amp; save existing entities</option>
+          <option value="DELETE">DELETE — Delist or delete records</option>
+          <option value="IMPORT">IMPORT — Bulk batch import spreadsheets</option>
+          <option value="EXPORT">EXPORT — Download reports &amp; statements</option>
+          <option value="SEARCH">SEARCH — Execute AI discovery searches</option>
+          <option value="ADMIN">ADMIN — Full module administration</option>
+        </select>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+        <button type="button" onclick="closeRegisterModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer">Cancel</button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md transition cursor-pointer">Register Token</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- HIDDEN FORM: DELETE PERMISSION TOKEN -->
+<form id="deletePermForm" method="POST" action="{% url 'admin-panel-permissions' %}" style="display: none;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="delete">
+  <input type="hidden" id="delete_perm_id" name="perm_id" value="">
+</form>
+
+<script>
+function openRegisterModal() {
+  document.getElementById('modal_module_select').value = '';
+  document.getElementById('modal_module_input').value = '';
+  document.getElementById('registerPermModal').classList.remove('hidden');
+}
+
+function openRegisterModalForModule(modName) {
+  document.getElementById('modal_module_select').value = modName;
+  document.getElementById('modal_module_input').value = modName;
+  document.getElementById('registerPermModal').classList.remove('hidden');
+}
+
+function closeRegisterModal() {
+  document.getElementById('registerPermModal').classList.add('hidden');
+}
+
+function handleModuleSelectChange(sel) {
+  const input = document.getElementById('modal_module_input');
+  if (sel.value && sel.value !== '__custom__') {
+    input.value = sel.value;
+  } else if (sel.value === '__custom__') {
+    input.value = '';
+    input.focus();
+  }
+}
+
+function quickRegisterPerm(modName, actName) {
+  document.getElementById('modal_module_select').value = modName;
+  document.getElementById('modal_module_input').value = modName;
+  document.getElementById('modal_permission_select').value = actName;
+  document.getElementById('registerPermModal').classList.remove('hidden');
+}
+
+function confirmDeletePerm(permId, desc) {
+  if (confirm('Are you sure you want to delete permission token "' + desc + '" from the registry?')) {
+    document.getElementById('delete_perm_id').value = permId;
+    document.getElementById('deletePermForm').submit();
+  }
+}
+</script>
 {% endblock %}

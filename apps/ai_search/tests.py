@@ -238,3 +238,254 @@ class DynamicMatchingParametersTestCase(TestCase):
             results_fallback = provider.search("industrial valves manufacturers", num_results=2)
             self.assertGreaterEqual(len(results_fallback), 1)
             self.assertTrue(results_fallback[0]["url"].startswith("http"))
+
+
+class PlatformMatchingCriteriaTestCase(TestCase):
+    def setUp(self):
+        self.superadmin = User.objects.create_superuser(
+            email="superadmin@platform.com",
+            password="adminpassword123",
+            first_name="Super",
+            last_name="Admin",
+        )
+        self.seller_user = User.objects.create_user(
+            email="seller@example.com",
+            password="sellerpass123",
+            first_name="Seller",
+            last_name="User",
+        )
+        self.seller_company = Company.objects.create(
+            name="Apex Engineering Ltd",
+            company_type=Company.CompanyType.SELLER,
+            industry="Engineering",
+            city="Mumbai",
+            created_by=self.seller_user,
+        )
+        CompanyMember.objects.create(
+            user=self.seller_user,
+            company=self.seller_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.buyer_user = User.objects.create_user(
+            email="buyer@example.com",
+            password="buyerpass123",
+            first_name="Buyer",
+            last_name="User",
+        )
+        self.buyer_company = Company.objects.create(
+            name="Zenith Procurement Corp",
+            company_type=Company.CompanyType.BUYER,
+            industry="Procurement",
+            city="Delhi",
+            created_by=self.buyer_user,
+        )
+        CompanyMember.objects.create(
+            user=self.buyer_user,
+            company=self.buyer_company,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.admin_client = Client()
+        self.admin_client.login(email="superadmin@platform.com", password="adminpassword123")
+
+        self.seller_client = Client()
+        self.seller_client.login(email="seller@example.com", password="sellerpass123")
+        seller_session = self.seller_client.session
+        seller_session["active_company_id"] = self.seller_company.id
+        seller_session.save()
+
+        self.buyer_client = Client()
+        self.buyer_client.login(email="buyer@example.com", password="buyerpass123")
+        buyer_session = self.buyer_client.session
+        buyer_session["active_company_id"] = self.buyer_company.id
+        buyer_session.save()
+
+    def test_platform_criteria_seeding_and_domain_queries(self):
+        """Test default seeding and domain-specific filtering for SALES, VENDOR, and BOTH."""
+        from apps.ai_search.models import PlatformMatchingCriteria
+        PlatformMatchingCriteria.objects.all().delete()
+        self.assertEqual(PlatformMatchingCriteria.objects.count(), 0)
+
+        # Seeding
+        count = PlatformMatchingCriteria.seed_default_criteria()
+        self.assertEqual(count, 10)
+        self.assertEqual(PlatformMatchingCriteria.objects.count(), 10)
+
+        # Domain queries
+        both_criteria = list(PlatformMatchingCriteria.get_criteria_for_domain("BOTH"))
+        self.assertEqual(len(both_criteria), 10)
+
+        # Add a domain-specific criterion for SALES only
+        sales_only = PlatformMatchingCriteria.objects.create(
+            name="ISO 14001 Environmental Certification",
+            parameter_key="iso_14001",
+            target_domain=PlatformMatchingCriteria.TargetDomain.SALES,
+            default_value="ISO 14001:2015 Accredited",
+            rule_type=PlatformMatchingCriteria.RuleType.MANDATORY,
+            weight_percentage=15,
+            icon="fa-leaf",
+            color="emerald",
+            order=15,
+            is_active=True,
+        )
+
+        # Add a domain-specific criterion for VENDOR only
+        vendor_only = PlatformMatchingCriteria.objects.create(
+            name="Immediate Credit Line Approved",
+            parameter_key="credit_line",
+            target_domain=PlatformMatchingCriteria.TargetDomain.VENDOR,
+            default_value="30-day corporate credit limit",
+            rule_type=PlatformMatchingCriteria.RuleType.BONUS,
+            weight_percentage=10,
+            icon="fa-credit-card",
+            color="blue",
+            order=25,
+            is_active=True,
+        )
+
+        sales_list = list(PlatformMatchingCriteria.get_criteria_for_domain("SALES"))
+        sales_keys = [c.parameter_key for c in sales_list]
+        self.assertIn("iso_14001", sales_keys)
+        self.assertNotIn("credit_line", sales_keys)
+
+        vendor_list = list(PlatformMatchingCriteria.get_criteria_for_domain("VENDOR"))
+        vendor_keys = [c.parameter_key for c in vendor_list]
+        self.assertIn("credit_line", vendor_keys)
+        self.assertNotIn("iso_14001", vendor_keys)
+
+        # Inactive criteria should be excluded
+        sales_only.is_active = False
+        sales_only.save()
+        sales_list_after = list(PlatformMatchingCriteria.get_criteria_for_domain("SALES"))
+        self.assertNotIn("iso_14001", [c.parameter_key for c in sales_list_after])
+
+    def test_super_admin_matching_criteria_view_permissions_and_listing(self):
+        """Test Super Admin matching criteria page access control and default 10 pagination."""
+        # Non-superadmin access blocked
+        resp_seller = self.seller_client.get(reverse("admin-panel-matching-criteria"))
+        self.assertEqual(resp_seller.status_code, 403)
+
+        # Superadmin access success
+        resp_admin = self.admin_client.get(reverse("admin-panel-matching-criteria"))
+        self.assertEqual(resp_admin.status_code, 200)
+        self.assertIn("page_obj", resp_admin.context)
+        self.assertEqual(resp_admin.context["page_obj"].paginator.per_page, 10)
+
+    def test_super_admin_crud_actions(self):
+        """Test Super Admin create, edit, toggle, and delete actions for matching criteria."""
+        from apps.ai_search.models import PlatformMatchingCriteria
+
+        # 1. Create action
+        create_data = {
+            "action": "create",
+            "name": "ESG Carbon Neutrality Standard",
+            "parameter_key": "esg_carbon_neutral",
+            "target_domain": "SALES",
+            "rule_type": "weighted",
+            "weight_percentage": "12",
+            "icon": "fa-seedling",
+            "color": "teal",
+            "order": "5",
+            "default_value": "Scope 1 & 2 Emissions Reported",
+            "description": "Enterprise carbon audit report validated.",
+            "is_active": "1",
+        }
+        resp = self.admin_client.post(reverse("admin-panel-matching-criteria"), data=create_data)
+        self.assertEqual(resp.status_code, 302)
+
+        crit = PlatformMatchingCriteria.objects.filter(parameter_key="esg_carbon_neutral").first()
+        self.assertIsNotNone(crit)
+        self.assertEqual(crit.name, "ESG Carbon Neutrality Standard")
+        self.assertEqual(crit.target_domain, "SALES")
+        self.assertEqual(crit.weight_percentage, 12)
+        self.assertTrue(crit.is_active)
+
+        # 2. Edit action
+        edit_data = {
+            "action": "edit",
+            "criteria_id": crit.id,
+            "name": "ESG & Net-Zero Carbon Commitment",
+            "target_domain": "BOTH",
+            "rule_type": "mandatory",
+            "weight_percentage": "20",
+            "icon": "fa-seedling",
+            "color": "emerald",
+            "order": "3",
+            "default_value": "Scope 1, 2 & 3 Emissions Reported",
+            "description": "Full net-zero decarbonization compliance.",
+            "is_active": "1",
+        }
+        resp = self.admin_client.post(reverse("admin-panel-matching-criteria"), data=edit_data)
+        self.assertEqual(resp.status_code, 302)
+
+        crit.refresh_from_db()
+        self.assertEqual(crit.name, "ESG & Net-Zero Carbon Commitment")
+        self.assertEqual(crit.target_domain, "BOTH")
+        self.assertEqual(crit.weight_percentage, 20)
+        self.assertEqual(crit.rule_type, "mandatory")
+
+        # 3. Toggle action
+        resp = self.admin_client.post(reverse("admin-panel-matching-criteria"), data={
+            "action": "toggle",
+            "criteria_id": crit.id,
+        })
+        self.assertEqual(resp.status_code, 302)
+        crit.refresh_from_db()
+        self.assertFalse(crit.is_active)
+
+        # Toggle back
+        self.admin_client.post(reverse("admin-panel-matching-criteria"), data={
+            "action": "toggle",
+            "criteria_id": crit.id,
+        })
+        crit.refresh_from_db()
+        self.assertTrue(crit.is_active)
+
+        # 4. Delete action
+        resp = self.admin_client.post(reverse("admin-panel-matching-criteria"), data={
+            "action": "delete",
+            "criteria_id": crit.id,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(PlatformMatchingCriteria.objects.filter(parameter_key="esg_carbon_neutral").exists())
+
+    def test_dynamic_criteria_displayed_in_find_buyers_and_suppliers(self):
+        """Test that newly added Super Admin criteria immediately appear dynamically in Find Buyers & Find Suppliers."""
+        from apps.ai_search.models import PlatformMatchingCriteria
+
+        # Create a Sales-only criterion in Super Admin
+        sales_crit = PlatformMatchingCriteria.objects.create(
+            name="Defense Empaneled Vendor Status",
+            parameter_key="defense_empaneled",
+            target_domain=PlatformMatchingCriteria.TargetDomain.SALES,
+            default_value="DGQA / DRDO Empanelment Registered",
+            is_active=True,
+            order=1,
+        )
+
+        # Create a Vendor-only criterion in Super Admin
+        vendor_crit = PlatformMatchingCriteria.objects.create(
+            name="Direct EPC Project Contractor",
+            parameter_key="epc_contractor",
+            target_domain=PlatformMatchingCriteria.TargetDomain.VENDOR,
+            default_value="Tier-1 EPC Contractor with active capex projects",
+            is_active=True,
+            order=2,
+        )
+
+        # 1. Check Sales (Find Suppliers)
+        resp_sales = self.buyer_client.get(reverse("find-suppliers"))
+        self.assertEqual(resp_sales.status_code, 200)
+        static_keys_sales = [c["key"] for c in resp_sales.context["static_criteria_list"]]
+        self.assertIn("defense_empaneled", static_keys_sales)
+        self.assertNotIn("epc_contractor", static_keys_sales)
+
+        # 2. Check Vendor (Find Buyers)
+        resp_vendor = self.seller_client.get(reverse("find-buyers"))
+        self.assertEqual(resp_vendor.status_code, 200)
+        static_keys_vendor = [c["key"] for c in resp_vendor.context["static_criteria_list"]]
+        self.assertIn("epc_contractor", static_keys_vendor)
+        self.assertNotIn("defense_empaneled", static_keys_vendor)

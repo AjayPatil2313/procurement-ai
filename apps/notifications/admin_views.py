@@ -1,0 +1,665 @@
+import json
+import logging
+from datetime import timedelta
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Count, Q
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from apps.companies.rbac import superadmin_required
+from apps.notifications.models import (
+    NotificationTemplate,
+    NotificationRule,
+    NotificationLog,
+    EmailDeliveryAttempt,
+    SMTPSetting,
+)
+from apps.notifications.services.email_engine import (
+    render_string_template,
+    build_branded_html,
+    retry_failed_notification_log,
+)
+from apps.notifications.services.smtp_service import test_smtp_connection
+
+logger = logging.getLogger(__name__)
+
+
+def paginate_and_preserve(request, queryset, per_page=10):
+    requested_per_page = request.GET.get("per_page")
+    if requested_per_page:
+        try:
+            per_page = max(5, min(100, int(requested_per_page)))
+        except ValueError:
+            pass
+
+    paginator = Paginator(queryset, per_page)
+    page = request.GET.get("page", 1)
+    try:
+        page_obj = paginator.page(page)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    params = request.GET.copy()
+    if "page" in params:
+        del params["page"]
+    query_string = params.urlencode()
+    return page_obj, query_string
+
+
+@login_required
+@superadmin_required
+def admin_email_overview_view(request):
+    """
+    Super Admin Email Operations Dashboard:
+    Real-time delivery statistics, status distribution, 24-hour trends, and recent transmissions.
+    """
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+    last_7d = now - timedelta(days=7)
+
+    total_logs = NotificationLog.objects.count()
+    sent_count = NotificationLog.objects.filter(status=NotificationLog.Status.SENT).count()
+    failed_count = NotificationLog.objects.filter(status=NotificationLog.Status.FAILED).count()
+    queued_count = NotificationLog.objects.filter(
+        status__in=[NotificationLog.Status.QUEUED, NotificationLog.Status.SENDING]
+    ).count()
+
+    delivery_rate = round((sent_count / total_logs * 100), 1) if total_logs > 0 else 100.0
+
+    # 24h metrics
+    logs_24h = NotificationLog.objects.filter(created_at__gte=last_24h)
+    sent_24h = logs_24h.filter(status=NotificationLog.Status.SENT).count()
+    failed_24h = logs_24h.filter(status=NotificationLog.Status.FAILED).count()
+
+    # Active SMTP config
+    active_smtp = SMTPSetting.get_active_config()
+
+    # Total active templates & rules
+    active_templates_count = NotificationTemplate.objects.filter(is_active=True).count()
+    active_rules_count = NotificationRule.objects.filter(is_enabled=True).count()
+
+    # Recent 10 logs
+    recent_logs = NotificationLog.objects.select_related("company", "user", "template").order_by("-created_at")[:10]
+
+    # Category breakdown
+    template_categories = NotificationTemplate.objects.values("category").annotate(count=Count("id")).order_by("category")
+
+    # Retry pending in backoff
+    retry_pending_count = NotificationLog.objects.filter(
+        status=NotificationLog.Status.QUEUED,
+        retry_after__gt=timezone.now(),
+    ).count()
+    has_attachments_count = NotificationLog.objects.filter(has_attachments=True).count()
+
+    context = {
+        "page_title": "Email Operations Overview",
+        "active_tab": "overview",
+        "total_logs": total_logs,
+        "sent_count": sent_count,
+        "failed_count": failed_count,
+        "queued_count": queued_count,
+        "retry_pending_count": retry_pending_count,
+        "has_attachments_count": has_attachments_count,
+        "delivery_rate": delivery_rate,
+        "sent_24h": sent_24h,
+        "failed_24h": failed_24h,
+        "active_smtp": active_smtp,
+        "active_templates_count": active_templates_count,
+        "active_rules_count": active_rules_count,
+        "recent_logs": recent_logs,
+        "template_categories": template_categories,
+    }
+    return render(request, "admin_panel/email/overview.html", context)
+
+
+@login_required
+@superadmin_required
+def admin_email_templates_view(request):
+    """
+    Super Admin Template Management:
+    Lists all email notification templates with filtering by category and search.
+    """
+    category_filter = request.GET.get("category", "").strip().upper()
+    search_query = request.GET.get("q", "").strip()
+
+    templates_qs = NotificationTemplate.objects.all().order_by("category", "name")
+
+    if category_filter:
+        templates_qs = templates_qs.filter(category=category_filter)
+    if search_query:
+        templates_qs = templates_qs.filter(
+            Q(name__icontains=search_query)
+            | Q(event_key__icontains=search_query)
+            | Q(subject__icontains=search_query)
+        )
+
+    categories = NotificationTemplate.Category.choices
+    page_obj, query_string = paginate_and_preserve(request, templates_qs, per_page=10)
+
+    context = {
+        "page_title": "Notification Templates",
+        "active_tab": "templates",
+        "templates": page_obj,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "categories": categories,
+        "selected_category": category_filter,
+        "search_query": search_query,
+    }
+    return render(request, "admin_panel/email/templates.html", context)
+
+
+@login_required
+@superadmin_required
+def admin_email_template_edit_view(request, pk):
+    """
+    Super Admin Template Editor:
+    Edit subject, HTML body, plain text content, and active status.
+    """
+    template_obj = get_object_or_404(NotificationTemplate, pk=pk)
+
+    if request.method == "POST":
+        subject = request.POST.get("subject", "").strip()
+        html_content = request.POST.get("html_content", "").strip()
+        text_content = request.POST.get("text_content", "").strip()
+        is_active = request.POST.get("is_active") == "on"
+
+        if not subject:
+            messages.error(request, "Subject line is required.")
+        elif not html_content:
+            messages.error(request, "HTML content is required.")
+        else:
+            template_obj.subject = subject
+            template_obj.html_content = html_content
+            template_obj.text_content = text_content
+            # Guard system templates from being deactivated casually
+            if not template_obj.is_system or is_active:
+                template_obj.is_active = is_active
+            template_obj.version += 1
+            template_obj.save()
+
+            messages.success(request, f"Template '{template_obj.name}' updated successfully (v{template_obj.version}).")
+            return redirect("admin-panel-email-templates")
+
+    context = {
+        "page_title": f"Edit Template: {template_obj.name}",
+        "active_tab": "templates",
+        "template_obj": template_obj,
+    }
+    return render(request, "admin_panel/email/template_edit.html", context)
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_template_preview_api(request, pk):
+    """
+    JSON API for live template preview rendering with sample variables.
+    """
+    template_obj = get_object_or_404(NotificationTemplate, pk=pk)
+
+    now = timezone.now()
+    sample_context = {
+        "recipient_name": request.user.get_full_name() or "Enterprise Partner",
+        "recipient_email": request.user.email or "partner@enterprise.com",
+        "company_name": "Sample Enterprise Ltd",
+        "platform_name": "TradeConnect B2B AI Procurement & Sales",
+        "current_year": now.year,
+        # Template 1: Inquiry received
+        "buyer_company": "ABC Industries Pvt. Ltd.",
+        "contact_person": "Rahul Sharma",
+        "buyer_email": "rahul@abcindustries.com",
+        "buyer_phone": "+91 98765 43210",
+        "buyer_location": "Ahmedabad, Gujarat",
+        "company_type": "Private Limited (Pvt Ltd)",
+        "product_name": "PP Woven Bag",
+        "quantity": "10,000 Bags",
+        "specification": "5 kg Capacity, Food Grade",
+        "price_range": "₹ 18 - ₹ 22 per bag",
+        # Template 2: Matching suppliers found
+        "requirement_title": "Industrial Stainless Steel Valves (Grade 316)",
+        "category": "Industrial Machinery & Valves",
+        "delivery_timeline": "Within 15 Days",
+        "count": "14",
+        "top_supplier": "Apex Engineering Works",
+        "verification_status": "GST & MSME Verified",
+        "estimated_price": "₹15,000 / unit",
+        # Template 3: New buyer lead
+        "sourcing_location": "Pune, Maharashtra",
+        "budget_range": "₹15,00,000 - ₹20,00,000",
+        "lead_time": "Immediate (Within 2 Weeks)",
+        "match_score": "96% High Match",
+        # Template 4: Wallet recharge
+        "amount": "25,000.00",
+        "transaction_ref": "TXN-DEMO-88210",
+        "payment_method": "Razorpay Corporate Net Banking",
+        "transaction_time": now.strftime("%d %b %Y, %I:%M %p"),
+        "previous_balance": "7,450.00",
+        "new_balance": "32,450.00",
+        "wallet_status": "Active & Operational",
+        # Template 5: Invoice generated
+        "invoice_number": "INV-2026-0042",
+        "invoice_date": now.strftime("%d %b %Y"),
+        "due_date": "Paid (Instant Settlement)",
+        "tax_id": "27AABCT3521G1Z0",
+        "plan_description": "Enterprise Pro Annual Plan (10,000 AI Credits)",
+        "subtotal": "21,186.44",
+        "tax_amount": "3,813.56 (18% GST)",
+        # Template 6: AI search completed
+        "query_title": "Precision CNC Machining Suppliers",
+        "search_scope": "Global Verified Manufacturers & Exporters",
+        "execution_time": "1.42 Seconds",
+        "scanned_count": "1,240 Suppliers Scanned",
+        "prequalified_count": "14 Pre-Qualified",
+        "confidence_score": "98.4% Match Accuracy",
+        # Template 7: Password reset
+        "user_name": request.user.first_name or "Enterprise User",
+        "request_time": now.strftime("%d %b %Y, %I:%M %p"),
+        "request_ip": "103.21.144.10 (Mumbai, IN)",
+        "token_expiry": "Valid for 24 Hours",
+        "reset_url": "https://tradeconnect.com/auth/reset-password/sample-token/",
+        # Template 8: Critical alert
+        "incident_title": "Vector Pipeline Latency Spike",
+        "incident_code": "INC-AI-9021",
+        "service_name": "Pinecone / FAISS Embedding Pipeline",
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "severity_level": "CRITICAL (P1)",
+        "error_summary": "Upstream timeout exceeded 5000ms threshold on search embeddings.",
+        "impacted_operations": "Autonomous discovery query fallback active",
+        "retry_status": "Automated failover engaged",
+        "environment": "Production Node cluster-01",
+        # Template 9: Low balance
+        "current_balance": "450.00",
+        "threshold_amount": "2,000.00",
+        "last_action": "AI Supplier Contact Unlock (-₹50.00)",
+        "searches_at_risk": "Direct Contact Unlocks & RFQ Blasts",
+        "unlocks_status": "Throttled (Top-up required)",
+        "days_remaining": "2 Days",
+        # Template 10: Subscription expiring
+        "plan_name": "Enterprise Growth Tier",
+        "expiry_date": (now + timedelta(days=5)).strftime("%d %b %Y"),
+        "billing_cycle": "Annual Subscription",
+        "active_inquiries": "24 Open Inquiries",
+        "search_quota": "500 AI Searches / Month",
+        "badge_status": "Verified Gold Supplier Badge",
+        "support_tier": "24/7 Dedicated Support",
+        # Template 11: Company registered
+        "industry": "Precision Engineering & Manufacturing",
+        "registered_at": now.strftime("%d %b %Y, %I:%M %p"),
+        "admin_name": "Vikramaditya Roy",
+        "contact_email": "vikram@sampleenterprise.com",
+        "admin_phone": "+91 98200 11223",
+        "location": "Mumbai, Maharashtra, India",
+        # Template 12: Export ready
+        "report_name": "Q3 Prequalified Supplier Intelligence Dossier",
+        "report_format": "Microsoft Excel (.xlsx)",
+        "record_count": "142 Records",
+        "file_size": "2.8 MB",
+        "requested_by": "Procurement Team Admin",
+        "generated_at": now.strftime("%d %b %Y, %I:%M %p"),
+        "filters_applied": "Location: Western India, MSME: Yes, ISO 9001: Yes",
+        "expires_at": (now + timedelta(hours=48)).strftime("%d %b %Y, %I:%M %p"),
+        # Standard Destination & Action URLs
+        "cta_url": "https://tradeconnect.com/dashboard/",
+        "dashboard_url": "https://tradeconnect.com/dashboard/",
+        "receipt_url": "https://tradeconnect.com/company/billing/receipts/",
+        "invoices_url": "https://tradeconnect.com/company/billing/invoices/",
+        "export_url": "https://tradeconnect.com/company/reports/",
+        "support_url": "https://tradeconnect.com/help-support/",
+        "logs_url": "https://tradeconnect.com/admin-panel/audit-logs/",
+        "usage_url": "https://tradeconnect.com/company/billing/",
+        "plans_url": "https://tradeconnect.com/company/billing/plans/",
+        "companies_url": "https://tradeconnect.com/admin-panel/companies/",
+        "reports_url": "https://tradeconnect.com/company/reports/",
+    }
+
+    # Custom context if submitted
+    custom_vars = request.POST.get("custom_vars")
+    if custom_vars:
+        try:
+            sample_context.update(json.loads(custom_vars))
+        except Exception:
+            pass
+
+    subject_rendered = render_string_template(template_obj.subject, sample_context).strip()
+    body_rendered = render_string_template(template_obj.html_content, sample_context)
+
+    if "<html" not in body_rendered.lower():
+        full_html = build_branded_html(
+            title=subject_rendered,
+            summary="Preview rendering of automated transactional notification.",
+            cta_url=sample_context.get("cta_url"),
+            cta_text="View in Platform",
+            severity="INFO",
+            custom_content=body_rendered,
+            event_key=template_obj.event_key,
+        )
+    else:
+        full_html = body_rendered
+
+    return JsonResponse({
+        "status": "success",
+        "subject": subject_rendered,
+        "html": full_html,
+    })
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_template_test_send_view(request, pk):
+    """
+    Sends a test email of the specified template to an admin-designated address.
+    """
+    template_obj = get_object_or_404(NotificationTemplate, pk=pk)
+    target_email = request.POST.get("target_email", "").strip() or request.user.email
+
+    from apps.notifications.services.email_engine import trigger_email_notification
+    logs = trigger_email_notification(
+        event_key=template_obj.event_key,
+        context={
+            "recipient_name": request.user.get_full_name() or "Admin Tester",
+            "requirement_title": "Test Sourcing Item",
+            "product_title": "Test Catalog Product",
+            "category": "Test Category",
+            "quantity": "100 Units",
+            "count": "5",
+            "query_title": "Test Query",
+            "inquiry_id": "999",
+            "supplier_name": "Test Supplier",
+            "buyer_company": "Test Buyer Corp",
+            "amount": "5,000",
+            "transaction_ref": "TEST-RECH-123",
+            "new_balance": "10,000",
+            "current_balance": "250",
+            "invoice_number": "TEST-INV-001",
+            "user_name": request.user.first_name,
+            "cta_url": request.build_absolute_uri("/"),
+        },
+        user=request.user,
+        async_dispatch=False,
+    )
+
+    if logs and any(l.status == NotificationLog.Status.SENT for l in logs):
+        messages.success(request, f"Test email for '{template_obj.name}' dispatched to {target_email}!")
+    else:
+        last_err = logs[0].last_error if logs else "No active rule matched"
+        messages.warning(request, f"Test dispatch initiated (Status: {logs[0].status if logs else 'None'}). Result / Log: {last_err}")
+
+    return redirect("admin-panel-email-templates")
+
+
+@login_required
+@superadmin_required
+def admin_email_triggers_view(request):
+    """
+    Super Admin Notification Triggers & Routing Matrix:
+    Lists all event triggers, enabled status, target recipient types, and priority.
+    """
+    rules_qs = NotificationRule.objects.select_related("template").order_by("module", "name")
+    
+    module_filter = request.GET.get("module", "").strip().upper()
+    if module_filter:
+        rules_qs = rules_qs.filter(module=module_filter)
+
+    modules = NotificationRule.ModuleType.choices
+    page_obj, query_string = paginate_and_preserve(request, rules_qs, per_page=10)
+
+    context = {
+        "page_title": "Notification Event Rules & Triggers",
+        "active_tab": "triggers",
+        "rules": page_obj,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "modules": modules,
+        "selected_module": module_filter,
+    }
+    return render(request, "admin_panel/email/triggers.html", context)
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_trigger_toggle_view(request, pk):
+    """
+    POST action to toggle an event trigger rule on or off.
+    """
+    rule_obj = get_object_or_404(NotificationRule, pk=pk)
+    rule_obj.is_enabled = not rule_obj.is_enabled
+    rule_obj.save(update_fields=["is_enabled"])
+
+    status_str = "Enabled" if rule_obj.is_enabled else "Disabled"
+    messages.success(request, f"Rule '{rule_obj.name}' is now {status_str}.")
+    return redirect("admin-panel-email-triggers")
+
+
+@login_required
+@superadmin_required
+def admin_email_smtp_view(request):
+    """
+    Super Admin SMTP & Provider Settings:
+    Configure custom or environment SMTP credentials with masking and live ping testing.
+    """
+    active_smtp = SMTPSetting.get_active_config()
+
+    if request.method == "POST":
+        backend_type = request.POST.get("backend_type", SMTPSetting.BackendType.SMTP)
+        sender_name = request.POST.get("sender_name", "").strip() or "AI Procurement & Sales Platform"
+        sender_email = request.POST.get("sender_email", "").strip() or "notifications@procurement-ai.com"
+        host = request.POST.get("host", "").strip() or "smtp.gmail.com"
+        port_str = request.POST.get("port", "587").strip()
+        use_tls = request.POST.get("use_tls") == "on"
+        use_ssl = request.POST.get("use_ssl") == "on"
+        username = request.POST.get("username", "").strip()
+        password = request.POST.get("password", "").strip()
+        is_active = request.POST.get("is_active") == "on"
+
+        try:
+            port = int(port_str)
+        except ValueError:
+            port = 587
+
+        if not active_smtp:
+            active_smtp = SMTPSetting()
+
+        active_smtp.backend_type = backend_type
+        active_smtp.sender_name = sender_name
+        active_smtp.sender_email = sender_email
+        active_smtp.host = host
+        active_smtp.port = port
+        active_smtp.use_tls = use_tls
+        active_smtp.use_ssl = use_ssl
+        active_smtp.username = username
+        if password:
+            active_smtp.set_password(password)
+        active_smtp.is_active = is_active
+        active_smtp.updated_by = request.user
+        active_smtp.save()
+
+        # If this one is active, deactivate other SMTP settings
+        if is_active:
+            SMTPSetting.objects.exclude(pk=active_smtp.pk).update(is_active=False)
+
+        messages.success(request, "SMTP settings successfully saved.")
+        return redirect("admin-panel-email-smtp")
+
+    context = {
+        "page_title": "SMTP Provider Configuration",
+        "active_tab": "smtp",
+        "smtp": active_smtp,
+    }
+    return render(request, "admin_panel/email/smtp.html", context)
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_smtp_test_view(request):
+    """
+    POST action to test SMTP transmission with an active diagnostic ping.
+    """
+    target_email = request.POST.get("target_email", "").strip() or request.user.email
+
+    success, message = test_smtp_connection(target_email)
+    if success:
+        messages.success(request, f"SMTP Connection Test Passed! Diagnostic ping received by {target_email}.")
+    else:
+        messages.error(request, f"SMTP Connection Test Failed: {message}")
+
+    return redirect("admin-panel-email-smtp")
+
+
+@login_required
+@superadmin_required
+def admin_email_logs_view(request):
+    """
+    Super Admin Email Delivery Outbox Logs:
+    Searchable, filterable audit trail of all email transmissions with delivery attempts.
+    """
+    status_filter = request.GET.get("status", "").strip().upper()
+    severity_filter = request.GET.get("severity", "").strip().upper()
+    search_query = request.GET.get("q", "").strip()
+    from_date = request.GET.get("from_date", "").strip()
+    to_date = request.GET.get("to_date", "").strip()
+
+    logs_qs = NotificationLog.objects.select_related("company", "user", "template").order_by("-created_at")
+
+    if status_filter:
+        logs_qs = logs_qs.filter(status=status_filter)
+    if severity_filter:
+        logs_qs = logs_qs.filter(severity=severity_filter)
+    if search_query:
+        logs_qs = logs_qs.filter(
+            Q(recipient_email__icontains=search_query)
+            | Q(subject__icontains=search_query)
+            | Q(event_key__icontains=search_query)
+            | Q(company__name__icontains=search_query)
+        )
+    if from_date:
+        logs_qs = logs_qs.filter(created_at__date__gte=from_date)
+    if to_date:
+        logs_qs = logs_qs.filter(created_at__date__lte=to_date)
+
+    statuses = NotificationLog.Status.choices
+    severities = NotificationLog.Severity.choices
+    page_obj, query_string = paginate_and_preserve(request, logs_qs, per_page=10)
+
+    context = {
+        "page_title": "Email Delivery Audit Logs",
+        "active_tab": "logs",
+        "logs": page_obj,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "statuses": statuses,
+        "severities": severities,
+        "selected_status": status_filter,
+        "selected_severity": severity_filter,
+        "search_query": search_query,
+        "from_date": from_date,
+        "to_date": to_date,
+    }
+    return render(request, "admin_panel/email/logs.html", context)
+
+
+@login_required
+@superadmin_required
+def admin_email_log_detail_api(request, pk):
+    """
+    JSON endpoint providing complete payload, rendered HTML, and attempts history for a log entry.
+    """
+    log_obj = get_object_or_404(NotificationLog, pk=pk)
+    attempts = [
+        {
+            "attempt_number": a.attempt_number,
+            "status": a.status,
+            "error_message": a.error_message,
+            "timestamp": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        for a in log_obj.attempts.all().order_by("attempt_number")
+    ]
+
+    return JsonResponse({
+        "id": log_obj.id,
+        "event_key": log_obj.event_key,
+        "recipient_email": log_obj.recipient_email,
+        "recipient_name": log_obj.recipient_name,
+        "subject": log_obj.subject,
+        "status": log_obj.status,
+        "severity": log_obj.severity,
+        "attempts_count": log_obj.attempts_count,
+        "max_attempts": log_obj.max_attempts,
+        "last_error": log_obj.last_error,
+        "html_body": log_obj.html_body,
+        "context_data": log_obj.context_data,
+        "created_at": log_obj.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "sent_at": log_obj.sent_at.strftime("%Y-%m-%d %H:%M:%S") if log_obj.sent_at else None,
+        "attempts": attempts,
+    })
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_log_retry_view(request, pk):
+    """
+    POST action to manually retry a failed or queued email transmission.
+    """
+    log_obj = get_object_or_404(NotificationLog, pk=pk)
+    success = retry_failed_notification_log(log_obj, async_dispatch=False)
+
+    if success:
+        messages.success(request, f"Log #{log_obj.id} ({log_obj.recipient_email}) successfully delivered on retry!")
+    else:
+        messages.error(request, f"Retry failed for Log #{log_obj.id}: {log_obj.last_error}")
+
+    return redirect("admin-panel-email-logs")
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_logs_retry_all_view(request):
+    """
+    Super Admin bulk action to retry all failed email logs from the last 24-48 hours.
+    Resets status to QUEUED and increments max_attempts for asynchronous worker retry.
+    """
+    hours = int(request.POST.get("hours", 24))
+    cutoff = timezone.now() - timedelta(hours=hours)
+
+    failed_logs = NotificationLog.objects.filter(
+        status=NotificationLog.Status.FAILED,
+        created_at__gte=cutoff,
+    )
+    count = 0
+    for log in failed_logs:
+        retry_failed_notification_log(log, async_dispatch=True)
+        count += 1
+
+    messages.success(request, f"Re-queued {count} failed email(s) from the last {hours}h for automated background delivery.")
+    return redirect("admin-panel-email-logs")
+
+
+@login_required
+@superadmin_required
+def admin_email_alerts_view(request):
+    """
+    Super Admin Platform Alerts:
+    Displays high-severity/critical alerts, delivery retry exhausted events, and system notifications.
+    """
+    alert_logs = NotificationLog.objects.filter(
+        severity__in=[NotificationLog.Severity.WARNING, NotificationLog.Severity.CRITICAL]
+    ).select_related("company", "user").order_by("-created_at")[:50]
+
+    context = {
+        "page_title": "Platform Alert Policies & Log",
+        "active_tab": "alerts",
+        "alert_logs": alert_logs,
+    }
+    return render(request, "admin_panel/email/alerts.html", context)

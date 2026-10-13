@@ -4,6 +4,7 @@ from datetime import timedelta
 import json
 import os
 import random
+import re
 import string
 from decimal import Decimal
 
@@ -60,7 +61,7 @@ from apps.companies.rbac import superadmin_required
 from apps.dashboard.services.notification_service import create_notification
 
 
-def paginate_and_preserve(request, queryset, per_page=25):
+def paginate_and_preserve(request, queryset, per_page=10):
     """
     Paginates a queryset and preserves all active GET filter parameters across page changes.
     Returns (page_obj, query_string).
@@ -68,7 +69,7 @@ def paginate_and_preserve(request, queryset, per_page=25):
     requested_per_page = request.GET.get("per_page")
     if requested_per_page:
         try:
-            per_page = max(10, min(100, int(requested_per_page)))
+            per_page = max(5, min(100, int(requested_per_page)))
         except ValueError:
             pass
 
@@ -208,7 +209,7 @@ def admin_panel_dashboard_view(request):
     # 7. Real Analytical Chart Datasets (Optimized with zero loop queries)
     # Chart 1: Company Types (Doughnut)
     chart1_data = {
-        "labels": ["Buyer Companies", "Seller Companies", "Hybrid (Both)"],
+        "labels": ["Sales Companies", "Vendor Companies", "Hybrid (Both)"],
         "values": [buyer_companies, seller_companies, both_companies],
     }
 
@@ -514,8 +515,8 @@ def admin_panel_companies_view(request):
     verified_count = Company.objects.filter(is_deleted=False, is_verified=True).count()
     deleted_count = Company.objects.filter(is_deleted=True).count()
 
-    # Server-side pagination
-    page_obj, query_string = paginate_and_preserve(request, companies, per_page=25)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, companies, per_page=10)
 
     return render(request, "admin_panel/companies.html", {
         "companies": page_obj,
@@ -840,6 +841,24 @@ def admin_panel_toggle_company_status_view(request, pk):
             icon_type="building",
             color="emerald" if company.is_active else "rose",
         )
+
+        if not company.is_active:
+            try:
+                from apps.notifications.services.email_engine import trigger_email_notification
+                trigger_email_notification(
+                    event_key="admin.company_suspended",
+                    company=company,
+                    user=request.user,
+                    context={
+                        "company_name": company.name,
+                        "reason": f"Suspended via Super Admin Governance Panel by {request.user.email}",
+                        "suspended_by": request.user.get_full_name() or request.user.email,
+                        "cta_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
+                    },
+                    severity="CRITICAL",
+                )
+            except Exception:
+                pass
 
         messages.success(request, f"Company '{company.name}' has been {action_name.lower()}.")
     return redirect("admin-panel-companies")
@@ -1436,8 +1455,8 @@ def admin_panel_users_view(request):
     superadmin_count = User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)).count()
     all_companies = Company.objects.filter(is_deleted=False).order_by("name")
 
-    # Server-side pagination
-    page_obj, query_string = paginate_and_preserve(request, users, per_page=25)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, users, per_page=10)
 
     return render(request, "admin_panel/users.html", {
         "users": page_obj,
@@ -1538,7 +1557,8 @@ def admin_panel_auditlogs_view(request):
 
     total_activities = ActivityLog.objects.count()
 
-    page_obj, query_string = paginate_and_preserve(request, activities, per_page=30)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, activities, per_page=10)
 
     return render(request, "admin_panel/audit_logs.html", {
         "activities": page_obj,
@@ -1805,7 +1825,8 @@ def admin_panel_products_view(request):
     total_products = Product.objects.filter(is_deleted=False).count()
     all_companies = Company.objects.filter(is_deleted=False).order_by("name")
 
-    page_obj, query_string = paginate_and_preserve(request, products, per_page=25)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, products, per_page=10)
 
     return render(request, "admin_panel/products.html", {
         "page_title": "Products Catalog Moderation",
@@ -1872,7 +1893,8 @@ def admin_panel_requirements_view(request):
     total_requirements = Requirement.objects.filter(is_deleted=False).count()
     all_companies = Company.objects.filter(is_deleted=False).order_by("name")
 
-    page_obj, query_string = paginate_and_preserve(request, requirements, per_page=25)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, requirements, per_page=10)
 
     return render(request, "admin_panel/requirements.html", {
         "page_title": "Buyer Requirements Moderation",
@@ -2006,7 +2028,8 @@ def admin_panel_search_activity_view(request):
     failed_jobs = SearchJob.objects.filter(status=SearchJob.Status.FAILED).count()
     all_companies = Company.objects.filter(is_deleted=False).order_by("name")
 
-    page_obj, query_string = paginate_and_preserve(request, search_jobs, per_page=25)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, search_jobs, per_page=10)
 
     return render(request, "admin_panel/search_activity.html", {
         "page_title": "Platform AI Search Operations",
@@ -2056,7 +2079,8 @@ def admin_panel_inquiries_view(request):
     won_count = Inquiry.objects.filter(status=Inquiry.Status.WON).count()
     all_companies = Company.objects.filter(is_deleted=False).order_by("name")
 
-    page_obj, query_string = paginate_and_preserve(request, inquiries, per_page=25)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, inquiries, per_page=10)
 
     return render(request, "admin_panel/inquiries.html", {
         "page_title": "Platform Inquiries & RFQs Monitor",
@@ -2247,7 +2271,7 @@ def admin_panel_buyer_dashboard_view(request):
     if q:
         comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
 
-    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=15)
+    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=10)
 
     annotated_companies = []
     for comp in page_obj:
@@ -2274,7 +2298,7 @@ def admin_panel_buyer_dashboard_view(request):
     ).select_related("company", "user").order_by("-created_at")[:8]
 
     return render(request, "admin_panel/buyer_dashboard.html", {
-        "page_title": "Buyer Dashboard Governance",
+        "page_title": "Sales Dashboard Governance",
         "active_tab": active_tab,
         "modules": modules,
         "layout": layout,
@@ -2314,8 +2338,8 @@ def admin_panel_buyer_module_toggle_view(request, pk):
                 company=first_company,
                 user=request.user,
                 activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
-                title=f"Buyer Module {state_str}: {module.display_name}",
-                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Buyer module.",
+                title=f"Sales Module {state_str}: {module.display_name}",
+                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Sales module.",
                 icon_type="toggle-on" if module.is_enabled else "toggle-off",
                 color="emerald" if module.is_enabled else "rose",
             )
@@ -2329,7 +2353,7 @@ def admin_panel_buyer_module_toggle_view(request, pk):
                 "message": f"Module '{module.display_name}' is now {state_str}!",
             })
 
-        messages.success(request, f"Buyer module '{module.display_name}' is now {state_str}.")
+        messages.success(request, f"Sales module '{module.display_name}' is now {state_str}.")
 
     next_url = request.POST.get("next") or reverse("admin-panel-buyer-dashboard")
     return redirect(next_url)
@@ -2448,7 +2472,7 @@ def admin_panel_seller_dashboard_view(request):
     if q:
         comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
 
-    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=15)
+    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=10)
 
     annotated_companies = []
     for comp in page_obj:
@@ -2475,7 +2499,7 @@ def admin_panel_seller_dashboard_view(request):
     ).select_related("company", "user").order_by("-created_at")[:8]
 
     return render(request, "admin_panel/seller_dashboard.html", {
-        "page_title": "Seller Dashboard Governance",
+        "page_title": "Vendor Dashboard Governance",
         "active_tab": active_tab,
         "modules": modules,
         "layout": layout,
@@ -2501,7 +2525,7 @@ def admin_panel_seller_dashboard_view(request):
 @superadmin_required
 def admin_panel_seller_module_toggle_view(request, pk):
     """
-    Super Admin action to toggle Seller module enabled/disabled state.
+    Super Admin action to toggle Vendor module enabled/disabled state.
     """
     if request.method == "POST":
         module = get_object_or_404(SellerModuleConfig, pk=pk)
@@ -2515,8 +2539,8 @@ def admin_panel_seller_module_toggle_view(request, pk):
                 company=first_company,
                 user=request.user,
                 activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
-                title=f"Seller Module {state_str}: {module.display_name}",
-                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Seller module.",
+                title=f"Vendor Module {state_str}: {module.display_name}",
+                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Vendor module.",
                 icon_type="toggle-on" if module.is_enabled else "toggle-off",
                 color="emerald" if module.is_enabled else "rose",
             )
@@ -2530,7 +2554,7 @@ def admin_panel_seller_module_toggle_view(request, pk):
                 "message": f"Module '{module.display_name}' is now {state_str}!",
             })
 
-        messages.success(request, f"Seller module '{module.display_name}' is now {state_str}.")
+        messages.success(request, f"Vendor module '{module.display_name}' is now {state_str}.")
 
     next_url = request.POST.get("next") or reverse("admin-panel-seller-dashboard")
     return redirect(next_url)
@@ -2629,7 +2653,7 @@ def admin_panel_both_dashboard_view(request):
     if q:
         comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
 
-    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=15)
+    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=10)
 
     annotated_companies = []
     for comp in page_obj:
@@ -2649,7 +2673,7 @@ def admin_panel_both_dashboard_view(request):
         })
 
     return render(request, "admin_panel/both_dashboard.html", {
-        "page_title": "Both (Hybrid) Dashboard Governance",
+        "page_title": "Both (Sales & Vendor) Dashboard Governance",
         "layout": layout,
         "total_both_companies": total_both_companies,
         "total_requirements": total_requirements,
@@ -2735,7 +2759,7 @@ def admin_panel_modules_view(request):
         unified_matrix.append({
             "id": bm.id,
             "type": "buyer",
-            "type_label": "Buyer (Procurement)",
+            "type_label": "Sales",
             "type_badge_color": "blue",
             "module_key": bm.module_key,
             "display_name": bm.display_name,
@@ -2756,7 +2780,7 @@ def admin_panel_modules_view(request):
         unified_matrix.append({
             "id": sm.id,
             "type": "seller",
-            "type_label": "Seller (Sales)",
+            "type_label": "Vendor",
             "type_badge_color": "emerald",
             "module_key": sm.module_key,
             "display_name": sm.display_name,
@@ -2771,9 +2795,9 @@ def admin_panel_modules_view(request):
             "order": sm.order,
         })
 
-    if tab == "buyer":
+    if tab in ["sales", "buyer"]:
         filtered_matrix = [m for m in unified_matrix if m["type"] == "buyer"]
-    elif tab == "seller":
+    elif tab in ["vendor", "seller"]:
         filtered_matrix = [m for m in unified_matrix if m["type"] == "seller"]
     else:
         filtered_matrix = unified_matrix
@@ -2807,34 +2831,223 @@ def admin_panel_module_toggle_view(request, module_type, pk):
 
 
 # ==============================================================================
-# SUPER ADMIN ↔ MODULE-WISE PERMISSIONS MATRIX
+# SUPER ADMIN ↔ DYNAMIC MODULE-WISE PERMISSIONS MATRIX REGISTRY
 # ==============================================================================
 
 @login_required
 @superadmin_required
 def admin_panel_permissions_view(request):
     """
-    Super Admin Module-Wise Permissions Overview.
-    Displays configured permissions matrix across platform modules.
+    Super Admin Dynamic Module-Wise Permissions Matrix Registry.
+    - Live governance over fine-grained action tokens (<module>:<action>)
+    - Supports dynamic registration, deletion, and bulk capability sync
+    - Renders dynamic Module x Action matrix registry with pagination (default 10 items)
+    - Displays role taxonomy and active user grants across all platform modules
     """
     from apps.companies.rbac import ensure_default_permissions
+
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+
+        if action == "register":
+            module_name = request.POST.get("module", "").strip().lower()
+            permission_type = request.POST.get("permission", "").strip().upper()
+            if not module_name or not permission_type:
+                messages.error(request, "Both module name and permission action are required.")
+            else:
+                obj, created = CompanyPermission.objects.get_or_create(
+                    module=module_name,
+                    permission=permission_type,
+                )
+                if created:
+                    messages.success(request, f"Permission '{module_name}:{permission_type}' successfully registered in matrix.")
+                else:
+                    messages.info(request, f"Permission '{module_name}:{permission_type}' already exists in registry.")
+            return redirect("admin-panel-permissions")
+
+        elif action == "delete":
+            perm_id = request.POST.get("perm_id")
+            perm_obj = CompanyPermission.objects.filter(id=perm_id).first()
+            if perm_obj:
+                mod_desc = f"{perm_obj.module}:{perm_obj.permission}"
+                perm_obj.delete()
+                messages.success(request, f"Permission '{mod_desc}' removed from registry.")
+            else:
+                messages.error(request, "Permission token not found.")
+            return redirect("admin-panel-permissions")
+
+        elif action == "sync_all":
+            ensure_default_permissions()
+            messages.success(request, "Standard capability tokens (READ, EDIT, UPDATE, DELETE, IMPORT, EXPORT) synchronized across platform modules.")
+            return redirect("admin-panel-permissions")
+
     ensure_default_permissions()
 
-    permissions = CompanyPermission.objects.all().order_by("module", "permission")
-    modules_grouped = {}
-    for perm in permissions:
-        modules_grouped.setdefault(perm.module, []).append(perm.permission)
+    q = request.GET.get("q", "").strip()
+    category_filter = request.GET.get("category", "all").strip().lower()
 
-    total_perms = permissions.count()
+    # Pre-fetch permissions with member assignment counts
+    all_perms = CompanyPermission.objects.annotate(
+        assignments_count=Count("member_assignments")
+    ).order_by("module", "permission")
+
+    # Module metadata dictionary for display
+    MODULE_METADATA = {
+        "requirements": {"title": "Procurement Requirements", "category": "Sales", "icon": "fa-clipboard-list"},
+        "products": {"title": "Product Catalog & Offerings", "category": "Vendor", "icon": "fa-box-open"},
+        "catalog": {"title": "Company Catalog", "category": "Vendor", "icon": "fa-boxes-stacked"},
+        "leads": {"title": "Buyer Leads Pipeline", "category": "Vendor", "icon": "fa-bullseye"},
+        "inquiries": {"title": "Commercial Inquiries & RFQs", "category": "Shared", "icon": "fa-paper-plane"},
+        "search": {"title": "AI Discovery & Search", "category": "Shared", "icon": "fa-magnifying-glass-chart"},
+        "find_buyers": {"title": "Find Vendors & Customers", "category": "Vendor", "icon": "fa-users-viewfinder"},
+        "find_suppliers": {"title": "Find Suppliers Search", "category": "Sales", "icon": "fa-truck-field"},
+        "saved_buyers": {"title": "Saved / Prequalified Vendors", "category": "Vendor", "icon": "fa-bookmark"},
+        "saved_suppliers": {"title": "Saved Suppliers Directory", "category": "Sales", "icon": "fa-address-book"},
+        "saved_items": {"title": "Saved Pipeline Items", "category": "Shared", "icon": "fa-floppy-disk"},
+        "results": {"title": "Search Evaluation Results", "category": "Shared", "icon": "fa-chart-pie"},
+        "categories": {"title": "Taxonomy & Categories", "category": "Shared", "icon": "fa-tags"},
+        "billing": {"title": "Billing & Subscriptions", "category": "Admin", "icon": "fa-credit-card"},
+        "companies": {"title": "Company Directory & Profile", "category": "Admin", "icon": "fa-building"},
+        "members": {"title": "Team & User Access", "category": "Admin", "icon": "fa-user-group"},
+        "dashboard": {"title": "Analytics Dashboard", "category": "Shared", "icon": "fa-gauge-high"},
+        "reports": {"title": "Certified Reports & Exports", "category": "Shared", "icon": "fa-file-excel"},
+        "external_companies": {"title": "Discovered Market Entities", "category": "Shared", "icon": "fa-globe"},
+        "general": {"title": "General System Operations", "category": "Platform", "icon": "fa-sliders"},
+    }
+
+    # Group permissions by module
+    module_perm_map = {}
+    for p in all_perms:
+        module_perm_map.setdefault(p.module, []).append(p)
+
+    standard_actions = ["READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"]
+
+    module_matrix = []
+    for mod_name, perms_list in sorted(module_perm_map.items()):
+        meta = MODULE_METADATA.get(mod_name, {
+            "title": mod_name.replace("_", " ").title(),
+            "category": "Platform",
+            "icon": "fa-layer-group",
+        })
+
+        if q:
+            match_q = (
+                q.lower() in mod_name.lower()
+                or q.lower() in meta["title"].lower()
+                or q.lower() in meta["category"].lower()
+            )
+            if not match_q:
+                continue
+
+        if category_filter != "all" and meta["category"].lower() != category_filter:
+            continue
+
+        action_dict = {p.permission: p for p in perms_list}
+        actions_status = []
+        for act in standard_actions:
+            p_obj = action_dict.get(act)
+            actions_status.append({
+                "action": act,
+                "is_active": bool(p_obj),
+                "perm_id": p_obj.id if p_obj else None,
+                "assignments_count": p_obj.assignments_count if p_obj else 0,
+            })
+
+        custom_actions = [
+            {"action": p.permission, "perm_id": p.id, "assignments_count": p.assignments_count}
+            for p in perms_list if p.permission not in standard_actions
+        ]
+
+        total_module_assignments = sum(p.assignments_count for p in perms_list)
+
+        module_matrix.append({
+            "module": mod_name,
+            "title": meta["title"],
+            "category": meta["category"],
+            "icon": meta["icon"],
+            "actions": actions_status,
+            "custom_actions": custom_actions,
+            "total_perms": len(perms_list),
+            "total_assignments": total_module_assignments,
+            "raw_perms": [p.permission for p in perms_list],
+        })
+
+    total_perms = all_perms.count()
     total_roles = CompanyRole.objects.count()
     total_assignments = MemberPermission.objects.count()
+    total_modules = len(module_perm_map)
+
+    # Dynamic role taxonomy summary
+    system_roles = [
+        {
+            "code": "SUPER_ADMIN",
+            "name": "Super Admin",
+            "badge_color": "rose",
+            "scope": "Global (Cross-Tenant)",
+            "description": "Full unmetered governance over all tenants, modules, wallets, and system configurations.",
+            "access_level": "All Capabilities (*:*)",
+        },
+        {
+            "code": "COMPANY_ADMIN",
+            "name": "Company Admin",
+            "badge_color": "blue",
+            "scope": "Tenant Wide",
+            "description": "Full administrative management over company profile, team, roles, billing & recharges.",
+            "access_level": "All Company Modules (READ, EDIT, UPDATE, DELETE, IMPORT, EXPORT)",
+        },
+        {
+            "code": "BUYER_SPECIALIST",
+            "name": "Procurement Specialist",
+            "badge_color": "indigo",
+            "scope": "Sales Domain",
+            "description": "Posts requirements, runs supplier searches, dispatches inquiries & RFQs.",
+            "access_level": "Requirements, Inquiries, Find Suppliers, Reports",
+        },
+        {
+            "code": "SALES_EXECUTIVE",
+            "name": "Sales Executive",
+            "badge_color": "emerald",
+            "scope": "Vendor Domain",
+            "description": "Catalog management, runs find-buyer jobs, negotiates inquiries and leads.",
+            "access_level": "Products, Leads, Inquiries, Find Customers, Reports",
+        },
+        {
+            "code": "VIEWER",
+            "name": "Viewer (Read-Only)",
+            "badge_color": "slate",
+            "scope": "Read Only",
+            "description": "Restricted read-only access to dashboard and reports without credit consumption permissions.",
+            "access_level": "READ on Dashboards & Reports",
+        },
+    ]
+
+    # Dynamic custom company roles from database
+    custom_roles_list = list(
+        CompanyRole.objects.select_related("company")
+        .prefetch_related("module_permissions")
+        .order_by("-is_system", "company__name", "name")[:20]
+    )
+
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, module_matrix, per_page=10)
+
+    # Available distinct module keys for quick register dropdown
+    distinct_modules = sorted(list(module_perm_map.keys()))
 
     return render(request, "admin_panel/permissions.html", {
         "page_title": "Module-Wise Permissions Matrix",
-        "modules_grouped": modules_grouped,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "standard_actions": standard_actions,
         "total_perms": total_perms,
         "total_roles": total_roles,
         "total_assignments": total_assignments,
+        "total_modules": total_modules,
+        "system_roles": system_roles,
+        "custom_roles": custom_roles_list,
+        "distinct_modules": distinct_modules,
+        "q": q,
+        "category_filter": category_filter,
     })
 
 
@@ -2856,10 +3069,11 @@ def admin_panel_transactions_view(request):
     q = request.GET.get("q", "").strip()
 
     # 1. Wallet Transactions
-    wallet_tx_qs = WalletTransaction.objects.select_related("wallet__company", "created_by").order_by("-created_at")
+    wallet_tx_qs = WalletTransaction.objects.select_related("wallet__company", "company", "created_by").order_by("-created_at")
     if q:
         wallet_tx_qs = wallet_tx_qs.filter(
             Q(reference_id__icontains=q)
+            | Q(company__name__icontains=q)
             | Q(wallet__company__name__icontains=q)
             | Q(description__icontains=q)
         )
@@ -2873,12 +3087,13 @@ def admin_panel_transactions_view(request):
         )
 
     # 3. Credit Transactions
-    credit_tx_qs = CreditTransaction.objects.select_related("company", "user").order_by("-created_at")
+    credit_tx_qs = CreditTransaction.objects.select_related("company", "user", "wallet").order_by("-created_at")
     if q:
         credit_tx_qs = credit_tx_qs.filter(
             Q(notes__icontains=q)
             | Q(receipt_number__icontains=q)
             | Q(company__name__icontains=q)
+            | Q(feature_code__icontains=q)
         )
 
     total_wallet_volume = WalletTransaction.objects.filter(
@@ -2889,12 +3104,13 @@ def admin_panel_transactions_view(request):
     total_paid_invoices = Invoice.objects.filter(status=Invoice.Status.PAID).count()
     total_pending_invoices = Invoice.objects.filter(status__in=[Invoice.Status.DRAFT, Invoice.Status.OVERDUE]).count()
 
+    # Server-side pagination (default 10)
     if active_tab == "invoices":
-        page_obj, query_string = paginate_and_preserve(request, invoice_qs, per_page=20)
+        page_obj, query_string = paginate_and_preserve(request, invoice_qs, per_page=10)
     elif active_tab == "credits":
-        page_obj, query_string = paginate_and_preserve(request, credit_tx_qs, per_page=20)
+        page_obj, query_string = paginate_and_preserve(request, credit_tx_qs, per_page=10)
     else:
-        page_obj, query_string = paginate_and_preserve(request, wallet_tx_qs, per_page=20)
+        page_obj, query_string = paginate_and_preserve(request, wallet_tx_qs, per_page=10)
 
     return render(request, "admin_panel/transactions.html", {
         "page_title": "Transactions & Invoices",
@@ -2932,7 +3148,8 @@ def admin_panel_wallets_view(request):
             | Q(company__city__icontains=q)
         )
 
-    page_obj, query_string = paginate_and_preserve(request, wallet_qs, per_page=20)
+    # Server-side pagination (default 10)
+    page_obj, query_string = paginate_and_preserve(request, wallet_qs, per_page=10)
 
     total_available_liability = CompanyWallet.objects.aggregate(total=Sum("available_balance"))["total"] or Decimal("0.00")
     total_reserved_liability = CompanyWallet.objects.aggregate(total=Sum("reserved_balance"))["total"] or Decimal("0.00")
@@ -2952,5 +3169,188 @@ def admin_panel_wallets_view(request):
         "total_credited_platform": total_credited_platform,
         "pricing_list": pricing_list,
     })
+
+
+@login_required
+@superadmin_required
+def admin_panel_matching_criteria_view(request):
+    """
+    Super Admin Dynamic AI Search & Lead Matching Criteria Governance.
+    - View all platform-wide matching criteria with domain routing (Sales vs Vendor vs Both)
+    - Full CRUD: Add, Edit, Delete, Toggle Active/Inactive, and Reset to Defaults
+    - Fine-grained controls for rule type (weighted, mandatory, bonus), weight percentage, icon, order, and benchmark value
+    - Search and multi-criteria filters with default 10-item pagination
+    """
+    from apps.ai_search.models import PlatformMatchingCriteria
+
+    # Ensure baseline defaults exist
+    if not PlatformMatchingCriteria.objects.exists():
+        PlatformMatchingCriteria.seed_default_criteria()
+
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+
+        if action == "create":
+            name = request.POST.get("name", "").strip()
+            parameter_key = request.POST.get("parameter_key", "").strip().lower()
+            target_domain = request.POST.get("target_domain", PlatformMatchingCriteria.TargetDomain.BOTH).strip().upper()
+            rule_type = request.POST.get("rule_type", PlatformMatchingCriteria.RuleType.WEIGHTED).strip()
+            weight_str = request.POST.get("weight_percentage", "10").strip()
+            icon = request.POST.get("icon", "fa-sliders").strip()
+            color = request.POST.get("color", "blue").strip()
+            order_str = request.POST.get("order", "10").strip()
+            default_value = request.POST.get("default_value", "").strip()
+            description = request.POST.get("description", "").strip()
+            is_active = request.POST.get("is_active") == "1" or request.POST.get("is_active") == "on"
+
+            if not name:
+                messages.error(request, "Criterion name is required.")
+                return redirect("admin-panel-matching-criteria")
+
+            if not parameter_key:
+                from django.utils.text import slugify
+                parameter_key = slugify(name).replace("-", "_")[:80]
+
+            parameter_key = re.sub(r"[^a-zA-Z0-9_]", "_", parameter_key)[:80]
+            if not parameter_key:
+                messages.error(request, "Valid unique parameter slug key is required.")
+                return redirect("admin-panel-matching-criteria")
+
+            if PlatformMatchingCriteria.objects.filter(parameter_key=parameter_key).exists():
+                messages.error(request, f"Parameter slug key '{parameter_key}' already exists. Please choose a unique key.")
+                return redirect("admin-panel-matching-criteria")
+
+            weight = int(weight_str) if weight_str.isdigit() else 10
+            order = int(order_str) if order_str.isdigit() else 10
+
+            new_crit = PlatformMatchingCriteria.objects.create(
+                name=name[:150],
+                parameter_key=parameter_key,
+                target_domain=target_domain if target_domain in [PlatformMatchingCriteria.TargetDomain.BOTH, PlatformMatchingCriteria.TargetDomain.SALES, PlatformMatchingCriteria.TargetDomain.VENDOR] else PlatformMatchingCriteria.TargetDomain.BOTH,
+                rule_type=rule_type if rule_type in [PlatformMatchingCriteria.RuleType.WEIGHTED, PlatformMatchingCriteria.RuleType.MANDATORY, PlatformMatchingCriteria.RuleType.BONUS] else PlatformMatchingCriteria.RuleType.WEIGHTED,
+                weight_percentage=min(max(weight, 1), 100),
+                icon=icon[:50] or "fa-sliders",
+                color=color[:30] or "blue",
+                order=order,
+                default_value=default_value[:255],
+                description=description,
+                is_active=is_active,
+            )
+            messages.success(request, f"Matching criterion '{new_crit.name}' ({new_crit.parameter_key}) created successfully.")
+            return redirect("admin-panel-matching-criteria")
+
+        elif action == "edit":
+            crit_id = request.POST.get("criteria_id")
+            crit = get_object_or_404(PlatformMatchingCriteria, pk=crit_id)
+
+            name = request.POST.get("name", "").strip()
+            target_domain = request.POST.get("target_domain", PlatformMatchingCriteria.TargetDomain.BOTH).strip().upper()
+            rule_type = request.POST.get("rule_type", PlatformMatchingCriteria.RuleType.WEIGHTED).strip()
+            weight_str = request.POST.get("weight_percentage", "10").strip()
+            icon = request.POST.get("icon", "fa-sliders").strip()
+            color = request.POST.get("color", "blue").strip()
+            order_str = request.POST.get("order", "10").strip()
+            default_value = request.POST.get("default_value", "").strip()
+            description = request.POST.get("description", "").strip()
+            is_active = request.POST.get("is_active") == "1" or request.POST.get("is_active") == "on"
+
+            if name:
+                crit.name = name[:150]
+            if target_domain in [PlatformMatchingCriteria.TargetDomain.BOTH, PlatformMatchingCriteria.TargetDomain.SALES, PlatformMatchingCriteria.TargetDomain.VENDOR]:
+                crit.target_domain = target_domain
+            if rule_type in [PlatformMatchingCriteria.RuleType.WEIGHTED, PlatformMatchingCriteria.RuleType.MANDATORY, PlatformMatchingCriteria.RuleType.BONUS]:
+                crit.rule_type = rule_type
+            if weight_str.isdigit():
+                crit.weight_percentage = min(max(int(weight_str), 1), 100)
+            if icon:
+                crit.icon = icon[:50]
+            if color:
+                crit.color = color[:30]
+            if order_str.isdigit():
+                crit.order = int(order_str)
+            crit.default_value = default_value[:255]
+            crit.description = description
+            crit.is_active = is_active
+            crit.save()
+            messages.success(request, f"Criterion '{crit.name}' updated successfully.")
+            return redirect("admin-panel-matching-criteria")
+
+        elif action == "toggle":
+            crit_id = request.POST.get("criteria_id")
+            crit = get_object_or_404(PlatformMatchingCriteria, pk=crit_id)
+            crit.is_active = not crit.is_active
+            crit.save(update_fields=["is_active", "updated_at"])
+            status_text = "activated" if crit.is_active else "deactivated"
+            messages.success(request, f"Criterion '{crit.name}' has been {status_text}.")
+            return redirect("admin-panel-matching-criteria")
+
+        elif action == "delete":
+            crit_id = request.POST.get("criteria_id")
+            crit = get_object_or_404(PlatformMatchingCriteria, pk=crit_id)
+            c_name = crit.name
+            crit.delete()
+            messages.success(request, f"Criterion '{c_name}' was deleted.")
+            return redirect("admin-panel-matching-criteria")
+
+        elif action == "reset_defaults":
+            seeded_count = PlatformMatchingCriteria.seed_default_criteria()
+            messages.success(request, f"Restored {seeded_count} standard recommended B2B matching parameters.")
+            return redirect("admin-panel-matching-criteria")
+
+        messages.warning(request, "Unrecognized action.")
+        return redirect("admin-panel-matching-criteria")
+
+    # GET Request: Filter & Search
+    qs = PlatformMatchingCriteria.objects.all().order_by("order", "id")
+
+    domain_filter = request.GET.get("domain", "all").strip().upper()
+    status_filter = request.GET.get("status", "all").strip().lower()
+    rule_filter = request.GET.get("rule_type", "all").strip().lower()
+    q = request.GET.get("q", "").strip()
+
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q)
+            | Q(parameter_key__icontains=q)
+            | Q(description__icontains=q)
+            | Q(default_value__icontains=q)
+        )
+
+    if domain_filter in ["SALES", "VENDOR", "BOTH"]:
+        qs = qs.filter(target_domain=domain_filter)
+
+    if status_filter == "active":
+        qs = qs.filter(is_active=True)
+    elif status_filter == "inactive":
+        qs = qs.filter(is_active=False)
+
+    if rule_filter in ["weighted", "mandatory", "bonus"]:
+        qs = qs.filter(rule_type=rule_filter)
+
+    # Metrics
+    all_criteria = PlatformMatchingCriteria.objects.all()
+    total_criteria = all_criteria.count()
+    active_criteria = all_criteria.filter(is_active=True).count()
+    sales_criteria = all_criteria.filter(is_active=True, target_domain__in=["SALES", "BOTH"]).count()
+    vendor_criteria = all_criteria.filter(is_active=True, target_domain__in=["VENDOR", "BOTH"]).count()
+
+    page_obj, query_string = paginate_and_preserve(request, qs, per_page=10)
+
+    return render(request, "admin_panel/matching_criteria.html", {
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "total_criteria": total_criteria,
+        "active_criteria": active_criteria,
+        "sales_criteria": sales_criteria,
+        "vendor_criteria": vendor_criteria,
+        "domain_filter": domain_filter,
+        "status_filter": status_filter,
+        "rule_filter": rule_filter,
+        "q": q,
+        "domain_choices": PlatformMatchingCriteria.TargetDomain.choices,
+        "rule_choices": PlatformMatchingCriteria.RuleType.choices,
+        "page_title": "AI Search Matching Criteria Governance — Super Admin",
+    })
+
 
 

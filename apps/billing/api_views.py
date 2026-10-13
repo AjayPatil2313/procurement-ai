@@ -96,7 +96,7 @@ def wallet_transactions_api(request):
         tx_qs = tx_qs.filter(created_at__date__lte=date_to)
 
     page = int(request.GET.get("page", 1))
-    page_size = min(int(request.GET.get("page_size", 25)), 100)
+    page_size = min(int(request.GET.get("page_size", 10)), 100)
     paginator = Paginator(tx_qs, page_size)
     page_obj = paginator.get_page(page)
 
@@ -200,7 +200,7 @@ def usage_history_api(request):
         qs = qs.filter(status=status_filter)
 
     page = int(request.GET.get("page", 1))
-    page_size = min(int(request.GET.get("page_size", 25)), 100)
+    page_size = min(int(request.GET.get("page_size", 10)), 100)
     paginator = Paginator(qs, page_size)
     page_obj = paginator.get_page(page)
 

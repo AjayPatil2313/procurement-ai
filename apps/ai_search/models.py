@@ -363,8 +363,214 @@ DEFAULT_MATCHING_PARAMETERS = [
 ]
 
 
+class PlatformMatchingCriteria(models.Model):
+    """
+    Platform-Wide Dynamic AI Search & Lead Matching Criteria:
+    Managed exclusively by Super Admin to dynamically control which evaluation criteria
+    are available and enforced across Vendor (Find Buyers) and Sales (Find Suppliers).
+    Supports domain targeting (SALES, VENDOR, BOTH), custom weights, rule types,
+    ordering, icon/color customization, and real-time activation toggling.
+    """
+    class TargetDomain(models.TextChoices):
+        BOTH = "BOTH", "Both (Sales & Vendor)"
+        SALES = "SALES", "Sales (Find Suppliers)"
+        VENDOR = "VENDOR", "Vendor (Find Buyers)"
+
+    class RuleType(models.TextChoices):
+        WEIGHTED = "weighted", "Weighted (Percentage Contribution)"
+        MANDATORY = "mandatory", "Mandatory (Must Satisfy)"
+        BONUS = "bonus", "Bonus (Boost Points)"
+
+    name = models.CharField(max_length=150, help_text="Display title for the matching criterion")
+    parameter_key = models.CharField(max_length=80, unique=True, help_text="Unique slug key identifier (e.g. entity_type)")
+    target_domain = models.CharField(
+        max_length=20,
+        choices=TargetDomain.choices,
+        default=TargetDomain.BOTH,
+        help_text="Module target domain where this criterion is active"
+    )
+    default_value = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Default baseline specification or benchmark"
+    )
+    description = models.TextField(blank=True, help_text="Guidance explanation for matching evaluation")
+    rule_type = models.CharField(
+        max_length=20,
+        choices=RuleType.choices,
+        default=RuleType.WEIGHTED,
+    )
+    weight_percentage = models.PositiveSmallIntegerField(default=10, help_text="Contribution weight percentage (0-100)")
+    icon = models.CharField(max_length=50, default="fa-sliders", help_text="FontAwesome icon class")
+    color = models.CharField(max_length=30, default="blue", help_text="Tailwind accent badge color")
+    order = models.PositiveSmallIntegerField(default=10, help_text="Display priority order")
+    is_active = models.BooleanField(default=True, help_text="Whether this criterion is currently active platform-wide")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "Platform Matching Criteria"
+        verbose_name_plural = "Platform Matching Criteria"
+
+    def __str__(self):
+        return f"{self.name} [{self.get_target_domain_display()}] ({self.rule_type})"
+
+    @classmethod
+    def get_criteria_for_domain(cls, domain="BOTH"):
+        """
+        Returns active criteria for a given domain ('SALES', 'VENDOR', or 'BOTH').
+        If no criteria records exist, auto-seeds default benchmark criteria.
+        """
+        if not cls.objects.exists():
+            cls.seed_default_criteria()
+
+        if domain == "BOTH":
+            qs = cls.objects.filter(is_active=True)
+        else:
+            qs = cls.objects.filter(is_active=True, target_domain__in=[domain, cls.TargetDomain.BOTH])
+        return qs.order_by("order", "id")
+
+    @classmethod
+    def seed_default_criteria(cls):
+        """
+        Seeds standard recommended B2B criteria if not already present.
+        """
+        defaults = [
+            {
+                "parameter_key": "entity_type",
+                "name": "Legal Entity Structure (Pvt Ltd / Ltd)",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Private Limited (Pvt Ltd), Public Limited, Corporate Entity",
+                "description": "Target enterprise must be an officially incorporated Private Limited (Pvt Ltd) or Public Ltd commercial entity with corporate standing.",
+                "rule_type": cls.RuleType.MANDATORY,
+                "weight_percentage": 10,
+                "icon": "fa-building-columns",
+                "color": "blue",
+                "order": 10,
+            },
+            {
+                "parameter_key": "verified_status",
+                "name": "Verified Contact & Registration",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Verified Phone, Direct Corporate Email & Official Web Domain",
+                "description": "Company must possess reachable communication channels, confirmed phone lines, and verified operational presence.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 10,
+                "icon": "fa-circle-check",
+                "color": "emerald",
+                "order": 20,
+            },
+            {
+                "parameter_key": "categories_match",
+                "name": "Product Category Alignment",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Target Industrial Category & Sector Classification",
+                "description": "Company actively manufactures, supplies, or procures within the specific product category classification.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 10,
+                "icon": "fa-layer-group",
+                "color": "amber",
+                "order": 30,
+            },
+            {
+                "parameter_key": "industry_match",
+                "name": "Industry Vertical Match",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Manufacturing, Infrastructure, EPC, Chemical, Heavy Engineering",
+                "description": "Company operates in an industrial vertical that routinely consumes or supplies relevant engineering goods.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 10,
+                "icon": "fa-industry",
+                "color": "indigo",
+                "order": 40,
+            },
+            {
+                "parameter_key": "specifications",
+                "name": "Company Specifications (Size, Grade, Capacity)",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Enterprise Scale, Quality Grade (ISO/MTC), Plant Capacity",
+                "description": "Operational scale, unit capacity, dimensions, and quality grade standards match procurement requirements.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 10,
+                "icon": "fa-ruler-combined",
+                "color": "teal",
+                "order": 50,
+            },
+            {
+                "parameter_key": "product_matching",
+                "name": "Product Technical Matching",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Direct Technical Compatibility & SKU Relevance",
+                "description": "Direct operational alignment between the offered product technical specifications and catalog item.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 15,
+                "icon": "fa-microchip",
+                "color": "purple",
+                "order": 60,
+            },
+            {
+                "parameter_key": "location",
+                "name": "Geographic Location & Delivery Proximity",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Regional Hub, Industrial Corridor, Domestic Proximity",
+                "description": "Proximity between buyer plant or project location and target logistics dispatch corridor.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 10,
+                "icon": "fa-location-dot",
+                "color": "rose",
+                "order": 70,
+            },
+            {
+                "parameter_key": "buyer_req_match",
+                "name": "Buyer Requirement & Demand Intent",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Active Tender, Expansion Capex, Recurring Maintenance Demand",
+                "description": "Buyer demonstrates an active buying signal, vendor empanelement window, ongoing RFQ, or replenishment cycle.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 15,
+                "icon": "fa-bell",
+                "color": "amber",
+                "order": 80,
+            },
+            {
+                "parameter_key": "b2b_model",
+                "name": "B2B Commercial Operating Model",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Commercial B2B Wholesale / Institutional Bulk Consumer",
+                "description": "Buyer must operate on a B2B model (wholesale, institutional project, OEM, or distributor) and not retail/consumer.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 5,
+                "icon": "fa-handshake",
+                "color": "blue",
+                "order": 90,
+            },
+            {
+                "parameter_key": "profile_relevance",
+                "name": "Company Profile & Operational Relevance",
+                "target_domain": cls.TargetDomain.BOTH,
+                "default_value": "Operational Plant, Facility Infrastructure, Historical Track Record",
+                "description": "Buyer's plant infrastructure and published commercial activities align with our technical portfolio.",
+                "rule_type": cls.RuleType.WEIGHTED,
+                "weight_percentage": 5,
+                "icon": "fa-id-card",
+                "color": "slate",
+                "order": 100,
+            },
+        ]
+        created_count = 0
+        for item in defaults:
+            obj, created = cls.objects.get_or_create(
+                parameter_key=item["parameter_key"],
+                defaults=item,
+            )
+            if created:
+                created_count += 1
+        return created_count
+
+
 def ensure_default_parameters_for_company(company):
-    """Initializes standard matching parameters for a company if none exist."""
+    """Initializes standard matching parameters for a company if none exist, drawing from dynamic PlatformMatchingCriteria."""
     if not company:
         return []
     existing = list(MatchingParameter.objects.filter(company=company))
@@ -372,6 +578,26 @@ def ensure_default_parameters_for_company(company):
         return existing
 
     created_params = []
+    # Attempt to load from active PlatformMatchingCriteria first
+    try:
+        platform_criteria = list(PlatformMatchingCriteria.get_criteria_for_domain("BOTH"))
+        if platform_criteria:
+            for pc in platform_criteria:
+                p = MatchingParameter.objects.create(
+                    company=company,
+                    name=pc.name,
+                    parameter_key=pc.parameter_key,
+                    criteria_value=pc.default_value,
+                    description=pc.description,
+                    rule_type=pc.rule_type,
+                    weight_percentage=pc.weight_percentage,
+                    is_active=pc.is_active,
+                )
+                created_params.append(p)
+            return created_params
+    except Exception:
+        pass
+
     for data in DEFAULT_MATCHING_PARAMETERS:
         p = MatchingParameter.objects.create(
             company=company,

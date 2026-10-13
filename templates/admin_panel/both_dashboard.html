@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Both (Hybrid) Dashboard Governance — Super Admin Panel{% endblock %}
+{% block title %}Both (Sales &amp; Vendor) Dashboard Governance — Super Admin Panel{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,9 +11,9 @@
       <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 mb-3">
         <i class="fa-solid fa-crown mr-1.5 text-purple-400"></i> Platform Super Admin Control Center
       </div>
-      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Hybrid Enterprise (Both) Dashboard Governance</h1>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Both (Sales &amp; Vendor) Dashboard Governance</h1>
       <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
-        Manage dual-operating enterprises (Company Type = BOTH). Govern default workspace views, allow seamless switching between Buyer and Seller spaces, and supervise unified wallet balances.
+        Manage dual-operating enterprises (Company Type = BOTH). Govern default workspace views, allow seamless switching between Sales and Vendor spaces, and supervise unified wallet balances.
       </p>
     </div>
 
@@ -42,7 +42,7 @@
         </span>
       </div>
       <div class="text-2xl font-black text-purple-600">{{ total_both_companies }}</div>
-      <div class="text-[11px] text-slate-500 mt-1">Both Buyer &amp; Seller active</div>
+      <div class="text-[11px] text-slate-500 mt-1">Both Sales &amp; Vendor active</div>
     </div>
 
     <!-- Requirements Posted -->
@@ -54,7 +54,7 @@
         </span>
       </div>
       <div class="text-2xl font-black text-blue-600">{{ total_requirements }}</div>
-      <div class="text-[11px] text-slate-500 mt-1">Buyer side requirements</div>
+      <div class="text-[11px] text-slate-500 mt-1">Sales side requirements</div>
     </div>
 
     <!-- Products in Catalog -->
@@ -66,7 +66,7 @@
         </span>
       </div>
       <div class="text-2xl font-black text-emerald-600">{{ total_products }}</div>
-      <div class="text-[11px] text-slate-500 mt-1">Seller side listings</div>
+      <div class="text-[11px] text-slate-500 mt-1">Vendor side listings</div>
     </div>
 
     <!-- AI Searches (Cross-functional) -->
@@ -116,8 +116,8 @@
           <p class="text-[11px] text-slate-500 mb-3">Which view should open by default when a BOTH company user accesses /dashboard/</p>
           <select name="default_active_view" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:ring-1 focus:ring-purple-500 outline-none bg-white">
             <option value="combined" {% if layout.default_active_view == 'combined' %}selected{% endif %}>Combined Synergy View (All KPIs)</option>
-            <option value="buyer" {% if layout.default_active_view == 'buyer' %}selected{% endif %}>Buyer Workspace (Procurement Focus)</option>
-            <option value="seller" {% if layout.default_active_view == 'seller' %}selected{% endif %}>Seller Workspace (Sales &amp; Catalog Focus)</option>
+            <option value="buyer" {% if layout.default_active_view == 'buyer' %}selected{% endif %}>Sales Workspace (Procurement Focus)</option>
+            <option value="seller" {% if layout.default_active_view == 'seller' %}selected{% endif %}>Vendor Workspace (Catalog &amp; Sales Focus)</option>
           </select>
         </div>
 
@@ -125,7 +125,7 @@
         <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col justify-between">
           <div>
             <div class="text-xs font-bold text-slate-800">Workspace Switcher Pill</div>
-            <div class="text-[11px] text-slate-500 mt-1">Render interactive Buyer &bull; Seller &bull; Combined switcher pill on the tenant dashboard</div>
+            <div class="text-[11px] text-slate-500 mt-1">Render interactive Sales &bull; Vendor &bull; Combined switcher pill on the tenant dashboard</div>
           </div>
           <label class="flex items-center gap-2 cursor-pointer mt-3">
             <input type="checkbox" name="show_view_switcher" {% if layout.show_view_switcher %}checked{% endif %} class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
@@ -256,19 +256,7 @@
     </div>
 
     <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-      <div>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-      <div class="flex items-center gap-1">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Previous</a>
-        {% endif %}
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Next</a>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
+    {% include "admin_panel/includes/pagination.html" %}
   </div>
 
 </div>

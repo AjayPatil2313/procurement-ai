@@ -254,8 +254,8 @@ class BuyerModuleConfig(models.Model):
 
     class Meta:
         ordering = ["order", "id"]
-        verbose_name = "Buyer Module Configuration"
-        verbose_name_plural = "Buyer Module Configurations"
+        verbose_name = "Sales Module Configuration"
+        verbose_name_plural = "Sales Module Configurations"
 
     def __str__(self):
         status = "Active" if self.is_enabled else "Disabled"
@@ -404,8 +404,8 @@ class BuyerDashboardLayout(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Buyer Dashboard Layout"
-        verbose_name_plural = "Buyer Dashboard Layouts"
+        verbose_name = "Sales Dashboard Layout"
+        verbose_name_plural = "Sales Dashboard Layouts"
 
     @classmethod
     def get_layout(cls):
@@ -438,8 +438,8 @@ class SellerModuleConfig(models.Model):
 
     class Meta:
         ordering = ["order", "id"]
-        verbose_name = "Seller Module Configuration"
-        verbose_name_plural = "Seller Module Configurations"
+        verbose_name = "Vendor Module Configuration"
+        verbose_name_plural = "Vendor Module Configurations"
 
     def __str__(self):
         status = "Active" if self.is_enabled else "Disabled"
@@ -600,8 +600,8 @@ class SellerDashboardLayout(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Seller Dashboard Layout"
-        verbose_name_plural = "Seller Dashboard Layouts"
+        verbose_name = "Vendor Dashboard Layout"
+        verbose_name_plural = "Vendor Dashboard Layouts"
 
     @classmethod
     def get_layout(cls):
@@ -614,8 +614,8 @@ class BothDashboardLayout(models.Model):
         max_length=20,
         choices=[
             ("combined", "Combined Overview"),
-            ("buyer", "Buyer Procurement"),
-            ("seller", "Seller Sales"),
+            ("buyer", "Sales Workspace"),
+            ("seller", "Vendor Workspace"),
         ],
         default="combined",
     )
@@ -624,8 +624,8 @@ class BothDashboardLayout(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Both Dashboard Layout"
-        verbose_name_plural = "Both Dashboard Layouts"
+        verbose_name = "Both (Sales & Vendor) Dashboard Layout"
+        verbose_name_plural = "Both (Sales & Vendor) Dashboard Layouts"
 
     @classmethod
     def get_layout(cls):
