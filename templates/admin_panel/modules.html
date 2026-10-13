@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Centralized Module &amp; Feature Management — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-indigo-400"></i> Platform Super Admin Control Center
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Platform Module &amp; Feature Management</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+        Centralized governance matrix across Buyer, Seller, and Hybrid (Both) modules. Super Admin controls module availability, minimum subscription tiers, credit deductions, and supported CRUD/Import/Export operations.
+      </p>
+    </div>
+
+    <!-- Quick Action Shortcut Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{% url 'admin-panel-buyer-dashboard' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-cart-shopping mr-1.5"></i> Buyer Matrix
+      </a>
+      <a href="{% url 'admin-panel-seller-dashboard' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-bullhorn mr-1.5"></i> Seller Matrix
+      </a>
+      <a href="{% url 'admin-panel-both-dashboard' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-arrows-split-up-and-left mr-1.5"></i> Both Matrix
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Aggregate Metrics -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Total System Modules</div>
+        <div class="text-2xl font-black text-slate-900">{{ total_modules }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Configured in registry</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-cubes"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Active Modules</div>
+        <div class="text-2xl font-black text-emerald-600">{{ active_count }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Available to tenant companies</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-circle-check"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Disabled Modules</div>
+        <div class="text-2xl font-black {% if disabled_count > 0 %}text-rose-600{% else %}text-slate-400{% endif %}">{{ disabled_count }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Blocked platform-wide</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-ban"></i>
+      </span>
+    </div>
+  </div>
+
+  <!-- Enforcement Notice Callout -->
+  <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3.5 shadow-sm text-xs text-amber-900">
+    <span class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 text-sm mt-0.5">
+      <i class="fa-solid fa-shield-halved"></i>
+    </span>
+    <div>
+      <div class="font-bold text-amber-950 text-sm">Two-Way Backend Enforcement Active</div>
+      <div class="mt-0.5 text-amber-900 leading-relaxed">
+        Disabling any module here does <strong>not</strong> merely hide navigation links in the frontend. It actively engages backend enforcement: all Django web routes wrapped in <code class="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-mono text-[11px]">@module_permission_required</code> and DRF API endpoints with <code class="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-mono text-[11px]">HasModulePermission</code> immediately reject tenant requests with <code class="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-mono text-[11px]">HTTP 403 Forbidden / PermissionDenied</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Centralized Module Matrix Card -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <!-- Filter and Search Bar -->
+    <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <!-- Tabs -->
+      <div class="flex items-center gap-2">
+        <a href="?tab=all{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'all' %}bg-slate-900 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+          All Modules ({{ total_modules }})
+        </a>
+        <a href="?tab=buyer{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'buyer' %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+          Buyer Only
+        </a>
+        <a href="?tab=seller{% if q %}&q={{ q }}{% endif %}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition {% if tab == 'seller' %}bg-emerald-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+          Seller Only
+        </a>
+      </div>
+
+      <!-- Search Query -->
+      <form method="GET" class="flex items-center gap-2">
+        <input type="hidden" name="tab" value="{{ tab }}">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search module name or key..." class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-64">
+        <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
+      </form>
+    </div>
+
+    <!-- Matrix Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Module Name &amp; Key</th>
+            <th class="py-3 px-4">Company Type</th>
+            <th class="py-3 px-4">Status</th>
+            <!-- Supported Operations Matrix -->
+            <th class="py-3 px-2 text-center" title="Read / View Access">View</th>
+            <th class="py-3 px-2 text-center" title="Create / Add Access">Create</th>
+            <th class="py-3 px-2 text-center" title="Edit Access">Edit</th>
+            <th class="py-3 px-2 text-center" title="Update Access">Update</th>
+            <th class="py-3 px-2 text-center" title="Delete Access">Delete</th>
+            <th class="py-3 px-2 text-center" title="Import Access">Import</th>
+            <th class="py-3 px-2 text-center" title="Export Access">Export</th>
+            <th class="py-3 px-4">Min Plan</th>
+            <th class="py-3 px-4">AI Credits</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for item in modules_matrix %}
+          <tr class="hover:bg-slate-50 transition">
+            <!-- Module Name & Key -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-lg {% if item.type == 'buyer' %}bg-blue-50 text-blue-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-xs shrink-0">
+                  <i class="fa-solid {{ item.icon_class }}"></i>
+                </span>
+                <div>
+                  <div class="font-bold text-slate-900">{{ item.display_name }}</div>
+                  <div class="text-[11px] text-slate-500 font-mono">{{ item.module_key }}</div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Company Type -->
+            <td class="py-3.5 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if item.type == 'buyer' %}bg-blue-100 text-blue-800{% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                {{ item.type_label }}
+              </span>
+            </td>
+
+            <!-- Status Toggle -->
+            <td class="py-3.5 px-4">
+              <form method="POST" action="{% url 'admin-panel-module-toggle' item.type item.id %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold transition {% if item.is_enabled %}bg-emerald-100 text-emerald-800 hover:bg-emerald-200{% else %}bg-rose-100 text-rose-800 hover:bg-rose-200{% endif %}">
+                  <i class="fa-solid {% if item.is_enabled %}fa-toggle-on text-emerald-600{% else %}fa-toggle-off text-rose-600{% endif %} mr-1.5 text-xs"></i>
+                  {% if item.is_enabled %}Active{% else %}Disabled{% endif %}
+                </button>
+              </form>
+            </td>
+
+            <!-- Operations Matrix -->
+            <!-- View -->
+            <td class="py-3.5 px-2 text-center">
+              {% if "View" in item.actions or "Search" in item.actions %}
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-emerald-50 text-emerald-600 text-[11px] font-bold" title="View / Read Allowed"><i class="fa-solid fa-check"></i></span>
+              {% else %}
+              <span class="text-slate-300">&minus;</span>
+              {% endif %}
+            </td>
+
+            <!-- Create -->
+            <td class="py-3.5 px-2 text-center">
+              {% if "Create" in item.actions or "Save" in item.actions or "Recharge" in item.actions %}
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-blue-50 text-blue-600 text-[11px] font-bold" title="Create / Add Allowed"><i class="fa-solid fa-check"></i></span>
+              {% else %}
+              <span class="text-slate-300">&minus;</span>
+              {% endif %}
+            </td>
+
+            <!-- Edit -->
+            <td class="py-3.5 px-2 text-center">
+              {% if "Edit" in item.actions %}
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-indigo-50 text-indigo-600 text-[11px] font-bold" title="Edit Form Allowed"><i class="fa-solid fa-check"></i></span>
+              {% else %}
+              <span class="text-slate-300">&minus;</span>
+              {% endif %}
+            </td>
+
+            <!-- Update -->
+            <td class="py-3.5 px-2 text-center">
+              {% if "Update" in item.actions %}
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-purple-50 text-purple-600 text-[11px] font-bold" title="Update / Patch Allowed"><i class="fa-solid fa-check"></i></span>
+              {% else %}
+              <span class="text-slate-300">&minus;</span>
+              {% endif %}
+            </td>
+
+            <!-- Delete -->
+            <td class="py-3.5 px-2 text-center">
+              {% if "Delete" in item.actions %}
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-rose-50 text-rose-600 text-[11px] font-bold" title="Delete Allowed"><i class="fa-solid fa-check"></i></span>
+              {% else %}
+              <span class="text-slate-300">&minus;</span>
+              {% endif %}
+            </td>
+
+            <!-- Import -->
+            <td class="py-3.5 px-2 text-center">
+              {% if "Import" in item.actions %}
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-amber-50 text-amber-600 text-[11px] font-bold" title="Import Allowed"><i class="fa-solid fa-check"></i></span>
+              {% else %}
+              <span class="text-slate-300">&minus;</span>
+              {% endif %}
+            </td>
+
+            <!-- Export -->
+            <td class="py-3.5 px-2 text-center">
+              {% if "Export" in item.actions %}
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-teal-50 text-teal-600 text-[11px] font-bold" title="Export Allowed"><i class="fa-solid fa-check"></i></span>
+              {% else %}
+              <span class="text-slate-300">&minus;</span>
+              {% endif %}
+            </td>
+
+            <!-- Min Plan -->
+            <td class="py-3.5 px-4 font-semibold text-slate-700">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                {{ item.min_plan }}
+              </span>
+            </td>
+
+            <!-- AI Credits -->
+            <td class="py-3.5 px-4">
+              {% if item.requires_credits %}
+              <span class="text-amber-700 font-semibold"><i class="fa-solid fa-coins mr-1"></i> Yes</span>
+              {% else %}
+              <span class="text-slate-400">Included</span>
+              {% endif %}
+            </td>
+
+            <!-- Actions -->
+            <td class="py-3.5 px-4 text-right">
+              {% if item.type == 'buyer' %}
+              <a href="{% url 'admin-panel-buyer-dashboard' %}?tab=modules" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 font-bold transition text-[11px]">
+                <i class="fa-solid fa-gear mr-1"></i> Configure
+              </a>
+              {% else %}
+              <a href="{% url 'admin-panel-seller-dashboard' %}?tab=modules" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 text-slate-700 font-bold transition text-[11px]">
+                <i class="fa-solid fa-gear mr-1"></i> Configure
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="13" class="text-center py-8 text-slate-400">No modules match search criteria.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

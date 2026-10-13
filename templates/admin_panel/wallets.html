@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Company Wallets &amp; Billing Governance — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-indigo-400"></i> Platform Super Admin Control Center
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Company Wallets &amp; Billing Governance</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+        Manage tenant prepaid currency wallets, monitor platform-wide financial liabilities, inspect reserved funds for running AI jobs, and execute audited balance adjustments.
+      </p>
+    </div>
+
+    <!-- Quick Action Shortcut Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{% url 'admin-panel-transactions' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-list-check mr-1.5"></i> Full Ledger
+      </a>
+      <a href="{% url 'admin-panel-plans' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-sliders mr-1.5 text-amber-400"></i> Configure Pricing Rates
+      </a>
+      <a href="{% url 'admin-panel-companies' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-building mr-1.5 text-blue-400"></i> Companies Directory
+      </a>
+    </div>
+  </div>
+
+  <!-- Platform Financial Liability Metrics -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Available Platform Liability</span>
+        <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-vault"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-emerald-600">₹{{ total_available_liability|floatformat:2 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Tenant usable prepaid balance</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Reserved Balance</span>
+        <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-lock"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-amber-600">₹{{ total_reserved_liability|floatformat:2 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Holds on active search jobs</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Cumulative Spent</span>
+        <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-receipt"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-blue-600">₹{{ total_spent_platform|floatformat:2 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">All AI jobs billed to date</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Total Recharged</span>
+        <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-circle-dollar-to-slot"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-indigo-600">₹{{ total_credited_platform|floatformat:2 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Lifetime wallet top-ups</div>
+    </div>
+  </div>
+
+  <!-- Service Rate Card Reference -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="text-sm font-bold text-slate-900">Active AI Service Usage Pricing Rates</h3>
+        <p class="text-xs text-slate-500">Atomic charges automatically deducted from company wallets upon successful execution</p>
+      </div>
+      <a href="{% url 'admin-panel-plans' %}" class="text-xs font-bold text-indigo-600 hover:underline">Edit Rate Card</a>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {% for sp in pricing_list %}
+      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+        <div class="text-[11px] text-slate-500 font-medium truncate">{{ sp.display_name }}</div>
+        <div class="text-base font-black text-slate-900 mt-1">₹{{ sp.price|floatformat:2 }}</div>
+        <div class="text-[10px] text-slate-400 capitalize">{{ sp.get_charging_unit_display }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Tenant Wallets Directory Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <!-- Search Bar -->
+    <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Tenant Company Wallets Registry</h3>
+        <p class="text-xs text-slate-500">Real-time ledger balances and single-click administrative credit adjustments</p>
+      </div>
+
+      <form method="GET" class="flex items-center gap-2">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search company, city..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-64">
+        <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
+        {% if q %}
+        <a href="{% url 'admin-panel-wallets' %}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
+        {% endif %}
+      </form>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Company Name</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Available Balance</th>
+            <th class="py-3 px-4">Reserved Hold</th>
+            <th class="py-3 px-4">Total Recharged</th>
+            <th class="py-3 px-4">Total Spent</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4">Last Activity</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for w in page_obj %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-900">
+              <a href="{% url 'admin-panel-company-detail' w.company.id %}" class="hover:text-indigo-600 transition flex items-center gap-2">
+                <span>{{ w.company.name }}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-400"></i>
+              </a>
+              <div class="text-[11px] font-normal text-slate-500">{{ w.company.city|default:"India" }} &bull; {{ w.company.industry|default:"General" }}</div>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if w.company.company_type == 'BUYER' %}bg-blue-100 text-blue-800{% elif w.company.company_type == 'SELLER' %}bg-emerald-100 text-emerald-800{% else %}bg-purple-100 text-purple-800{% endif %}">
+                {{ w.company.get_company_type_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <div class="text-sm font-black {% if w.available_balance <= w.low_balance_threshold %}text-rose-600{% else %}text-slate-900{% endif %}">
+                ₹{{ w.available_balance|floatformat:2 }}
+              </div>
+              {% if w.available_balance <= w.low_balance_threshold %}
+              <div class="text-[10px] text-rose-600 font-bold flex items-center gap-1 mt-0.5">
+                <i class="fa-solid fa-triangle-exclamation"></i> Low Balance
+              </div>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 font-bold text-amber-600">₹{{ w.reserved_balance|floatformat:2 }}</td>
+            <td class="py-3 px-4 font-semibold text-emerald-600">₹{{ w.total_credited|floatformat:2 }}</td>
+            <td class="py-3 px-4 font-semibold text-slate-700">₹{{ w.total_spent|floatformat:2 }}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if w.status == 'active' %}bg-emerald-100 text-emerald-800{% else %}bg-rose-100 text-rose-800{% endif %}">
+                {{ w.get_status_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-slate-500 font-mono">
+              {% if w.last_transaction_at %}
+              {{ w.last_transaction_at|date:"M d, Y H:i" }}
+              {% else %}
+              <span class="text-slate-400">Never</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-right">
+              <button type="button" onclick="openAdjustWalletModal('{{ w.company.id }}', '{{ w.company.name|escapejs }}', '{{ w.available_balance|floatformat:2 }}')" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold transition text-[11px]">
+                <i class="fa-solid fa-pen-to-square mr-1"></i> Adjust
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center py-8 text-slate-400">No company wallets match query.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+      <div>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+      <div class="flex items-center gap-1">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Next</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Manual Adjust Wallet Balance Modal -->
+<div id="adjustWalletModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Adjust Company Wallet Balance</h3>
+        <p class="text-xs text-slate-500 mt-0.5" id="modalCompanyName">Company Name</p>
+      </div>
+      <button type="button" onclick="closeAdjustWalletModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+
+    <form id="adjustWalletForm" method="POST" action="" class="p-6 space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <div class="text-[11px] text-slate-500">Current Available Balance:</div>
+        <div class="text-xl font-black text-slate-900" id="modalCurrentBalance">₹0.00</div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Adjustment Amount (₹ INR)</label>
+        <p class="text-[11px] text-slate-500 mb-1.5">Enter positive amount to credit (e.g. +500.00) or negative to debit (e.g. -200.00)</p>
+        <input type="number" step="0.01" name="amount" required placeholder="+500.00 or -200.00" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Mandatory Audit Reason</label>
+        <textarea name="reason" rows="3" required placeholder="Explain why this adjustment is being made (e.g. Offline bank transfer receipt verified, promotional credit, or dispute correction)..." class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"></textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+        <button type="button" onclick="closeAdjustWalletModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md transition">Commit Adjustment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openAdjustWalletModal(companyId, companyName, currentBalance) {
+  const form = document.getElementById('adjustWalletForm');
+  form.action = `/admin-panel/companies/${companyId}/adjust-wallet/`;
+  document.getElementById('modalCompanyName').textContent = companyName;
+  document.getElementById('modalCurrentBalance').textContent = `₹${currentBalance}`;
+  document.getElementById('adjustWalletModal').classList.remove('hidden');
+}
+function closeAdjustWalletModal() {
+  document.getElementById('adjustWalletModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

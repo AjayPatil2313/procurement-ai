@@ -23,13 +23,14 @@ from apps.catalog.web_views import (
     STATIC_CRITERIA_KEYS,
     _sync_company_matching_criteria,
 )
-from apps.companies.rbac import get_user_rbac_context
+from apps.companies.rbac import get_user_rbac_context, module_permission_required
 from apps.leads.models import SavedItem
 from apps.requirements.models import Requirement
 from apps.dashboard.ratelimit import rate_limit
 
 
 @login_required
+@module_permission_required("requirements", "READ")
 def requirements_list_view(request):
     """
     Buyer Requirements List View:

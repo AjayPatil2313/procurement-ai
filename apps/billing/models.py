@@ -132,6 +132,12 @@ class Subscription(models.Model):
         if self.renewal_date and not self.valid_till:
             self.valid_till = self.renewal_date.date()
         super().save(*args, **kwargs)
+        if hasattr(self, "company") and hasattr(self.company, "credit_wallet"):
+            cw = self.company.credit_wallet
+            expected_sub_credits = max(0, self.credits_total - self.credits_used)
+            if cw.subscription_credits != expected_sub_credits:
+                cw.subscription_credits = expected_sub_credits
+                cw.save(update_fields=["subscription_credits"])
 
     def __str__(self):
         plan_name = self.plan_tier.name if self.plan_tier else self.get_plan_display()

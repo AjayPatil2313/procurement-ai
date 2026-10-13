@@ -128,6 +128,21 @@ from apps.companies.admin_views import (
     admin_panel_inquiries_view,
     admin_panel_reports_view,
     admin_panel_settings_view,
+    admin_panel_buyer_dashboard_view,
+    admin_panel_buyer_module_toggle_view,
+    admin_panel_buyer_module_edit_view,
+    admin_panel_buyer_layout_update_view,
+    admin_panel_seller_dashboard_view,
+    admin_panel_seller_module_toggle_view,
+    admin_panel_seller_module_edit_view,
+    admin_panel_seller_layout_update_view,
+    admin_panel_both_dashboard_view,
+    admin_panel_both_layout_update_view,
+    admin_panel_modules_view,
+    admin_panel_module_toggle_view,
+    admin_panel_permissions_view,
+    admin_panel_transactions_view,
+    admin_panel_wallets_view,
 )
 from apps.ai_search.web_views import (
     matching_parameters_view,
@@ -286,6 +301,27 @@ urlpatterns = [
     path("admin-panel/maintenance/toggle/", admin_panel_toggle_maintenance_view, name="admin-panel-toggle-maintenance"),
     path("admin-panel/api-logs/", admin_panel_apilogs_view, name="admin-panel-apilogs"),
     path("admin-panel/audit-logs/", admin_panel_auditlogs_view, name="admin-panel-auditlogs"),
+
+    # Super Admin Dashboard & Module Governance
+    path("admin-panel/buyer-dashboard/", admin_panel_buyer_dashboard_view, name="admin-panel-buyer-dashboard"),
+    path("admin-panel/buyer-dashboard/modules/<int:pk>/toggle/", admin_panel_buyer_module_toggle_view, name="admin-panel-buyer-module-toggle"),
+    path("admin-panel/buyer-dashboard/modules/<int:pk>/edit/", admin_panel_buyer_module_edit_view, name="admin-panel-buyer-module-edit"),
+    path("admin-panel/buyer-dashboard/layout/", admin_panel_buyer_layout_update_view, name="admin-panel-buyer-layout-update"),
+
+    path("admin-panel/seller-dashboard/", admin_panel_seller_dashboard_view, name="admin-panel-seller-dashboard"),
+    path("admin-panel/seller-dashboard/modules/<int:pk>/toggle/", admin_panel_seller_module_toggle_view, name="admin-panel-seller-module-toggle"),
+    path("admin-panel/seller-dashboard/modules/<int:pk>/edit/", admin_panel_seller_module_edit_view, name="admin-panel-seller-module-edit"),
+    path("admin-panel/seller-dashboard/layout/", admin_panel_seller_layout_update_view, name="admin-panel-seller-layout-update"),
+
+    path("admin-panel/both-dashboard/", admin_panel_both_dashboard_view, name="admin-panel-both-dashboard"),
+    path("admin-panel/both-dashboard/layout/", admin_panel_both_layout_update_view, name="admin-panel-both-layout-update"),
+
+    path("admin-panel/modules/", admin_panel_modules_view, name="admin-panel-modules"),
+    path("admin-panel/modules/<str:module_type>/<int:pk>/toggle/", admin_panel_module_toggle_view, name="admin-panel-module-toggle"),
+    path("admin-panel/permissions/", admin_panel_permissions_view, name="admin-panel-permissions"),
+    path("admin-panel/transactions/", admin_panel_transactions_view, name="admin-panel-transactions"),
+    path("admin-panel/invoices/", admin_panel_transactions_view, name="admin-panel-invoices"),
+    path("admin-panel/billing/wallets/", admin_panel_wallets_view, name="admin-panel-wallets"),
 
     # REST APIs
     path("api/auth/", include("apps.accounts.urls")),

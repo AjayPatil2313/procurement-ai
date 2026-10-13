@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Both (Hybrid) Dashboard Governance — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-purple-950 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-purple-400"></i> Platform Super Admin Control Center
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Hybrid Enterprise (Both) Dashboard Governance</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+        Manage dual-operating enterprises (Company Type = BOTH). Govern default workspace views, allow seamless switching between Buyer and Seller spaces, and supervise unified wallet balances.
+      </p>
+    </div>
+
+    <!-- Quick Action Shortcut Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{% url 'dashboard' %}?workspace=combined" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-up-right-from-square mr-1.5"></i> Live Combined View
+      </a>
+      <a href="{% url 'admin-panel-modules' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-cubes mr-1.5 text-purple-400"></i> All Modules
+      </a>
+      <a href="{% url 'admin-panel-companies' %}?type=BOTH" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-sitemap mr-1.5 text-purple-400"></i> Both Companies
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Aggregate Metrics (100% Real Database Values) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <!-- Total Dual Enterprises -->
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Dual Tenants</span>
+        <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-arrows-split-up-and-left"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-purple-600">{{ total_both_companies }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Both Buyer &amp; Seller active</div>
+    </div>
+
+    <!-- Requirements Posted -->
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Sourcing Reqs</span>
+        <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-clipboard-list"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-blue-600">{{ total_requirements }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Buyer side requirements</div>
+    </div>
+
+    <!-- Products in Catalog -->
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Catalog Products</span>
+        <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-box-open"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-emerald-600">{{ total_products }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Seller side listings</div>
+    </div>
+
+    <!-- AI Searches (Cross-functional) -->
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Cross AI Searches</span>
+        <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-magnifying-glass-chart"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-indigo-600">{{ total_searches }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Combined discovery jobs</div>
+    </div>
+
+    <!-- Inquiries & RFQs -->
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Total Inquiries</span>
+        <span class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-paper-plane"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-rose-600">{{ total_inquiries }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Sent &amp; received RFQs</div>
+    </div>
+  </div>
+
+  <!-- Dual Workspace Configuration Panel -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+    <div class="border-b border-slate-200 pb-4 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Dual Workspace Display Preferences</h3>
+        <p class="text-xs text-slate-500 mt-1">Govern the default presentation and workspace switching experience for tenant users in BOTH companies</p>
+      </div>
+      <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+        <i class="fa-solid fa-sliders mr-1.5"></i> Platform-Wide Policy
+      </div>
+    </div>
+
+    <form method="POST" action="{% url 'admin-panel-both-layout-update' %}" class="space-y-6">
+      {% csrf_token %}
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Default Active View -->
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <label class="block text-xs font-bold text-slate-800 mb-2">Default Active Workspace View</label>
+          <p class="text-[11px] text-slate-500 mb-3">Which view should open by default when a BOTH company user accesses /dashboard/</p>
+          <select name="default_active_view" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:ring-1 focus:ring-purple-500 outline-none bg-white">
+            <option value="combined" {% if layout.default_active_view == 'combined' %}selected{% endif %}>Combined Synergy View (All KPIs)</option>
+            <option value="buyer" {% if layout.default_active_view == 'buyer' %}selected{% endif %}>Buyer Workspace (Procurement Focus)</option>
+            <option value="seller" {% if layout.default_active_view == 'seller' %}selected{% endif %}>Seller Workspace (Sales &amp; Catalog Focus)</option>
+          </select>
+        </div>
+
+        <!-- View Switcher Toggle -->
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold text-slate-800">Workspace Switcher Pill</div>
+            <div class="text-[11px] text-slate-500 mt-1">Render interactive Buyer &bull; Seller &bull; Combined switcher pill on the tenant dashboard</div>
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer mt-3">
+            <input type="checkbox" name="show_view_switcher" {% if layout.show_view_switcher %}checked{% endif %} class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+            <span class="text-xs font-bold text-slate-700">Enable Workspace Switcher Pill</span>
+          </label>
+        </div>
+
+        <!-- Combined Metrics Toggle -->
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold text-slate-800">Combined Synergy Metrics</div>
+            <div class="text-[11px] text-slate-500 mt-1">Display unified procurement + sales aggregate cards when view is set to Combined</div>
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer mt-3">
+            <input type="checkbox" name="show_combined_metrics" {% if layout.show_combined_metrics %}checked{% endif %} class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+            <span class="text-xs font-bold text-slate-700">Display Synergy Metrics</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/30 transition">
+          <i class="fa-solid fa-floppy-disk mr-1.5"></i> Update Hybrid Layout Preferences
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Architecture Reference Card -->
+  <div class="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 rounded-2xl border border-purple-200 p-5 shadow-sm">
+    <div class="flex items-start gap-3.5">
+      <span class="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 text-sm mt-0.5">
+        <i class="fa-solid fa-network-wired"></i>
+      </span>
+      <div class="space-y-1">
+        <h4 class="text-sm font-bold text-purple-950">Architectural Principles for Hybrid (BOTH) Companies</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-purple-900 mt-2">
+          <div class="bg-white/80 p-3 rounded-xl border border-purple-100">
+            <div class="font-bold mb-1 flex items-center gap-1.5"><i class="fa-solid fa-wallet text-purple-600"></i> Single Company Wallet</div>
+            <div class="text-[11px] text-slate-600">Both procurement searches and sales lead generation deduct from the single unified company wallet with no double-charging.</div>
+          </div>
+          <div class="bg-white/80 p-3 rounded-xl border border-purple-100">
+            <div class="font-bold mb-1 flex items-center gap-1.5"><i class="fa-solid fa-folder-tree text-purple-600"></i> Strict Data Categorization</div>
+            <div class="text-[11px] text-slate-600">Requirements and Products remain strictly decoupled in database tables while accessible through unified navigation.</div>
+          </div>
+          <div class="bg-white/80 p-3 rounded-xl border border-purple-100">
+            <div class="font-bold mb-1 flex items-center gap-1.5"><i class="fa-solid fa-user-lock text-purple-600"></i> Granular RBAC Permissions</div>
+            <div class="text-[11px] text-slate-600">Team members can be given procurement-only, sales-only, or full administrator privileges within the same company account.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tenant Companies Directory (BOTH) -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Hybrid (BOTH) Enterprises Directory</h3>
+        <p class="text-xs text-slate-500">Live directory of enterprises operating in both procurement and sales domains</p>
+      </div>
+      <form method="GET" class="flex items-center gap-2">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search company, city, industry..." class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-purple-500 outline-none w-64">
+        <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
+      </form>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Company Name</th>
+            <th class="py-3 px-4">Industry / Location</th>
+            <th class="py-3 px-4 text-center">Requirements</th>
+            <th class="py-3 px-4 text-center">Catalog Products</th>
+            <th class="py-3 px-4 text-center">AI Searches</th>
+            <th class="py-3 px-4">Unified Wallet</th>
+            <th class="py-3 px-4">Subscription</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for item in annotated_companies %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-bold text-slate-900">
+              <a href="{% url 'admin-panel-company-detail' item.company.id %}" class="hover:text-purple-600 transition flex items-center gap-2">
+                <span>{{ item.company.name }}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-400"></i>
+              </a>
+              <div class="text-[10px] font-mono text-purple-600 mt-0.5">Dual-Operating Enterprise</div>
+            </td>
+            <td class="py-3 px-4">
+              <div class="font-medium text-slate-800">{{ item.company.industry|default:"Diversified" }}</div>
+              <div class="text-[11px] text-slate-400">{{ item.company.city|default:"India" }}</div>
+            </td>
+            <td class="py-3 px-4 text-center font-bold text-blue-600">{{ item.req_count }}</td>
+            <td class="py-3 px-4 text-center font-bold text-emerald-600">{{ item.prod_count }}</td>
+            <td class="py-3 px-4 text-center font-bold text-indigo-600">{{ item.searches_count }}</td>
+            <td class="py-3 px-4">
+              {% if item.wallet %}
+              <div class="font-bold text-slate-900">₹{{ item.wallet.available_balance|floatformat:2 }}</div>
+              <div class="text-[10px] text-slate-400">₹{{ item.wallet.reserved_balance|floatformat:2 }} reserved</div>
+              {% else %}
+              <span class="text-slate-400">₹0.00</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4">
+              {% if item.subscription %}
+              <div class="font-bold text-slate-800">{{ item.subscription.get_plan_display }}</div>
+              <div class="text-[11px] text-amber-700 font-semibold">{{ item.subscription.credits_remaining }} credits left</div>
+              {% else %}
+              <span class="text-slate-400">No Plan</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 text-right">
+              <a href="{% url 'admin-panel-company-detail' item.company.id %}" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition text-[11px]">
+                View 360
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center py-8 text-slate-400">No hybrid (BOTH) companies matching query.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+      <div>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+      <div class="flex items-center gap-1">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Next</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

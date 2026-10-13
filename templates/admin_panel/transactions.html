@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Transactions &amp; Invoices — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-indigo-400"></i> Platform Super Admin Control Center
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Transactions &amp; Invoices Central Ledger</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+        Complete financial audit trail across company wallets, AI usage debits, subscription renewals, payments, and generated tax invoices.
+      </p>
+    </div>
+
+    <!-- Quick Action Shortcut Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{% url 'admin-panel-wallets' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-wallet mr-1.5"></i> Company Wallets
+      </a>
+      <a href="{% url 'admin-panel-plans' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-credit-card mr-1.5 text-amber-400"></i> Plans &amp; Rates
+      </a>
+      <a href="{% url 'admin-panel-reports' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-file-arrow-down mr-1.5 text-emerald-400"></i> Export Ledgers
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Aggregate Financial Metrics -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Total Wallet Volume</span>
+        <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-money-bill-trend-up"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-emerald-600">₹{{ total_wallet_volume|floatformat:2 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Recharge transactions volume</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Total Invoiced</span>
+        <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-blue-600">₹{{ total_invoiced_amt|floatformat:2 }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Generated tax invoices total</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Paid Invoices</span>
+        <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-receipt"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-indigo-600">{{ total_paid_invoices }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Fully settled billing records</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
+      <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
+        <span>Pending / Draft</span>
+        <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-hourglass-half"></i>
+        </span>
+      </div>
+      <div class="text-2xl font-black text-amber-600">{{ total_pending_invoices }}</div>
+      <div class="text-[11px] text-slate-500 mt-1">Draft or overdue invoices</div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="border-b border-slate-200">
+    <nav class="flex space-x-6 text-sm font-bold">
+      <a href="?tab=wallet_tx{% if q %}&q={{ q }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'wallet_tx' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
+        <i class="fa-solid fa-wallet"></i> Company Wallet Ledger
+      </a>
+      <a href="?tab=invoices{% if q %}&q={{ q }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'invoices' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
+        <i class="fa-solid fa-file-invoice-dollar"></i> Tax Invoices Ledger
+      </a>
+      <a href="?tab=credits{% if q %}&q={{ q }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'credits' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
+        <i class="fa-solid fa-coins"></i> AI Search Credit Ledger
+      </a>
+    </nav>
+  </div>
+
+  <!-- Search Filter Form -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="text-xs text-slate-500">
+      Viewing <span class="font-bold text-slate-800">{% if active_tab == 'wallet_tx' %}Wallet Ledger Transactions{% elif active_tab == 'invoices' %}Billing Invoices{% else %}Credit Usage Records{% endif %}</span>
+    </div>
+
+    <form method="GET" class="flex items-center gap-2">
+      <input type="hidden" name="tab" value="{{ active_tab }}">
+      <input type="text" name="q" value="{{ q }}" placeholder="Search by reference, company, description..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-72">
+      <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
+      {% if q %}
+      <a href="?tab={{ active_tab }}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- TAB CONTENT 1: WALLET TRANSACTIONS LEDGER -->
+  {% if active_tab == 'wallet_tx' %}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Reference ID</th>
+            <th class="py-3 px-4">Company</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Amount</th>
+            <th class="py-3 px-4">Balance After</th>
+            <th class="py-3 px-4">Description</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4">Initiated By</th>
+            <th class="py-3 px-4 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for tx in page_obj %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-slate-800">{{ tx.reference_id }}</td>
+            <td class="py-3 px-4 font-bold text-slate-900">
+              <a href="{% url 'admin-panel-company-detail' tx.company.id %}" class="hover:text-indigo-600 transition">
+                {{ tx.company.name }}
+              </a>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if tx.transaction_type == 'recharge' %}bg-emerald-100 text-emerald-800{% elif tx.transaction_type == 'usage_debit' %}bg-amber-100 text-amber-800{% elif tx.transaction_type == 'refund' %}bg-blue-100 text-blue-800{% else %}bg-purple-100 text-purple-800{% endif %}">
+                {{ tx.get_transaction_type_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4 font-black {% if tx.amount >= 0 %}text-emerald-600{% else %}text-slate-800{% endif %}">
+              {% if tx.amount > 0 %}+{% endif %}₹{{ tx.amount|floatformat:2 }}
+            </td>
+            <td class="py-3 px-4 font-bold text-slate-700">₹{{ tx.balance_after|floatformat:2 }}</td>
+            <td class="py-3 px-4 text-slate-600 max-w-xs truncate" title="{{ tx.description }}">{{ tx.description }}</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center gap-1 font-semibold {% if tx.status == 'completed' %}text-emerald-600{% elif tx.status == 'pending' %}text-amber-600{% else %}text-rose-600{% endif %}">
+                <span class="w-1.5 h-1.5 rounded-full {% if tx.status == 'completed' %}bg-emerald-500{% elif tx.status == 'pending' %}bg-amber-500{% else %}bg-rose-500{% endif %}"></span>
+                {{ tx.get_status_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-slate-500 font-medium">
+              {{ tx.created_by.get_full_name|default:tx.created_by.email|default:"System" }}
+            </td>
+            <td class="py-3 px-4 text-right text-slate-400 font-mono">
+              {{ tx.created_at|date:"M d, Y H:i" }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center py-8 text-slate-400">No wallet transactions found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- TAB CONTENT 2: TAX INVOICES LEDGER -->
+  {% if active_tab == 'invoices' %}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Invoice #</th>
+            <th class="py-3 px-4">Company</th>
+            <th class="py-3 px-4">Plan / Tier</th>
+            <th class="py-3 px-4">Subtotal</th>
+            <th class="py-3 px-4">GST / Tax</th>
+            <th class="py-3 px-4">Total Amount</th>
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4">Issued Date</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for inv in page_obj %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-slate-800">{{ inv.invoice_number }}</td>
+            <td class="py-3 px-4 font-bold text-slate-900">
+              <a href="{% url 'admin-panel-company-detail' inv.company.id %}" class="hover:text-indigo-600 transition">
+                {{ inv.company.name }}
+              </a>
+            </td>
+            <td class="py-3 px-4 font-medium text-slate-700">
+              {{ inv.subscription.get_plan_display|default:"Top-Up / Addon" }}
+            </td>
+            <td class="py-3 px-4 font-semibold text-slate-700">₹{{ inv.subtotal|floatformat:2 }}</td>
+            <td class="py-3 px-4 text-slate-500">₹{{ inv.tax|floatformat:2 }}</td>
+            <td class="py-3 px-4 font-black text-slate-900">₹{{ inv.total_amount|floatformat:2 }}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if inv.status == 'paid' %}bg-emerald-100 text-emerald-800{% elif inv.status == 'draft' %}bg-slate-100 text-slate-700{% elif inv.status == 'overdue' %}bg-rose-100 text-rose-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                {{ inv.get_status_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-slate-500 font-mono">{{ inv.issue_date|date:"M d, Y" }}</td>
+            <td class="py-3 px-4 text-right">
+              <a href="{% url 'company-invoice-detail' inv.invoice_number %}" target="_blank" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition text-[11px]">
+                <i class="fa-solid fa-file-pdf mr-1 text-rose-500"></i> View PDF
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center py-8 text-slate-400">No invoices found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- TAB CONTENT 3: AI CREDITS LEDGER -->
+  {% if active_tab == 'credits' %}
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+          <tr>
+            <th class="py-3 px-4">Receipt #</th>
+            <th class="py-3 px-4">Company</th>
+            <th class="py-3 px-4">Type</th>
+            <th class="py-3 px-4">Credits (+/-)</th>
+            <th class="py-3 px-4">Balance After</th>
+            <th class="py-3 px-4">Notes / Operation</th>
+            <th class="py-3 px-4">User</th>
+            <th class="py-3 px-4 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for cr in page_obj %}
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-slate-800">{{ cr.receipt_number|default:"-" }}</td>
+            <td class="py-3 px-4 font-bold text-slate-900">
+              <a href="{% url 'admin-panel-company-detail' cr.company.id %}" class="hover:text-indigo-600 transition">
+                {{ cr.company.name }}
+              </a>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if cr.transaction_type == 'credit' or cr.transaction_type == 'allocation' %}bg-emerald-100 text-emerald-800{% elif cr.transaction_type == 'deduction' or cr.transaction_type == 'debit' %}bg-amber-100 text-amber-800{% else %}bg-purple-100 text-purple-800{% endif %}">
+                {{ cr.get_transaction_type_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4 font-black {% if cr.credits >= 0 %}text-emerald-600{% else %}text-amber-700{% endif %}">
+              {% if cr.credits > 0 %}+{% endif %}{{ cr.credits }}
+            </td>
+            <td class="py-3 px-4 font-bold text-slate-700">{{ cr.balance_after }}</td>
+            <td class="py-3 px-4 text-slate-600 max-w-xs truncate" title="{{ cr.notes }}">{{ cr.notes|default:cr.feature_code }}</td>
+            <td class="py-3 px-4 text-slate-500 font-medium">
+              {{ cr.user.get_full_name|default:cr.user.email|default:"System" }}
+            </td>
+            <td class="py-3 px-4 text-right text-slate-400 font-mono">
+              {{ cr.created_at|date:"M d, Y H:i" }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center py-8 text-slate-400">No credit transactions recorded.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center justify-between text-xs text-slate-500">
+    <div>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+    <div class="flex items-center gap-1">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}&tab={{ active_tab }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Previous</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}&tab={{ active_tab }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold">Next</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

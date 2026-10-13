@@ -11,6 +11,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
@@ -18,7 +19,14 @@ from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from apps.companies.models import Company, CompanyMember
+from apps.companies.models import (
+    Company,
+    CompanyMember,
+    CompanyPermission,
+    CompanyRole,
+    RolePermission,
+    MemberPermission,
+)
 from apps.accounts.models import User
 from apps.billing.models import (
     Subscription,
@@ -27,14 +35,25 @@ from apps.billing.models import (
     CreditTransaction,
     UsageRecord,
     Invoice,
+    Payment,
     CompanyWallet,
     WalletTransaction,
     ServicePricing,
 )
 from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
-from apps.ai_search.models import SearchJob
-from apps.dashboard.models import ActivityLog, SupportTicket, PlatformSetting
-from apps.leads.models import Inquiry
+from apps.ai_search.models import SearchJob, SearchResult
+from apps.dashboard.models import (
+    ActivityLog,
+    SupportTicket,
+    PlatformSetting,
+    BuyerModuleConfig,
+    BuyerDashboardLayout,
+    SellerModuleConfig,
+    SellerDashboardLayout,
+    BothDashboardLayout,
+    is_platform_module_enabled,
+)
+from apps.leads.models import Inquiry, SavedItem
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
 from apps.companies.rbac import superadmin_required
@@ -1042,6 +1061,7 @@ def admin_panel_adjust_wallet_view(request, company_id):
     POST action for Super Admin to manually credit or debit a company's prepaid currency wallet.
     Requires mandatory audited reason.
     """
+    next_url = request.POST.get("next") or reverse("admin-panel-wallets")
     if request.method == "POST":
         company = get_object_or_404(Company, pk=company_id)
         raw_delta = request.POST.get("amount", "0").strip()
@@ -1049,16 +1069,16 @@ def admin_panel_adjust_wallet_view(request, company_id):
 
         if not reason:
             messages.error(request, "A mandatory audit reason is required for manual balance adjustments.")
-            return redirect("admin-panel-plans")
+            return redirect(next_url)
 
         try:
             delta = Decimal(raw_delta)
             if delta == Decimal("0.00"):
                 messages.error(request, "Adjustment amount must be non-zero.")
-                return redirect("admin-panel-plans")
+                return redirect(next_url)
         except Exception:
             messages.error(request, "Invalid adjustment amount specified.")
-            return redirect("admin-panel-plans")
+            return redirect(next_url)
 
         try:
             tx = CompanyWalletService.adjust_balance_admin(
@@ -1074,7 +1094,7 @@ def admin_panel_adjust_wallet_view(request, company_id):
         except Exception as e:
             messages.error(request, f"Adjustment failed: {e}")
 
-    return redirect("admin-panel-plans")
+    return redirect(next_url)
 
 
 @login_required
@@ -2175,4 +2195,762 @@ def admin_panel_settings_view(request):
         "maintenance_mode": maintenance_mode,
         "maintenance_message": maintenance_message,
     })
+
+
+# ==============================================================================
+# SUPER ADMIN ↔ BUYER DASHBOARD MANAGEMENT
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_dashboard_view(request):
+    """
+    Super Admin Buyer Dashboard & Module Governance Control Center.
+    Provides aggregated procurement KPIs across all tenant companies,
+    buyer module configuration matrix, and KPI layout switches.
+    """
+    active_tab = request.GET.get("tab", "overview").lower()
+    if active_tab not in ["overview", "modules", "layout", "companies"]:
+        active_tab = "overview"
+
+    # Aggregations across BUYER and BOTH companies
+    buyer_filter = Q(company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH], is_deleted=False)
+    total_buyer_companies = Company.objects.filter(buyer_filter).count()
+    buyer_only_companies = Company.objects.filter(company_type=Company.CompanyType.BUYER, is_deleted=False).count()
+    both_companies = Company.objects.filter(company_type=Company.CompanyType.BOTH, is_deleted=False).count()
+
+    total_requirements = Requirement.objects.filter(is_deleted=False).count()
+    total_searches_run = SearchJob.objects.filter(
+        Q(requirement__isnull=False) | Q(job_type=SearchJob.JobType.FIND_SUPPLIERS)
+    ).count()
+    total_suppliers_discovered = SearchResult.objects.filter(result_type=SearchResult.ResultType.SUPPLIER).count()
+    total_saved_suppliers = SavedItem.objects.filter(
+        company__company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH]
+    ).count()
+    total_inquiries_sent = Inquiry.objects.filter(
+        company__company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH]
+    ).count()
+
+    buyer_subs = Subscription.objects.filter(company__in=Company.objects.filter(buyer_filter))
+    total_credits_allocated = buyer_subs.aggregate(total=Sum("credits_total"))["total"] or 0
+    total_credits_consumed = buyer_subs.aggregate(used=Sum("credits_used"))["used"] or 0
+    total_credits_remaining = max(0, total_credits_allocated - total_credits_consumed)
+
+    # Modules and layout configuration
+    BuyerModuleConfig.ensure_defaults()
+    modules = BuyerModuleConfig.objects.all().order_by("order", "id")
+    layout = BuyerDashboardLayout.get_layout()
+
+    # Buyer companies directory
+    comp_qs = Company.objects.filter(buyer_filter).order_by("-created_at")
+    q = request.GET.get("q", "").strip()
+    if q:
+        comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
+
+    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=15)
+
+    annotated_companies = []
+    for comp in page_obj:
+        req_count = Requirement.objects.filter(company=comp, is_deleted=False).count()
+        jobs_count = SearchJob.objects.filter(company=comp).count()
+        saved_count = SavedItem.objects.filter(company=comp).count()
+        inq_count = Inquiry.objects.filter(company=comp).count()
+        sub = getattr(comp, "subscription", None)
+        admin_member = comp.members.filter(role=CompanyMember.Role.ADMIN).select_related("user").first()
+        admin_user = admin_member.user if admin_member else None
+
+        annotated_companies.append({
+            "company": comp,
+            "req_count": req_count,
+            "jobs_count": jobs_count,
+            "saved_count": saved_count,
+            "inq_count": inq_count,
+            "subscription": sub,
+            "admin_user": admin_user,
+        })
+
+    recent_buyer_activities = ActivityLog.objects.filter(
+        company__company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH]
+    ).select_related("company", "user").order_by("-created_at")[:8]
+
+    return render(request, "admin_panel/buyer_dashboard.html", {
+        "page_title": "Buyer Dashboard Governance",
+        "active_tab": active_tab,
+        "modules": modules,
+        "layout": layout,
+        "total_buyer_companies": total_buyer_companies,
+        "buyer_only_companies": buyer_only_companies,
+        "both_companies": both_companies,
+        "total_requirements": total_requirements,
+        "total_searches_run": total_searches_run,
+        "total_suppliers_discovered": total_suppliers_discovered,
+        "total_saved_suppliers": total_saved_suppliers,
+        "total_inquiries_sent": total_inquiries_sent,
+        "total_credits_allocated": total_credits_allocated,
+        "total_credits_remaining": total_credits_remaining,
+        "annotated_companies": annotated_companies,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "recent_buyer_activities": recent_buyer_activities,
+        "q": q,
+    })
+
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_module_toggle_view(request, pk):
+    """
+    Super Admin action to toggle Buyer module enabled/disabled state.
+    """
+    if request.method == "POST":
+        module = get_object_or_404(BuyerModuleConfig, pk=pk)
+        module.is_enabled = not module.is_enabled
+        module.save(update_fields=["is_enabled", "updated_at"])
+
+        state_str = "ENABLED" if module.is_enabled else "DISABLED"
+        first_company = Company.objects.first()
+        if first_company:
+            ActivityLog.objects.create(
+                company=first_company,
+                user=request.user,
+                activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
+                title=f"Buyer Module {state_str}: {module.display_name}",
+                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Buyer module.",
+                icon_type="toggle-on" if module.is_enabled else "toggle-off",
+                color="emerald" if module.is_enabled else "rose",
+            )
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "is_enabled": module.is_enabled,
+                "module_key": module.module_key,
+                "display_name": module.display_name,
+                "message": f"Module '{module.display_name}' is now {state_str}!",
+            })
+
+        messages.success(request, f"Buyer module '{module.display_name}' is now {state_str}.")
+
+    next_url = request.POST.get("next") or reverse("admin-panel-buyer-dashboard")
+    return redirect(next_url)
+
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_module_edit_view(request, pk):
+    """
+    Super Admin action to configure Buyer module display name, nav label, icon, order, min plan.
+    """
+    module = get_object_or_404(BuyerModuleConfig, pk=pk)
+    if request.method == "POST":
+        display_name = request.POST.get("display_name", "").strip()
+        nav_label = request.POST.get("nav_label", "").strip()
+        icon_class = request.POST.get("icon_class", "").strip()
+        order_raw = request.POST.get("order", "0").strip()
+        min_plan = request.POST.get("min_plan", "FREE").strip()
+        requires_credits = bool(request.POST.get("requires_credits"))
+        is_visible_on_sidebar = bool(request.POST.get("is_visible_on_sidebar"))
+        description = request.POST.get("description", "").strip()
+
+        if display_name:
+            module.display_name = display_name
+        if nav_label:
+            module.nav_label = nav_label
+        if icon_class:
+            module.icon_class = icon_class
+        try:
+            module.order = max(0, int(order_raw))
+        except ValueError:
+            pass
+        if min_plan in dict(BuyerModuleConfig.MinPlan.choices):
+            module.min_plan = min_plan
+        module.requires_credits = requires_credits
+        module.is_visible_on_sidebar = is_visible_on_sidebar
+        if description:
+            module.description = description
+        module.save()
+
+        messages.success(request, f"Configuration updated for Buyer module '{module.display_name}'.")
+
+    return redirect(reverse("admin-panel-buyer-dashboard") + "?tab=modules")
+
+
+@login_required
+@superadmin_required
+def admin_panel_buyer_layout_update_view(request):
+    """
+    Super Admin action to configure Buyer Dashboard layout switches.
+    """
+    if request.method == "POST":
+        layout = BuyerDashboardLayout.get_layout()
+        layout.show_kpi_requirements = bool(request.POST.get("show_kpi_requirements"))
+        layout.show_kpi_searches = bool(request.POST.get("show_kpi_searches"))
+        layout.show_kpi_suppliers_discovered = bool(request.POST.get("show_kpi_suppliers_discovered"))
+        layout.show_kpi_saved_suppliers = bool(request.POST.get("show_kpi_saved_suppliers"))
+        layout.show_kpi_inquiries_sent = bool(request.POST.get("show_kpi_inquiries_sent"))
+        layout.show_kpi_credits = bool(request.POST.get("show_kpi_credits"))
+        layout.show_quick_actions = bool(request.POST.get("show_quick_actions"))
+        layout.show_recent_searches = bool(request.POST.get("show_recent_searches"))
+        layout.show_recent_activity = bool(request.POST.get("show_recent_activity"))
+        layout.show_top_suppliers = bool(request.POST.get("show_top_suppliers"))
+        layout.show_subscription_widget = bool(request.POST.get("show_subscription_widget"))
+        layout.save()
+
+        messages.success(request, "Buyer Dashboard layout and KPI card preferences updated successfully.")
+
+    return redirect(reverse("admin-panel-buyer-dashboard") + "?tab=layout")
+
+
+# ==============================================================================
+# SUPER ADMIN ↔ SELLER DASHBOARD MANAGEMENT
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_seller_dashboard_view(request):
+    """
+    Super Admin Seller Dashboard & Module Governance Control Center.
+    Provides aggregated sales KPIs across all tenant companies,
+    seller module configuration matrix, and KPI layout switches.
+    """
+    active_tab = request.GET.get("tab", "overview").lower()
+    if active_tab not in ["overview", "modules", "layout", "companies"]:
+        active_tab = "overview"
+
+    seller_filter = Q(company_type__in=[Company.CompanyType.SELLER, Company.CompanyType.BOTH], is_deleted=False)
+    total_seller_companies = Company.objects.filter(seller_filter).count()
+    seller_only_companies = Company.objects.filter(company_type=Company.CompanyType.SELLER, is_deleted=False).count()
+    both_companies = Company.objects.filter(company_type=Company.CompanyType.BOTH, is_deleted=False).count()
+
+    total_products = Product.objects.filter(is_deleted=False).count()
+    total_searches_run = SearchJob.objects.filter(
+        Q(product__isnull=False) | Q(job_type=SearchJob.JobType.FIND_BUYERS)
+    ).count()
+    total_leads_discovered = SearchResult.objects.exclude(result_type=SearchResult.ResultType.SUPPLIER).count()
+    total_saved_leads = SavedItem.objects.filter(
+        company__company_type__in=[Company.CompanyType.SELLER, Company.CompanyType.BOTH]
+    ).count()
+    total_inquiries_received = Inquiry.objects.filter(
+        company__company_type__in=[Company.CompanyType.SELLER, Company.CompanyType.BOTH]
+    ).count()
+
+    seller_subs = Subscription.objects.filter(company__in=Company.objects.filter(seller_filter))
+    total_credits_allocated = seller_subs.aggregate(total=Sum("credits_total"))["total"] or 0
+    total_credits_consumed = seller_subs.aggregate(used=Sum("credits_used"))["used"] or 0
+    total_credits_remaining = max(0, total_credits_allocated - total_credits_consumed)
+
+    SellerModuleConfig.ensure_defaults()
+    modules = SellerModuleConfig.objects.all().order_by("order", "id")
+    layout = SellerDashboardLayout.get_layout()
+
+    comp_qs = Company.objects.filter(seller_filter).order_by("-created_at")
+    q = request.GET.get("q", "").strip()
+    if q:
+        comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
+
+    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=15)
+
+    annotated_companies = []
+    for comp in page_obj:
+        prod_count = Product.objects.filter(company=comp, is_deleted=False).count()
+        jobs_count = SearchJob.objects.filter(company=comp).count()
+        saved_count = SavedItem.objects.filter(company=comp).count()
+        inq_count = Inquiry.objects.filter(company=comp).count()
+        sub = getattr(comp, "subscription", None)
+        admin_member = comp.members.filter(role=CompanyMember.Role.ADMIN).select_related("user").first()
+        admin_user = admin_member.user if admin_member else None
+
+        annotated_companies.append({
+            "company": comp,
+            "prod_count": prod_count,
+            "jobs_count": jobs_count,
+            "saved_count": saved_count,
+            "inq_count": inq_count,
+            "subscription": sub,
+            "admin_user": admin_user,
+        })
+
+    recent_seller_activities = ActivityLog.objects.filter(
+        company__company_type__in=[Company.CompanyType.SELLER, Company.CompanyType.BOTH]
+    ).select_related("company", "user").order_by("-created_at")[:8]
+
+    return render(request, "admin_panel/seller_dashboard.html", {
+        "page_title": "Seller Dashboard Governance",
+        "active_tab": active_tab,
+        "modules": modules,
+        "layout": layout,
+        "total_seller_companies": total_seller_companies,
+        "seller_only_companies": seller_only_companies,
+        "both_companies": both_companies,
+        "total_products": total_products,
+        "total_searches_run": total_searches_run,
+        "total_leads_discovered": total_leads_discovered,
+        "total_saved_leads": total_saved_leads,
+        "total_inquiries_received": total_inquiries_received,
+        "total_credits_allocated": total_credits_allocated,
+        "total_credits_remaining": total_credits_remaining,
+        "annotated_companies": annotated_companies,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "recent_seller_activities": recent_seller_activities,
+        "q": q,
+    })
+
+
+@login_required
+@superadmin_required
+def admin_panel_seller_module_toggle_view(request, pk):
+    """
+    Super Admin action to toggle Seller module enabled/disabled state.
+    """
+    if request.method == "POST":
+        module = get_object_or_404(SellerModuleConfig, pk=pk)
+        module.is_enabled = not module.is_enabled
+        module.save(update_fields=["is_enabled", "updated_at"])
+
+        state_str = "ENABLED" if module.is_enabled else "DISABLED"
+        first_company = Company.objects.first()
+        if first_company:
+            ActivityLog.objects.create(
+                company=first_company,
+                user=request.user,
+                activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
+                title=f"Seller Module {state_str}: {module.display_name}",
+                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Seller module.",
+                icon_type="toggle-on" if module.is_enabled else "toggle-off",
+                color="emerald" if module.is_enabled else "rose",
+            )
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "is_enabled": module.is_enabled,
+                "module_key": module.module_key,
+                "display_name": module.display_name,
+                "message": f"Module '{module.display_name}' is now {state_str}!",
+            })
+
+        messages.success(request, f"Seller module '{module.display_name}' is now {state_str}.")
+
+    next_url = request.POST.get("next") or reverse("admin-panel-seller-dashboard")
+    return redirect(next_url)
+
+
+@login_required
+@superadmin_required
+def admin_panel_seller_module_edit_view(request, pk):
+    """
+    Super Admin action to configure Seller module display name, nav label, icon, order, min plan.
+    """
+    module = get_object_or_404(SellerModuleConfig, pk=pk)
+    if request.method == "POST":
+        display_name = request.POST.get("display_name", "").strip()
+        nav_label = request.POST.get("nav_label", "").strip()
+        icon_class = request.POST.get("icon_class", "").strip()
+        order_raw = request.POST.get("order", "0").strip()
+        min_plan = request.POST.get("min_plan", "FREE").strip()
+        requires_credits = bool(request.POST.get("requires_credits"))
+        is_visible_on_sidebar = bool(request.POST.get("is_visible_on_sidebar"))
+        description = request.POST.get("description", "").strip()
+
+        if display_name:
+            module.display_name = display_name
+        if nav_label:
+            module.nav_label = nav_label
+        if icon_class:
+            module.icon_class = icon_class
+        try:
+            module.order = max(0, int(order_raw))
+        except ValueError:
+            pass
+        if min_plan in dict(SellerModuleConfig.MinPlan.choices):
+            module.min_plan = min_plan
+        module.requires_credits = requires_credits
+        module.is_visible_on_sidebar = is_visible_on_sidebar
+        if description:
+            module.description = description
+        module.save()
+
+        messages.success(request, f"Configuration updated for Seller module '{module.display_name}'.")
+
+    return redirect(reverse("admin-panel-seller-dashboard") + "?tab=modules")
+
+
+@login_required
+@superadmin_required
+def admin_panel_seller_layout_update_view(request):
+    """
+    Super Admin action to configure Seller Dashboard layout switches.
+    """
+    if request.method == "POST":
+        layout = SellerDashboardLayout.get_layout()
+        layout.show_kpi_products = bool(request.POST.get("show_kpi_products"))
+        layout.show_kpi_searches = bool(request.POST.get("show_kpi_searches"))
+        layout.show_kpi_leads_discovered = bool(request.POST.get("show_kpi_leads_discovered"))
+        layout.show_kpi_saved_leads = bool(request.POST.get("show_kpi_saved_leads"))
+        layout.show_kpi_inquiries_received = bool(request.POST.get("show_kpi_inquiries_received"))
+        layout.show_kpi_credits = bool(request.POST.get("show_kpi_credits"))
+        layout.show_quick_actions = bool(request.POST.get("show_quick_actions"))
+        layout.show_recent_searches = bool(request.POST.get("show_recent_searches"))
+        layout.show_recent_activity = bool(request.POST.get("show_recent_activity"))
+        layout.show_top_leads = bool(request.POST.get("show_top_leads"))
+        layout.show_subscription_widget = bool(request.POST.get("show_subscription_widget"))
+        layout.save()
+
+        messages.success(request, "Seller Dashboard layout and KPI card preferences updated successfully.")
+
+    return redirect(reverse("admin-panel-seller-dashboard") + "?tab=layout")
+
+
+# ==============================================================================
+# SUPER ADMIN ↔ BOTH DASHBOARD MANAGEMENT
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_both_dashboard_view(request):
+    """
+    Super Admin Hybrid (Both) Dashboard Governance.
+    Manages dual-operating enterprises (CompanyType == BOTH),
+    default view switcher, cross-module synergy, and shared wallets.
+    """
+    layout = BothDashboardLayout.get_layout()
+
+    both_filter = Q(company_type=Company.CompanyType.BOTH, is_deleted=False)
+    total_both_companies = Company.objects.filter(both_filter).count()
+
+    total_requirements = Requirement.objects.filter(company__in=Company.objects.filter(both_filter), is_deleted=False).count()
+    total_products = Product.objects.filter(company__in=Company.objects.filter(both_filter), is_deleted=False).count()
+    total_searches = SearchJob.objects.filter(company__in=Company.objects.filter(both_filter)).count()
+    total_inquiries = Inquiry.objects.filter(company__in=Company.objects.filter(both_filter)).count()
+
+    comp_qs = Company.objects.filter(both_filter).order_by("-created_at")
+    q = request.GET.get("q", "").strip()
+    if q:
+        comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
+
+    page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=15)
+
+    annotated_companies = []
+    for comp in page_obj:
+        req_count = Requirement.objects.filter(company=comp, is_deleted=False).count()
+        prod_count = Product.objects.filter(company=comp, is_deleted=False).count()
+        searches_count = SearchJob.objects.filter(company=comp).count()
+        wallet = CompanyWallet.objects.filter(company=comp).first()
+        sub = getattr(comp, "subscription", None)
+
+        annotated_companies.append({
+            "company": comp,
+            "req_count": req_count,
+            "prod_count": prod_count,
+            "searches_count": searches_count,
+            "wallet": wallet,
+            "subscription": sub,
+        })
+
+    return render(request, "admin_panel/both_dashboard.html", {
+        "page_title": "Both (Hybrid) Dashboard Governance",
+        "layout": layout,
+        "total_both_companies": total_both_companies,
+        "total_requirements": total_requirements,
+        "total_products": total_products,
+        "total_searches": total_searches,
+        "total_inquiries": total_inquiries,
+        "annotated_companies": annotated_companies,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "q": q,
+    })
+
+
+@login_required
+@superadmin_required
+def admin_panel_both_layout_update_view(request):
+    """
+    Super Admin action to configure Both Dashboard default active view and switcher.
+    """
+    if request.method == "POST":
+        layout = BothDashboardLayout.get_layout()
+        default_view = request.POST.get("default_active_view", "combined").strip().lower()
+        if default_view in ["combined", "buyer", "seller"]:
+            layout.default_active_view = default_view
+        layout.show_view_switcher = bool(request.POST.get("show_view_switcher"))
+        layout.show_combined_metrics = bool(request.POST.get("show_combined_metrics"))
+        layout.save()
+
+        messages.success(request, f"Both Dashboard layout updated. Default view set to '{layout.get_default_active_view_display()}'.")
+
+    return redirect("admin-panel-both-dashboard")
+
+
+# ==============================================================================
+# SUPER ADMIN ↔ CENTRALIZED MODULE & FEATURE MANAGEMENT
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_modules_view(request):
+    """
+    Centralized Module & Feature Management Matrix:
+    Displays module matrix across BUYER, SELLER, and BOTH with:
+    Module Name, Enabled/Disabled, View, Create, Edit, Update, Delete, Import, Export, and Actions.
+    """
+    tab = request.GET.get("tab", "all").lower()
+    q = request.GET.get("q", "").strip().lower()
+
+    BuyerModuleConfig.ensure_defaults()
+    SellerModuleConfig.ensure_defaults()
+
+    buyer_mods = list(BuyerModuleConfig.objects.all().order_by("order", "id"))
+    seller_mods = list(SellerModuleConfig.objects.all().order_by("order", "id"))
+
+    # Map supported actions for each module
+    MODULE_ACTION_PERMS = {
+        "my_requirements": ["View", "Create", "Edit", "Update", "Delete", "Import", "Export"],
+        "my_products": ["View", "Create", "Edit", "Update", "Delete", "Import", "Export"],
+        "find_suppliers": ["View", "Search", "Filter", "Export"],
+        "find_buyers": ["View", "Search", "Filter", "Export"],
+        "buyer_leads": ["View", "Save", "Export"],
+        "saved_suppliers": ["View", "Create", "Edit", "Update", "Delete", "Export"],
+        "saved_buyers": ["View", "Create", "Edit", "Update", "Delete", "Export"],
+        "inquiries": ["View", "Create", "Edit", "Update", "Delete", "Export"],
+        "seller_inquiries": ["View", "Create", "Edit", "Update", "Delete", "Export"],
+        "price_comparison": ["View", "Export"],
+        "export_reports": ["View", "Export"],
+        "seller_export_reports": ["View", "Export"],
+        "seller_roles": ["View", "Create", "Edit", "Update", "Delete"],
+        "subscription_credits": ["View", "Recharge"],
+        "seller_subscription_credits": ["View", "Recharge"],
+        "invoices_billing": ["View", "Export"],
+        "seller_invoices_billing": ["View", "Export"],
+        "help_support": ["View", "Create", "Update"],
+        "seller_help_support": ["View", "Create", "Update"],
+    }
+
+    unified_matrix = []
+
+    for bm in buyer_mods:
+        if q and q not in bm.display_name.lower() and q not in bm.module_key.lower():
+            continue
+        unified_matrix.append({
+            "id": bm.id,
+            "type": "buyer",
+            "type_label": "Buyer (Procurement)",
+            "type_badge_color": "blue",
+            "module_key": bm.module_key,
+            "display_name": bm.display_name,
+            "nav_label": bm.nav_label,
+            "icon_class": bm.icon_class,
+            "is_enabled": bm.is_enabled,
+            "min_plan": bm.get_min_plan_display(),
+            "requires_credits": bm.requires_credits,
+            "description": bm.description,
+            "actions": MODULE_ACTION_PERMS.get(bm.module_key, ["View"]),
+            "toggle_url": reverse("admin-panel-buyer-module-toggle", kwargs={"pk": bm.id}),
+            "order": bm.order,
+        })
+
+    for sm in seller_mods:
+        if q and q not in sm.display_name.lower() and q not in sm.module_key.lower():
+            continue
+        unified_matrix.append({
+            "id": sm.id,
+            "type": "seller",
+            "type_label": "Seller (Sales)",
+            "type_badge_color": "emerald",
+            "module_key": sm.module_key,
+            "display_name": sm.display_name,
+            "nav_label": sm.nav_label,
+            "icon_class": sm.icon_class,
+            "is_enabled": sm.is_enabled,
+            "min_plan": sm.get_min_plan_display(),
+            "requires_credits": sm.requires_credits,
+            "description": sm.description,
+            "actions": MODULE_ACTION_PERMS.get(sm.module_key, ["View"]),
+            "toggle_url": reverse("admin-panel-seller-module-toggle", kwargs={"pk": sm.id}),
+            "order": sm.order,
+        })
+
+    if tab == "buyer":
+        filtered_matrix = [m for m in unified_matrix if m["type"] == "buyer"]
+    elif tab == "seller":
+        filtered_matrix = [m for m in unified_matrix if m["type"] == "seller"]
+    else:
+        filtered_matrix = unified_matrix
+
+    total_modules = len(unified_matrix)
+    active_count = sum(1 for m in unified_matrix if m["is_enabled"])
+    disabled_count = total_modules - active_count
+
+    return render(request, "admin_panel/modules.html", {
+        "page_title": "Module & Feature Management Matrix",
+        "tab": tab,
+        "q": q,
+        "modules_matrix": filtered_matrix,
+        "total_modules": total_modules,
+        "active_count": active_count,
+        "disabled_count": disabled_count,
+    })
+
+
+@login_required
+@superadmin_required
+def admin_panel_module_toggle_view(request, module_type, pk):
+    """
+    Centralized toggle endpoint for either buyer or seller module.
+    """
+    if module_type == "buyer":
+        return admin_panel_buyer_module_toggle_view(request, pk)
+    elif module_type == "seller":
+        return admin_panel_seller_module_toggle_view(request, pk)
+    return redirect("admin-panel-modules")
+
+
+# ==============================================================================
+# SUPER ADMIN ↔ MODULE-WISE PERMISSIONS MATRIX
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_permissions_view(request):
+    """
+    Super Admin Module-Wise Permissions Overview.
+    Displays configured permissions matrix across platform modules.
+    """
+    from apps.companies.rbac import ensure_default_permissions
+    ensure_default_permissions()
+
+    permissions = CompanyPermission.objects.all().order_by("module", "permission")
+    modules_grouped = {}
+    for perm in permissions:
+        modules_grouped.setdefault(perm.module, []).append(perm.permission)
+
+    total_perms = permissions.count()
+    total_roles = CompanyRole.objects.count()
+    total_assignments = MemberPermission.objects.count()
+
+    return render(request, "admin_panel/permissions.html", {
+        "page_title": "Module-Wise Permissions Matrix",
+        "modules_grouped": modules_grouped,
+        "total_perms": total_perms,
+        "total_roles": total_roles,
+        "total_assignments": total_assignments,
+    })
+
+
+# ==============================================================================
+# SUPER ADMIN ↔ TRANSACTIONS & INVOICES MANAGEMENT
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_transactions_view(request):
+    """
+    Super Admin Centralized Transactions & Invoices Audit Ledger.
+    Displays wallet transactions, credit debits, payments, and tax invoices.
+    """
+    active_tab = request.GET.get("tab", "wallet_tx").lower()
+    if active_tab not in ["wallet_tx", "invoices", "credits"]:
+        active_tab = "wallet_tx"
+
+    q = request.GET.get("q", "").strip()
+
+    # 1. Wallet Transactions
+    wallet_tx_qs = WalletTransaction.objects.select_related("wallet__company", "created_by").order_by("-created_at")
+    if q:
+        wallet_tx_qs = wallet_tx_qs.filter(
+            Q(reference_id__icontains=q)
+            | Q(wallet__company__name__icontains=q)
+            | Q(description__icontains=q)
+        )
+
+    # 2. Invoices
+    invoice_qs = Invoice.objects.select_related("company", "subscription").order_by("-issue_date", "-id")
+    if q:
+        invoice_qs = invoice_qs.filter(
+            Q(invoice_number__icontains=q)
+            | Q(company__name__icontains=q)
+        )
+
+    # 3. Credit Transactions
+    credit_tx_qs = CreditTransaction.objects.select_related("company", "user").order_by("-created_at")
+    if q:
+        credit_tx_qs = credit_tx_qs.filter(
+            Q(notes__icontains=q)
+            | Q(receipt_number__icontains=q)
+            | Q(company__name__icontains=q)
+        )
+
+    total_wallet_volume = WalletTransaction.objects.filter(
+        transaction_type=WalletTransaction.TransactionType.RECHARGE
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    total_invoiced_amt = Invoice.objects.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+    total_paid_invoices = Invoice.objects.filter(status=Invoice.Status.PAID).count()
+    total_pending_invoices = Invoice.objects.filter(status__in=[Invoice.Status.DRAFT, Invoice.Status.OVERDUE]).count()
+
+    if active_tab == "invoices":
+        page_obj, query_string = paginate_and_preserve(request, invoice_qs, per_page=20)
+    elif active_tab == "credits":
+        page_obj, query_string = paginate_and_preserve(request, credit_tx_qs, per_page=20)
+    else:
+        page_obj, query_string = paginate_and_preserve(request, wallet_tx_qs, per_page=20)
+
+    return render(request, "admin_panel/transactions.html", {
+        "page_title": "Transactions & Invoices",
+        "active_tab": active_tab,
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "q": q,
+        "total_wallet_volume": total_wallet_volume,
+        "total_invoiced_amt": total_invoiced_amt,
+        "total_paid_invoices": total_paid_invoices,
+        "total_pending_invoices": total_pending_invoices,
+    })
+
+
+# ==============================================================================
+# SUPER ADMIN ↔ COMPANY WALLETS & BILLING GOVERNANCE
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_wallets_view(request):
+    """
+    Super Admin Company Wallets Control Center.
+    Inspects tenant wallet balances, reserved funds, total liabilities,
+    and supports 1-click manual financial adjustments with mandatory audit trail.
+    """
+    q = request.GET.get("q", "").strip()
+
+    CompanyWalletService.ensure_default_service_pricing()
+
+    wallet_qs = CompanyWallet.objects.select_related("company").order_by("-available_balance")
+    if q:
+        wallet_qs = wallet_qs.filter(
+            Q(company__name__icontains=q)
+            | Q(company__city__icontains=q)
+        )
+
+    page_obj, query_string = paginate_and_preserve(request, wallet_qs, per_page=20)
+
+    total_available_liability = CompanyWallet.objects.aggregate(total=Sum("available_balance"))["total"] or Decimal("0.00")
+    total_reserved_liability = CompanyWallet.objects.aggregate(total=Sum("reserved_balance"))["total"] or Decimal("0.00")
+    total_spent_platform = CompanyWallet.objects.aggregate(total=Sum("total_spent"))["total"] or Decimal("0.00")
+    total_credited_platform = CompanyWallet.objects.aggregate(total=Sum("total_credited"))["total"] or Decimal("0.00")
+
+    pricing_list = ServicePricing.objects.all().order_by("service_code")
+
+    return render(request, "admin_panel/wallets.html", {
+        "page_title": "Company Wallets & Billing Governance",
+        "page_obj": page_obj,
+        "query_string": query_string,
+        "q": q,
+        "total_available_liability": total_available_liability,
+        "total_reserved_liability": total_reserved_liability,
+        "total_spent_platform": total_spent_platform,
+        "total_credited_platform": total_credited_platform,
+        "pricing_list": pricing_list,
+    })
+
 

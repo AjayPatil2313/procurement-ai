@@ -21,12 +21,13 @@ from apps.ai_search.models import (
 )
 from apps.ai_search.services.pipeline import run_find_buyers_search
 from apps.catalog.models import Category, Product, ProductImage
-from apps.companies.rbac import get_user_rbac_context
+from apps.companies.rbac import get_user_rbac_context, module_permission_required
 from apps.leads.models import SavedItem
 from apps.dashboard.ratelimit import rate_limit
 
 
 @login_required
+@module_permission_required("products", "READ")
 def products_list_view(request):
     """
     Seller Product Catalog List View:

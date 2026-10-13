@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Module-Wise Permissions Matrix — Super Admin Panel{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-3">
+        <i class="fa-solid fa-crown mr-1.5 text-indigo-400"></i> Platform Super Admin Control Center
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Module-Wise Permissions Matrix</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+        Inspect and govern granular access rights across all platform modules. Permissions control fine-grained capability checks for view, create, edit, update, delete, search, and export operations.
+      </p>
+    </div>
+
+    <!-- Quick Action Shortcut Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="{% url 'admin-panel-roles' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-user-shield mr-1.5"></i> Manage Company Roles
+      </a>
+      <a href="{% url 'admin-panel-modules' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-cubes mr-1.5 text-indigo-400"></i> Modules Matrix
+      </a>
+      <a href="{% url 'admin-panel-users' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-users mr-1.5 text-blue-400"></i> Users Directory
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Aggregate Metrics -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Defined Permissions</div>
+        <div class="text-2xl font-black text-slate-900">{{ total_perms }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Granular module operations</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-key"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Configured Roles</div>
+        <div class="text-2xl font-black text-blue-600">{{ total_roles }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Tenant custom roles</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-id-badge"></i>
+      </span>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Active User Grants</div>
+        <div class="text-2xl font-black text-emerald-600">{{ total_assignments }}</div>
+        <div class="text-[11px] text-slate-500 mt-1">Member-level overrides</div>
+      </div>
+      <span class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-user-check"></i>
+      </span>
+    </div>
+  </div>
+
+  <!-- RBAC Architecture Reference -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <div class="flex items-start gap-3.5 mb-4">
+      <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 text-sm mt-0.5">
+        <i class="fa-solid fa-diagram-project"></i>
+      </span>
+      <div>
+        <h3 class="text-sm font-bold text-slate-900">Standard Platform Roles &amp; Responsibilities</h3>
+        <p class="text-xs text-slate-500">Built-in role taxonomy enforced at controller and API layer</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+          <span class="w-2 h-2 rounded-full bg-red-500"></span> Super Admin
+        </div>
+        <div class="text-[11px] text-slate-600">Unrestricted governance over all tenants, modules, wallets, and system settings.</div>
+      </div>
+
+      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span> Company Admin
+        </div>
+        <div class="text-[11px] text-slate-600">Full administrative management over company profile, team, roles, billing &amp; recharges.</div>
+      </div>
+
+      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+          <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Procurement Specialist
+        </div>
+        <div class="text-[11px] text-slate-600">Buyer focused: Posts requirements, runs supplier searches, dispatches inquiries &amp; RFQs.</div>
+      </div>
+
+      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Sales Executive
+        </div>
+        <div class="text-[11px] text-slate-600">Seller focused: Catalog management, runs find-buyer jobs, negotiates inquiries and leads.</div>
+      </div>
+
+      <div class="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+        <div class="text-xs font-bold text-slate-900 flex items-center gap-1.5 mb-1">
+          <span class="w-2 h-2 rounded-full bg-slate-400"></span> Viewer (Read-Only)
+        </div>
+        <div class="text-[11px] text-slate-600">Restricted read-only access to dashboard and reports without credit consumption permissions.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Module-Wise Permissions Grid -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Module Permissions Matrix Registry</h3>
+        <p class="text-xs text-slate-500">Supported fine-grained action tokens per functional domain</p>
+      </div>
+      <span class="text-xs text-slate-400 font-medium">Checked against <code class="font-mono text-indigo-600">&lt;module&gt;:&lt;action&gt;</code></span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 p-2">
+      {% for module_name, perms_list in modules_grouped.items %}
+      <div class="p-4 hover:bg-slate-50/60 transition rounded-xl">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-layer-group"></i>
+            </span>
+            <div class="font-bold text-slate-900 text-xs capitalize">{{ module_name }}</div>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+            {{ perms_list|length }} actions
+          </span>
+        </div>
+
+        <div class="flex flex-wrap gap-1.5">
+          {% for perm in perms_list %}
+          <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-mono font-medium {% if perm == 'READ' %}bg-blue-50 text-blue-700 border border-blue-200{% elif perm == 'CREATE' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif perm == 'UPDATE' or perm == 'EDIT' %}bg-amber-50 text-amber-700 border border-amber-200{% elif perm == 'DELETE' %}bg-rose-50 text-rose-700 border border-rose-200{% elif perm == 'EXPORT' or perm == 'IMPORT' %}bg-purple-50 text-purple-700 border border-purple-200{% elif perm == 'SEARCH' %}bg-teal-50 text-teal-700 border border-teal-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+            {{ perm }}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="col-span-3 text-center py-8 text-slate-400 text-xs">No module permissions currently registered in database.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

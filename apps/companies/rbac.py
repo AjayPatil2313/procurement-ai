@@ -4,6 +4,7 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from rest_framework.permissions import BasePermission
 from apps.companies.models import CompanyMember, MemberPermission, Company, CompanyPermission
+from apps.dashboard.models import BuyerModuleConfig, SellerModuleConfig, is_platform_module_enabled
 
 
 class IsSuperAdmin(BasePermission):
@@ -113,7 +114,12 @@ class HasModulePermission(BasePermission):
         company = membership.company
         required_module = getattr(view, "required_module", None)
 
-        # 1. Company-level type restriction
+        # 1. Company active status
+        if not company.is_active:
+            self.message = "Access restricted: Company account is suspended by Platform Administrator."
+            return False
+
+        # 2. Company-level type restriction & Super Admin module configuration
         if required_module:
             if required_module in self.BUYER_MODULES and company.company_type == Company.CompanyType.SELLER:
                 self.message = "Access restricted: This module is only available for Buyer accounts."
@@ -121,8 +127,11 @@ class HasModulePermission(BasePermission):
             if required_module in self.SELLER_MODULES and company.company_type == Company.CompanyType.BUYER:
                 self.message = "Access restricted: This module is only available for Seller accounts."
                 return False
+            if not is_platform_module_enabled(required_module, company.company_type):
+                self.message = f"Access restricted: Module '{required_module}' is disabled by Platform Administrator."
+                return False
 
-        # 2. Company Admin has full access to all company-allowed modules
+        # 3. Company Admin has full access to all company-allowed active modules
         if membership.role == CompanyMember.Role.ADMIN:
             return True
 
@@ -281,26 +290,38 @@ def get_user_rbac_context(user, company_id=None):
         is_company_admin or "READ" in permissions_set or "products:READ" in permissions_set or "leads:READ" in permissions_set
     )
 
-    # Build visible modules list
+    # Load module status maps from BuyerModuleConfig and SellerModuleConfig
+    buyer_modules_map = {m.module_key: m.is_enabled for m in BuyerModuleConfig.objects.all()}
+    seller_modules_map = {m.module_key: m.is_enabled for m in SellerModuleConfig.objects.all()}
+
+    # Build visible modules list filtered by enabled status
     visible_modules = []
     if can_view_buyer:
-        visible_modules.extend([
-            "buyer_dashboard",
-            "my_requirements",
-            "find_suppliers",
-            "supplier_search",
-            "saved_suppliers",
-            "inquiries",
-        ])
+        raw_buyer_mods = [
+            ("buyer_dashboard", "buyer_dashboard"),
+            ("my_requirements", "my_requirements"),
+            ("find_suppliers", "find_suppliers"),
+            ("supplier_search", "find_suppliers"),
+            ("saved_suppliers", "saved_suppliers"),
+            ("inquiries", "inquiries"),
+        ]
+        for v_name, mod_key in raw_buyer_mods:
+            if buyer_modules_map.get(mod_key, True):
+                visible_modules.append(v_name)
+
     if can_view_seller:
-        visible_modules.extend([
-            "seller_dashboard",
-            "my_products",
-            "find_buyers",
-            "buyer_leads",
-            "saved_buyers",
-            "inquiries",
-        ])
+        raw_seller_mods = [
+            ("seller_dashboard", "seller_dashboard"),
+            ("my_products", "my_products"),
+            ("find_buyers", "find_buyers"),
+            ("buyer_leads", "buyer_leads"),
+            ("saved_buyers", "saved_buyers"),
+            ("inquiries", "seller_inquiries"),
+        ]
+        for v_name, mod_key in raw_seller_mods:
+            if seller_modules_map.get(mod_key, True):
+                visible_modules.append(v_name)
+
     if is_company_admin or is_super_admin:
         visible_modules.extend([
             "company_profile",
@@ -312,57 +333,59 @@ def get_user_rbac_context(user, company_id=None):
     # Build hierarchical navigation representation
     navigation = {}
     if is_buyer_only:
+        b_nav_items = [
+            {"name": "Buyer Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "buyer_dashboard"},
+            {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list", "key": "my_requirements"},
+            {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
+            {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
+            {"name": "Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane", "key": "inquiries"},
+        ]
         navigation = {
             "title": "Buyer Dashboard",
-            "modules": [
-                {"name": "Buyer Dashboard", "url": "/dashboard/", "icon": "fa-house"},
-                {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list"},
-                {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart"},
-                {"name": "Supplier Search", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass"},
-                {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark"},
-                {"name": "Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane"},
-            ],
+            "modules": [item for item in b_nav_items if buyer_modules_map.get(item["key"], True)],
         }
     elif is_seller_only:
-        seller_mods = [
-            {"name": "Seller Dashboard", "url": "/dashboard/", "icon": "fa-house"},
-            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open"},
-            {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
-            {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
-            {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
-            {"name": "Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane"},
+        s_nav_items = [
+            {"name": "Seller Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "seller_dashboard"},
+            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open", "key": "my_products"},
+            {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs", "key": "find_buyers"},
+            {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder", "key": "buyer_leads"},
+            {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark", "key": "saved_buyers"},
+            {"name": "Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane", "key": "seller_inquiries"},
         ]
-        if is_company_admin or is_super_admin:
-            seller_mods.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield"})
+        if (is_company_admin or is_super_admin) and seller_modules_map.get("seller_roles", True):
+            s_nav_items.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield", "key": "seller_roles"})
         navigation = {
             "title": "Seller Dashboard",
-            "modules": seller_mods,
+            "modules": [item for item in s_nav_items if seller_modules_map.get(item["key"], True)],
         }
     else:  # BOTH or Super Admin
-        seller_mods = [
-            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open"},
-            {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs"},
-            {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder"},
-            {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark"},
-            {"name": "Buyer Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane"},
+        b_both_items = [
+            {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list", "key": "my_requirements"},
+            {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
+            {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
+            {"name": "Supplier Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane", "key": "inquiries"},
         ]
-        if is_company_admin or is_super_admin:
-            seller_mods.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield"})
+        s_both_items = [
+            {"name": "Products", "url": "/sales/products/", "icon": "fa-box-open", "key": "my_products"},
+            {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs", "key": "find_buyers"},
+            {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder", "key": "buyer_leads"},
+            {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark", "key": "saved_buyers"},
+            {"name": "Buyer Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane", "key": "seller_inquiries"},
+        ]
+        if (is_company_admin or is_super_admin) and seller_modules_map.get("seller_roles", True):
+            s_both_items.append({"name": "Roles & Responsibilities", "url": "/sales/roles/", "icon": "fa-user-shield", "key": "seller_roles"})
+
         navigation = {
             "title": "Overview",
             "sections": [
                 {
                     "title": "BUYER",
-                    "modules": [
-                        {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list"},
-                        {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart"},
-                        {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark"},
-                        {"name": "Supplier Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane"},
-                    ],
+                    "modules": [item for item in b_both_items if buyer_modules_map.get(item["key"], True)],
                 },
                 {
                     "title": "SELLER",
-                    "modules": seller_mods,
+                    "modules": [item for item in s_both_items if seller_modules_map.get(item["key"], True)],
                 },
             ],
         }
@@ -384,6 +407,8 @@ def get_user_rbac_context(user, company_id=None):
         "is_both": is_both,
         "visible_modules": visible_modules,
         "navigation": navigation,
+        "buyer_modules": buyer_modules_map,
+        "seller_modules": seller_modules_map,
     }
 
 
@@ -411,20 +436,27 @@ def company_admin_required(view_func):
 
 
 def module_permission_required(module, permission_type="READ"):
-    BUYER_MODULES = {"requirements", "procurement", "suppliers"}
-    SELLER_MODULES = {"catalog", "products", "leads", "sales"}
+    BUYER_MODULES = {"requirements", "procurement", "suppliers", "find_suppliers", "saved_suppliers", "inquiries", "price_comparison", "buyer_reports"}
+    SELLER_MODULES = {"catalog", "products", "leads", "sales", "find_buyers", "saved_buyers", "seller_inquiries", "seller_reports"}
 
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
             if not request.user.is_authenticated:
                 return redirect("login")
-            rbac = get_user_rbac_context(request.user)
+            active_cid = request.session.get("active_company_id") if hasattr(request, "session") else None
+            rbac = get_user_rbac_context(request.user, company_id=active_cid)
+            company = rbac["company"]
+
             if not rbac["is_super_admin"]:
+                if company and not company.is_active:
+                    raise PermissionDenied("Your company account has been suspended by Platform Administrator.")
                 if module in BUYER_MODULES and not rbac["can_view_buyer"]:
                     raise PermissionDenied("Access restricted: This module is only available for Buyer accounts.")
                 if module in SELLER_MODULES and not rbac["can_view_seller"]:
                     raise PermissionDenied("Access restricted: This module is only available for Seller accounts.")
+                if not is_platform_module_enabled(module, company.company_type if company else None):
+                    raise PermissionDenied(f"Access restricted: Module '{module}' has been disabled by Platform Administrator.")
 
             if rbac["is_company_admin"] or rbac["is_super_admin"]:
                 return view_func(request, *args, **kwargs)
@@ -440,3 +472,4 @@ def module_permission_required(module, permission_type="READ"):
             return view_func(request, *args, **kwargs)
         return _wrapped_view
     return decorator
+

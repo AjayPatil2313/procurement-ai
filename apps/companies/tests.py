@@ -5,7 +5,7 @@ from apps.accounts.models import User
 from apps.companies.models import Company, CompanyMember
 from apps.billing.models import Subscription, CreditTransaction
 from apps.ai_search.models import APILog, SearchJob
-from apps.dashboard.models import ActivityLog, PlatformSetting
+from apps.dashboard.models import ActivityLog, PlatformSetting, BuyerModuleConfig, SellerModuleConfig, BothDashboardLayout
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
 from apps.leads.models import Inquiry
@@ -749,6 +749,191 @@ class SuperAdminSuiteTestCase(TestCase):
         self.assertEqual(res2.status_code, 200)
         req.refresh_from_db()
         self.assertFalse(req.is_deleted)
+
+
+class SuperAdminDashboardSyncTestCase(TestCase):
+    """
+    Validates end-to-end synchronization between Super Admin panel and
+    Buyer, Seller, and Both (Hybrid) dashboards, including active backend
+    permission enforcement, module matrix toggles, and workspace switching.
+    """
+
+    def setUp(self):
+        BuyerModuleConfig.ensure_defaults()
+        SellerModuleConfig.ensure_defaults()
+
+        self.superadmin = User.objects.create_superuser(
+            email="superadmin_sync@platform.ai",
+            password="Password123!",
+            first_name="Global",
+            last_name="SuperAdmin",
+        )
+
+        # 1. Buyer Company & User
+        self.buyer_comp = Company.objects.create(
+            name="Buyer Corp India",
+            company_type=Company.CompanyType.BUYER,
+            is_active=True,
+            created_by=self.superadmin,
+        )
+        self.buyer_user = User.objects.create_user(
+            email="buyer_sync@buyer.com",
+            password="Password123!",
+            first_name="Raj",
+            last_name="Kumar",
+        )
+        CompanyMember.objects.create(
+            company=self.buyer_comp,
+            user=self.buyer_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # 2. Seller Company & User
+        self.seller_comp = Company.objects.create(
+            name="Seller Corp India",
+            company_type=Company.CompanyType.SELLER,
+            is_active=True,
+            created_by=self.superadmin,
+        )
+        self.seller_user = User.objects.create_user(
+            email="seller_sync@seller.com",
+            password="Password123!",
+            first_name="Amit",
+            last_name="Shah",
+        )
+        CompanyMember.objects.create(
+            company=self.seller_comp,
+            user=self.seller_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # 3. Both (Hybrid) Company & User
+        self.both_comp = Company.objects.create(
+            name="Hybrid Conglomerate",
+            company_type=Company.CompanyType.BOTH,
+            is_active=True,
+            created_by=self.superadmin,
+        )
+        self.both_user = User.objects.create_user(
+            email="hybrid_sync@hybrid.com",
+            password="Password123!",
+            first_name="Pooja",
+            last_name="Verma",
+        )
+        CompanyMember.objects.create(
+            company=self.both_comp,
+            user=self.both_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+    def test_super_admin_governance_views_access_control(self):
+        """Super Admin can access all dashboard governance views; regular users receive 403."""
+        admin_urls = [
+            reverse("admin-panel-buyer-dashboard"),
+            reverse("admin-panel-seller-dashboard"),
+            reverse("admin-panel-both-dashboard"),
+            reverse("admin-panel-modules"),
+            reverse("admin-panel-permissions"),
+            reverse("admin-panel-transactions"),
+            reverse("admin-panel-wallets"),
+        ]
+
+        # Regular user denied
+        self.client.login(email="buyer_sync@buyer.com", password="Password123!")
+        for url in admin_urls:
+            res = self.client.get(url)
+            self.assertEqual(res.status_code, 403, f"Non-admin should be forbidden from {url}")
+
+        # Super Admin granted
+        self.client.login(email="superadmin_sync@platform.ai", password="Password123!")
+        for url in admin_urls:
+            res = self.client.get(url)
+            self.assertEqual(res.status_code, 200, f"Super Admin should have 200 OK on {url}")
+
+    def test_buyer_module_disable_enforces_backend_route_403(self):
+        """Disabling a Buyer module via Super Admin actively blocks backend route access with 403."""
+        self.client.login(email="buyer_sync@buyer.com", password="Password123!")
+        # Accessible initially
+        res_initial = self.client.get(reverse("requirements-list"))
+        self.assertEqual(res_initial.status_code, 200)
+
+        # Super Admin disables requirements module
+        self.client.login(email="superadmin_sync@platform.ai", password="Password123!")
+        mod = BuyerModuleConfig.objects.get(module_key="my_requirements")
+        toggle_res = self.client.post(reverse("admin-panel-buyer-module-toggle", kwargs={"pk": mod.pk}))
+        self.assertEqual(toggle_res.status_code, 302)
+        mod.refresh_from_db()
+        self.assertFalse(mod.is_enabled)
+
+        # Buyer attempts to access disabled module -> HTTP 403 PermissionDenied
+        self.client.login(email="buyer_sync@buyer.com", password="Password123!")
+        res_blocked = self.client.get(reverse("requirements-list"))
+        self.assertEqual(res_blocked.status_code, 403)
+
+        # Re-enable module -> HTTP 200 again
+        self.client.login(email="superadmin_sync@platform.ai", password="Password123!")
+        self.client.post(reverse("admin-panel-buyer-module-toggle", kwargs={"pk": mod.pk}))
+        mod.refresh_from_db()
+        self.assertTrue(mod.is_enabled)
+
+        self.client.login(email="buyer_sync@buyer.com", password="Password123!")
+        res_restored = self.client.get(reverse("requirements-list"))
+        self.assertEqual(res_restored.status_code, 200)
+
+    def test_seller_module_disable_enforces_backend_route_403(self):
+        """Disabling a Seller module via Super Admin actively blocks backend route access with 403."""
+        self.client.login(email="seller_sync@seller.com", password="Password123!")
+        # Accessible initially
+        res_initial = self.client.get(reverse("products-list"))
+        self.assertEqual(res_initial.status_code, 200)
+
+        # Super Admin disables products catalog module
+        self.client.login(email="superadmin_sync@platform.ai", password="Password123!")
+        mod = SellerModuleConfig.objects.get(module_key="my_products")
+        toggle_res = self.client.post(reverse("admin-panel-seller-module-toggle", kwargs={"pk": mod.pk}))
+        self.assertEqual(toggle_res.status_code, 302)
+        mod.refresh_from_db()
+        self.assertFalse(mod.is_enabled)
+
+        # Seller attempts to access disabled module -> HTTP 403 PermissionDenied
+        self.client.login(email="seller_sync@seller.com", password="Password123!")
+        res_blocked = self.client.get(reverse("products-list"))
+        self.assertEqual(res_blocked.status_code, 403)
+
+        # Re-enable module -> HTTP 200 again
+        self.client.login(email="superadmin_sync@platform.ai", password="Password123!")
+        self.client.post(reverse("admin-panel-seller-module-toggle", kwargs={"pk": mod.pk}))
+        mod.refresh_from_db()
+        self.assertTrue(mod.is_enabled)
+
+        self.client.login(email="seller_sync@seller.com", password="Password123!")
+        res_restored = self.client.get(reverse("products-list"))
+        self.assertEqual(res_restored.status_code, 200)
+
+    def test_both_company_workspace_session_persistence(self):
+        """BOTH companies support workspace switching and session persistence."""
+        self.client.login(email="hybrid_sync@hybrid.com", password="Password123!")
+
+        # 1. Switch to buyer workspace
+        res = self.client.get(reverse("dashboard") + "?workspace=buyer")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self.client.session.get("active_workspace"), "buyer")
+        self.assertEqual(res.context["active_workspace"], "buyer")
+
+        # 2. Subsequent dashboard access without query parameter retains 'buyer' workspace
+        res2 = self.client.get(reverse("dashboard"))
+        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(res2.context["active_workspace"], "buyer")
+
+        # 3. Switch to seller workspace
+        res3 = self.client.get(reverse("dashboard") + "?workspace=seller")
+        self.assertEqual(res3.status_code, 200)
+        self.assertEqual(self.client.session.get("active_workspace"), "seller")
+        self.assertEqual(res3.context["active_workspace"], "seller")
+
 
 
 

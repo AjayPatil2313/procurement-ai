@@ -295,10 +295,24 @@ def dashboard_view(request):
     workspace = request.GET.get("workspace", "").lower().strip()
     if company.company_type == Company.CompanyType.BUYER:
         active_workspace = "buyer"
+        request.session["active_workspace"] = "buyer"
     elif company.company_type == Company.CompanyType.SELLER:
         active_workspace = "seller"
+        request.session["active_workspace"] = "seller"
     else:
-        active_workspace = workspace if workspace in ["buyer", "seller", "combined"] else "combined"
+        # BOTH
+        if workspace in ["buyer", "seller", "combined"]:
+            request.session["active_workspace"] = workspace
+            active_workspace = workspace
+        else:
+            session_ws = request.session.get("active_workspace")
+            if session_ws in ["buyer", "seller", "combined"]:
+                active_workspace = session_ws
+            else:
+                from apps.dashboard.models import BothDashboardLayout
+                both_layout = BothDashboardLayout.get_layout()
+                active_workspace = both_layout.default_active_view or "combined"
+                request.session["active_workspace"] = active_workspace
 
     dashboard_data = get_dashboard_data_for_company(company, workspace=active_workspace)
 
