@@ -568,6 +568,9 @@
                 <a href="{% if is_seller_context %}{% url 'sales-inquiry-detail' inq.id %}{% else %}{% url 'inquiry-detail' inq.id %}{% endif %}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 transition">
                   Dossier
                 </a>
+                <a href="{% if is_seller_context %}{% url 'sales-inquiry-quotation-pdf' inq.id %}{% else %}{% url 'inquiry-quotation-pdf' inq.id %}{% endif %}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs p-1.5 rounded-lg border border-slate-200 transition inline-flex items-center" title="Download Quotation PDF">
+                  <i class="fa-solid fa-file-pdf text-rose-600"></i>
+                </a>
                 <button type="button" onclick="openQuickQuoteModal('{{ inq.id }}', '{{ inq.search_result.external_company.name|escapejs }}', '{{ inq.quoted_price|default:'' }}', '{{ inq.quoted_currency|default:'INR' }}', '{{ inq.delivery_terms|default:''|escapejs }}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg transition cursor-pointer">
                   Quote
                 </button>
@@ -745,8 +748,25 @@
         </div>
 
         <div>
-          <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Message Body</label>
-          <textarea name="message_body" rows="4" required placeholder="Type follow-up content, negotiations, or client feedback..."
+          <div class="flex items-center justify-between mb-1">
+            <label class="block font-bold text-slate-700 uppercase tracking-wider">Message Body</label>
+            <span class="text-[10px] text-slate-400 font-semibold">1-Click Templates:</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <button type="button" onclick="setQuickTemplate('price')" class="px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-[10px] font-bold transition">
+              <i class="fa-solid fa-calculator mr-1"></i> Request Revision
+            </button>
+            <button type="button" onclick="setQuickTemplate('accept')" class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-[10px] font-bold transition">
+              <i class="fa-solid fa-circle-check mr-1"></i> Accept Quote
+            </button>
+            <button type="button" onclick="setQuickTemplate('delivery')" class="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 text-[10px] font-bold transition">
+              <i class="fa-solid fa-truck-fast mr-1"></i> Delivery Terms
+            </button>
+            <button type="button" onclick="setQuickTemplate('call')" class="px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 text-[10px] font-bold transition">
+              <i class="fa-solid fa-phone mr-1"></i> Schedule Call
+            </button>
+          </div>
+          <textarea id="quickFollowupTextarea" name="message_body" rows="4" required placeholder="Type follow-up content, negotiations, or client feedback..."
                     class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800 text-xs"></textarea>
         </div>
 
@@ -905,6 +925,20 @@ function openQuickFollowupModal(inquiryId, companyName, subject) {
 
 function closeQuickFollowupModal() {
   document.getElementById('quickFollowupModal').classList.add('hidden');
+}
+
+function setQuickTemplate(type) {
+  const ta = document.getElementById('quickFollowupTextarea');
+  if (!ta) return;
+  const templates = {
+    price: "Dear Team,\n\nThank you for your commercial quotation. We are reviewing the terms for this requirement. Could you offer your best volume discount or revised unit pricing to help us proceed with contract finalization?\n\nLooking forward to your prompt response.",
+    accept: "Dear Team,\n\nWe have reviewed and accepted your proposed quotation terms. Please share your official proforma invoice, technical compliance specs, and bank remittance details so we can initiate payment and issue purchase authorization.",
+    delivery: "Dear Team,\n\nCould you please confirm the exact dispatch timeline, available freight/delivery terms (Ex-Works / Door Delivery), and standard packaging specifications for this requirement?",
+    call: "Dear Team,\n\nWe would like to schedule a brief commercial and technical clarification call regarding this quotation. Please let us know your availability for a 15-minute discussion today or tomorrow."
+  };
+  if (templates[type]) {
+    ta.value = templates[type];
+  }
 }
 
 document.getElementById('quickQuoteModal')?.addEventListener('click', function(e) {

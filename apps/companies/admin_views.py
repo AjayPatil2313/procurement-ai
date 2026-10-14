@@ -515,6 +515,20 @@ def admin_panel_companies_view(request):
     verified_count = Company.objects.filter(is_deleted=False, is_verified=True).count()
     deleted_count = Company.objects.filter(is_deleted=True).count()
 
+    # CSV Export Handler
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response["Content-Disposition"] = f'attachment; filename="Platform_Companies_{today_str}.csv"'
+        response.write("\ufeff")  # UTF-8 BOM for Excel
+        writer = csv.writer(response)
+        writer.writerow(["Company ID", "Company Name", "Legal Name", "Company Type", "Subscription Plan", "Wallet Balance", "Verified", "Active", "GSTIN", "PAN", "Phone", "Email", "City", "State", "Country", "Industry", "Registration Date"])
+        for c in companies:
+            plan_str = c.subscription.get_plan_display() if hasattr(c, "subscription") and c.subscription else "Free"
+            wallet_bal = str(c.wallet.available_balance) if hasattr(c, "wallet") and c.wallet else "0.00"
+            writer.writerow([c.id, c.name, c.legal_name, c.get_company_type_display(), plan_str, wallet_bal, "Yes" if c.is_verified else "No", "Yes" if c.is_active else "No", c.gstin or "", c.pan_number or "", c.phone or "", c.email or "", c.city or "", c.state or "", c.country or "", c.industry or "", c.created_at.strftime("%Y-%m-%d")])
+        return response
+
     # Server-side pagination (default 10)
     page_obj, query_string = paginate_and_preserve(request, companies, per_page=10)
 
@@ -1401,6 +1415,29 @@ def admin_panel_users_view(request):
                     )
             messages.success(request, f"Successfully deactivated {updated_count} selected users.")
 
+        elif bulk_action == "export":
+            # Direct CSV export for selected users
+            response = HttpResponse(content_type="text/csv; charset=utf-8")
+            today_str = timezone.now().strftime("%Y%m%d")
+            response["Content-Disposition"] = f'attachment; filename="Selected_Users_{today_str}.csv"'
+            response.write("\ufeff")  # UTF-8 BOM for Excel
+            writer = csv.writer(response)
+            writer.writerow(["User ID", "Full Name", "Email", "Company ID", "Company Name", "Company Type", "Membership Role", "System Role", "Email Verified", "Account Status", "Joined Date", "Last Login"])
+            for u in User.objects.filter(id__in=selected_ids).select_related("company_membership__company").order_by("-created_at"):
+                membership = getattr(u, "company_membership", None)
+                comp = membership.company if membership else None
+                comp_id = comp.id if comp else ""
+                comp_name = comp.name if comp else "No Company"
+                comp_type = comp.get_company_type_display() if comp else ""
+                mem_role = membership.get_role_display() if membership else "N/A"
+                sys_role = "Super Admin" if u.is_superuser else ("Staff Admin" if u.is_staff else "Regular User")
+                verified = "Yes" if getattr(u, "is_email_verified", False) else "No"
+                status = "Active" if u.is_active else "Deactivated"
+                joined = u.created_at.strftime("%Y-%m-%d %H:%M:%S") if getattr(u, "created_at", None) else ""
+                last_login = u.last_login.strftime("%Y-%m-%d %H:%M:%S") if u.last_login else "Never"
+                writer.writerow([u.id, u.get_full_name(), u.email, comp_id, comp_name, comp_type, mem_role, sys_role, verified, status, joined, last_login])
+            return response
+
         cache.delete("superadmin_dashboard_kpis_7d")
         return redirect(request.get_full_path())
 
@@ -1449,6 +1486,35 @@ def admin_panel_users_view(request):
     field = allowed_sorts.get(sort_by, "created_at")
     sort_prefix = "-" if order == "desc" else ""
     users = users.order_by(f"{sort_prefix}{field}")
+
+    # CSV Export Handler (All matching filtered users or company-wise)
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        if company_filter != "all":
+            selected_comp = Company.objects.filter(id=company_filter).first()
+            slug = (selected_comp.name.replace(" ", "_") if selected_comp else f"Company_{company_filter}")
+            filename = f"Platform_Users_{slug}_{today_str}.csv"
+        else:
+            filename = f"Platform_Users_All_{today_str}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response.write("\ufeff")  # UTF-8 BOM for Excel
+        writer = csv.writer(response)
+        writer.writerow(["User ID", "Full Name", "Email", "Company ID", "Company Name", "Company Type", "Membership Role", "System Role", "Email Verified", "Account Status", "Joined Date", "Last Login"])
+        for u in users:
+            membership = getattr(u, "company_membership", None)
+            comp = membership.company if membership else None
+            comp_id = comp.id if comp else ""
+            comp_name = comp.name if comp else "No Company"
+            comp_type = comp.get_company_type_display() if comp else ""
+            mem_role = membership.get_role_display() if membership else "N/A"
+            sys_role = "Super Admin" if u.is_superuser else ("Staff Admin" if u.is_staff else "Regular User")
+            verified = "Yes" if getattr(u, "is_email_verified", False) else "No"
+            status = "Active" if u.is_active else "Deactivated"
+            joined = u.created_at.strftime("%Y-%m-%d %H:%M:%S") if getattr(u, "created_at", None) else ""
+            last_login = u.last_login.strftime("%Y-%m-%d %H:%M:%S") if u.last_login else "Never"
+            writer.writerow([u.id, u.get_full_name(), u.email, comp_id, comp_name, comp_type, mem_role, sys_role, verified, status, joined, last_login])
+        return response
 
     total_users = User.objects.count()
     active_users = User.objects.filter(is_active=True).count()
@@ -1556,6 +1622,20 @@ def admin_panel_auditlogs_view(request):
     activity_types = ActivityLog.ActivityType.choices
 
     total_activities = ActivityLog.objects.count()
+
+    # CSV Export Handler
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response["Content-Disposition"] = f'attachment; filename="Platform_Audit_Trail_{today_str}.csv"'
+        response.write("\ufeff")  # UTF-8 BOM for Excel
+        writer = csv.writer(response)
+        writer.writerow(["Log ID", "Timestamp", "Event Type", "Title", "Description", "Company", "User Email"])
+        for act in activities:
+            c_name = act.company.name if act.company else "Platform Global"
+            u_email = act.user.email if act.user else "System"
+            writer.writerow([act.id, act.created_at.strftime("%Y-%m-%d %H:%M:%S"), act.get_activity_type_display(), act.title, act.description, c_name, u_email])
+        return response
 
     # Server-side pagination (default 10)
     page_obj, query_string = paginate_and_preserve(request, activities, per_page=10)
@@ -2078,6 +2158,19 @@ def admin_panel_inquiries_view(request):
     total_inquiries = Inquiry.objects.count()
     won_count = Inquiry.objects.filter(status=Inquiry.Status.WON).count()
     all_companies = Company.objects.filter(is_deleted=False).order_by("name")
+
+    # CSV Export Handler
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response["Content-Disposition"] = f'attachment; filename="Platform_Inquiries_{today_str}.csv"'
+        response.write("\ufeff")  # UTF-8 BOM for Excel
+        writer = csv.writer(response)
+        writer.writerow(["Inquiry ID", "Subject", "Sender Company", "Recipient Supplier", "Quoted Value", "Status", "Sent Date"])
+        for inq in inquiries:
+            c_name = inq.company.name if inq.company else ""
+            writer.writerow([inq.id, inq.subject, c_name, inq.sent_to_email, inq.quoted_price or "", inq.get_status_display(), inq.created_at.strftime("%Y-%m-%d %H:%M:%S")])
+        return response
 
     # Server-side pagination (default 10)
     page_obj, query_string = paginate_and_preserve(request, inquiries, per_page=10)
@@ -3103,6 +3196,31 @@ def admin_panel_transactions_view(request):
     total_invoiced_amt = Invoice.objects.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
     total_paid_invoices = Invoice.objects.filter(status=Invoice.Status.PAID).count()
     total_pending_invoices = Invoice.objects.filter(status__in=[Invoice.Status.DRAFT, Invoice.Status.OVERDUE]).count()
+
+    # CSV Export Handler
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response.write("\ufeff")  # UTF-8 BOM for Excel
+        writer = csv.writer(response)
+        if active_tab == "invoices":
+            response["Content-Disposition"] = f'attachment; filename="Platform_Invoices_{today_str}.csv"'
+            writer.writerow(["Invoice ID", "Invoice Number", "Company", "Subtotal", "Tax Amount", "Total Amount", "Status", "Issue Date", "Due Date"])
+            for inv in invoice_qs:
+                writer.writerow([inv.id, inv.invoice_number, inv.company.name if inv.company else "", inv.subtotal, inv.tax_amount, inv.total_amount, inv.get_status_display(), inv.issue_date.strftime("%Y-%m-%d"), inv.due_date.strftime("%Y-%m-%d") if inv.due_date else ""])
+        elif active_tab == "credits":
+            response["Content-Disposition"] = f'attachment; filename="Platform_Credit_Ledger_{today_str}.csv"'
+            writer.writerow(["Transaction ID", "Receipt Number", "Company", "Feature Code", "Credits Amount", "Notes", "Timestamp"])
+            for ctx in credit_tx_qs:
+                writer.writerow([ctx.id, ctx.receipt_number or "", ctx.company.name if ctx.company else "", ctx.feature_code or "", ctx.amount, ctx.notes or "", ctx.created_at.strftime("%Y-%m-%d %H:%M:%S")])
+        else:
+            response["Content-Disposition"] = f'attachment; filename="Platform_Wallet_Ledger_{today_str}.csv"'
+            writer.writerow(["Transaction ID", "Reference ID", "Company", "Transaction Type", "Amount", "Balance After", "Status", "Description", "Initiated By", "Timestamp"])
+            for tx in wallet_tx_qs:
+                user_email = tx.created_by.email if tx.created_by else "System"
+                comp_name = (tx.company.name if tx.company else (tx.wallet.company.name if tx.wallet and tx.wallet.company else ""))
+                writer.writerow([tx.id, tx.reference_id, comp_name, tx.get_transaction_type_display(), tx.amount, tx.balance_after, tx.get_status_display(), tx.description, user_email, tx.created_at.strftime("%Y-%m-%d %H:%M:%S")])
+        return response
 
     # Server-side pagination (default 10)
     if active_tab == "invoices":

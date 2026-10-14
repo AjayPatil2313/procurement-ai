@@ -843,6 +843,66 @@ class BuyerProcurementPipelineAndComparisonTestCase(TestCase):
         self.assertEqual(dup_data["saved_count"], 0)
         self.assertEqual(dup_data["already_saved_count"], 2)
 
+    def test_inquiry_quotation_pdf_view(self):
+        """Test downloading quotation PDF for an inquiry returns valid PDF response."""
+        inquiry = Inquiry.objects.create(
+            company=self.company,
+            search_result=self.search_result1,
+            subject="Commercial Quote: Flange Valves",
+            message="Quotation for high-pressure valves",
+            sent_to_email="valves@precision.com",
+            quoted_price=Decimal("45000.00"),
+            delivery_terms="Ex-Works, 7 Days",
+            status=Inquiry.Status.SENT,
+        )
+        url = reverse("inquiry-quotation-pdf", kwargs={"pk": inquiry.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
+        self.assertTrue(len(response.content) > 100)
 
+    def test_batch_send_rfq_view(self):
+        """Test batch dispatching RFQ to multiple suppliers creates Inquiries and messages."""
+        url = reverse("batch-send-rfq")
+        response = self.client.post(url, {
+            "result_ids": [self.search_result1.id, self.search_result2.id],
+            "subject": "Batch RFQ: Valves Supply",
+            "message": "Please provide quotation and delivery timelines for our requirements.",
+            "target_price": "40000.00",
+            "delivery_terms": "CIF Mumbai, 15 Days",
+        }, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["sent_count"], 2)
 
+        inquiries = Inquiry.objects.filter(company=self.company, subject="Batch RFQ: Valves Supply")
+        self.assertEqual(inquiries.count(), 2)
+        for inq in inquiries:
+            self.assertEqual(inq.quoted_price, Decimal("40000.00"))
+            self.assertEqual(inq.delivery_terms, "CIF Mumbai, 15 Days")
+            self.assertEqual(inq.messages.count(), 1)
 
+    def test_kanban_stage_update_ajax(self):
+        """Test drag-and-drop Kanban status update updates stage_counts in real time."""
+        saved_item = SavedItem.objects.create(
+            company=self.company,
+            search_result=self.search_result1,
+            status=SavedItem.Status.NEW,
+        )
+        url = reverse("update-saved-supplier", kwargs={"item_id": saved_item.id})
+        response = self.client.post(
+            url,
+            {"status": "negotiating", "notes": "Discussion in progress"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["status"], "negotiating")
+        self.assertIn("stage_counts", data)
+        self.assertEqual(data["stage_counts"]["negotiating"], 1)
+        saved_item.refresh_from_db()
+        self.assertEqual(saved_item.status, SavedItem.Status.NEGOTIATING)
+        self.assertEqual(saved_item.notes, "Discussion in progress")

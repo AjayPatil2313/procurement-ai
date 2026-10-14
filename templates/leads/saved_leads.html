@@ -484,31 +484,43 @@
         </button>
       </div>
 
-      <div class="flex flex-wrap items-center gap-1.5" id="saved_filter_chips_container">
-        <button type="button" class="saved-filter-chip active text-xs font-bold px-3 py-1.5 rounded-xl border border-orange-500 bg-orange-500 text-white transition shadow-xs cursor-pointer" data-filter="all">
-          All (<span id="visible_saved_leads_count">{{ saved_items|length }}</span>)
-        </button>
-        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="active">
-          Active Pipeline
-        </button>
-        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="won">
-          Won Deals
-        </button>
-        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="new">
-          New Leads
-        </button>
-        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="unassigned_rep">
-          Unassigned Rep
-        </button>
-        <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="has_contact">
-          Verified Contact
-        </button>
+      <div class="flex items-center gap-2.5">
+        <!-- View Switcher (Table vs Kanban) -->
+        <div class="inline-flex rounded-xl p-0.5 bg-slate-100 border border-slate-200 shrink-0">
+          <button type="button" onclick="switchPipelineView('table')" id="view-btn-table" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-white text-slate-900 shadow-xs cursor-pointer">
+            <i class="fa-solid fa-table-list mr-1"></i> Table
+          </button>
+          <button type="button" onclick="switchPipelineView('kanban')" id="view-btn-kanban" class="px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-500 hover:text-slate-900 cursor-pointer">
+            <i class="fa-solid fa-chart-simple mr-1"></i> Kanban
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5" id="saved_filter_chips_container">
+          <button type="button" class="saved-filter-chip active text-xs font-bold px-3 py-1.5 rounded-xl border border-orange-500 bg-orange-500 text-white transition shadow-xs cursor-pointer" data-filter="all">
+            All (<span id="visible_saved_leads_count">{{ saved_items|length }}</span>)
+          </button>
+          <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="active">
+            Active Pipeline
+          </button>
+          <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="won">
+            Won Deals
+          </button>
+          <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="new">
+            New Leads
+          </button>
+          <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="unassigned_rep">
+            Unassigned Rep
+          </button>
+          <button type="button" class="saved-filter-chip text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer" data-filter="has_contact">
+            Verified Contact
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Filtered Saved Leads Table -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" id="saved_leads_table_container">
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto" id="pipeline-table-wrapper">
         <table class="w-full text-left text-xs min-w-[880px]" id="saved_leads_table">
           <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
             <tr>
@@ -644,6 +656,112 @@
             {% endfor %}
           </tbody>
         </table>
+      </div>
+
+      <!-- Kanban Board View -->
+      <div id="pipeline-kanban-container" class="hidden p-4 sm:p-5 bg-slate-50/60 overflow-x-auto border-t border-slate-100">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 items-start min-w-[1100px] pb-4">
+          {% for stage in kanban_stages %}
+          <div class="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col min-h-[460px] overflow-hidden">
+            <!-- Column Header -->
+            <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-lg {{ stage.badge_class }} flex items-center justify-center text-[10px] font-bold">
+                  <i class="fa-solid {{ stage.icon }}"></i>
+                </span>
+                <span class="font-bold text-slate-800 text-xs">{{ stage.label }}</span>
+              </div>
+              <span id="kanban-stage-count-{{ stage.key }}" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold {{ stage.badge_class }}">
+                {{ stage.items|length }}
+              </span>
+            </div>
+
+            <!-- Cards Dropzone -->
+            <div 
+              class="kanban-column-dropzone p-2.5 space-y-2.5 flex-1 min-h-[380px] transition-colors"
+              id="kanban-col-{{ stage.key }}"
+              data-stage="{{ stage.key }}"
+              ondragover="handleKanbanDragOver(event)"
+              ondragleave="handleKanbanDragLeave(event)"
+              ondrop="handleKanbanDrop(event, '{{ stage.key }}')"
+            >
+              {% for item in stage.items %}
+              <div 
+                class="kanban-card p-3 bg-white hover:bg-slate-50/90 rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition cursor-grab active:cursor-grabbing space-y-2 group"
+                id="kanban-card-{{ item.id }}"
+                data-id="{{ item.id }}"
+                data-current-stage="{{ stage.key }}"
+                draggable="true"
+                ondragstart="handleKanbanDragStart(event, '{{ item.id }}')"
+              >
+                <div class="flex items-start justify-between gap-1.5">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-6 h-6 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-[10px] shrink-0 font-bold border border-orange-100">
+                      <i class="fa-solid fa-industry"></i>
+                    </span>
+                    <div class="truncate">
+                      <div class="font-bold text-xs text-slate-900 truncate" title="{{ item.search_result.external_company.name }}">
+                        {{ item.search_result.external_company.name }}
+                      </div>
+                      <div class="text-[10px] text-slate-400 truncate">
+                        <i class="fa-solid fa-location-dot text-rose-500 text-[9px] mr-0.5"></i>
+                        {{ item.search_result.external_company.city|default:"India" }}
+                      </div>
+                    </div>
+                  </div>
+                  {% if item.search_result.match_score %}
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold shrink-0 {% if item.search_result.match_score >= 85 %}bg-emerald-100 text-emerald-800{% elif item.search_result.match_score >= 70 %}bg-blue-100 text-blue-800{% else %}bg-slate-100 text-slate-700{% endif %}" title="Fit Score">
+                    {{ item.search_result.match_score }}%
+                  </span>
+                  {% endif %}
+                </div>
+
+                <!-- Product Item Pill -->
+                <div class="text-[11px] font-medium text-slate-700 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg truncate" title="{{ item.search_result.product_title }}">
+                  {{ item.search_result.product_title }}
+                </div>
+
+                {% if item.notes %}
+                <div class="text-[10px] text-slate-500 italic bg-amber-50/50 border border-amber-100/60 p-1.5 rounded-lg line-clamp-2" title="{{ item.notes }}">
+                  <i class="fa-solid fa-note-sticky text-amber-500 mr-1 text-[9px]"></i>{{ item.notes }}
+                </div>
+                {% endif %}
+
+                <!-- Card Footer: Assigned Rep & Proposal / Delete -->
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                  <div class="flex items-center gap-1 text-[10px] text-slate-500 truncate max-w-[110px]" title="Assigned Rep">
+                    <i class="fa-solid fa-user-circle text-slate-400"></i>
+                    <span class="truncate">{% if item.assigned_to %}{{ item.assigned_to.get_full_name|default:item.assigned_to.email }}{% else %}Unassigned Rep{% endif %}</span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button 
+                      type="button" 
+                      onclick="openSendProposalModal('{{ item.search_result.id }}', '{% if item.search_result.external_company %}{{ item.search_result.external_company.name|escapejs }}{% else %}Lead{% endif %}', '{% if item.search_result.external_company %}{{ item.search_result.external_company.email|default:""|escapejs }}{% endif %}', '{{ item.search_result.product_title|default:"Product"|escapejs }}')" 
+                      class="p-1 text-orange-600 hover:text-orange-800 rounded transition" 
+                      title="Send Commercial Proposal"
+                    >
+                      <i class="fa-solid fa-envelope text-[10px]"></i>
+                    </button>
+                    <button 
+                      type="button" 
+                      onclick="openDeleteSavedLeadModal('{{ item.id }}', '{% if item.search_result.external_company %}{{ item.search_result.external_company.name|escapejs }}{% else %}Lead{% endif %}')" 
+                      class="p-1 text-rose-500 hover:text-rose-700 rounded transition" 
+                      title="Remove Lead"
+                    >
+                      <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {% empty %}
+              <div class="p-6 text-center text-[11px] text-slate-400 italic empty-column-placeholder">
+                Drag leads here
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
 
@@ -1260,6 +1378,133 @@ document.addEventListener('DOMContentLoaded', function() {
       showPipelineToast('Error removing lead.', false);
     });
   });
+
+  // Pipeline View Switcher (Table vs Kanban)
+  window.switchPipelineView = function(view) {
+    const tableWrapper = document.getElementById('pipeline-table-wrapper');
+    const kanbanContainer = document.getElementById('pipeline-kanban-container');
+    const btnTable = document.getElementById('view-btn-table');
+    const btnKanban = document.getElementById('view-btn-kanban');
+
+    if (view === 'kanban') {
+      if (tableWrapper) tableWrapper.classList.add('hidden');
+      if (kanbanContainer) kanbanContainer.classList.remove('hidden');
+      if (btnTable) {
+        btnTable.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-500 hover:text-slate-900 cursor-pointer';
+      }
+      if (btnKanban) {
+        btnKanban.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-white text-slate-900 shadow-xs cursor-pointer';
+      }
+      localStorage.setItem('saved_leads_view', 'kanban');
+    } else {
+      if (tableWrapper) tableWrapper.classList.remove('hidden');
+      if (kanbanContainer) kanbanContainer.classList.add('hidden');
+      if (btnTable) {
+        btnTable.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-white text-slate-900 shadow-xs cursor-pointer';
+      }
+      if (btnKanban) {
+        btnKanban.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-500 hover:text-slate-900 cursor-pointer';
+      }
+      localStorage.setItem('saved_leads_view', 'table');
+    }
+  };
+
+  // Restore saved view preference
+  const savedView = localStorage.getItem('saved_leads_view');
+  if (savedView === 'kanban') {
+    switchPipelineView('kanban');
+  }
+
+  // Kanban Drag and Drop Logic
+  let draggedItemId = null;
+
+  window.handleKanbanDragStart = function(e, itemId) {
+    draggedItemId = itemId;
+    e.dataTransfer.setData('text/plain', itemId);
+    e.dataTransfer.effectAllowed = 'move';
+    const card = document.getElementById(`kanban-card-${itemId}`);
+    if (card) card.classList.add('opacity-40');
+  };
+
+  window.handleKanbanDragOver = function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const dropzone = e.currentTarget;
+    dropzone.classList.add('bg-orange-50/70', 'border-dashed', 'border-2', 'border-orange-400');
+  };
+
+  window.handleKanbanDragLeave = function(e) {
+    const dropzone = e.currentTarget;
+    dropzone.classList.remove('bg-orange-50/70', 'border-dashed', 'border-2', 'border-orange-400');
+  };
+
+  window.handleKanbanDrop = function(e, targetStage) {
+    e.preventDefault();
+    const dropzone = e.currentTarget;
+    dropzone.classList.remove('bg-orange-50/70', 'border-dashed', 'border-2', 'border-orange-400');
+
+    const itemId = draggedItemId || e.dataTransfer.getData('text/plain');
+    if (!itemId) return;
+
+    const card = document.getElementById(`kanban-card-${itemId}`);
+    if (card) card.classList.remove('opacity-40');
+
+    const currentStage = card ? card.getAttribute('data-current-stage') : '';
+    if (currentStage === targetStage) return;
+
+    const emptyPlaceholder = dropzone.querySelector('.empty-column-placeholder');
+    if (emptyPlaceholder) emptyPlaceholder.remove();
+    dropzone.appendChild(card);
+    if (card) card.setAttribute('data-current-stage', targetStage);
+
+    const csrfToken = getCsrfToken();
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', csrfToken);
+    formData.append('status', targetStage);
+
+    fetch(`/sales/saved-leads/${itemId}/update/`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        if (data.stage_counts) {
+          Object.entries(data.stage_counts).forEach(([stage, count]) => {
+            const pill = document.getElementById(`kanban-stage-count-${stage}`);
+            if (pill) pill.textContent = count;
+          });
+          updatePipelineKpis(data);
+        }
+        if (data.win_rate_pct !== undefined) {
+          const winEl = document.getElementById('kpi_win_rate');
+          if (winEl) winEl.textContent = `${data.win_rate_pct}%`;
+        }
+        if (data.active_velocity_count !== undefined) {
+          const velEl = document.getElementById('kpi_active_velocity');
+          if (velEl) velEl.textContent = data.active_velocity_count;
+        }
+        const tableRow = document.getElementById(`saved_row_${itemId}`);
+        if (tableRow) {
+          tableRow.setAttribute('data-status', targetStage);
+          const sel = tableRow.querySelector('select[name="status"]');
+          if (sel) sel.value = targetStage;
+          updateAdvanceButtonSlot(itemId, targetStage);
+        }
+        showPipelineToast(`Lead stage updated to ${data.status_display}!`);
+      } else {
+        showPipelineToast('Could not update stage: ' + (data.error || 'Server error'), false);
+        window.location.reload();
+      }
+    })
+    .catch(err => {
+      console.error('Kanban stage update error:', err);
+      window.location.reload();
+    });
+  };
 });
 </script>
 

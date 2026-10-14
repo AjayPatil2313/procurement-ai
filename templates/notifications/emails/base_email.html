@@ -39,10 +39,13 @@
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="email-container" style="max-width: 640px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.04);">
 
           <!-- ======================================================== -->
-          <!-- 1. STANDARD HEADER (FIXED ACROSS ALL TEMPLATES)          -->
+          <!-- 1. HEADER SECTION (CONFIGURABLE VIA UI)                  -->
           <!-- ======================================================== -->
+          {% if custom_header_html %}
+            {{ custom_header_html|safe }}
+          {% else %}
           <tr>
-            <td style="background-color: #ffffff; padding: 24px 32px 20px; border-bottom: 1px solid #f1f5f9;" class="mobile-padding">
+            <td style="background-color: {{ header_bg_color|default:'#ffffff' }}; padding: 24px 32px 20px; border-bottom: 1px solid #f1f5f9;" class="mobile-padding">
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <!-- Left: Brand Logo & Tagline -->
@@ -50,14 +53,18 @@
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="vertical-align: middle; padding-right: 12px;">
-                          <!-- TradeConnect Geometric Logo Icon -->
-                          <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%); text-align: center; line-height: 38px; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
-                            <span style="color: #ffffff; font-size: 20px; font-weight: 900; line-height: 38px; display: inline-block;">&#9650;</span>
-                          </div>
+                          {% if logo_url %}
+                            <img src="{{ logo_url }}" alt="{{ brand_name|default:'TradeConnect' }}" style="max-height: 40px; max-width: 140px; display: block; border-radius: 8px;">
+                          {% else %}
+                            <!-- Geometric Brand Icon -->
+                            <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%); text-align: center; line-height: 38px; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
+                              <span style="color: #ffffff; font-size: 20px; font-weight: 900; line-height: 38px; display: inline-block;">&#9650;</span>
+                            </div>
+                          {% endif %}
                         </td>
                         <td style="vertical-align: middle;">
-                          <span style="font-size: 21px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; display: block; line-height: 1.1;">TradeConnect</span>
-                          <span style="font-size: 10px; font-weight: 700; color: #0284c7; letter-spacing: 1px; text-transform: uppercase; display: block; margin-top: 2px;">Buy &bull; Sell &bull; Grow</span>
+                          <span style="font-size: 21px; font-weight: 900; color: {{ header_text_color|default:'#0f172a' }}; letter-spacing: -0.5px; display: block; line-height: 1.1;">{{ brand_name|default:'TradeConnect' }}</span>
+                          <span style="font-size: 10px; font-weight: 700; color: #0284c7; letter-spacing: 1px; text-transform: uppercase; display: block; margin-top: 2px;">{{ brand_tagline|default:'Buy &bull; Sell &bull; Grow'|safe }}</span>
                         </td>
                       </tr>
                     </table>
@@ -65,13 +72,14 @@
 
                   <!-- Right: Platform Slogan -->
                   <td align="right" style="vertical-align: middle;" class="hide-mobile">
-                    <span style="font-size: 12px; font-weight: 700; color: #334155; display: block; line-height: 1.2;">B2B Procurement &amp; Sales Platform</span>
-                    <span style="font-size: 10px; color: #64748b; display: block; margin-top: 2px;">Smarter Sourcing. Stronger Partnerships.</span>
+                    <span style="font-size: 12px; font-weight: 700; color: #334155; display: block; line-height: 1.2;">{{ header_title|default:'B2B Procurement &amp; Sales Platform' }}</span>
+                    <span style="font-size: 10px; color: #64748b; display: block; margin-top: 2px;">{{ header_subtitle|default:'Smarter Sourcing. Stronger Partnerships.' }}</span>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
+          {% endif %}
 
           <!-- ======================================================== -->
           <!-- 2. EVENT-SPECIFIC HERO BANNER                            -->
@@ -122,67 +130,78 @@
           </tr>
 
           <!-- ======================================================== -->
-          <!-- 4. TRUST BADGES ROW (FIXED ACROSS ALL TEMPLATES)         -->
+          <!-- 4. TRUST BADGES ROW (CONFIGURABLE VIA UI)                -->
           <!-- ======================================================== -->
+          {% if show_trust_badges|default:True %}
           <tr>
             <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 18px 24px;" class="mobile-padding">
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <!-- Badge 1: Secure & Verified -->
+                  <!-- Badge 1 -->
                   <td width="33%" align="center" style="vertical-align: middle; border-right: 1px solid #e2e8f0; padding: 4px 8px;">
-                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">&#128737;</span>
-                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">Secure &amp; Verified</span>
+                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">{{ badge_1_icon|default:'&#128737;' }}</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">{{ badge_1_text|default:'Secure &amp; Verified' }}</span>
                   </td>
 
-                  <!-- Badge 2: Trusted B2B Platform -->
+                  <!-- Badge 2 -->
                   <td width="34%" align="center" style="vertical-align: middle; border-right: 1px solid #e2e8f0; padding: 4px 8px;">
-                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">&#9745;</span>
-                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">Trusted B2B Platform</span>
+                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">{{ badge_2_icon|default:'&#9745;' }}</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">{{ badge_2_text|default:'Trusted B2B Platform' }}</span>
                   </td>
 
-                  <!-- Badge 3: 24/7 Dedicated Support -->
+                  <!-- Badge 3 -->
                   <td width="33%" align="center" style="vertical-align: middle; padding: 4px 8px;">
-                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">&#127911;</span>
-                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">24/7 Support</span>
+                    <span style="font-size: 15px; margin-right: 4px; vertical-align: middle;">{{ badge_3_icon|default:'&#127911;' }}</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #475569; vertical-align: middle;">{{ badge_3_text|default:'24/7 Support' }}</span>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
+          {% endif %}
 
           <!-- ======================================================== -->
-          <!-- 5. DARK BRAND FOOTER (FIXED ACROSS ALL TEMPLATES)        -->
+          <!-- 5. BRAND FOOTER (CONFIGURABLE VIA UI)                    -->
           <!-- ======================================================== -->
+          {% if custom_footer_html %}
+            {{ custom_footer_html|safe }}
+          {% else %}
           <tr>
             <td style="background-color: #0f172a; padding: 24px 32px; color: #94a3b8; font-size: 11px;" class="mobile-padding">
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <!-- Left: Links & Brand -->
                   <td align="left" style="vertical-align: middle;">
-                    <span style="color: #ffffff; font-weight: 800; font-size: 13px;">TradeConnect</span>
+                    <span style="color: #ffffff; font-weight: 800; font-size: 13px;">{{ footer_brand_name|default:'TradeConnect' }}</span>
+                    {% if website_url %}
                     <span style="color: #475569; margin: 0 8px;">|</span>
-                    <a href="https://tradeconnect.com" style="color: #94a3b8; text-decoration: none;">www.tradeconnect.com</a>
+                    <a href="{{ website_url }}" style="color: #94a3b8; text-decoration: none;">{{ website_display|default:website_url }}</a>
+                    {% endif %}
+                    {% if support_email %}
                     <span style="color: #475569; margin: 0 8px;">|</span>
-                    <a href="mailto:support@tradeconnect.com" style="color: #94a3b8; text-decoration: none;">support@tradeconnect.com</a>
+                    <a href="mailto:{{ support_email }}" style="color: #94a3b8; text-decoration: none;">{{ support_email }}</a>
+                    {% endif %}
                   </td>
 
                   <!-- Right: Social Channels -->
                   <td align="right" style="vertical-align: middle;" class="hide-mobile">
-                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">in</span>
-                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">fb</span>
-                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">yt</span>
-                    <span style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px;">&#120143;</span>
+                    {% if social_linkedin %}<a href="{{ social_linkedin }}" style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px; text-decoration: none;">in</a>{% endif %}
+                    {% if social_facebook %}<a href="{{ social_facebook }}" style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px; text-decoration: none;">fb</a>{% endif %}
+                    {% if social_youtube %}<a href="{{ social_youtube }}" style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px; text-decoration: none;">yt</a>{% endif %}
+                    {% if social_twitter %}<a href="{{ social_twitter }}" style="color: #cbd5e1; font-weight: 700; font-size: 11px; margin-left: 10px; text-decoration: none;">&#120143;</a>{% endif %}
                   </td>
                 </tr>
                 <tr>
                   <td colspan="2" style="padding-top: 14px; border-top: 1px solid #1e293b; margin-top: 12px; color: #64748b; font-size: 10px; line-height: 1.5;">
-                    You received this operational email because your company account is registered on the <strong>TradeConnect B2B AI Procurement &amp; Sales Platform</strong>.<br>
+                    {{ compliance_text|default:"You received this operational email because your company account is registered on the TradeConnect B2B AI Procurement & Sales Platform." }}<br>
+                    {{ copyright_text|default:"© 2026 TradeConnect Inc. All rights reserved." }} &bull;
                     Manage your <a href="{{ preferences_url|default:'#' }}" style="color: #38bdf8; text-decoration: underline;">notification preferences</a> or <a href="{{ unsubscribe_url|default:'#' }}" style="color: #38bdf8; text-decoration: underline;">unsubscribe</a>.
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
+          {% endif %}
 
         </table>
         <!-- /Main Card Container -->

@@ -12,6 +12,7 @@ from apps.notifications.models import (
     NotificationRule,
     NotificationLog,
     EmailDeliveryAttempt,
+    EmailLayoutSetting,
 )
 from apps.notifications.services.smtp_service import (
     get_active_email_connection,
@@ -225,6 +226,10 @@ def build_branded_html(
     preferences_url=None,
     unsubscribe_url=None,
     event_key=None,
+    template_obj=None,
+    layout_setting=None,
+    custom_header_html=None,
+    custom_footer_html=None,
 ):
     """
     Renders a responsive, modern HTML email matching the TradeConnect reference layout.
@@ -536,22 +541,74 @@ def build_branded_html(
 """
     try:
         from django.template.loader import render_to_string
-        return render_to_string(
-            "notifications/emails/base_email.html",
-            {
-                "email_subject": clean_title,
-                "banner_gradient": theme["gradient"],
-                "banner_icon_color": theme["icon_color"],
-                "banner_icon_html": f'<span style="font-size: 28px; color: {theme["icon_color"]}; line-height: 64px;">{icon_display}</span>',
-                "banner_title": main_title_text,
-                "banner_highlight": highlight_word,
-                "banner_highlight_color": theme["highlight"],
-                "banner_subtitle": subtitle_display,
-                "email_body": body_slot,
-                "preferences_url": prefs_link,
-                "unsubscribe_url": unsub_link,
-            },
-        )
+
+        # Resolve layout settings and template overrides
+        if not layout_setting:
+            try:
+                layout_setting = EmailLayoutSetting.get_active_layout()
+            except Exception:
+                layout_setting = None
+
+        header_html_to_use = custom_header_html
+        footer_html_to_use = custom_footer_html
+
+        if template_obj and getattr(template_obj, "use_custom_layout", False):
+            if template_obj.header_html:
+                header_html_to_use = template_obj.header_html
+            if template_obj.footer_html:
+                footer_html_to_use = template_obj.footer_html
+
+        if not header_html_to_use and layout_setting:
+            if layout_setting.use_custom_header_html and layout_setting.custom_header_html:
+                header_html_to_use = layout_setting.custom_header_html
+
+        if not footer_html_to_use and layout_setting:
+            if layout_setting.use_custom_footer_html and layout_setting.custom_footer_html:
+                footer_html_to_use = layout_setting.custom_footer_html
+
+        email_context = {
+            "email_subject": clean_title,
+            "banner_gradient": theme["gradient"],
+            "banner_icon_color": theme["icon_color"],
+            "banner_icon_html": f'<span style="font-size: 28px; color: {theme["icon_color"]}; line-height: 64px;">{icon_display}</span>',
+            "banner_title": main_title_text,
+            "banner_highlight": highlight_word,
+            "banner_highlight_color": theme["highlight"],
+            "banner_subtitle": subtitle_display,
+            "email_body": body_slot,
+            "preferences_url": prefs_link,
+            "unsubscribe_url": unsub_link,
+            # Dynamic Header fields
+            "custom_header_html": header_html_to_use,
+            "brand_name": getattr(layout_setting, "brand_name", "TradeConnect") if layout_setting else "TradeConnect",
+            "brand_tagline": str(getattr(layout_setting, "brand_tagline", "Buy &bull; Sell &bull; Grow") if layout_setting else "Buy &bull; Sell &bull; Grow").replace("•", "&bull;"),
+            "header_title": getattr(layout_setting, "header_title", "B2B Procurement & Sales Platform") if layout_setting else "B2B Procurement & Sales Platform",
+            "header_subtitle": getattr(layout_setting, "header_subtitle", "Smarter Sourcing. Stronger Partnerships.") if layout_setting else "Smarter Sourcing. Stronger Partnerships.",
+            "logo_url": getattr(layout_setting, "logo_url", "") if layout_setting else "",
+            "header_bg_color": getattr(layout_setting, "header_bg_color", "#ffffff") if layout_setting else "#ffffff",
+            "header_text_color": getattr(layout_setting, "header_text_color", "#0f172a") if layout_setting else "#0f172a",
+            # Trust Badges
+            "show_trust_badges": getattr(layout_setting, "show_trust_badges", True) if layout_setting else True,
+            "badge_1_icon": getattr(layout_setting, "badge_1_icon", "🛡️") if layout_setting else "🛡️",
+            "badge_1_text": getattr(layout_setting, "badge_1_text", "Secure &amp; Verified") if layout_setting else "Secure &amp; Verified",
+            "badge_2_icon": getattr(layout_setting, "badge_2_icon", "☑️") if layout_setting else "☑️",
+            "badge_2_text": getattr(layout_setting, "badge_2_text", "Trusted B2B Platform") if layout_setting else "Trusted B2B Platform",
+            "badge_3_icon": getattr(layout_setting, "badge_3_icon", "🎧") if layout_setting else "🎧",
+            "badge_3_text": getattr(layout_setting, "badge_3_text", "24/7 Support") if layout_setting else "24/7 Support",
+            # Dynamic Footer fields
+            "custom_footer_html": footer_html_to_use,
+            "footer_brand_name": getattr(layout_setting, "footer_brand_name", "TradeConnect") if layout_setting else "TradeConnect",
+            "website_url": getattr(layout_setting, "website_url", "https://tradeconnect.com") if layout_setting else "https://tradeconnect.com",
+            "website_display": "www.tradeconnect.com" if "tradeconnect" in str(getattr(layout_setting, "website_url", "https://tradeconnect.com")).lower() else str(getattr(layout_setting, "website_url", "")).replace("https://", "").replace("http://", "").strip("/"),
+            "support_email": getattr(layout_setting, "support_email", "support@tradeconnect.com") if layout_setting else "support@tradeconnect.com",
+            "compliance_text": getattr(layout_setting, "compliance_text", "") if layout_setting else "You received this operational email because your company account is registered on the TradeConnect B2B AI Procurement & Sales Platform.",
+            "copyright_text": getattr(layout_setting, "copyright_text", "© 2026 TradeConnect Inc. All rights reserved.") if layout_setting else "© 2026 TradeConnect Inc. All rights reserved.",
+            "social_linkedin": getattr(layout_setting, "social_linkedin", "") if layout_setting else "https://linkedin.com",
+            "social_facebook": getattr(layout_setting, "social_facebook", "") if layout_setting else "https://facebook.com",
+            "social_youtube": getattr(layout_setting, "social_youtube", "") if layout_setting else "https://youtube.com",
+            "social_twitter": getattr(layout_setting, "social_twitter", "") if layout_setting else "https://twitter.com",
+        }
+        return render_to_string("notifications/emails/base_email.html", email_context)
     except Exception as exc:
         logger.debug(f"render_to_string base_email fallback: {exc}")
         return html
@@ -677,6 +734,7 @@ def trigger_email_notification(
                     preferences_url="/company/notification-preferences/",
                     unsubscribe_url=token_unsub_url,
                     event_key=event_key,
+                    template_obj=tpl,
                 )
             else:
                 final_html = body_rendered

@@ -2658,7 +2658,7 @@ class HelpSupportTestCase(TestCase):
     def test_help_support_page_renders(self):
         response = self.client.get(reverse("help-support"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Help & Support Center")
+        self.assertContains(response, "Help & Support")
         self.assertContains(response, "Frequently Asked Questions")
         self.assertContains(response, "support@procureai.in")
         self.assertNotContains(response, "My Support Tickets")
@@ -2972,6 +2972,17 @@ class SuperAdminHelpAndSupportTestCase(TestCase):
         self.assertEqual(page_res.status_code, 200)
         self.assertNotContains(page_res, self.ticket1.subject)
         self.assertEqual(page_res.context["total_tickets_count"], 0)
+
+    def test_superadmin_export_tickets_csv(self):
+        """Validates that Super Admin can export support tickets as CSV."""
+        self.client.force_login(self.superadmin)
+        res = self.client.get(reverse("admin-panel-support") + "?export=csv")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/csv", res["Content-Type"])
+        self.assertIn("Support_Tickets_", res["Content-Disposition"])
+        content = res.content.decode("utf-8")
+        self.assertIn("Question regarding MOQ landed price calculation", content)
+        self.assertIn("Apex Heavy Machinery Ltd.", content)
 
 
 

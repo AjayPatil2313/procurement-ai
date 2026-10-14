@@ -1,6 +1,7 @@
 from django.urls import path
 from apps.notifications.admin_views import (
     admin_email_overview_view,
+    admin_email_layout_view,
     admin_email_templates_view,
     admin_email_template_edit_view,
     admin_email_template_preview_api,
@@ -24,6 +25,7 @@ urlpatterns = [
     # Super Admin Email Operations & Governance
     path("admin-panel/email/", admin_email_overview_view, name="admin-panel-email-overview"),
     path("admin-panel/email/dashboard/", admin_email_overview_view, name="admin-panel-email-dashboard"),
+    path("admin-panel/email/layout/", admin_email_layout_view, name="admin-panel-email-layout"),
     path("admin-panel/email/templates/", admin_email_templates_view, name="admin-panel-email-templates"),
     path("admin-panel/email/templates/<int:pk>/edit/", admin_email_template_edit_view, name="admin-panel-email-template-edit"),
     path("admin-panel/email/templates/<int:pk>/preview/", admin_email_template_preview_api, name="admin-panel-email-template-preview"),

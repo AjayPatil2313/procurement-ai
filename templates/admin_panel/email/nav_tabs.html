@@ -6,6 +6,9 @@
   <a href="{% url 'admin-panel-email-templates' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'templates' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
     <i class="fa-solid fa-file-code text-[11px]"></i> Templates
   </a>
+  <a href="{% url 'admin-panel-email-layout' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'layout' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-table-columns text-[11px]"></i> Header &amp; Footer Layout
+  </a>
   <a href="{% url 'admin-panel-email-triggers' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'triggers' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
     <i class="fa-solid fa-bolt text-[11px]"></i> Event Triggers &amp; Routing
   </a>

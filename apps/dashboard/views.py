@@ -4,7 +4,8 @@ from django.core.exceptions import PermissionDenied
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import JsonResponse
+import csv
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from rest_framework import status
@@ -621,6 +622,21 @@ def help_support_view(request):
             | Q(company__city__icontains=query_search)
             | Q(company__country__icontains=query_search)
         )
+
+    # CSV Export Handler
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response["Content-Disposition"] = f'attachment; filename="Support_Tickets_{today_str}.csv"'
+        response.write("\ufeff")  # UTF-8 BOM for Excel
+        writer = csv.writer(response)
+        writer.writerow(["Ticket ID", "Ticket Number", "Company ID", "Company Name", "Contact Email", "User", "Subject", "Category", "Priority", "Status", "Created Date", "Last Updated"])
+        for tkt in tickets_qs:
+            c_id = tkt.company.id if tkt.company else ""
+            c_name = tkt.company.name if tkt.company else "Direct User"
+            u_email = tkt.user.email if tkt.user else tkt.contact_email
+            writer.writerow([tkt.id, tkt.ticket_number, c_id, c_name, tkt.contact_email, u_email, tkt.subject, tkt.get_category_display(), tkt.get_priority_display(), tkt.get_status_display(), tkt.created_at.strftime("%Y-%m-%d %H:%M:%S"), tkt.updated_at.strftime("%Y-%m-%d %H:%M:%S")])
+        return response
 
     tickets = list(tickets_qs)
 

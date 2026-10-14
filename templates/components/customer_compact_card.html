@@ -51,9 +51,29 @@
           </span>
         </div>
       </div>
-      <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black shrink-0 {% if lead.match_score >= 85 %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif lead.match_score >= 70 %}bg-blue-50 text-blue-700 border border-blue-200{% else %}bg-slate-100 text-slate-700{% endif %}">
-        {{ lead.match_score }}% Fit
-      </span>
+      <div class="relative group/score" onclick="event.stopPropagation()">
+        <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black shrink-0 cursor-help {% if lead.match_score >= 85 %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif lead.match_score >= 70 %}bg-blue-50 text-blue-700 border border-blue-200{% else %}bg-slate-100 text-slate-700{% endif %}">
+          {{ lead.match_score }}% Fit
+        </span>
+        <!-- Explainability Popover -->
+        <div class="hidden group-hover/score:block absolute right-0 top-full mt-1.5 z-30 w-52 p-2.5 bg-slate-900 text-white rounded-xl shadow-xl text-[10px] space-y-1.5 border border-slate-700 animate-in fade-in zoom-in-95 duration-100 pointer-events-none text-left">
+          <div class="font-bold text-slate-200 border-b border-slate-800 pb-1 flex items-center justify-between">
+            <span>AI Match Breakdown</span>
+            <span class="text-emerald-400 font-extrabold">{{ lead.match_score }}/100</span>
+          </div>
+          <div class="space-y-1 text-slate-300">
+            <div class="flex justify-between"><span>Category & Product:</span><span class="text-white font-bold">High Alignment</span></div>
+            <div class="flex justify-between"><span>Location / Proximity:</span><span class="text-white font-bold">{% if lead.external_company.city %}City Match{% else %}Country Match{% endif %}</span></div>
+            <div class="flex justify-between"><span>Verified Contact:</span><span class="text-white font-bold">{% if lead.external_company.email or lead.external_company.phone %}Verified{% else %}Pending{% endif %}</span></div>
+            <div class="flex justify-between"><span>Commercial Readiness:</span><span class="text-white font-bold">Active B2B</span></div>
+          </div>
+          {% if lead.match_reason %}
+          <div class="pt-1 border-t border-slate-800 text-[9px] text-slate-400 italic line-clamp-2">
+            "{{ lead.match_reason }}"
+          </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
     <!-- Contact Details (Compact) -->

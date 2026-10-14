@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}Master Email Header &amp; Footer Layout — Super Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 mb-3">
+        <i class="fa-solid fa-table-columns mr-1.5 text-blue-400"></i> Platform Email Architecture
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Master Header &amp; Footer Layout</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Configure the standard brand header, trust badges, and dark footer shared across all transactional email templates.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a href="{% url 'admin-panel-email-templates' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-file-code mr-1.5 text-blue-400"></i> Manage Templates
+      </a>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  {% include "admin_panel/email/nav_tabs.html" %}
+
+  <!-- Information Callout -->
+  <div class="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4 flex items-start gap-3.5 text-xs text-blue-900">
+    <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+      <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+    </div>
+    <div class="space-y-1">
+      <div class="font-bold text-sm text-blue-950">Shared Layout System (Standard Template Architecture)</div>
+      <p class="text-blue-800 leading-relaxed">
+        Yahan par aap jo <strong>Header, Trust Badges, aur Footer</strong> configure karenge, wo platform ke saare <strong>12+ transactional email templates</strong> me universally apply honge. Jab bhi koi email trigger hogi, sirf uska <em>Body</em> badlega jabki Header aur Footer bilkul uniform aur standard rahenge.
+      </p>
+    </div>
+  </div>
+
+  <!-- Main Grid: Form + Live Preview -->
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+
+    <!-- Left Column: Layout Form Controls (7 cols) -->
+    <div class="xl:col-span-7 space-y-6">
+      <form method="POST" id="layoutForm" class="space-y-6">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+
+        <!-- 1. Header Card -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                1
+              </span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 leading-tight">Standard Brand Header</h3>
+                <p class="text-[11px] text-slate-400">Logo, brand title, and platform slogan displayed at the top</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              Top Section
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Brand Name</label>
+              <input type="text" name="brand_name" value="{{ layout_obj.brand_name }}" required class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <span class="text-[10px] text-slate-400 mt-1 block">e.g. TradeConnect or Your Brand</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Brand Tagline</label>
+              <input type="text" name="brand_tagline" value="{{ layout_obj.brand_tagline }}" class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <span class="text-[10px] text-slate-400 mt-1 block">e.g. Buy &bull; Sell &bull; Grow</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Header Right Title</label>
+              <input type="text" name="header_title" value="{{ layout_obj.header_title }}" class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <span class="text-[10px] text-slate-400 mt-1 block">e.g. B2B Procurement &amp; Sales Platform</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Header Right Subtitle</label>
+              <input type="text" name="header_subtitle" value="{{ layout_obj.header_subtitle }}" class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <span class="text-[10px] text-slate-400 mt-1 block">e.g. Smarter Sourcing. Stronger Partnerships.</span>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Custom Logo Image URL (Optional)</label>
+            <input type="url" name="logo_url" value="{{ layout_obj.logo_url }}" placeholder="https://example.com/assets/logo.png" class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <span class="text-[10px] text-slate-400 mt-1 block">Agar logo URL blank chhodenge to modern geometric brand icon automatically render hoga.</span>
+          </div>
+
+          <!-- Advanced Custom Header HTML Toggle -->
+          <div class="border-t border-slate-100 pt-3">
+            <div class="flex items-center justify-between mb-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="use_custom_header_html" id="toggleCustomHeader" {% if layout_obj.use_custom_header_html %}checked{% endif %} class="w-4 h-4 text-blue-600 rounded">
+                <span class="text-xs font-bold text-slate-800">Use Advanced Raw Custom Header HTML</span>
+              </label>
+              <span class="text-[11px] text-slate-400">Overrides structured fields</span>
+            </div>
+
+            <div id="customHeaderContainer" class="{% if not layout_obj.use_custom_header_html %}hidden{% endif %} mt-2">
+              <textarea name="custom_header_html" rows="4" placeholder="<tr><td>...Custom header HTML table row...</td></tr>" class="w-full p-3 font-mono text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ layout_obj.custom_header_html }}</textarea>
+              <p class="text-[10px] text-slate-400 mt-1">Raw HTML table row (<code>&lt;tr&gt;...&lt;/tr&gt;</code>) for complete creative design freedom.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Trust Badges Row Card -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                2
+              </span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 leading-tight">Trust &amp; Verification Badges</h3>
+                <p class="text-[11px] text-slate-400">Reassurance strip placed between body content and footer</p>
+              </div>
+            </div>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" name="show_trust_badges" {% if layout_obj.show_trust_badges %}checked{% endif %} class="w-4 h-4 text-emerald-600 rounded">
+              <span class="text-xs font-bold text-slate-700">Enabled</span>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="p-3 rounded-xl bg-slate-50/70 border border-slate-100 space-y-2">
+              <div class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Badge 1</div>
+              <div>
+                <label class="text-[10px] text-slate-500 block">Icon / Emoji</label>
+                <input type="text" name="badge_1_icon" value="{{ layout_obj.badge_1_icon }}" class="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white">
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 block">Badge Text</label>
+                <input type="text" name="badge_1_text" value="{{ layout_obj.badge_1_text }}" class="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white">
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50/70 border border-slate-100 space-y-2">
+              <div class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Badge 2</div>
+              <div>
+                <label class="text-[10px] text-slate-500 block">Icon / Emoji</label>
+                <input type="text" name="badge_2_icon" value="{{ layout_obj.badge_2_icon }}" class="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white">
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 block">Badge Text</label>
+                <input type="text" name="badge_2_text" value="{{ layout_obj.badge_2_text }}" class="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white">
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50/70 border border-slate-100 space-y-2">
+              <div class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Badge 3</div>
+              <div>
+                <label class="text-[10px] text-slate-500 block">Icon / Emoji</label>
+                <input type="text" name="badge_3_icon" value="{{ layout_obj.badge_3_icon }}" class="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white">
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 block">Badge Text</label>
+                <input type="text" name="badge_3_text" value="{{ layout_obj.badge_3_text }}" class="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Footer Card -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                3
+              </span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 leading-tight">Dark Brand Footer</h3>
+                <p class="text-[11px] text-slate-400">Support channels, website, social links, and legal notice</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+              Bottom Section
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Footer Brand Title</label>
+              <input type="text" name="footer_brand_name" value="{{ layout_obj.footer_brand_name }}" required class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Website URL</label>
+              <input type="text" name="website_url" value="{{ layout_obj.website_url }}" class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Support Email</label>
+              <input type="email" name="support_email" value="{{ layout_obj.support_email }}" class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Compliance / Notice Statement</label>
+              <textarea name="compliance_text" rows="2" class="w-full p-2.5 text-xs font-medium rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ layout_obj.compliance_text }}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Copyright Line</label>
+              <textarea name="copyright_text" rows="2" class="w-full p-2.5 text-xs font-medium rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ layout_obj.copyright_text }}</textarea>
+            </div>
+          </div>
+
+          <!-- Social Channels -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-2">Social Channels (Links in Footer)</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-1"><i class="fa-brands fa-linkedin text-blue-600 mr-1"></i> LinkedIn</span>
+                <input type="url" name="social_linkedin" value="{{ layout_obj.social_linkedin }}" placeholder="https://linkedin.com" class="w-full px-2.5 py-1.5 rounded-lg text-xs border border-slate-200">
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-1"><i class="fa-brands fa-facebook text-blue-500 mr-1"></i> Facebook</span>
+                <input type="url" name="social_facebook" value="{{ layout_obj.social_facebook }}" placeholder="https://facebook.com" class="w-full px-2.5 py-1.5 rounded-lg text-xs border border-slate-200">
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-1"><i class="fa-brands fa-youtube text-red-600 mr-1"></i> YouTube</span>
+                <input type="url" name="social_youtube" value="{{ layout_obj.social_youtube }}" placeholder="https://youtube.com" class="w-full px-2.5 py-1.5 rounded-lg text-xs border border-slate-200">
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-1"><i class="fa-brands fa-x-twitter text-slate-800 mr-1"></i> X (Twitter)</span>
+                <input type="url" name="social_twitter" value="{{ layout_obj.social_twitter }}" placeholder="https://twitter.com" class="w-full px-2.5 py-1.5 rounded-lg text-xs border border-slate-200">
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced Custom Footer HTML Toggle -->
+          <div class="border-t border-slate-100 pt-3">
+            <div class="flex items-center justify-between mb-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="use_custom_footer_html" id="toggleCustomFooter" {% if layout_obj.use_custom_footer_html %}checked{% endif %} class="w-4 h-4 text-blue-600 rounded">
+                <span class="text-xs font-bold text-slate-800">Use Advanced Raw Custom Footer HTML</span>
+              </label>
+              <span class="text-[11px] text-slate-400">Overrides structured fields</span>
+            </div>
+
+            <div id="customFooterContainer" class="{% if not layout_obj.use_custom_footer_html %}hidden{% endif %} mt-2">
+              <textarea name="custom_footer_html" rows="4" placeholder="<tr><td>...Custom footer HTML table row...</td></tr>" class="w-full p-3 font-mono text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ layout_obj.custom_footer_html }}</textarea>
+              <p class="text-[10px] text-slate-400 mt-1">Raw HTML table row (<code>&lt;tr&gt;...&lt;/tr&gt;</code>) for custom footer layouts.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <button type="submit" class="inline-flex items-center px-6 py-3 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-md shadow-blue-600/20 cursor-pointer">
+            <i class="fa-solid fa-floppy-disk mr-2"></i> Save Master Header &amp; Footer Layout
+          </button>
+
+          <button type="button" onclick="confirmResetDefaults()" class="inline-flex items-center px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer">
+            <i class="fa-solid fa-rotate-left mr-1.5 text-slate-500"></i> Reset to Defaults
+          </button>
+        </div>
+      </form>
+
+      <!-- Hidden Form for Reset Action -->
+      <form method="POST" id="resetForm" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reset">
+      </form>
+    </div>
+
+    <!-- Right Column: Live Responsive Preview (5 cols) -->
+    <div class="xl:col-span-5 space-y-4 sticky top-6">
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-xs font-bold text-slate-900">Live Architecture Preview</span>
+          </div>
+          <span class="text-[11px] text-slate-400">Desktop / Tablet Frame</span>
+        </div>
+
+        <p class="text-[11px] text-slate-500">
+          Ye preview dikhata hai ki aapka <strong>Master Header</strong> (upar) aur <strong>Master Footer</strong> (neeche) kis tarah platform ke kisi bhi email body ko frame karta hai:
+        </p>
+
+        <!-- Preview Container with scroll -->
+        <div class="rounded-xl border border-slate-200 overflow-hidden shadow-inner bg-slate-100 max-h-[640px] overflow-y-auto custom-scrollbar">
+          <iframe id="previewIframe" srcdoc="{{ preview_html|escape }}" class="w-full h-[640px] border-0 bg-transparent" title="Live Layout Preview"></iframe>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // Toggle custom header raw HTML textarea
+  const toggleHeader = document.getElementById('toggleCustomHeader');
+  const headerContainer = document.getElementById('customHeaderContainer');
+  if (toggleHeader && headerContainer) {
+    toggleHeader.addEventListener('change', function() {
+      headerContainer.classList.toggle('hidden', !this.checked);
+    });
+  }
+
+  // Toggle custom footer raw HTML textarea
+  const toggleFooter = document.getElementById('toggleCustomFooter');
+  const footerContainer = document.getElementById('customFooterContainer');
+  if (toggleFooter && footerContainer) {
+    toggleFooter.addEventListener('change', function() {
+      footerContainer.classList.toggle('hidden', !this.checked);
+    });
+  }
+
+  // Reset confirmation
+  function confirmResetDefaults() {
+    if (confirm("Kya aap sach me Master Header & Footer ko platform standard defaults par reset karna chahte hain?")) {
+      document.getElementById('resetForm').submit();
+    }
+  }
+</script>
+{% endblock %}

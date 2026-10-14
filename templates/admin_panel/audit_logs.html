@@ -65,7 +65,12 @@
       <h3 class="text-sm font-bold text-slate-900 flex items-center">
         <i class="fa-solid fa-clock-rotate-left text-purple-600 mr-2"></i> Audit Event Stream
       </h3>
-      <span class="text-xs text-slate-500">Showing latest {{ activities|length }} events</span>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-500">Showing latest {{ activities|length }} events</span>
+        <a href="?{% if query_string %}{{ query_string }}&{% endif %}export=csv" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm transition hover:border-slate-300 cursor-pointer" title="Export audit trail to CSV">
+          <i class="fa-solid fa-file-arrow-down mr-1.5 text-emerald-600"></i> Export CSV
+        </a>
+      </div>
     </div>
 
     <div class="overflow-x-auto">

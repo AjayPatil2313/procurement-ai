@@ -1,3 +1,4 @@
+import csv
 import json
 import logging
 from datetime import timedelta
@@ -18,6 +19,7 @@ from apps.notifications.models import (
     NotificationLog,
     EmailDeliveryAttempt,
     SMTPSetting,
+    EmailLayoutSetting,
 )
 from apps.notifications.services.email_engine import (
     render_string_template,
@@ -164,12 +166,16 @@ def admin_email_template_edit_view(request, pk):
     Edit subject, HTML body, plain text content, and active status.
     """
     template_obj = get_object_or_404(NotificationTemplate, pk=pk)
+    active_layout = EmailLayoutSetting.get_active_layout()
 
     if request.method == "POST":
         subject = request.POST.get("subject", "").strip()
         html_content = request.POST.get("html_content", "").strip()
         text_content = request.POST.get("text_content", "").strip()
         is_active = request.POST.get("is_active") == "on"
+        use_custom_layout = request.POST.get("use_custom_layout") == "on"
+        header_html = request.POST.get("header_html", "").strip()
+        footer_html = request.POST.get("footer_html", "").strip()
 
         if not subject:
             messages.error(request, "Subject line is required.")
@@ -179,6 +185,9 @@ def admin_email_template_edit_view(request, pk):
             template_obj.subject = subject
             template_obj.html_content = html_content
             template_obj.text_content = text_content
+            template_obj.use_custom_layout = use_custom_layout
+            template_obj.header_html = header_html
+            template_obj.footer_html = footer_html
             # Guard system templates from being deactivated casually
             if not template_obj.is_system or is_active:
                 template_obj.is_active = is_active
@@ -192,8 +201,130 @@ def admin_email_template_edit_view(request, pk):
         "page_title": f"Edit Template: {template_obj.name}",
         "active_tab": "templates",
         "template_obj": template_obj,
+        "active_layout": active_layout,
     }
     return render(request, "admin_panel/email/template_edit.html", context)
+
+
+@login_required
+@superadmin_required
+def admin_email_layout_view(request):
+    """
+    Super Admin Master Email Header & Footer Layout Management:
+    Allows full control over the standard header, trust badges, and dark brand footer
+    shared across all responsive email templates, with live real-time preview.
+    """
+    layout_obj = EmailLayoutSetting.get_active_layout()
+
+    if request.method == "POST":
+        action = request.POST.get("action", "save")
+
+        if action == "reset":
+            # Reset to platform standard defaults
+            layout_obj.brand_name = "TradeConnect"
+            layout_obj.brand_tagline = "Buy • Sell • Grow"
+            layout_obj.header_title = "B2B Procurement & Sales Platform"
+            layout_obj.header_subtitle = "Smarter Sourcing. Stronger Partnerships."
+            layout_obj.logo_url = ""
+            layout_obj.header_bg_color = "#ffffff"
+            layout_obj.header_text_color = "#0f172a"
+            layout_obj.use_custom_header_html = False
+            layout_obj.custom_header_html = ""
+            layout_obj.show_trust_badges = True
+            layout_obj.badge_1_icon = "🛡️"
+            layout_obj.badge_1_text = "Secure & Verified"
+            layout_obj.badge_2_icon = "☑️"
+            layout_obj.badge_2_text = "Trusted B2B Platform"
+            layout_obj.badge_3_icon = "🎧"
+            layout_obj.badge_3_text = "24/7 Support"
+            layout_obj.footer_brand_name = "TradeConnect"
+            layout_obj.website_url = "https://tradeconnect.com"
+            layout_obj.support_email = "support@tradeconnect.com"
+            layout_obj.compliance_text = "You received this operational email because your company account is registered on the TradeConnect B2B AI Procurement & Sales Platform."
+            layout_obj.copyright_text = "© 2026 TradeConnect Inc. All rights reserved."
+            layout_obj.social_linkedin = "https://linkedin.com"
+            layout_obj.social_facebook = "https://facebook.com"
+            layout_obj.social_youtube = "https://youtube.com"
+            layout_obj.social_twitter = "https://twitter.com"
+            layout_obj.use_custom_footer_html = False
+            layout_obj.custom_footer_html = ""
+            layout_obj.updated_by = request.user
+            layout_obj.save()
+            messages.success(request, "Master Header & Footer layout reset to platform standard defaults.")
+            return redirect("admin-panel-email-layout")
+
+        # Save customized values
+        layout_obj.brand_name = request.POST.get("brand_name", "").strip() or "TradeConnect"
+        layout_obj.brand_tagline = request.POST.get("brand_tagline", "").strip() or "Buy • Sell • Grow"
+        layout_obj.header_title = request.POST.get("header_title", "").strip() or "B2B Procurement & Sales Platform"
+        layout_obj.header_subtitle = request.POST.get("header_subtitle", "").strip() or "Smarter Sourcing. Stronger Partnerships."
+        layout_obj.logo_url = request.POST.get("logo_url", "").strip()
+        layout_obj.header_bg_color = request.POST.get("header_bg_color", "#ffffff").strip() or "#ffffff"
+        layout_obj.header_text_color = request.POST.get("header_text_color", "#0f172a").strip() or "#0f172a"
+        layout_obj.use_custom_header_html = request.POST.get("use_custom_header_html") == "on"
+        layout_obj.custom_header_html = request.POST.get("custom_header_html", "").strip()
+
+        layout_obj.show_trust_badges = request.POST.get("show_trust_badges") == "on"
+        layout_obj.badge_1_icon = request.POST.get("badge_1_icon", "🛡️").strip()
+        layout_obj.badge_1_text = request.POST.get("badge_1_text", "Secure & Verified").strip()
+        layout_obj.badge_2_icon = request.POST.get("badge_2_icon", "☑️").strip()
+        layout_obj.badge_2_text = request.POST.get("badge_2_text", "Trusted B2B Platform").strip()
+        layout_obj.badge_3_icon = request.POST.get("badge_3_icon", "🎧").strip()
+        layout_obj.badge_3_text = request.POST.get("badge_3_text", "24/7 Support").strip()
+
+        layout_obj.footer_brand_name = request.POST.get("footer_brand_name", "").strip() or layout_obj.brand_name
+        layout_obj.website_url = request.POST.get("website_url", "").strip() or "https://tradeconnect.com"
+        layout_obj.support_email = request.POST.get("support_email", "").strip() or "support@tradeconnect.com"
+        layout_obj.compliance_text = request.POST.get("compliance_text", "").strip()
+        layout_obj.copyright_text = request.POST.get("copyright_text", "").strip() or f"© {timezone.now().year} {layout_obj.brand_name}. All rights reserved."
+        layout_obj.social_linkedin = request.POST.get("social_linkedin", "").strip()
+        layout_obj.social_facebook = request.POST.get("social_facebook", "").strip()
+        layout_obj.social_youtube = request.POST.get("social_youtube", "").strip()
+        layout_obj.social_twitter = request.POST.get("social_twitter", "").strip()
+        layout_obj.use_custom_footer_html = request.POST.get("use_custom_footer_html") == "on"
+        layout_obj.custom_footer_html = request.POST.get("custom_footer_html", "").strip()
+
+        layout_obj.updated_by = request.user
+        layout_obj.save()
+
+        messages.success(
+            request,
+            "Master Email Header & Footer layout updated successfully! All standard email templates will now use this branding."
+        )
+        return redirect("admin-panel-email-layout")
+
+    # Generate live preview HTML for initial render
+    sample_body = """
+    <div style="margin: 0 0 20px 0;">
+      <p style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 8px 0; line-height: 1.2;">
+        Hello Procurement Team,
+      </p>
+      <p style="font-size: 13px; color: #475569; line-height: 1.6; margin: 0;">
+        This is a live preview demonstrating how your Master Header and Footer frame every transactional email body across the platform.
+      </p>
+    </div>
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px;">
+      <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 8px;">Sample Sourcing Requirement</div>
+      <div style="font-size: 12px; color: #64748b; line-height: 1.5;">Industrial Stainless Steel Valves (Grade 316) &bull; 14 Verified Vendors Discovered</div>
+    </div>
+    """
+    preview_html = build_branded_html(
+        title="Master Layout Preview",
+        summary="Live visual layout preview with active header and footer settings.",
+        cta_url="https://tradeconnect.com/dashboard/",
+        cta_text="Sample Action Button",
+        severity="INFO",
+        custom_content=sample_body,
+        layout_setting=layout_obj,
+    )
+
+    context = {
+        "page_title": "Master Email Header & Footer Layout",
+        "active_tab": "layout",
+        "layout_obj": layout_obj,
+        "preview_html": preview_html,
+    }
+    return render(request, "admin_panel/email/layout.html", context)
 
 
 @login_required
@@ -328,8 +459,28 @@ def admin_email_template_preview_api(request, pk):
         except Exception:
             pass
 
-    subject_rendered = render_string_template(template_obj.subject, sample_context).strip()
-    body_rendered = render_string_template(template_obj.html_content, sample_context)
+    post_subject = request.POST.get("subject")
+    post_body = request.POST.get("html_content")
+    post_use_custom = request.POST.get("use_custom_layout") in ("on", "true", "1")
+    post_header_html = request.POST.get("header_html")
+    post_footer_html = request.POST.get("footer_html")
+
+    target_subject = post_subject if post_subject is not None and post_subject.strip() else template_obj.subject
+    target_body = post_body if post_body is not None and post_body.strip() else template_obj.html_content
+
+    subject_rendered = render_string_template(target_subject, sample_context).strip()
+    body_rendered = render_string_template(target_body, sample_context)
+
+    # Determine header and footer for preview
+    c_header = None
+    c_footer = None
+    if post_subject is not None:
+        if post_use_custom:
+            c_header = post_header_html or ""
+            c_footer = post_footer_html or ""
+    elif template_obj.use_custom_layout:
+        c_header = template_obj.header_html
+        c_footer = template_obj.footer_html
 
     if "<html" not in body_rendered.lower():
         full_html = build_branded_html(
@@ -340,6 +491,9 @@ def admin_email_template_preview_api(request, pk):
             severity="INFO",
             custom_content=body_rendered,
             event_key=template_obj.event_key,
+            template_obj=template_obj,
+            custom_header_html=c_header,
+            custom_footer_html=c_footer,
         )
     else:
         full_html = body_rendered
@@ -546,6 +700,19 @@ def admin_email_logs_view(request):
         logs_qs = logs_qs.filter(created_at__date__gte=from_date)
     if to_date:
         logs_qs = logs_qs.filter(created_at__date__lte=to_date)
+
+    # CSV Export Handler
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        today_str = timezone.now().strftime("%Y%m%d")
+        response["Content-Disposition"] = f'attachment; filename="Email_Delivery_Logs_{today_str}.csv"'
+        response.write("\ufeff")  # UTF-8 BOM for Excel
+        writer = csv.writer(response)
+        writer.writerow(["Log ID", "Event Key", "Recipient Email", "Recipient Name", "Subject", "Company", "Status", "Severity", "Attempts", "Dispatched At"])
+        for lg in logs_qs:
+            c_name = lg.company.name if lg.company else ""
+            writer.writerow([lg.id, lg.event_key, lg.recipient_email, lg.recipient_name or "", lg.subject, c_name, lg.get_status_display(), lg.get_severity_display(), lg.attempt_count, lg.created_at.strftime("%Y-%m-%d %H:%M:%S")])
+        return response
 
     statuses = NotificationLog.Status.choices
     severities = NotificationLog.Severity.choices

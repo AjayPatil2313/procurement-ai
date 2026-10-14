@@ -99,14 +99,19 @@
       Viewing <span class="font-bold text-slate-800">{% if active_tab == 'wallet_tx' %}Wallet Ledger Transactions{% elif active_tab == 'invoices' %}Billing Invoices{% else %}Credit Usage Records{% endif %}</span>
     </div>
 
-    <form method="GET" class="flex items-center gap-2">
-      <input type="hidden" name="tab" value="{{ active_tab }}">
-      <input type="text" name="q" value="{{ q }}" placeholder="Search by reference, company, description..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-72">
-      <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
-      {% if q %}
-      <a href="?tab={{ active_tab }}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
-      {% endif %}
-    </form>
+    <div class="flex items-center gap-2">
+      <form method="GET" class="flex items-center gap-2">
+        <input type="hidden" name="tab" value="{{ active_tab }}">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search by reference, company, description..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-72">
+        <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
+        {% if q %}
+        <a href="?tab={{ active_tab }}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
+        {% endif %}
+      </form>
+      <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&export=csv" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm hover:border-slate-300 cursor-pointer" title="Export current ledger to CSV">
+        <i class="fa-solid fa-file-arrow-down text-emerald-600"></i> Export CSV
+      </a>
+    </div>
   </div>
 
   <!-- TAB CONTENT 1: WALLET TRANSACTIONS LEDGER -->

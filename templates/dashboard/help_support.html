@@ -274,6 +274,9 @@
             Reset
           </a>
           {% endif %}
+          <a href="{% if is_super_admin %}{% url 'admin-panel-support' %}{% else %}{% url 'help-support' %}{% endif %}?{% if query_search %}ticket_q={{ query_search }}&{% endif %}{% if status_filter != 'all' %}ticket_status={{ status_filter }}&{% endif %}{% if priority_filter != 'all' %}ticket_priority={{ priority_filter }}&{% endif %}export=csv" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer ml-auto" title="Export tickets to CSV">
+            <i class="fa-solid fa-file-arrow-down text-emerald-600"></i> Export CSV
+          </a>
         </form>
       </div>
 

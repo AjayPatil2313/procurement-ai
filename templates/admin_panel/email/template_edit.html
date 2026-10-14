@@ -9,7 +9,7 @@
   <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
       <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 mb-3">
-        <i class="fa-solid fa-code mr-1.5 text-blue-400"></i> Template Editor
+        <i class="fa-solid fa-code mr-1.5 text-blue-400"></i> Template &amp; Layout Editor
       </div>
       <h1 class="text-2xl font-black tracking-tight text-white">{{ template_obj.name }}</h1>
       <p class="text-xs md:text-sm text-slate-300 mt-1">
@@ -17,26 +17,100 @@
       </p>
     </div>
 
-    <a href="{% url 'admin-panel-email-templates' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
-      &larr; Back to Templates
-    </a>
+    <div class="flex items-center gap-2">
+      <button type="button" onclick="previewCurrentTemplate()" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm cursor-pointer">
+        <i class="fa-solid fa-eye mr-1.5"></i> Live Preview Full Email
+      </button>
+      <a href="{% url 'admin-panel-email-templates' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        &larr; Back to Templates
+      </a>
+    </div>
   </div>
 
   <!-- Form Layout -->
-  <form method="POST" class="space-y-6">
+  <form method="POST" id="templateEditForm" class="space-y-6">
     {% csrf_token %}
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      <!-- Main Content Editor -->
+      <!-- Main Content Editor (2 cols) -->
       <div class="lg:col-span-2 space-y-6">
+
+        <!-- 1. HEADER CONTENT SECTION -->
         <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-          <h3 class="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">Email Subject &amp; Content</h3>
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                1
+              </span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 leading-tight">Header Content</h3>
+                <p class="text-[11px] text-slate-400">Standard platform header or template-specific override</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <a href="{% url 'admin-panel-email-layout' %}" target="_blank" class="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Master Layout
+              </a>
+            </div>
+          </div>
+
+          <!-- Master Header Status Box -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-3 text-xs">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-800">Global Master Header:</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <i class="fa-solid fa-check text-[8px] mr-1"></i> Active Across Platform
+                </span>
+              </div>
+              <p class="text-slate-500 text-[11px]">
+                Brand: <strong>{{ active_layout.brand_name }}</strong> &bull; Tagline: <em>{{ active_layout.brand_tagline }}</em> &bull; Slogan: <em>{{ active_layout.header_subtitle }}</em>
+              </p>
+            </div>
+          </div>
+
+          <!-- Custom Header Override Toggle -->
+          <div class="pt-1">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="use_custom_layout" id="toggleCustomLayout" {% if template_obj.use_custom_layout %}checked{% endif %} class="w-4 h-4 text-blue-600 rounded">
+              <span class="text-xs font-bold text-slate-800">Customize Header &amp; Footer for this Specific Template</span>
+            </label>
+            <p class="text-[11px] text-slate-400 ml-6 mt-0.5">
+              Agar aap ise uncheck rakhenge, to Master Header aur Footer automatically use honge (Recommended).
+            </p>
+          </div>
+
+          <!-- Custom Header Textarea -->
+          <div id="customHeaderField" class="{% if not template_obj.use_custom_layout %}hidden{% endif %} space-y-2 pt-2 border-t border-slate-100">
+            <label class="block text-xs font-bold text-slate-700">Custom Template Header HTML (Optional)</label>
+            <textarea name="header_html" rows="4" placeholder="<tr><td>...Custom header HTML table row...</td></tr>" class="w-full p-3 font-mono text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ template_obj.header_html }}</textarea>
+            <span class="text-[10px] text-slate-400 block">Leave blank to inherit the standard Master Header.</span>
+          </div>
+        </div>
+
+        <!-- 2. BODY CONTENT SECTION -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                2
+              </span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 leading-tight">Subject Line &amp; Body Content</h3>
+                <p class="text-[11px] text-slate-400">Event-specific message, operational cards, and call-to-action</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Dynamic Body
+            </span>
+          </div>
           
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Subject Line</label>
-            <input type="text" name="subject" value="{{ template_obj.subject }}" required class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <span class="text-[11px] text-slate-400 mt-1 block">Supports variables like <code>{{ recipient_name }}</code> or <code>{{ requirement_title }}</code></span>
+            <input type="text" name="subject" id="subjectInput" value="{{ template_obj.subject }}" required class="w-full px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <span class="text-[11px] text-slate-400 mt-1 block">Supports variables like <code>&#123;&#123; recipient_name &#125;&#125;</code>, <code>&#123;&#123; requirement_title &#125;&#125;</code>, <code>&#123;&#123; count &#125;&#125;</code></span>
           </div>
 
           <div>
@@ -44,9 +118,9 @@
               <label class="block text-xs font-bold text-slate-700">HTML Content Body</label>
               <span class="text-[11px] text-slate-400">Standard Django Template syntax supported</span>
             </div>
-            <textarea name="html_content" rows="14" required class="w-full p-3 font-mono text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ template_obj.html_content }}</textarea>
+            <textarea name="html_content" id="htmlContentInput" rows="14" required class="w-full p-3 font-mono text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ template_obj.html_content }}</textarea>
             <p class="text-[11px] text-slate-400 mt-1">
-              Snippet body will be automatically wrapped in our responsive branded layout unless it starts with full <code>&lt;html&gt;</code> tags.
+              Ye body automatically aapke Master Header aur Footer ke beech me seamlessly frame hoti hai.
             </p>
           </div>
 
@@ -55,9 +129,50 @@
             <textarea name="text_content" rows="4" class="w-full p-3 font-mono text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ template_obj.text_content }}</textarea>
           </div>
         </div>
+
+        <!-- 3. FOOTER CONTENT SECTION -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                3
+              </span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 leading-tight">Footer Content</h3>
+                <p class="text-[11px] text-slate-400">Standard platform footer or template-specific override</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+              Bottom Section
+            </span>
+          </div>
+
+          <!-- Master Footer Status Box -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-3 text-xs">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-800">Global Master Footer:</span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <i class="fa-solid fa-check text-[8px] mr-1"></i> Active Across Platform
+                </span>
+              </div>
+              <p class="text-slate-500 text-[11px]">
+                Support: <strong>{{ active_layout.support_email }}</strong> &bull; Website: <em>{{ active_layout.website_url }}</em> &bull; Copyright: <em>{{ active_layout.copyright_text }}</em>
+              </p>
+            </div>
+          </div>
+
+          <!-- Custom Footer Textarea -->
+          <div id="customFooterField" class="{% if not template_obj.use_custom_layout %}hidden{% endif %} space-y-2 pt-2 border-t border-slate-100">
+            <label class="block text-xs font-bold text-slate-700">Custom Template Footer HTML (Optional)</label>
+            <textarea name="footer_html" rows="4" placeholder="<tr><td>...Custom footer HTML table row...</td></tr>" class="w-full p-3 font-mono text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">{{ template_obj.footer_html }}</textarea>
+            <span class="text-[10px] text-slate-400 block">Leave blank to inherit the standard Master Footer.</span>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Sidebar Settings & Variables Reference -->
+      <!-- Sidebar Settings & Variables Reference (1 col) -->
       <div class="space-y-6">
         
         <!-- Activation & System Info -->
@@ -79,9 +194,13 @@
           </div>
           {% endif %}
 
-          <div class="pt-2">
-            <button type="submit" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm">
+          <div class="space-y-2 pt-2">
+            <button type="submit" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm cursor-pointer">
               <i class="fa-solid fa-floppy-disk mr-1.5"></i> Save Template Changes
+            </button>
+
+            <button type="button" onclick="previewCurrentTemplate()" class="w-full px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer">
+              <i class="fa-solid fa-eye mr-1.5 text-blue-600"></i> Preview with Header &amp; Footer
             </button>
           </div>
         </div>
@@ -93,7 +212,7 @@
             <i class="fa-solid fa-tags text-slate-400 text-xs"></i>
           </h3>
           <p class="text-xs text-slate-500">
-            Click any tag to view its placeholder:
+            Supported merge placeholders for this template:
           </p>
           <div class="flex flex-wrap gap-1.5">
             {% for var in template_obj.variables %}
@@ -120,4 +239,118 @@
   </form>
 
 </div>
+
+<!-- Interactive Live Preview Modal -->
+<div id="previewModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div>
+        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+          <i class="fa-solid fa-eye text-blue-600"></i> Full Email Live Preview
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5" id="previewModalSubject">Rendering preview...</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="flex items-center bg-slate-200 p-0.5 rounded-lg text-xs">
+          <button type="button" id="btnViewportDesktop" onclick="setPreviewViewport('desktop')" class="px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-sm">
+            <i class="fa-solid fa-desktop mr-1"></i> Desktop
+          </button>
+          <button type="button" id="btnViewportMobile" onclick="setPreviewViewport('mobile')" class="px-2.5 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-mobile-screen mr-1"></i> Mobile
+          </button>
+        </div>
+        <button type="button" onclick="closePreviewModal()" class="w-8 h-8 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 bg-slate-100 flex justify-center custom-scrollbar" id="previewContainer">
+      <div class="flex items-center justify-center h-64 text-slate-400">
+        <i class="fa-solid fa-spinner fa-spin text-2xl mr-2"></i> Rendering preview...
+      </div>
+    </div>
+
+    <div class="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+      <span>Header &amp; Footer layout verified &bull; Responsive multi-device layout</span>
+      <button type="button" onclick="closePreviewModal()" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700 transition">
+        Close Preview
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Toggle custom header and footer fields
+  const toggleLayout = document.getElementById('toggleCustomLayout');
+  const headerField = document.getElementById('customHeaderField');
+  const footerField = document.getElementById('customFooterField');
+
+  if (toggleLayout) {
+    toggleLayout.addEventListener('change', function() {
+      headerField.classList.toggle('hidden', !this.checked);
+      footerField.classList.toggle('hidden', !this.checked);
+    });
+  }
+
+  // Live Preview Function
+  function previewCurrentTemplate() {
+    const modal = document.getElementById("previewModal");
+    const container = document.getElementById("previewContainer");
+    modal.classList.remove("hidden");
+    container.innerHTML = '<div class="flex items-center justify-center h-64 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl mr-2"></i> Generating live full email preview...</div>';
+
+    const formData = new FormData(document.getElementById("templateEditForm"));
+
+    fetch("{% url 'admin-panel-email-template-preview' template_obj.pk %}", {
+      method: "POST",
+      body: formData,
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        document.getElementById("previewModalSubject").textContent = "Subject: " + data.subject;
+        const iframe = document.createElement("iframe");
+        iframe.id = "previewModalIframe";
+        iframe.style.width = "100%";
+        iframe.style.height = "640px";
+        iframe.style.border = "none";
+        iframe.style.borderRadius = "8px";
+        iframe.srcdoc = data.html;
+        container.innerHTML = "";
+        container.appendChild(iframe);
+      } else {
+        container.innerHTML = '<p class="text-rose-600 text-center py-8">Failed to generate preview.</p>';
+      }
+    })
+    .catch(err => {
+      container.innerHTML = '<p class="text-rose-600 text-center py-8">Error contacting preview endpoint: ' + err + '</p>';
+    });
+  }
+
+  function setPreviewViewport(mode) {
+    const iframe = document.getElementById("previewModalIframe");
+    const btnDesktop = document.getElementById("btnViewportDesktop");
+    const btnMobile = document.getElementById("btnViewportMobile");
+    if (!iframe) return;
+
+    if (mode === "mobile") {
+      iframe.style.maxWidth = "420px";
+      iframe.style.margin = "0 auto";
+      iframe.style.display = "block";
+      btnMobile.className = "px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-sm";
+      btnDesktop.className = "px-2.5 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900";
+    } else {
+      iframe.style.maxWidth = "100%";
+      btnDesktop.className = "px-2.5 py-1 rounded-md font-bold bg-white text-slate-800 shadow-sm";
+      btnMobile.className = "px-2.5 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900";
+    }
+  }
+
+  function closePreviewModal() {
+    document.getElementById("previewModal").classList.add("hidden");
+    setPreviewViewport('desktop');
+  }
+</script>
 {% endblock %}

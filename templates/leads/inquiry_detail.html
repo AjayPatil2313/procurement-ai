@@ -32,6 +32,11 @@
 
     <!-- Header Actions -->
     <div class="flex items-center gap-2.5 flex-wrap">
+      <a href="{% if is_seller_context %}{% url 'sales-inquiry-quotation-pdf' inquiry.id %}{% else %}{% url 'inquiry-quotation-pdf' inquiry.id %}{% endif %}" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition shadow-sm">
+        <i class="fa-solid fa-file-pdf text-rose-600"></i>
+        <span>Download Quotation PDF</span>
+      </a>
+
       <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition shadow-sm">
         <i class="fa-solid fa-print"></i>
         <span>Print Dossier</span>
@@ -109,7 +114,7 @@
     </div>
 
     <!-- Commercial Metrics Snapshot Row -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
       <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Quoted Unit Price</span>
         {% if inquiry.quoted_price %}
@@ -120,7 +125,7 @@
       </div>
 
       <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Commercial Delivery / Lead Terms</span>
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Delivery / Lead Terms</span>
         {% if inquiry.delivery_terms %}
         <div class="text-xs font-bold text-slate-800 truncate" title="{{ inquiry.delivery_terms }}">{{ inquiry.delivery_terms }}</div>
         {% else %}
@@ -129,9 +134,23 @@
       </div>
 
       <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Tax & Total Estimate</span>
+        {% if inquiry.quoted_price %}
+        <div class="text-xs font-bold text-emerald-700">
+          Incl. 18% GST Estimated
+        </div>
+        <div class="text-[11px] text-slate-500 font-mono mt-0.5">
+          Standard B2B Commercial
+        </div>
+        {% else %}
+        <div class="text-xs font-semibold text-slate-400 italic">Quote pending</div>
+        {% endif %}
+      </div>
+
+      <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Conversation Activity</span>
         <div class="text-xs font-bold text-slate-800">
-          {{ messages_list|length }} messages recorded &bull; Updated {{ inquiry.updated_at|timesince }} ago
+          {{ messages_list|length }} messages recorded &bull; {{ inquiry.updated_at|timesince }} ago
         </div>
       </div>
     </div>
@@ -493,6 +512,28 @@
                  class="w-full rounded-xl border border-slate-300 p-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 text-slate-800">
         </div>
 
+        <!-- Commercial Tax & Contract Value Live Calculator -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div class="flex items-center justify-between text-slate-600 font-bold">
+            <span><i class="fa-solid fa-calculator text-emerald-600 mr-1"></i> Contract Tax & Total Calculator:</span>
+            <span class="text-[10px] text-slate-400 font-normal">Real-time estimate</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-slate-600">
+            <div>
+              <label class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Quantity</label>
+              <input type="number" step="0.01" id="modalCalcQty" value="1.00" oninput="runModalCalc()" class="w-full p-1.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-800">
+            </div>
+            <div>
+              <label class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">GST / Tax %</label>
+              <input type="number" step="0.5" id="modalCalcTaxPct" value="18" oninput="runModalCalc()" class="w-full p-1.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-800">
+            </div>
+          </div>
+          <div class="pt-1.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
+            <span class="text-slate-500">Subtotal: <strong id="modalCalcSubtotal" class="text-slate-800">₹0.00</strong> &bull; Tax: <strong id="modalCalcTaxAmt" class="text-slate-800">₹0.00</strong></span>
+            <span class="font-extrabold text-emerald-700 text-xs">Total: <span id="modalCalcGrandTotal">₹0.00</span></span>
+          </div>
+        </div>
+
         <div>
           <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Quotation Notes / Terms</label>
           <textarea name="notes" rows="3" placeholder="Commercial terms, payment stages, warranty, delivery address..."
@@ -518,10 +559,38 @@
 <script>
 function openRecordQuoteModal() {
   document.getElementById('recordQuoteModal').classList.remove('hidden');
+  runModalCalc();
 }
 function closeRecordQuoteModal() {
   document.getElementById('recordQuoteModal').classList.add('hidden');
 }
+
+function runModalCalc() {
+  const priceInput = document.querySelector('input[name="quoted_price"]');
+  const qtyInput = document.getElementById('modalCalcQty');
+  const taxInput = document.getElementById('modalCalcTaxPct');
+  const curSelect = document.querySelector('select[name="currency"]');
+
+  const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
+  const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+  const taxPct = parseFloat(taxInput ? taxInput.value : 0) || 0;
+  const cur = curSelect ? curSelect.value : 'INR';
+
+  const subtotal = price * qty;
+  const taxAmt = (subtotal * taxPct) / 100;
+  const grandTotal = subtotal + taxAmt;
+
+  const subEl = document.getElementById('modalCalcSubtotal');
+  const taxEl = document.getElementById('modalCalcTaxAmt');
+  const totEl = document.getElementById('modalCalcGrandTotal');
+
+  if (subEl) subEl.textContent = `${cur} ${subtotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  if (taxEl) taxEl.textContent = `${cur} ${taxAmt.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  if (totEl) totEl.textContent = `${cur} ${grandTotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+}
+
+document.querySelector('input[name="quoted_price"]')?.addEventListener('input', runModalCalc);
+document.querySelector('select[name="currency"]')?.addEventListener('change', runModalCalc);
 
 document.getElementById('recordQuoteModal')?.addEventListener('click', function(e) {
   if (e.target === this) closeRecordQuoteModal();

@@ -466,3 +466,282 @@ class PDFReportGenerator:
         pdf_bytes = buffer.getvalue()
         buffer.close()
         return pdf_bytes
+
+    @classmethod
+    def generate_inquiry_quotation_pdf(cls, inquiry) -> bytes:
+        """
+        Generates an official, professional B2B Commercial Quotation / Proforma PDF.
+        Suitable for customer dispatch, internal audit, and commercial contract negotiations.
+        """
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=36,
+            leftMargin=36,
+            topMargin=36,
+            bottomMargin=36,
+        )
+
+        styles = getSampleStyleSheet()
+        normal_style = styles["Normal"]
+
+        title_style = ParagraphStyle(
+            "QuoteTitle",
+            parent=normal_style,
+            fontName="Helvetica-Bold",
+            fontSize=18,
+            leading=22,
+            textColor=colors.HexColor("#0f172a"),
+        )
+        subtitle_style = ParagraphStyle(
+            "QuoteSubtitle",
+            parent=normal_style,
+            fontName="Helvetica",
+            fontSize=9,
+            leading=12,
+            textColor=colors.HexColor("#64748b"),
+        )
+        heading_style = ParagraphStyle(
+            "QuoteHeading",
+            parent=normal_style,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=13,
+            textColor=colors.HexColor("#1e293b"),
+        )
+        body_style = ParagraphStyle(
+            "QuoteBody",
+            parent=normal_style,
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=11.5,
+            textColor=colors.HexColor("#334155"),
+        )
+        bold_body = ParagraphStyle(
+            "QuoteBoldBody",
+            parent=normal_style,
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11.5,
+            textColor=colors.HexColor("#0f172a"),
+        )
+        status_style = ParagraphStyle(
+            "QuoteStatus",
+            parent=normal_style,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=12,
+            textColor=colors.HexColor("#16a34a") if inquiry.status in ["won", "replied"] else colors.HexColor("#2563eb"),
+            alignment=2,
+        )
+
+        story = []
+
+        # 1. Header with Company Branding & Quotation Metadata
+        company = inquiry.company
+        quote_no = f"QTN-{inquiry.id:05d}"
+        quote_date = inquiry.sent_at.strftime("%d-%b-%Y") if inquiry.sent_at else "Immediate"
+
+        header_data = [
+            [
+                Paragraph(f"<b>{company.name.upper()}</b>", title_style),
+                Paragraph(f"<b>COMMERCIAL QUOTATION</b><br/><font color='#2563eb'>#{quote_no}</font>", status_style),
+            ],
+            [
+                Paragraph("Commercial Sales & Procurement Operations", subtitle_style),
+                Paragraph(f"Date: <b>{quote_date}</b> &bull; Valid: <b>30 Days</b>", subtitle_style),
+            ],
+        ]
+        header_table = Table(header_data, colWidths=[310, 210])
+        header_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 8))
+        story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#2563eb"), spaceAfter=12))
+
+        # 2. Issuer (Vendor/Seller) and Recipient (Customer/Buyer)
+        issuer_addr = company.address or f"{company.city or ''}, {company.state or ''} {company.country or 'India'}".strip(", ") or "Corporate Office"
+        issuer_gstin = company.gst_vat_no or "Registered B2B Enterprise"
+
+        ext_comp = None
+        if inquiry.search_result and inquiry.search_result.external_company:
+            ext_comp = inquiry.search_result.external_company
+
+        recip_name = ext_comp.name if ext_comp else "Prospective Commercial Partner"
+        recip_addr = f"{ext_comp.city or ''}, {ext_comp.country or 'India'}".strip(", ") if ext_comp else "Verified Trade Entity"
+        recip_contact = inquiry.sent_to_email or (ext_comp.email if ext_comp else "Direct Commercial Channel")
+
+        issuer_html = (
+            "<b>ISSUED BY (SUPPLIER / VENDOR):</b><br/>"
+            f"<b>{company.name}</b><br/>"
+            f"{issuer_addr}<br/>"
+            f"Tax / GSTIN: <b>{issuer_gstin}</b><br/>"
+            f"Email: {company.email or 'sales@enterprise.com'}<br/>"
+            f"Phone: {company.phone or 'Direct Commercial Line'}"
+        )
+
+        customer_html = (
+            "<b>PREPARED FOR (PROSPECTIVE BUYER):</b><br/>"
+            f"<b>{recip_name}</b><br/>"
+            f"{recip_addr}<br/>"
+            f"Attention: Procurement & Purchasing Desk<br/>"
+            f"Email: <b>{recip_contact}</b><br/>"
+            f"Commercial Intent: Sourcing & Supply Contract"
+        )
+
+        info_table = Table(
+            [[Paragraph(issuer_html, body_style), Paragraph(customer_html, body_style)]],
+            colWidths=[260, 260],
+        )
+        info_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        story.append(info_table)
+        story.append(Spacer(1, 14))
+
+        # 3. Item & Commercial Specifications Table
+        story.append(Paragraph("<b>1. SCOPE OF SUPPLY & COMMERCIAL LINE ITEMS</b>", heading_style))
+        story.append(Spacer(1, 6))
+
+        item_title = inquiry.subject
+        specs = inquiry.message
+        qty = Decimal("1.00")
+        unit = "Lot"
+
+        if inquiry.search_result:
+            if inquiry.search_result.product_title:
+                item_title = inquiry.search_result.product_title
+            if inquiry.search_result.search_job:
+                req = inquiry.search_result.search_job.requirement
+                prod = inquiry.search_result.search_job.product
+                if req:
+                    qty = req.quantity
+                    unit = req.unit or "pcs"
+                    if req.specifications:
+                        specs = req.specifications
+                elif prod:
+                    qty = prod.minimum_order_quantity if prod.minimum_order_quantity else Decimal("1.00")
+                    unit = prod.unit or "pcs"
+                    if prod.specifications:
+                        specs = prod.specifications
+
+        currency = inquiry.quoted_currency or "INR"
+        unit_price = inquiry.quoted_price if inquiry.quoted_price else Decimal("0.00")
+        subtotal = unit_price * qty
+        tax_pct = Decimal("18.00")  # Standard GST
+        tax_amount = (subtotal * tax_pct / Decimal("100.00")).quantize(Decimal("0.01"))
+        total_amount = subtotal + tax_amount
+
+        items_table_data = [
+            [
+                Paragraph("<b>Item #</b>", bold_body),
+                Paragraph("<b>Description & Specifications</b>", bold_body),
+                Paragraph("<b>Qty / Unit</b>", bold_body),
+                Paragraph(f"<b>Unit Price ({currency})</b>", bold_body),
+                Paragraph(f"<b>Total ({currency})</b>", bold_body),
+            ],
+            [
+                Paragraph("01", body_style),
+                Paragraph(f"<b>{item_title}</b><br/><font color='#64748b' size=7.5>{specs[:220]}...</font>", body_style),
+                Paragraph(f"{qty:,.2f} {unit}", body_style),
+                Paragraph(f"{unit_price:,.2f}", body_style),
+                Paragraph(f"{subtotal:,.2f}", bold_body),
+            ],
+            [
+                Paragraph("", body_style),
+                Paragraph("<b>Subtotal (Net Commercial Value)</b>", bold_body),
+                Paragraph("", body_style),
+                Paragraph("", body_style),
+                Paragraph(f"{currency} {subtotal:,.2f}", bold_body),
+            ],
+            [
+                Paragraph("", body_style),
+                Paragraph(f"Applicable Tax (GST @ {tax_pct}%)", body_style),
+                Paragraph("", body_style),
+                Paragraph("", body_style),
+                Paragraph(f"{currency} {tax_amount:,.2f}", body_style),
+            ],
+            [
+                Paragraph("", body_style),
+                Paragraph("<b>TOTAL CONTRACT VALUE (INCL. TAX)</b>", bold_body),
+                Paragraph("", body_style),
+                Paragraph("", body_style),
+                Paragraph(f"<b>{currency} {total_amount:,.2f}</b>", bold_body),
+            ],
+        ]
+
+        items_table = Table(items_table_data, colWidths=[40, 240, 75, 80, 85])
+        items_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#f1f5f9")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#f8fafc")),
+            ("BACKGROUND", (0, 4), (-1, 4), colors.HexColor("#e2e8f0")),
+        ]))
+        for cell in items_table_data[0]:
+            cell.style.textColor = colors.white
+
+        story.append(items_table)
+        story.append(Spacer(1, 14))
+
+        # 4. Commercial Terms & Conditions
+        story.append(Paragraph("<b>2. COMMERCIAL TERMS & FULFILLMENT CONDITIONS</b>", heading_style))
+        story.append(Spacer(1, 6))
+
+        deliv_terms = inquiry.delivery_terms or "Ex-Works / Door Delivery as agreed in contract"
+        terms_html = (
+            f"&bull; <b>Delivery / Logistics:</b> {deliv_terms}<br/>"
+            "&bull; <b>Payment Terms:</b> 100% advance against Proforma Invoice / Confirmed Irrevocable L/C / Net 30 days as mutually finalized.<br/>"
+            "&bull; <b>Inspection & Quality:</b> Factory standard test certificates and batch inspection reports provided prior to dispatch.<br/>"
+            "&bull; <b>Quotation Validity:</b> Valid for 30 calendar days from the date of issue. Prices subject to raw material escalation thereafter.<br/>"
+            "&bull; <b>Governing Law & Jurisdiction:</b> Governed under the commercial jurisdiction of the registered supplier headquarters."
+        )
+
+        terms_table = Table([[Paragraph(terms_html, body_style)]], colWidths=[520])
+        terms_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        story.append(terms_table)
+        story.append(Spacer(1, 18))
+
+        # 5. Signatory & Digital Verification Block
+        sign_data = [
+            [
+                Paragraph("<b>Customer Acceptance:</b><br/><br/><br/>___________________________________<br/>Authorized Customer Representative", subtitle_style),
+                Paragraph(f"<b>For {company.name}:</b><br/><br/><br/>___________________________________<br/>Authorized Commercial Signatory", subtitle_style),
+            ]
+        ]
+        sign_table = Table(sign_data, colWidths=[260, 260])
+        sign_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        story.append(sign_table)
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("<i>Note: This is a verified electronic commercial quotation generated via Procurement AI Platform.</i>", subtitle_style))
+
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        return pdf_bytes
+

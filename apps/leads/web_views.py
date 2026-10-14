@@ -326,6 +326,22 @@ def saved_leads_view(request):
 
     team_members = company.members.filter(is_active=True).select_related("user") if company else []
 
+    # Build Kanban stages for interactive board view
+    kanban_stages = [
+        {"key": SavedItem.Status.NEW, "label": "New Leads", "icon": "fa-sparkles", "badge_class": "bg-blue-100 text-blue-800 border-blue-200", "column_color": "border-blue-400", "items": []},
+        {"key": SavedItem.Status.CONTACTED, "label": "Contacted", "icon": "fa-paper-plane", "badge_class": "bg-indigo-100 text-indigo-800 border-indigo-200", "column_color": "border-indigo-400", "items": []},
+        {"key": SavedItem.Status.INTERESTED, "label": "Interested", "icon": "fa-thumbs-up", "badge_class": "bg-purple-100 text-purple-800 border-purple-200", "column_color": "border-purple-400", "items": []},
+        {"key": SavedItem.Status.NEGOTIATING, "label": "Negotiating", "icon": "fa-handshake", "badge_class": "bg-amber-100 text-amber-800 border-amber-200", "column_color": "border-amber-400", "items": []},
+        {"key": SavedItem.Status.WON, "label": "Won", "icon": "fa-circle-check", "badge_class": "bg-emerald-100 text-emerald-800 border-emerald-200", "column_color": "border-emerald-400", "items": []},
+        {"key": SavedItem.Status.LOST, "label": "Lost", "icon": "fa-circle-xmark", "badge_class": "bg-rose-100 text-rose-800 border-rose-200", "column_color": "border-rose-400", "items": []},
+    ]
+    stage_map = {stage["key"]: stage["items"] for stage in kanban_stages}
+    for it in active_items:
+        if it.status in stage_map:
+            stage_map[it.status].append(it)
+        else:
+            stage_map[SavedItem.Status.NEW].append(it)
+
     return render(request, "leads/saved_leads.html", {
         "products": products,
         "selected_product": selected_product,
@@ -337,6 +353,7 @@ def saved_leads_view(request):
         "unassigned_count": unassigned_count,
         "total_saved_count": total_saved_count,
         "saved_items": saved_items,
+        "kanban_stages": kanban_stages,
         "stage_counts": stage_counts,
         "total_pipeline_count": total_pipeline_count,
         "win_rate_pct": win_rate_pct,
@@ -1079,6 +1096,22 @@ def saved_suppliers_view(request):
     verified_contact_count = sum(1 for it in active_items if (it.search_result and it.search_result.external_company and (it.search_result.external_company.email or it.search_result.external_company.phone)))
     negotiating_count = sum(1 for it in active_items if it.status in [SavedItem.Status.NEGOTIATING, SavedItem.Status.WON])
 
+    # Build Kanban stages for interactive board view
+    kanban_stages = [
+        {"key": SavedItem.Status.NEW, "label": "New Leads", "icon": "fa-sparkles", "badge_class": "bg-blue-100 text-blue-800 border-blue-200", "column_color": "border-blue-400", "items": []},
+        {"key": SavedItem.Status.CONTACTED, "label": "Contacted", "icon": "fa-paper-plane", "badge_class": "bg-indigo-100 text-indigo-800 border-indigo-200", "column_color": "border-indigo-400", "items": []},
+        {"key": SavedItem.Status.INTERESTED, "label": "Interested", "icon": "fa-thumbs-up", "badge_class": "bg-purple-100 text-purple-800 border-purple-200", "column_color": "border-purple-400", "items": []},
+        {"key": SavedItem.Status.NEGOTIATING, "label": "Negotiating", "icon": "fa-handshake", "badge_class": "bg-amber-100 text-amber-800 border-amber-200", "column_color": "border-amber-400", "items": []},
+        {"key": SavedItem.Status.WON, "label": "Won", "icon": "fa-circle-check", "badge_class": "bg-emerald-100 text-emerald-800 border-emerald-200", "column_color": "border-emerald-400", "items": []},
+        {"key": SavedItem.Status.LOST, "label": "Lost", "icon": "fa-circle-xmark", "badge_class": "bg-rose-100 text-rose-800 border-rose-200", "column_color": "border-rose-400", "items": []},
+    ]
+    stage_map = {stage["key"]: stage["items"] for stage in kanban_stages}
+    for it in active_items:
+        if it.status in stage_map:
+            stage_map[it.status].append(it)
+        else:
+            stage_map[SavedItem.Status.NEW].append(it)
+
     # Company team members for assignment dropdown
     team_members = []
     if company:
@@ -1101,6 +1134,7 @@ def saved_suppliers_view(request):
         "unassigned_count": unassigned_count,
         "total_saved_count": total_saved_count,
         "saved_suppliers": active_items,
+        "kanban_stages": kanban_stages,
         "items": items,
         "total_suppliers_count": total_suppliers_count,
         "high_fit_count": high_fit_count,
@@ -1151,6 +1185,29 @@ def update_saved_supplier_view(request, item_id):
         item.save()
 
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            # Real-time refreshed counts for the current requirement scope
+            scope_qs = SavedItem.objects.filter(
+                company=company,
+                search_result__result_type=SearchResult.ResultType.SUPPLIER,
+            )
+            req_id = item.search_result.search_job.requirement_id if (item.search_result and item.search_result.search_job) else None
+            if req_id:
+                scope_qs = scope_qs.filter(search_result__search_job__requirement_id=req_id)
+
+            active_items = deduplicate_saved_items(list(scope_qs))
+            stage_counts = {
+                "new": sum(1 for i in active_items if i.status == SavedItem.Status.NEW),
+                "contacted": sum(1 for i in active_items if i.status == SavedItem.Status.CONTACTED),
+                "negotiating": sum(1 for i in active_items if i.status == SavedItem.Status.NEGOTIATING),
+                "interested": sum(1 for i in active_items if i.status == SavedItem.Status.INTERESTED),
+                "won": sum(1 for i in active_items if i.status == SavedItem.Status.WON),
+                "lost": sum(1 for i in active_items if i.status == SavedItem.Status.LOST),
+            }
+            total_suppliers_count = len(active_items)
+            high_fit_count = sum(1 for it in active_items if (it.search_result and it.search_result.match_score >= 85))
+            verified_contact_count = sum(1 for it in active_items if (it.search_result and it.search_result.external_company and (it.search_result.external_company.email or it.search_result.external_company.phone)))
+            negotiating_count = stage_counts["negotiating"] + stage_counts["won"]
+
             return JsonResponse({
                 "success": True,
                 "status": item.status,
@@ -1158,6 +1215,11 @@ def update_saved_supplier_view(request, item_id):
                 "assigned_to_id": item.assigned_to_id,
                 "assigned_to_name": item.assigned_to.get_full_name() or item.assigned_to.email if item.assigned_to else "Unassigned",
                 "notes": item.notes,
+                "stage_counts": stage_counts,
+                "total_suppliers_count": total_suppliers_count,
+                "high_fit_count": high_fit_count,
+                "verified_contact_count": verified_contact_count,
+                "negotiating_count": negotiating_count,
                 "message": f"Supplier '{item.search_result.external_company.name}' updated successfully.",
             })
 
@@ -1414,6 +1476,131 @@ def send_rfq_view(request, result_id):
 
     redirect_to = request.META.get("HTTP_REFERER") or (reverse("find-buyers") if is_seller_context else reverse("find-suppliers"))
     return redirect(redirect_to)
+
+
+@login_required
+def batch_send_rfq_view(request):
+    """
+    Batch Send RFQ / Inquiry:
+    Allows sales reps and buyers to dispatch commercial RFQs / proposals
+    to multiple shortlisted companies simultaneously in 1 click.
+    """
+    selected_company_id = request.session.get("active_company_id")
+    rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
+    company = rbac["company"]
+
+    if not (rbac["can_view_buyer"] or rbac["can_view_seller"] or rbac["is_super_admin"]):
+        return JsonResponse({"success": False, "error": "Access restricted: Permission required."}, status=403)
+
+    if request.method == "POST":
+        data = {}
+        result_ids = []
+        if request.content_type == "application/json":
+            try:
+                data = json.loads(request.body.decode("utf-8")) if request.body else {}
+                result_ids = data.get("result_ids", [])
+            except Exception:
+                data = {}
+        else:
+            data = request.POST
+            result_ids = request.POST.getlist("result_ids[]") or request.POST.getlist("result_ids")
+            if not result_ids and "result_ids" in request.POST:
+                raw_val = request.POST.get("result_ids")
+                if isinstance(raw_val, str):
+                    result_ids = [x.strip() for x in raw_val.split(",") if x.strip()]
+
+        if isinstance(result_ids, str):
+            result_ids = [int(x.strip()) for x in result_ids.split(",") if x.strip().isdigit()]
+        elif isinstance(result_ids, (list, tuple)):
+            result_ids = [int(x) for x in result_ids if str(x).isdigit()]
+
+        subject = (data.get("subject") or "").strip()
+        message = (data.get("message") or "").strip()
+        target_price_str = (data.get("target_price") or data.get("quoted_price") or "").strip()
+        delivery_terms = (data.get("delivery_terms") or "").strip()
+
+        quoted_price = None
+        if target_price_str:
+            try:
+                quoted_price = Decimal(target_price_str)
+            except Exception:
+                pass
+
+        if not result_ids:
+            return JsonResponse({"success": False, "error": "No companies selected for inquiry."}, status=400)
+
+        if not subject:
+            subject = f"Commercial Inquiry & RFQ from {company.name}"
+        if not message:
+            message = "We are interested in your commercial offerings and would like to request your quotation and availability."
+
+        # Fetch SearchResults belonging to this company's jobs
+        results = SearchResult.objects.filter(
+            id__in=result_ids,
+            search_job__company=company,
+        ).select_related("external_company", "search_job", "search_job__requirement", "search_job__product")
+
+        dispatched_count = 0
+
+        for res in results:
+            target_email = ""
+            if res.external_company and res.external_company.email:
+                target_email = res.external_company.email
+            elif res.contact_email:
+                target_email = res.contact_email
+
+            if not target_email:
+                target_email = "contact@b2bpartner.com"
+
+            inquiry = Inquiry.objects.create(
+                company=company,
+                search_result=res,
+                subject=subject,
+                message=message,
+                sent_to_email=target_email,
+                quoted_price=quoted_price,
+                delivery_terms=delivery_terms,
+                status=Inquiry.Status.SENT,
+            )
+
+            # Sync matching SavedItem if any to contacted
+            SavedItem.objects.filter(
+                company=company,
+                search_result=res,
+                status=SavedItem.Status.NEW,
+            ).update(status=SavedItem.Status.CONTACTED)
+
+            # Log outbound message
+            InquiryMessage.objects.create(
+                inquiry=inquiry,
+                sender=request.user,
+                sender_name=request.user.get_full_name() or request.user.email,
+                message_type=InquiryMessage.MessageType.OUTBOUND,
+                subject=subject,
+                body=message,
+            )
+
+            # Dispatch real email
+            try:
+                send_inquiry_email(inquiry, user=request.user)
+            except Exception as ex:
+                logger.warning("Could not dispatch batch email for inquiry #%s: %s", inquiry.id, ex)
+
+            try:
+                notify_proposal_sent(inquiry, user=request.user)
+            except Exception as ex:
+                logger.warning("Could not create in-app notification for inquiry #%s: %s", inquiry.id, ex)
+
+            dispatched_count += 1
+
+        return JsonResponse({
+            "success": True,
+            "dispatched_count": dispatched_count,
+            "sent_count": dispatched_count,
+            "message": f"Successfully recorded and dispatched {dispatched_count} inquiries / RFQs!",
+        })
+
+    return JsonResponse({"success": False, "error": "Invalid request method"}, status=405)
 
 
 @login_required

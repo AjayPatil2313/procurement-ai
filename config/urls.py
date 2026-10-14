@@ -95,7 +95,9 @@ from apps.leads.web_views import (
     send_rfq_view,
     customers_list_view,
     batch_save_suppliers_view,
+    batch_send_rfq_view,
 )
+from apps.leads.pdf_views import inquiry_quotation_pdf_view
 from apps.companies.admin_views import (
     admin_panel_dashboard_view,
     admin_panel_companies_view,
@@ -223,6 +225,8 @@ urlpatterns = [
     path("procurement/inquiries/<int:pk>/quote/", record_inquiry_quote_view, name="record-inquiry-quote"),
     path("procurement/inquiries/<int:pk>/resend/", resend_inquiry_view, name="resend-inquiry"),
     path("procurement/inquiries/<int:pk>/delete/", delete_inquiry_view, name="delete-inquiry"),
+    path("procurement/inquiries/<int:pk>/quotation-pdf/", inquiry_quotation_pdf_view, name="inquiry-quotation-pdf"),
+    path("procurement/inquiries/batch-send/", batch_send_rfq_view, name="batch-send-rfq"),
     path("procurement/inquiries/send/<int:result_id>/", send_rfq_view, name="send-rfq"),
     path("procurement/price-comparison/", price_comparison_view, name="price-comparison"),
     path("procurement/price-comparison/export/", export_price_comparison_csv_view, name="export-price-comparison-csv"),
@@ -256,6 +260,8 @@ urlpatterns = [
     path("sales/inquiries/<int:pk>/quote/", record_inquiry_quote_view, name="sales-record-inquiry-quote"),
     path("sales/inquiries/<int:pk>/resend/", resend_inquiry_view, name="sales-resend-inquiry"),
     path("sales/inquiries/<int:pk>/delete/", delete_inquiry_view, name="sales-delete-inquiry"),
+    path("sales/inquiries/<int:pk>/quotation-pdf/", inquiry_quotation_pdf_view, name="sales-inquiry-quotation-pdf"),
+    path("sales/inquiries/batch-send/", batch_send_rfq_view, name="sales-batch-send-rfq"),
     path("sales/inquiries/send/<int:result_id>/", send_rfq_view, name="sales-send-inquiry"),
     path("sales/export-reports/", export_reports_view, name="sales-export-reports"),
     path("sales/roles/", seller_roles_web_view, name="seller-roles-web"),

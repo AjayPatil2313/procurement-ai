@@ -933,6 +933,66 @@ class SuperAdminDashboardSyncTestCase(TestCase):
         self.assertEqual(self.client.session.get("active_workspace"), "seller")
         self.assertEqual(res3.context["active_workspace"], "seller")
 
+    def test_admin_panel_users_export_all_and_company_wise(self):
+        """Validates all users export, company-filtered export, and bulk selected export."""
+        self.client.force_login(self.superadmin)
 
+        # 1. Export All Users
+        res_all = self.client.get(reverse("admin-panel-users") + "?export=csv")
+        self.assertEqual(res_all.status_code, 200)
+        self.assertIn("text/csv", res_all["Content-Type"])
+        self.assertIn("Platform_Users_All_", res_all["Content-Disposition"])
+        content_all = res_all.content.decode("utf-8")
+        self.assertIn("superadmin@platform.ai", content_all)
+        self.assertIn("regular@vendor.com", content_all)
 
+        # 2. Export Company-Wise Users
+        res_comp = self.client.get(reverse("admin-panel-users") + f"?company_id={self.company.id}&export=csv")
+        self.assertEqual(res_comp.status_code, 200)
+        self.assertIn("text/csv", res_comp["Content-Type"])
+        content_comp = res_comp.content.decode("utf-8")
+        self.assertIn("regular@vendor.com", content_comp)
 
+        # 3. Bulk Selected Users Export
+        res_bulk = self.client.post(
+            reverse("admin-panel-users"),
+            {"bulk_action": "export", "selected_ids": [str(self.regular_user.id)]},
+        )
+        self.assertEqual(res_bulk.status_code, 200)
+        self.assertIn("text/csv", res_bulk["Content-Type"])
+        self.assertIn("Selected_Users_", res_bulk["Content-Disposition"])
+        content_bulk = res_bulk.content.decode("utf-8")
+        self.assertIn("regular@vendor.com", content_bulk)
+
+    def test_admin_panel_module_exports_csv(self):
+        """Validates CSV exports across companies, transactions, and audit logs."""
+        self.client.force_login(self.superadmin)
+
+        # Companies Export
+        res_comp = self.client.get(reverse("admin-panel-companies") + "?export=csv")
+        self.assertEqual(res_comp.status_code, 200)
+        self.assertIn("text/csv", res_comp["Content-Type"])
+        self.assertIn("Platform_Companies_", res_comp["Content-Disposition"])
+        self.assertIn("Apex Engineering Ltd", res_comp.content.decode("utf-8"))
+
+        # Transactions Export (Wallet & Invoices)
+        res_tx = self.client.get(reverse("admin-panel-transactions") + "?tab=wallet_tx&export=csv")
+        self.assertEqual(res_tx.status_code, 200)
+        self.assertIn("text/csv", res_tx["Content-Type"])
+        self.assertIn("Platform_Wallet_Ledger_", res_tx["Content-Disposition"])
+
+        # Audit Logs Export
+        res_audit = self.client.get(reverse("admin-panel-auditlogs") + "?export=csv")
+        self.assertEqual(res_audit.status_code, 200)
+        self.assertIn("text/csv", res_audit["Content-Type"])
+        self.assertIn("Platform_Audit_Trail_", res_audit["Content-Disposition"])
+
+    def test_sidebar_no_duplicate_support_desk_for_superadmin(self):
+        """Validates that Help & Support Desk appears only once in sidebar for super admin."""
+        self.client.force_login(self.superadmin)
+        res = self.client.get(reverse("admin-panel-dashboard"))
+        self.assertEqual(res.status_code, 200)
+        html = res.content.decode("utf-8")
+        sidebar_part = html.split('<aside id="appSidebar"')[1].split('</aside>')[0]
+        count_in_sidebar = sidebar_part.count("/admin-panel/support/")
+        self.assertEqual(count_in_sidebar, 1, f"Expected 1 support desk link in sidebar, found {count_in_sidebar}")

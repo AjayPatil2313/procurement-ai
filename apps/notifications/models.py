@@ -32,6 +32,20 @@ class NotificationTemplate(models.Model):
         default=False,
         help_text="System-critical template (e.g. security reset) that cannot be casually deactivated",
     )
+    use_custom_layout = models.BooleanField(
+        default=False,
+        help_text="If True, overrides global master header/footer with template-specific header/footer",
+    )
+    header_html = models.TextField(
+        blank=True,
+        default="",
+        help_text="Template-specific custom header HTML. If blank, global master header is used.",
+    )
+    footer_html = models.TextField(
+        blank=True,
+        default="",
+        help_text="Template-specific custom footer HTML. If blank, global master footer is used.",
+    )
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -352,3 +366,93 @@ class SMTPSetting(models.Model):
             return signing.loads(self.password_encrypted, salt="tc_smtp_salt")
         except Exception:
             return self.password_encrypted
+
+
+class EmailLayoutSetting(models.Model):
+    name = models.CharField(max_length=120, default="Global Master Layout")
+    is_active = models.BooleanField(
+        default=True,
+        help_text="When active, this master layout governs the header and footer of all emails",
+    )
+
+    # 1. Header Section
+    brand_name = models.CharField(max_length=120, default="TradeConnect")
+    brand_tagline = models.CharField(max_length=150, default="Buy &bull; Sell &bull; Grow")
+    header_title = models.CharField(max_length=150, default="B2B Procurement & Sales Platform")
+    header_subtitle = models.CharField(max_length=200, default="Smarter Sourcing. Stronger Partnerships.")
+    logo_url = models.URLField(
+        blank=True,
+        default="",
+        help_text="Custom Logo image URL (If blank, platform modern brand icon is rendered)",
+    )
+    header_bg_color = models.CharField(max_length=30, default="#ffffff")
+    header_text_color = models.CharField(max_length=30, default="#0f172a")
+    use_custom_header_html = models.BooleanField(
+        default=False,
+        help_text="If enabled, uses raw custom header HTML below instead of structured fields",
+    )
+    custom_header_html = models.TextField(
+        blank=True,
+        default="",
+        help_text="Custom raw HTML for email header",
+    )
+
+    # 2. Trust Badges Row
+    show_trust_badges = models.BooleanField(default=True)
+    badge_1_icon = models.CharField(max_length=50, default="🛡️")
+    badge_1_text = models.CharField(max_length=100, default="Secure & Verified")
+    badge_2_icon = models.CharField(max_length=50, default="☑️")
+    badge_2_text = models.CharField(max_length=100, default="Trusted B2B Platform")
+    badge_3_icon = models.CharField(max_length=50, default="🎧")
+    badge_3_text = models.CharField(max_length=100, default="24/7 Support")
+
+    # 3. Footer Section
+    footer_brand_name = models.CharField(max_length=120, default="TradeConnect")
+    website_url = models.CharField(max_length=200, default="https://tradeconnect.com")
+    support_email = models.EmailField(default="support@tradeconnect.com")
+    compliance_text = models.TextField(
+        default="You received this operational email because your company account is registered on the TradeConnect B2B AI Procurement & Sales Platform."
+    )
+    copyright_text = models.CharField(max_length=200, default="© 2026 TradeConnect Inc. All rights reserved.")
+    social_linkedin = models.URLField(blank=True, default="https://linkedin.com")
+    social_facebook = models.URLField(blank=True, default="https://facebook.com")
+    social_youtube = models.URLField(blank=True, default="https://youtube.com")
+    social_twitter = models.URLField(blank=True, default="https://twitter.com")
+    use_custom_footer_html = models.BooleanField(
+        default=False,
+        help_text="If enabled, uses raw custom footer HTML below instead of structured fields",
+    )
+    custom_footer_html = models.TextField(
+        blank=True,
+        default="",
+        help_text="Custom raw HTML for email footer",
+    )
+
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Email Layout Setting"
+        verbose_name_plural = "Email Layout Settings"
+
+    def __str__(self):
+        return f"{self.name} (Active: {self.is_active})"
+
+    @classmethod
+    def get_active_layout(cls):
+        """Returns the primary active layout setting or creates the default."""
+        layout = cls.objects.filter(is_active=True).first()
+        if not layout:
+            layout = cls.objects.first()
+            if not layout:
+                layout = cls.objects.create(name="Global Master Layout", is_active=True)
+            else:
+                layout.is_active = True
+                layout.save(update_fields=["is_active"])
+        return layout
+

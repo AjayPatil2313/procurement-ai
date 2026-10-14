@@ -13,6 +13,7 @@ from apps.notifications.models import (
     NotificationLog,
     EmailDeliveryAttempt,
     SMTPSetting,
+    EmailLayoutSetting,
 )
 from apps.notifications.services.email_engine import (
     render_string_template,
@@ -566,7 +567,7 @@ class TwelveStandardEmailTemplatesTests(TestCase):
 
             # Master Header check
             self.assertIn("TradeConnect", final_html)
-            self.assertIn("Buy &bull; Sell &bull; Grow", final_html)
+            self.assertTrue("Buy &bull; Sell &bull; Grow" in final_html or "Buy • Sell • Grow" in final_html)
             self.assertIn("B2B Procurement &amp; Sales Platform", final_html)
 
             # Trust Badges check
@@ -855,4 +856,97 @@ class EnhancedEmailFeaturesTests(TestCase):
         self.assertEqual(failed_log.status, NotificationLog.Status.QUEUED)
         self.assertTrue(failed_log.max_attempts > 3)
 
+    def test_email_layout_setting_and_ui_view(self):
+        """Super Admin can manage Master Email Header & Footer layout through UI."""
+        self.client.force_login(self.superadmin)
 
+        # GET layout settings view
+        response = self.client.get(reverse("admin-panel-email-layout"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Master Header &amp; Footer Layout")
+
+        # POST update custom branding in header and footer
+        post_data = {
+            "action": "save",
+            "brand_name": "Acme Global B2B",
+            "brand_tagline": "Enterprise Sourcing",
+            "header_title": "Custom Procurement Portal",
+            "header_subtitle": "Intelligent Sourcing. Accelerated Growth.",
+            "logo_url": "https://example.com/logo.png",
+            "show_trust_badges": "on",
+            "badge_1_icon": "🔒",
+            "badge_1_text": "Bank-Grade Encryption",
+            "badge_2_icon": "⭐",
+            "badge_2_text": "Top Rated Platform",
+            "badge_3_icon": "📞",
+            "badge_3_text": "VIP Support",
+            "footer_brand_name": "Acme Global B2B",
+            "website_url": "https://acmeglobal.com",
+            "support_email": "help@acmeglobal.com",
+            "compliance_text": "Custom legal compliance text for Acme Global.",
+            "copyright_text": "© 2026 Acme Global B2B Corp.",
+            "social_linkedin": "https://linkedin.com/company/acme",
+            "social_facebook": "https://facebook.com/acme",
+            "social_youtube": "https://youtube.com/acme",
+            "social_twitter": "https://twitter.com/acme",
+        }
+        post_res = self.client.post(reverse("admin-panel-email-layout"), post_data)
+        self.assertEqual(post_res.status_code, 302)
+
+        layout = EmailLayoutSetting.get_active_layout()
+        self.assertEqual(layout.brand_name, "Acme Global B2B")
+        self.assertEqual(layout.support_email, "help@acmeglobal.com")
+
+        # Verify build_branded_html renders the customized header and footer
+        rendered = build_branded_html(
+            title="Test Inquiry",
+            summary="Test summary text",
+            layout_setting=layout,
+        )
+        self.assertIn("Acme Global B2B", rendered)
+        self.assertIn("help@acmeglobal.com", rendered)
+        self.assertIn("Bank-Grade Encryption", rendered)
+        self.assertIn("Custom legal compliance text", rendered)
+
+    def test_template_level_header_footer_override(self):
+        """Template editor supports overriding header and footer for a specific template."""
+        self.client.force_login(self.superadmin)
+        tpl = NotificationTemplate.objects.create(
+            name="Custom Layout Notice",
+            event_key="test.custom_header_footer",
+            category=NotificationTemplate.Category.SYSTEM,
+            subject="Notice Subject",
+            html_content="<p>Body Content</p>",
+        )
+
+        edit_data = {
+            "subject": "Notice Subject Updated",
+            "html_content": "<p>Updated Body Content</p>",
+            "text_content": "Text body",
+            "is_active": "on",
+            "use_custom_layout": "on",
+            "header_html": "<tr><td style='background:#111827;color:#fff;'>Custom Template Header</td></tr>",
+            "footer_html": "<tr><td style='background:#111827;color:#fff;'>Custom Template Footer</td></tr>",
+        }
+        res = self.client.post(reverse("admin-panel-email-template-edit", kwargs={"pk": tpl.pk}), edit_data)
+        self.assertEqual(res.status_code, 302)
+
+        tpl.refresh_from_db()
+        self.assertTrue(tpl.use_custom_layout)
+        self.assertIn("Custom Template Header", tpl.header_html)
+        self.assertIn("Custom Template Footer", tpl.footer_html)
+
+        # Preview API reflects custom header and footer
+        preview_res = self.client.post(reverse("admin-panel-email-template-preview", kwargs={"pk": tpl.pk}))
+        self.assertEqual(preview_res.status_code, 200)
+        data = preview_res.json()
+        self.assertIn("Custom Template Header", data["html"])
+        self.assertIn("Custom Template Footer", data["html"])
+
+    def test_admin_email_logs_export_csv(self):
+        """Validates that Super Admin can export email notification logs as CSV."""
+        self.client.force_login(self.superadmin)
+        res = self.client.get(reverse("admin-panel-email-logs") + "?export=csv")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/csv", res["Content-Type"])
+        self.assertIn("Email_Delivery_Logs_", res["Content-Disposition"])
