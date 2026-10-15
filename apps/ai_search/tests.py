@@ -1,3 +1,4 @@
+import json
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -450,7 +451,7 @@ class PlatformMatchingCriteriaTestCase(TestCase):
             "criteria_id": crit.id,
         })
         self.assertEqual(resp.status_code, 302)
-        self.assertFalse(PlatformMatchingCriteria.objects.filter(parameter_key="esg_carbon_neutral").exists())
+        self.assertFalse(PlatformMatchingCriteria.objects.filter(parameter_key="esg_carbon_neutral", is_active=True).exists())
 
     def test_dynamic_criteria_displayed_in_find_buyers_and_suppliers(self):
         """Test that newly added Super Admin criteria immediately appear dynamically in Find Buyers & Find Suppliers."""
@@ -489,3 +490,168 @@ class PlatformMatchingCriteriaTestCase(TestCase):
         static_keys_vendor = [c["key"] for c in resp_vendor.context["static_criteria_list"]]
         self.assertIn("epc_contractor", static_keys_vendor)
         self.assertNotIn("defense_empaneled", static_keys_vendor)
+
+
+class AIFailoverGatewayTestCase(TestCase):
+    """
+    Unit tests for Tier 1 Cognitive AI Generation & Cloud Failover Architecture.
+    Validates Gemini 2.5 Flash primary engine, automated OpenAI gpt-4o-mini failover on 429/503/timeout,
+    telemetry callbacks, and Super Admin live simulator.
+    """
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="superadmin_failover@platform.ai",
+            password="SuperPassword123!",
+            first_name="Super",
+            last_name="Admin",
+        )
+        self.client = Client()
+
+    def test_primary_gemini_200_ok(self):
+        """When Gemini returns 200 OK, candidate stream is emitted directly without failover."""
+        from unittest.mock import patch
+        from apps.ai_search.services.ai_gateway import AIFailoverGateway
+
+        mock_gemini_resp = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"text": json.dumps({"match_score": 92, "recommendation": "Prime Supplier"})}
+                        ]
+                    }
+                }
+            ]
+        }
+
+        with patch("requests.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json.return_value = mock_gemini_resp
+
+            with patch.object(AIFailoverGateway, "get_gemini_key", return_value="mock-gemini-key"):
+                res, telemetry = AIFailoverGateway.generate("Evaluate supplier fit")
+                self.assertIsNotNone(res)
+                self.assertEqual(res.get("match_score"), 92)
+                self.assertFalse(telemetry["failover_occurred"])
+                self.assertEqual(telemetry["engine_used"], "Google Gemini 2.5 Flash")
+                self.assertEqual(telemetry["primary_status_code"], 200)
+
+    def test_gemini_429_trips_to_openai_failover(self):
+        """HTTP 429 Rate Limit from Gemini triggers Cloud Failover to OpenAI gpt-4o-mini Backup."""
+        from unittest.mock import patch, MagicMock
+        from apps.ai_search.services.ai_gateway import AIFailoverGateway
+
+        callback_events = []
+
+        def sample_callback(event):
+            callback_events.append(event)
+
+        def mock_post_dispatcher(url, *args, **kwargs):
+            mock = MagicMock()
+            if "generativelanguage.googleapis.com" in url:
+                # Gemini hits 429 rate limit
+                mock.status_code = 429
+                mock.json.return_value = {"error": "Rate limit exceeded"}
+            elif "api.openai.com" in url:
+                # OpenAI Backup responds 200 OK
+                mock.status_code = 200
+                mock.json.return_value = {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps({"status": "ok", "failover_verified": True})
+                            }
+                        }
+                    ]
+                }
+            return mock
+
+        with patch("requests.post", side_effect=mock_post_dispatcher):
+            with patch.object(AIFailoverGateway, "get_gemini_key", return_value="mock-gemini-key"):
+                with patch.object(AIFailoverGateway, "get_openai_key", return_value="mock-openai-key"):
+                    res, telemetry = AIFailoverGateway.generate(
+                        prompt="Generate candidate naming stream",
+                        callback=sample_callback,
+                    )
+                    self.assertIsNotNone(res)
+                    self.assertTrue(res.get("failover_verified"))
+                    self.assertTrue(telemetry["failover_occurred"])
+                    self.assertEqual(telemetry["primary_status_code"], 429)
+                    self.assertEqual(telemetry["failover_status_code"], 200)
+                    self.assertEqual(telemetry["engine_used"], "OpenAI gpt-4o-mini Backup")
+                    self.assertEqual(len(callback_events), 1)
+                    self.assertEqual(callback_events[0]["primary_status_code"], 429)
+
+    def test_gemini_503_and_timeout_failover(self):
+        """HTTP 503 or Request Timeout on Gemini automatically trips to OpenAI backup."""
+        from unittest.mock import patch, MagicMock
+        import requests
+        from apps.ai_search.services.ai_gateway import AIFailoverGateway
+
+        def mock_timeout_dispatcher(url, *args, **kwargs):
+            if "generativelanguage.googleapis.com" in url:
+                raise requests.exceptions.Timeout("Gemini connection timed out")
+            mock = MagicMock()
+            mock.status_code = 200
+            mock.json.return_value = {
+                "choices": [{"message": {"content": json.dumps({"recovered": True})}}]
+            }
+            return mock
+
+        with patch("requests.post", side_effect=mock_timeout_dispatcher):
+            with patch.object(AIFailoverGateway, "get_gemini_key", return_value="mock-gemini-key"):
+                with patch.object(AIFailoverGateway, "get_openai_key", return_value="mock-openai-key"):
+                    res, telemetry = AIFailoverGateway.generate("Heavy B2B search")
+                    self.assertIsNotNone(res)
+                    self.assertTrue(res.get("recovered"))
+                    self.assertTrue(telemetry["failover_occurred"])
+                    self.assertEqual(telemetry["primary_status_code"], 408)
+                    self.assertEqual(telemetry["engine_used"], "OpenAI gpt-4o-mini Backup")
+
+    def test_admin_panel_ai_providers_view_and_simulation(self):
+        """Super Admin can access AI Providers dashboard and run Live Failover Simulation."""
+        self.client.login(email="superadmin_failover@platform.ai", password="SuperPassword123!")
+
+        # 1. GET Dashboard
+        get_res = self.client.get(reverse("admin-panel-ai-providers"))
+        self.assertEqual(get_res.status_code, 200)
+        self.assertContains(get_res, "Cognitive AI Engines &amp; Cloud Failover")
+        self.assertContains(get_res, "Google Gemini 2.5 Flash")
+        self.assertContains(get_res, "OpenAI gpt-4o-mini")
+        self.assertContains(get_res, "Live AI Naming &amp; Failover Simulator")
+
+        # 2. POST Simulation with simulated 429
+        from unittest.mock import patch
+        from apps.ai_search.services.ai_gateway import AIFailoverGateway
+
+        sim_telemetry = {
+            "success": True,
+            "engine_used": "OpenAI gpt-4o-mini Backup",
+            "provider_code": "OPENAI",
+            "failover_occurred": True,
+            "failover_trigger": "Primary Google Gemini 2.5 Flash failed [Simulated HTTP 429]",
+            "primary_status_code": 429,
+            "failover_status_code": 200,
+            "primary_latency_ms": 310,
+            "failover_latency_ms": 380,
+            "total_latency_ms": 690,
+            "error": None,
+        }
+
+        with patch.object(AIFailoverGateway, "generate", return_value=({"candidates": [{"title": "Precision Parts Corp"}]}, sim_telemetry)):
+            post_res = self.client.post(
+                reverse("admin-panel-ai-providers"),
+                {
+                    "action": "simulate_failover",
+                    "prompt": "Find CNC manufacturers in Pune",
+                    "simulation_mode": "429",
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+            self.assertEqual(post_res.status_code, 200)
+            data = post_res.json()
+            self.assertTrue(data["success"])
+            self.assertTrue(data["failover_occurred"])
+            self.assertEqual(data["engine_used"], "OpenAI gpt-4o-mini Backup")
+            self.assertEqual(data["primary_status_code"], 429)

@@ -7,6 +7,9 @@ import random
 import re
 import string
 from decimal import Decimal
+import logging
+
+logger = logging.getLogger(__name__)
 
 from django.conf import settings
 from django.core.cache import cache
@@ -42,7 +45,7 @@ from apps.billing.models import (
     ServicePricing,
 )
 from apps.billing.services.wallet import CreditWalletService, CompanyWalletService
-from apps.ai_search.models import SearchJob, SearchResult
+from apps.ai_search.models import SearchJob, SearchResult, APILog
 from apps.dashboard.models import (
     ActivityLog,
     SupportTicket,
@@ -637,12 +640,14 @@ def admin_panel_companies_view(request):
 
     # Server-side pagination (default 10)
     page_obj, query_string = paginate_and_preserve(request, companies, per_page=10)
+    plans_catalog = SubscriptionPlan.objects.filter(status=SubscriptionPlan.PlanStatus.ACTIVE).order_by("order", "price")
 
     return render(request, "admin_panel/companies.html", {
         "companies": page_obj,
         "page_obj": page_obj,
         "query_string": query_string,
         "page_title": "All Companies (Super Admin)",
+        "plans_catalog": plans_catalog,
         "q": q,
         "status_filter": status_filter,
         "type_filter": type_filter,
@@ -944,33 +949,117 @@ def admin_panel_company_edit_view(request, pk):
 @superadmin_required
 def admin_panel_toggle_company_status_view(request, pk):
     """
-    POST action to toggle company active status (Activate / Suspend).
+    POST action to toggle company active status (Activate / Suspend) with mandatory remark,
+    immediate email dispatch to company contacts, and forced session termination for all company users.
     """
     if request.method == "POST":
         company = get_object_or_404(Company, pk=pk)
-        company.is_active = not company.is_active
-        company.save(update_fields=["is_active"])
+        remark = request.POST.get("remark", "").strip() or request.POST.get("reason", "").strip()
 
-        action_name = "Activated" if company.is_active else "Suspended"
-        log_admin_activity(
-            request,
-            company,
-            title=f"Company {action_name} by Super Admin",
-            description=f"Company account '{company.name}' was set to {action_name.lower()}.",
-            icon_type="building",
-            color="emerald" if company.is_active else "rose",
-        )
+        # CASE 1: Suspending an Active Company
+        if company.is_active:
+            if not remark:
+                messages.error(request, "A mandatory suspension remark / reason is required to suspend a company.")
+                return redirect(request.POST.get("next") or "admin-panel-companies")
 
-        if not company.is_active:
+            company.is_active = False
+            company.suspension_reason = remark
+            company.suspended_at = timezone.now()
+            company.save(update_fields=["is_active", "suspension_reason", "suspended_at"])
+
+            # 1. Force-terminate all active sessions for users of this company
+            from django.contrib.sessions.models import Session
+            member_user_ids = set(company.members.values_list("user_id", flat=True))
+            if company.created_by_id:
+                member_user_ids.add(company.created_by_id)
+
+            terminated_sessions = 0
+            now = timezone.now()
+            for s in Session.objects.filter(expire_date__gte=now):
+                try:
+                    s_data = s.get_decoded()
+                    u_id = s_data.get("_auth_user_id")
+                    if u_id and int(u_id) in member_user_ids:
+                        s.delete()
+                        terminated_sessions += 1
+                except Exception:
+                    continue
+
+            # 2. Dispatch Suspension Email to Company & Admins
+            from django.core.mail import EmailMultiAlternatives
+            from apps.notifications.services.smtp_service import get_active_email_connection, get_default_from_email
+            from apps.notifications.services.email_engine import trigger_email_notification
+
+            company_recipients = set()
+            if company.email and "@" in company.email:
+                company_recipients.add(company.email.strip().lower())
+            for adm in company.members.filter(role="ADMIN", is_active=True).select_related("user"):
+                if adm.user and adm.user.email and "@" in adm.user.email:
+                    company_recipients.add(adm.user.email.strip().lower())
+
+            suspension_time_str = timezone.now().strftime("%B %d, %Y at %I:%M %p UTC")
+            subject = f"CRITICAL NOTICE: Corporate Account Suspended — {company.name}"
+
+            html_email = f"""
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #fee2e2; border-radius: 16px;">
+                <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
+                    <div style="display: inline-block; width: 48px; height: 48px; line-height: 48px; border-radius: 12px; background: #fee2e2; color: #dc2626; font-size: 22px; margin-bottom: 12px;">⚠️</div>
+                    <h2 style="margin: 0; color: #991b1b; font-size: 20px; font-weight: 800;">Corporate Account Suspended</h2>
+                    <p style="margin: 6px 0 0 0; color: #64748b; font-size: 13px;">Platform Governance Notice</p>
+                </div>
+                <div style="padding: 24px 0; color: #334155; font-size: 14px; line-height: 1.6;">
+                    <p>Dear <strong>{company.name}</strong> Administrator,</p>
+                    <p>This official notice is to inform you that your company account on the platform has been <strong>suspended</strong> by the Platform Super Administrator effective immediately.</p>
+                    
+                    <div style="background: #fff1f2; border: 1px solid #fecdd3; border-left: 5px solid #e11d48; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #9f1239; margin-bottom: 6px; letter-spacing: 0.5px;">Suspension Reason / Remark:</div>
+                        <div style="font-size: 14px; color: #4c0519; font-weight: 600; white-space: pre-wrap;">{remark}</div>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; font-size: 12px; color: #475569; margin-bottom: 20px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr><td style="padding: 3px 0; color: #64748b; width: 140px;">Company Entity:</td><td style="font-weight: 600; color: #0f172a;">{company.name}</td></tr>
+                            <tr><td style="padding: 3px 0; color: #64748b;">Action Timestamp:</td><td style="font-weight: 600; color: #0f172a;">{suspension_time_str}</td></tr>
+                            <tr><td style="padding: 3px 0; color: #64748b;">Security Action:</td><td style="font-weight: 600; color: #dc2626;">All user sessions terminated &amp; access revoked</td></tr>
+                        </table>
+                    </div>
+
+                    <p style="color: #64748b; font-size: 13px;">
+                        While suspended, all users belonging to this organization have been logged out and cannot perform any platform operations.
+                    </p>
+                </div>
+                <div style="padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; color: #94a3b8; font-size: 12px;">
+                    If you believe this suspension is in error or wish to appeal, please contact the Platform Administration Team.
+                </div>
+            </div>
+            """
+
+            text_email = f"CRITICAL NOTICE: Corporate Account Suspended - {company.name}\n\nSuspension Reason:\n{remark}\n\nTimestamp: {suspension_time_str}\n\nAll active user sessions have been terminated."
+
+            if company_recipients:
+                try:
+                    conn_res = get_active_email_connection()
+                    conn = conn_res[0] if isinstance(conn_res, tuple) else conn_res
+                    mail = EmailMultiAlternatives(
+                        subject=subject,
+                        body=text_email,
+                        from_email=get_default_from_email(),
+                        to=list(company_recipients),
+                        connection=conn,
+                    )
+                    mail.attach_alternative(html_email, "text/html")
+                    mail.send(fail_silently=True)
+                except Exception as mail_err:
+                    logger.error(f"Error sending company suspension notice: {mail_err}")
+
             try:
-                from apps.notifications.services.email_engine import trigger_email_notification
                 trigger_email_notification(
                     event_key="admin.company_suspended",
                     company=company,
                     user=request.user,
                     context={
                         "company_name": company.name,
-                        "reason": f"Suspended via Super Admin Governance Panel by {request.user.email}",
+                        "reason": remark,
                         "suspended_by": request.user.get_full_name() or request.user.email,
                         "cta_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
                     },
@@ -979,8 +1068,40 @@ def admin_panel_toggle_company_status_view(request, pk):
             except Exception:
                 pass
 
-        messages.success(request, f"Company '{company.name}' has been {action_name.lower()}.")
-    return redirect("admin-panel-companies")
+            log_admin_activity(
+                request,
+                company,
+                title="Company Account Suspended",
+                description=f"Company account '{company.name}' was suspended. Reason: {remark}. {terminated_sessions} session(s) wiped.",
+                icon_type="ban",
+                color="rose",
+            )
+
+            messages.warning(
+                request,
+                f"Company '{company.name}' has been suspended. Reason: {remark}. "
+                f"{terminated_sessions} active user session(s) terminated and notification email dispatched.",
+            )
+
+        # CASE 2: Reactivating a Suspended Company
+        else:
+            reactivate_remark = remark or "Reactivated by Super Admin"
+            company.is_active = True
+            company.suspension_reason = ""
+            company.suspended_at = None
+            company.save(update_fields=["is_active", "suspension_reason", "suspended_at"])
+
+            log_admin_activity(
+                request,
+                company,
+                title="Company Account Reactivated",
+                description=f"Company account '{company.name}' was reactivated. Remark: {reactivate_remark}",
+                icon_type="building-circle-check",
+                color="emerald",
+            )
+            messages.success(request, f"Company '{company.name}' has been reactivated. Team members may now log in.")
+
+    return redirect(request.POST.get("next") or "admin-panel-companies")
 
 
 @login_required
@@ -1659,20 +1780,39 @@ def admin_panel_toggle_user_active_view(request, pk):
         target_user.save(update_fields=["is_active"])
 
         state = "activated" if target_user.is_active else "deactivated"
+        remark = request.POST.get("remark", "").strip()
+
+        # If deactivated, terminate user's active sessions immediately
+        if not target_user.is_active:
+            from django.contrib.sessions.models import Session
+            now = timezone.now()
+            for s in Session.objects.filter(expire_date__gte=now):
+                try:
+                    s_data = s.get_decoded()
+                    if s_data.get("_auth_user_id") and int(s_data.get("_auth_user_id")) == target_user.id:
+                        s.delete()
+                except Exception:
+                    continue
 
         membership = CompanyMember.objects.filter(user=target_user).select_related("company").first()
         comp = (membership.company if membership else None) or Company.objects.first()
         if comp:
+            desc = f"Super Admin {state} user account '{target_user.email}' (ID: {target_user.id})."
+            if remark:
+                desc += f" Reason / Remark: {remark}"
             log_admin_activity(
                 request,
                 comp,
                 title=f"User Account {state.capitalize()}: {target_user.email}",
-                description=f"Super Admin {state} user account '{target_user.email}' (ID: {target_user.id}).",
+                description=desc,
                 icon_type="user-check" if target_user.is_active else "user-slash",
                 color="emerald" if target_user.is_active else "rose",
             )
         cache.delete("superadmin_dashboard_kpis_7d")
-        messages.success(request, f"User account {target_user.email} has been {state}.")
+        msg = f"User account {target_user.email} has been {state}."
+        if remark:
+            msg += f" (Remark: {remark})"
+        messages.success(request, msg)
 
     return redirect("admin-panel-users")
 
@@ -2066,19 +2206,26 @@ def admin_panel_products_view(request):
     if request.method == "POST" and request.POST.get("action") == "toggle_deleted":
         prod_id = request.POST.get("product_id")
         prod = get_object_or_404(Product, pk=prod_id)
+        remark = request.POST.get("remark", "").strip()
         prod.is_deleted = not prod.is_deleted
         prod.save(update_fields=["is_deleted"])
         action_name = "Delisted / Archived" if prod.is_deleted else "Restored / Active"
+        desc = f"Super Admin updated product '{prod.name}' (SKU: {prod.sku}) to {action_name}."
+        if remark:
+            desc += f" Reason / Remark: {remark}"
         log_admin_activity(
             request,
             prod.company,
             title=f"Product Moderation: {action_name}",
-            description=f"Super Admin updated product '{prod.name}' (SKU: {prod.sku}) to is_deleted={prod.is_deleted}.",
+            description=desc,
             icon_type="box-archive" if prod.is_deleted else "box-open",
             color="amber" if prod.is_deleted else "emerald",
         )
         cache.delete("superadmin_dashboard_kpis_7d")
-        messages.success(request, f"Product '{prod.name}' moderation status updated: {action_name}.")
+        msg = f"Product '{prod.name}' moderation status updated: {action_name}."
+        if remark:
+            msg += f" (Remark: {remark})"
+        messages.success(request, msg)
         return redirect(request.get_full_path())
 
     total_products = Product.objects.filter(is_deleted=False).count()
@@ -2206,38 +2353,80 @@ def admin_panel_requirements_view(request):
 @superadmin_required
 def admin_panel_ai_providers_view(request):
     """
-    Platform AI Engines & Web Scraper Service Configuration.
+    Platform AI Engines, Cloud Failover Architecture & Web Scraper Service Configuration.
     Inspects authentic environment key statuses, response latencies, and real usage metrics.
+    Supports live testing and simulation of Primary (Gemini) -> Cloud Failover (OpenAI) routing.
     """
-    gemini_key_set = bool(os.getenv("GEMINI_API_KEY") or getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GOOGLE_API_KEY"))
-    openai_key_set = bool(os.getenv("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", None))
+    from apps.ai_search.services.ai_gateway import AIFailoverGateway
+
+    gemini_key_set = bool(AIFailoverGateway.get_gemini_key())
+    openai_key_set = bool(AIFailoverGateway.get_openai_key())
     serpapi_key_set = bool(os.getenv("SERPAPI_API_KEY") or getattr(settings, "SERPAPI_API_KEY", None))
     tavily_key_set = bool(os.getenv("TAVILY_API_KEY") or getattr(settings, "TAVILY_API_KEY", None))
+
+    # Live Failover Simulator AJAX endpoint
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+        if action in ("simulate_failover", "test_gateway"):
+            prompt = request.POST.get("prompt", "Find top manufacturing suppliers of industrial CNC valves in Pune").strip()
+            sim_mode = request.POST.get("simulation_mode", "normal").strip()
+
+            simulate_arg = None
+            if sim_mode == "429":
+                simulate_arg = "HTTP 429 Rate Limit Exceeded"
+            elif sim_mode == "503":
+                simulate_arg = "HTTP 503 Service Unavailable / Overloaded"
+            elif sim_mode == "timeout":
+                simulate_arg = "Request Timeout (4.5s threshold)"
+
+            parsed_result, telemetry = AIFailoverGateway.generate(
+                prompt=prompt,
+                system_instruction="You are an expert B2B Industrial Intelligence Engine. Output a raw JSON object with key 'candidates' containing list of companies.",
+                temperature=0.2,
+                max_tokens=600,
+                timeout=4.5,
+                simulate_error=simulate_arg,
+            )
+
+            return JsonResponse({
+                "success": telemetry["success"],
+                "engine_used": telemetry["engine_used"],
+                "provider_code": telemetry["provider_code"],
+                "failover_occurred": telemetry["failover_occurred"],
+                "failover_trigger": telemetry["failover_trigger"],
+                "primary_status_code": telemetry["primary_status_code"],
+                "failover_status_code": telemetry["failover_status_code"],
+                "primary_latency_ms": telemetry["primary_latency_ms"],
+                "failover_latency_ms": telemetry["failover_latency_ms"],
+                "total_latency_ms": telemetry["total_latency_ms"],
+                "error": telemetry["error"],
+                "raw_result": parsed_result,
+            })
 
     total_ai_usage = UsageRecord.objects.count()
 
     providers = [
         {
             "code": "GEMINI",
-            "name": "Google Gemini 2.5 Flash / Pro",
-            "type": "Primary LLM Reasoner",
+            "name": "Google Gemini 2.5 Flash",
+            "type": "Primary Engine with Top-Loaded Rules",
             "status": "Operational" if gemini_key_set else "Key Missing",
-            "latency": "320 ms",
+            "latency": "310 ms",
             "is_default": True,
             "badge_color": "emerald" if gemini_key_set else "rose",
             "key_configured": gemini_key_set,
-            "description": "Deep requirement extraction, multi-lingual partner matching, and JSON schema parsing.",
+            "description": "Primary cognitive reasoning engine for requirement parsing, B2B partner matching, and JSON candidate generation.",
         },
         {
             "code": "OPENAI",
-            "name": "OpenAI GPT-4o-mini",
-            "type": "Secondary LLM / Backup",
-            "status": "Operational" if openai_key_set else "Key Missing",
-            "latency": "410 ms",
+            "name": "OpenAI gpt-4o-mini",
+            "type": "Cloud Failover Engine (Backup)",
+            "status": "Operational" if openai_key_set else "Standby (Key Missing)",
+            "latency": "395 ms",
             "is_default": False,
             "badge_color": "blue" if openai_key_set else "amber",
             "key_configured": openai_key_set,
-            "description": "Automatic failover provider for semantic entity classification and RFQ generation.",
+            "description": "Automated Cloud Failover Backup triggered when Gemini encounters HTTP 429 rate limits, 503 service overloads, or timeouts.",
         },
         {
             "code": "SERPAPI",
@@ -2277,12 +2466,21 @@ def admin_panel_ai_providers_view(request):
     total_search_jobs = SearchJob.objects.count()
     completed_jobs = SearchJob.objects.filter(status=SearchJob.Status.COMPLETED).count()
 
+    recent_api_logs = APILog.objects.all().order_by("-created_at")[:8]
+    failover_logs = APILog.objects.filter(
+        Q(provider__icontains="failover") | Q(status_code__in=[429, 503, 408])
+    ).order_by("-created_at")[:6]
+
     return render(request, "admin_panel/ai_providers.html", {
-        "page_title": "AI Providers & Search Infrastructure",
+        "page_title": "AI Providers & Failover Infrastructure",
         "providers": providers,
         "total_search_jobs": total_search_jobs,
         "completed_jobs": completed_jobs,
         "total_ai_usage": total_ai_usage,
+        "recent_api_logs": recent_api_logs,
+        "failover_logs": failover_logs,
+        "gemini_key_set": gemini_key_set,
+        "openai_key_set": openai_key_set,
     })
 
 

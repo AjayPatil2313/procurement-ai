@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import urllib.parse
 import requests
 from bs4 import BeautifulSoup
@@ -49,6 +50,32 @@ class WebSearchProvider:
             "Accept-Language": "en-US,en;q=0.9",
         }
 
+    @staticmethod
+    def _deduplicate_candidates(candidates: list[dict], max_results: int = 6) -> list[dict]:
+        """Restricts duplicate candidates by unique domain and normalized company title."""
+        seen_domains = set()
+        seen_titles = set()
+        unique = []
+        for c in candidates:
+            url = c.get("url", "").strip()
+            domain = urllib.parse.urlparse(url).netloc.lower().replace("www.", "") if url else ""
+            title_clean = re.sub(r"[^a-zA-Z0-9]", "", (c.get("title") or "").lower())
+
+            if domain and domain in seen_domains:
+                continue
+            if title_clean and len(title_clean) > 3 and title_clean in seen_titles:
+                continue
+
+            if domain:
+                seen_domains.add(domain)
+            if title_clean and len(title_clean) > 3:
+                seen_titles.add(title_clean)
+
+            unique.append(c)
+            if len(unique) >= max_results:
+                break
+        return unique
+
     def search(self, query: str, num_results: int = 6) -> list[dict]:
         """
         Executes discovery search for the given query and returns candidate URLs with snippets.
@@ -59,39 +86,41 @@ class WebSearchProvider:
           3. AI-Powered Verified Discovery via Gemini (using GEMINI_API_KEY)
           4. Live Web Search Engine (DuckDuckGo HTML live crawl)
           5. Verified Real Industrial Enterprise Directory Fallback
+        All results are strictly deduplicated across domains and company names.
         """
         query_clean = query.strip()
         if not query_clean:
             return []
 
         # 1. SerpAPI Google Search Strategy
-        serpapi_candidates = self._search_via_serpapi(query_clean, num_results=num_results)
+        serpapi_candidates = self._search_via_serpapi(query_clean, num_results=num_results * 2)
         if serpapi_candidates:
             logger.info(f"Discovered {len(serpapi_candidates)} live candidates via SerpAPI Google Search for '{query_clean}'")
-            return serpapi_candidates[:num_results]
+            return self._deduplicate_candidates(serpapi_candidates, max_results=num_results)
 
         # 2. Google Custom Search JSON API Strategy
-        google_cse_candidates = self._search_via_google_cse(query_clean, num_results=num_results)
+        google_cse_candidates = self._search_via_google_cse(query_clean, num_results=num_results * 2)
         if google_cse_candidates:
             logger.info(f"Discovered {len(google_cse_candidates)} live candidates via Google Custom Search API for '{query_clean}'")
-            return google_cse_candidates[:num_results]
+            return self._deduplicate_candidates(google_cse_candidates, max_results=num_results)
 
         # 3. AI-Powered Verified Discovery via Gemini
-        ai_candidates = self._search_via_gemini(query_clean, num_results=num_results)
+        ai_candidates = self._search_via_gemini(query_clean, num_results=num_results * 2)
         if ai_candidates:
             logger.info(f"Discovered {len(ai_candidates)} real verified candidates via Gemini AI for '{query_clean}'")
-            return ai_candidates[:num_results]
+            return self._deduplicate_candidates(ai_candidates, max_results=num_results)
 
         # 4. Live Web Search Engine (DuckDuckGo)
         try:
-            live_results = self._search_duckduckgo(query_clean, num_results=num_results)
+            live_results = self._search_duckduckgo(query_clean, num_results=num_results * 2)
             if live_results:
-                return live_results[:num_results]
+                return self._deduplicate_candidates(live_results, max_results=num_results)
         except Exception as e:
             logger.warning(f"Web search engine exception: {e}")
 
         # 5. Verified Real Industrial Enterprise Directory Fallback
-        return self._generate_fallback_candidates(query_clean, num_results=num_results)
+        fallback = self._generate_fallback_candidates(query_clean, num_results=num_results * 2)
+        return self._deduplicate_candidates(fallback, max_results=num_results)
 
     def _search_via_serpapi(self, query: str, num_results: int = 6) -> list[dict]:
         """Queries SerpAPI (Google Search API) for real-time live web search results."""
@@ -176,10 +205,8 @@ class WebSearchProvider:
         return []
 
     def _search_via_gemini(self, query: str, num_results: int = 6) -> list[dict]:
-        """Queries Gemini LLM for verified real manufacturing enterprises and buyers with official sites."""
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
-        if not api_key:
-            return []
+        """Queries AI Gateway (Google Gemini 2.5 Flash with OpenAI gpt-4o-mini Cloud Failover) for verified companies."""
+        from apps.ai_search.services.ai_gateway import AIFailoverGateway
 
         prompt = f"""
 You are an expert B2B Industrial Intelligence Engine.
@@ -187,7 +214,7 @@ Find {num_results} REAL, GENUINE, VERIFIED industrial companies matching the com
 Every single company MUST be an actual existing corporate enterprise with their REAL official website domain.
 Do NOT fabricate domains or companies. Only output real registered businesses.
 
-Output ONLY a raw JSON array of objects (no markdown, no backticks):
+Output a raw JSON array of objects (no markdown, no backticks):
 [
   {{
     "title": "Exact Company Name",
@@ -200,38 +227,33 @@ Output ONLY a raw JSON array of objects (no markdown, no backticks):
   }}
 ]
 """
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 600},
-        }
+        parsed, telemetry = AIFailoverGateway.generate(
+            prompt=prompt,
+            system_instruction="You are an expert B2B Industrial Intelligence Engine. Output ONLY a raw JSON array of verified industrial companies.",
+            temperature=0.1,
+            max_tokens=650,
+            timeout=4.5,
+        )
 
-        try:
-            resp = requests.post(endpoint, json=payload, timeout=4.5)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                clean_json = raw_text.strip().replace("```json", "").replace("```", "").strip()
-                parsed = json.loads(clean_json)
-                candidates = []
-                for item in parsed:
-                    url = item.get("url", "").strip()
-                    if url and url.startswith("http"):
-                        candidates.append({
-                            "title": item.get("title", "Industrial Partner").strip(),
-                            "url": url,
-                            "snippet": item.get("snippet", "").strip(),
-                            "city": item.get("city", "").strip(),
-                            "state": item.get("state", "").strip(),
-                            "phone": item.get("phone", "").strip(),
-                            "email": item.get("email", "").strip(),
-                        })
-                if candidates:
-                    return candidates
-        except Exception as e:
-            logger.debug(f"Gemini candidate discovery exception: {e}")
+        if not parsed:
+            return []
 
-        return []
+        items = parsed if isinstance(parsed, list) else (parsed.get("companies") or parsed.get("results") or [parsed])
+        candidates = []
+        for item in items:
+            if isinstance(item, dict):
+                url = item.get("url", "").strip()
+                if url and url.startswith("http"):
+                    candidates.append({
+                        "title": item.get("title", "Industrial Partner").strip(),
+                        "url": url,
+                        "snippet": item.get("snippet", "").strip(),
+                        "city": item.get("city", "").strip(),
+                        "state": item.get("state", "").strip(),
+                        "phone": item.get("phone", "").strip(),
+                        "email": item.get("email", "").strip(),
+                    })
+        return candidates
 
     def _search_duckduckgo(self, query: str, num_results: int = 6) -> list[dict]:
         """Queries DuckDuckGo HTML endpoint and extracts real external URLs and snippets."""

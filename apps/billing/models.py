@@ -63,6 +63,7 @@ class Subscription(models.Model):
     class Status(models.TextChoices):
         TRIAL = "trial", "Trial"
         ACTIVE = "active", "Active"
+        PAUSED = "paused", "Paused"
         PAST_DUE = "past_due", "Past Due"
         EXPIRED = "expired", "Expired"
         SUSPENDED = "suspended", "Suspended"

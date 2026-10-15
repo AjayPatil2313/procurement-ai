@@ -1,0 +1,92 @@
+<!-- ======================================================== -->
+<!-- GLOBAL ENTERPRISE ACTION LOADER MODAL -->
+<!-- ======================================================== -->
+<div 
+  id="admin_action_loader_modal" 
+  class="fixed inset-0 z-[9999] hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md transition-all duration-300"
+  role="dialog"
+  aria-modal="true"
+>
+  <style>
+    @keyframes admin-spin-ring {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes admin-pulse-core {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+    .admin-spin-ring {
+      animation: admin-spin-ring 2.5s linear infinite;
+    }
+    .admin-pulse-core {
+      animation: admin-pulse-core 2s ease-in-out infinite;
+    }
+  </style>
+
+  <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden p-6 sm:p-8 text-center animate-in fade-in zoom-in-95 duration-200">
+    
+    <!-- Ambient Blue/Purple Glow -->
+    <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-gradient-to-tr from-blue-600/25 via-indigo-500/20 to-purple-500/25 rounded-full blur-3xl pointer-events-none"></div>
+
+    <!-- Spinner Orb -->
+    <div class="relative w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+      <!-- Outer spinning gradient border -->
+      <div class="absolute inset-0 rounded-full border-2 border-t-blue-600 border-r-indigo-500 border-b-transparent border-l-transparent admin-spin-ring"></div>
+      <div class="absolute inset-2 rounded-full border border-dashed border-slate-300"></div>
+      <!-- Center Orb Icon -->
+      <div class="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-lg shadow-lg shadow-blue-500/30 admin-pulse-core">
+        <i class="fa-solid fa-gear fa-spin" style="--fa-animation-duration: 4s;"></i>
+      </div>
+      <!-- Live Ping Indicator -->
+      <span class="absolute top-0 right-0 flex h-3.5 w-3.5">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-600"></span>
+      </span>
+    </div>
+
+    <!-- Message -->
+    <h3 class="text-base font-bold text-slate-900 tracking-tight" id="admin_loader_message">
+      Processing Request...
+    </h3>
+    <p class="text-xs text-slate-500 mt-1" id="admin_loader_submessage">
+      Executing secure platform operations &amp; audit logging. Please do not refresh.
+    </p>
+
+    <!-- Progress line -->
+    <div class="w-full bg-slate-100 rounded-full h-1 mt-5 overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 h-1 rounded-full animate-pulse w-3/4 mx-auto"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.showActionLoader = function(message, submessage) {
+  const modal = document.getElementById('admin_action_loader_modal');
+  if (!modal) return;
+  const msgEl = document.getElementById('admin_loader_message');
+  const subEl = document.getElementById('admin_loader_submessage');
+  if (msgEl && message) msgEl.textContent = message;
+  if (subEl && submessage) subEl.textContent = submessage;
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+};
+
+window.hideActionLoader = function() {
+  const modal = document.getElementById('admin_action_loader_modal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+};
+
+// Auto-bind to forms with [data-loader-msg]
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('form[data-loader-msg]').forEach(function(form) {
+    form.addEventListener('submit', function() {
+      const msg = form.getAttribute('data-loader-msg') || 'Processing action...';
+      const sub = form.getAttribute('data-loader-sub') || 'Executing secure platform operations...';
+      window.showActionLoader(msg, sub);
+    });
+  });
+});
+</script>

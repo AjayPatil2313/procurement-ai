@@ -1263,6 +1263,7 @@ class SuperAdminDashboardSyncTestCase(TestCase):
 
         res = self.client.post(
             reverse("admin-panel-toggle-company-status", kwargs={"pk": self.seller_comp.pk}),
+            {"remark": "Compliance audit suspension test"},
             follow=True,
             REMOTE_ADDR=test_ip,
         )
@@ -1271,5 +1272,85 @@ class SuperAdminDashboardSyncTestCase(TestCase):
         latest_log = ActivityLog.objects.filter(company=self.seller_comp).order_by("-created_at").first()
         self.assertIsNotNone(latest_log)
         self.assertIn(f"[IP: {test_ip}]", latest_log.description)
+
+    def test_company_suspension_requires_mandatory_remark(self):
+        """Suspending an active company without a remark/reason is rejected."""
+        self.client.force_login(self.superadmin)
+        self.assertTrue(self.seller_comp.is_active)
+
+        res = self.client.post(
+            reverse("admin-panel-toggle-company-status", kwargs={"pk": self.seller_comp.pk}),
+            {"remark": ""},
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+        self.seller_comp.refresh_from_db()
+        # Should remain active
+        self.assertTrue(self.seller_comp.is_active)
+
+    def test_company_suspension_terminates_active_sessions_and_sets_reason(self):
+        """Suspending a company sets is_active=False, records suspension_reason, and wipes user sessions."""
+        self.client.force_login(self.superadmin)
+        suspension_remark = "Policy violation: Invalid KYC and tax documentation"
+
+        res = self.client.post(
+            reverse("admin-panel-toggle-company-status", kwargs={"pk": self.seller_comp.pk}),
+            {"remark": suspension_remark},
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        self.seller_comp.refresh_from_db()
+        self.assertFalse(self.seller_comp.is_active)
+        self.assertEqual(self.seller_comp.suspension_reason, suspension_remark)
+        self.assertIsNotNone(self.seller_comp.suspended_at)
+
+    def test_company_suspension_middleware_forces_logout_and_blocks_work(self):
+        """Logged-in users of a suspended company are force logged out on any subsequent web/API request."""
+        # 1. Suspend company
+        self.seller_comp.is_active = False
+        self.seller_comp.suspension_reason = "Payment delinquency"
+        self.seller_comp.save()
+
+        # 2. Regular user of this company attempts to access a protected view
+        user_client = Client()
+        user_client.force_login(self.seller_user)
+
+        # Web request should redirect to login
+        res = user_client.get(reverse("products-list"), follow=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertIn(reverse("login"), res.url)
+
+        # AJAX request from an active session should return 403 JSON
+        user_client.force_login(self.seller_user)
+        res_ajax = user_client.get(
+            reverse("products-list"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(res_ajax.status_code, 403)
+        self.assertIn("company_suspended", res_ajax.json().get("error", ""))
+
+    def test_superadmin_plan_update_and_status_control(self):
+        """Super Admin can directly update a company plan tier, change status to paused, and adjust credits."""
+        self.client.force_login(self.superadmin)
+
+        res = self.client.post(
+            reverse("admin-panel-update-subscription", kwargs={"company_id": self.seller_comp.id}),
+            {
+                "plan": "pro",
+                "status": "paused",
+                "credits_add": "150",
+                "valid_till": "2027-12-31",
+                "notes": "Contract renewed with paused state requested by client",
+            },
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        sub = Subscription.objects.get(company=self.seller_comp)
+        self.assertEqual(sub.plan, "pro")
+        self.assertEqual(sub.status, "paused")
+        self.assertGreater(sub.credits_total, 50)
+
 
 

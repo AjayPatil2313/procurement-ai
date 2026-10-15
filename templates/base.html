@@ -81,49 +81,37 @@
           </div>
           <div class="space-y-0.5">
             {% if rbac.buyer_modules.my_requirements != False %}
-            <a href="{% url 'requirements-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/requirements/' or '/procurement/requirements/' in request.path %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-cart-plus w-5 text-center mr-2.5 text-xs"></i> Add Product
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'requirements-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/requirements/' or '/procurement/requirements/' in request.path %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-cart-plus w-5 text-center text-xs"></i>
+              <span>Add Product</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.find_suppliers != False %}
-            <a href="{% url 'find-suppliers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/find-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-magnifying-glass-chart w-5 text-center mr-2.5 text-xs"></i> Find Customers
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'find-suppliers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/find-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-magnifying-glass-chart w-5 text-center text-xs"></i>
+              <span>Find Customers</span>
             </a>
-            <a href="{% url 'customers-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/customers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-users-viewfinder w-5 text-center mr-2.5 text-xs"></i> Customer list
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'customers-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/customers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-users-viewfinder w-5 text-center text-xs"></i>
+              <span>Customer list</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.saved_suppliers != False %}
-            <a href="{% url 'saved-suppliers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/saved-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Prequalified Customers
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'saved-suppliers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/saved-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-regular fa-bookmark w-5 text-center text-xs"></i>
+              <span>Prequalified Customers</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.inquiries != False %}
-            <a href="{% url 'inquiries-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-regular fa-paper-plane w-5 text-center mr-2.5 text-xs"></i> Inquiries
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'inquiries-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-regular fa-paper-plane w-5 text-center text-xs"></i>
+              <span>Inquiries</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.export_reports != False %}
-            <a href="{% url 'export-reports' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/export-reports/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-download w-5 text-center mr-2.5 text-xs"></i> Export Reports
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'export-reports' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/export-reports/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-download w-5 text-center text-xs"></i>
+              <span>Export Reports</span>
             </a>
             {% endif %}
           </div>
@@ -139,51 +127,39 @@
           </div>
           <div class="space-y-0.5">
             {% if rbac.seller_modules.my_products != False %}
-            <a href="{% url 'products-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/products/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-clipboard-list w-5 text-center mr-2.5 text-xs"></i> Add Requirement
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'products-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/products/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-clipboard-list w-5 text-center text-xs"></i>
+              <span>Add Requirement</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.find_buyers != False %}
-            <a href="{% url 'find-buyers' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/find-buyers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-crosshairs w-5 text-center mr-2.5 text-xs"></i> Find vendors
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'find-buyers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/find-buyers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-crosshairs w-5 text-center text-xs"></i>
+              <span>Find vendors</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.buyer_leads != False %}
-            <a href="{% url 'leads-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-users-viewfinder w-5 text-center mr-2.5 text-xs"></i> Vendor list
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'leads-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-users-viewfinder w-5 text-center text-xs"></i>
+              <span>Vendor list</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.saved_buyers != False %}
-            <a href="{% url 'saved-leads' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/saved-leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-regular fa-bookmark w-5 text-center mr-2.5 text-xs"></i> Prequalified Vendors
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'saved-leads' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/saved-leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-regular fa-bookmark w-5 text-center text-xs"></i>
+              <span>Prequalified Vendors</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.seller_inquiries != False %}
-            <a href="{% url 'sales-inquiries-list' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-regular fa-paper-plane w-5 text-center mr-2.5 text-xs"></i> Inquiries
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'sales-inquiries-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-regular fa-paper-plane w-5 text-center text-xs"></i>
+              <span>Inquiries</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.seller_export_reports != False %}
-            <a href="{% url 'sales-export-reports' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/export-reports/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-download w-5 text-center mr-2.5 text-xs"></i> Export Reports
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'sales-export-reports' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/export-reports/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-download w-5 text-center text-xs"></i>
+              <span>Export Reports</span>
             </a>
             {% endif %}
           </div>
@@ -199,46 +175,34 @@
           <div class="space-y-0.5">
             <!-- User Management & Roles: visible to Company Admin -->
             {% if rbac.is_company_admin %}
-            <a href="{% url 'company-team-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/team/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-users-gear w-5 text-center mr-2.5 text-xs"></i> User Management
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'company-team-web' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/team/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-users-gear w-5 text-center text-xs"></i>
+              <span>User Management</span>
             </a>
-            <a href="{% url 'company-roles-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/roles/' or request.path == '/sales/roles/' or '/roles/' in request.path %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-user-shield w-5 text-center mr-2.5 text-xs text-indigo-400"></i> Roles &amp; Responsibilities
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'company-roles-web' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/roles/' or request.path == '/sales/roles/' or '/roles/' in request.path %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-user-shield w-5 text-center text-xs text-indigo-400"></i>
+              <span>Roles &amp; Responsibilities</span>
             </a>
             {% endif %}
 
-            <a href="{% url 'subscription-billing-web' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/billing/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-coins w-5 text-center mr-2.5 text-xs text-amber-400"></i> Subscription &amp; Credits
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'subscription-billing-web' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/billing/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-coins w-5 text-center text-xs text-amber-400"></i>
+              <span>Subscription &amp; Credits</span>
             </a>
 
-            <a href="{% url 'company-invoices' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/invoices/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-file-invoice-dollar w-5 text-center mr-2.5 text-xs text-emerald-400"></i> Invoices &amp; Billing
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'company-invoices' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/invoices/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-file-invoice-dollar w-5 text-center text-xs text-emerald-400"></i>
+              <span>Invoices &amp; Billing</span>
             </a>
 
-            <a href="{% url 'company-credit-ledger' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/credit-ledger/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-receipt w-5 text-center mr-2.5 text-xs text-amber-400"></i> Credit Ledger
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'company-credit-ledger' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/credit-ledger/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-receipt w-5 text-center text-xs text-amber-400"></i>
+              <span>Credit Ledger</span>
             </a>
 
-            <a href="{% url 'user-notification-preferences' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/notification-preferences/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <span class="flex items-center">
-                <i class="fa-solid fa-bell w-5 text-center mr-2.5 text-xs text-blue-400"></i> Notifications
-              </span>
-              <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+            <a href="{% url 'user-notification-preferences' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/notification-preferences/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <i class="fa-solid fa-bell w-5 text-center text-xs text-blue-400"></i>
+              <span>Notifications</span>
             </a>
           </div>
         </div>
@@ -272,23 +236,17 @@
               <i class="fa-solid fa-chevron-right text-[9px] text-slate-500 transition-transform duration-200 group-open:rotate-90"></i>
             </summary>
             <div class="mt-1 space-y-0.5 pl-2 border-l border-slate-800 ml-3">
-              <a href="{% url 'admin-panel-dashboard' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-gauge-high w-4 text-center mr-2 text-[11px] text-red-400"></i> Dashboard
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-dashboard' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-gauge-high w-4 text-center text-[11px] text-red-400"></i>
+                <span>Dashboard</span>
               </a>
-              <a href="{% url 'admin-panel-search-activity' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/search-activity/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-magnifying-glass-chart w-4 text-center mr-2 text-[11px] text-cyan-400"></i> AI Search Ops
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-search-activity' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/search-activity/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-magnifying-glass-chart w-4 text-center text-[11px] text-cyan-400"></i>
+                <span>AI Search Ops</span>
               </a>
-              <a href="{% url 'admin-panel-reports' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/reports/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-file-arrow-down w-4 text-center mr-2 text-[11px] text-emerald-400"></i> Reports &amp; Exports
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-reports' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/reports/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-file-arrow-down w-4 text-center text-[11px] text-emerald-400"></i>
+                <span>Reports &amp; Exports</span>
               </a>
             </div>
           </details>
@@ -302,29 +260,21 @@
               <i class="fa-solid fa-chevron-right text-[9px] text-slate-500 transition-transform duration-200 group-open:rotate-90"></i>
             </summary>
             <div class="mt-1 space-y-0.5 pl-2 border-l border-slate-800 ml-3">
-              <a href="{% url 'admin-panel-companies' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if '/admin-panel/companies/' in request.path %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-sitemap w-4 text-center mr-2 text-[11px] text-blue-400"></i> All Companies
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-companies' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if '/admin-panel/companies/' in request.path %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-sitemap w-4 text-center text-[11px] text-blue-400"></i>
+                <span>All Companies</span>
               </a>
-              <a href="{% url 'admin-panel-users' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/users/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-users w-4 text-center mr-2 text-[11px] text-purple-400"></i> Platform Users
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-users' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/users/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-users w-4 text-center text-[11px] text-purple-400"></i>
+                <span>Platform Users</span>
               </a>
-              <a href="{% url 'admin-panel-roles' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/roles/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-user-shield w-4 text-center mr-2 text-[11px] text-indigo-400"></i> Roles &amp; Matrix
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-roles' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/roles/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-user-shield w-4 text-center text-[11px] text-indigo-400"></i>
+                <span>Roles &amp; Matrix</span>
               </a>
-              <a href="{% url 'admin-panel-support' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if '/admin-panel/support/' in request.path or request.path == '/help/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-headset w-4 text-center mr-2 text-[11px] text-rose-400"></i> Help &amp; Support
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-support' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if '/admin-panel/support/' in request.path or request.path == '/help/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-headset w-4 text-center text-[11px] text-rose-400"></i>
+                <span>Help &amp; Support</span>
               </a>
             </div>
           </details>
@@ -338,23 +288,17 @@
               <i class="fa-solid fa-chevron-right text-[9px] text-slate-500 transition-transform duration-200 group-open:rotate-90"></i>
             </summary>
             <div class="mt-1 space-y-0.5 pl-2 border-l border-slate-800 ml-3">
-              <a href="{% url 'admin-panel-products' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/products/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-box-open w-4 text-center mr-2 text-[11px] text-emerald-400"></i> Catalog Products
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-products' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/products/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-box-open w-4 text-center text-[11px] text-emerald-400"></i>
+                <span>Catalog Products</span>
               </a>
-              <a href="{% url 'admin-panel-requirements' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/requirements/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-clipboard-list w-4 text-center mr-2 text-[11px] text-amber-400"></i> Sourcing RFQs
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-requirements' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/requirements/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-clipboard-list w-4 text-center text-[11px] text-amber-400"></i>
+                <span>Sourcing RFQs</span>
               </a>
-              <a href="{% url 'admin-panel-inquiries' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/inquiries/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-paper-plane w-4 text-center mr-2 text-[11px] text-blue-400"></i> Inquiries &amp; Quotes
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-inquiries' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/inquiries/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-paper-plane w-4 text-center text-[11px] text-blue-400"></i>
+                <span>Inquiries &amp; Quotes</span>
               </a>
             </div>
           </details>
@@ -368,23 +312,17 @@
               <i class="fa-solid fa-chevron-right text-[9px] text-slate-500 transition-transform duration-200 group-open:rotate-90"></i>
             </summary>
             <div class="mt-1 space-y-0.5 pl-2 border-l border-slate-800 ml-3">
-              <a href="{% url 'admin-panel-wallets' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/billing/wallets/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-wallet w-4 text-center mr-2 text-[11px] text-emerald-400"></i> Company Wallets
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-wallets' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/billing/wallets/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-wallet w-4 text-center mr-1 text-[11px] text-emerald-400"></i>
+                <span>Company Wallets</span>
               </a>
-              <a href="{% url 'admin-panel-transactions' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/transactions/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-file-invoice-dollar w-4 text-center mr-2 text-[11px] text-teal-400"></i> Transactions Ledger
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-transactions' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/transactions/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-file-invoice-dollar w-4 text-center mr-1 text-[11px] text-teal-400"></i>
+                <span>Transactions Ledger</span>
               </a>
-              <a href="{% url 'admin-panel-plans' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/plans/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-credit-card w-4 text-center mr-2 text-[11px] text-amber-400"></i> Plans &amp; Credits
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-plans' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/plans/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-credit-card w-4 text-center mr-1 text-[11px] text-amber-400"></i>
+                <span>Plans &amp; Credits</span>
               </a>
             </div>
           </details>
@@ -398,17 +336,13 @@
               <i class="fa-solid fa-chevron-right text-[9px] text-slate-500 transition-transform duration-200 group-open:rotate-90"></i>
             </summary>
             <div class="mt-1 space-y-0.5 pl-2 border-l border-slate-800 ml-3">
-              <a href="{% url 'admin-panel-ai-providers' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/ai-providers/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-wand-magic-sparkles w-4 text-center mr-2 text-[11px] text-purple-400"></i> AI Engines
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-ai-providers' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/ai-providers/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-wand-magic-sparkles w-4 text-center mr-1 text-[11px] text-purple-400"></i>
+                <span>AI Engines</span>
               </a>
-              <a href="{% url 'admin-panel-matching-criteria' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/matching-criteria/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-sliders w-4 text-center mr-2 text-[11px] text-sky-400"></i> Matching Criteria
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-matching-criteria' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/matching-criteria/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-sliders w-4 text-center mr-1 text-[11px] text-sky-400"></i>
+                <span>Matching Criteria</span>
               </a>
             </div>
           </details>
@@ -422,53 +356,37 @@
               <i class="fa-solid fa-chevron-right text-[9px] text-slate-500 transition-transform duration-200 group-open:rotate-90"></i>
             </summary>
             <div class="mt-1 space-y-0.5 pl-2 border-l border-slate-800 ml-3">
-              <a href="{% url 'admin-panel-modules' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/modules/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-cubes w-4 text-center mr-2 text-[11px] text-indigo-400"></i> Modules Manager
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-modules' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/modules/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-cubes w-4 text-center mr-1 text-[11px] text-indigo-400"></i>
+                <span>Modules Manager</span>
               </a>
-              <a href="{% url 'admin-panel-buyer-dashboard' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/buyer-dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-cart-shopping w-4 text-center mr-2 text-[11px] text-blue-400"></i> Sales UI Layout
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-buyer-dashboard' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/buyer-dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-cart-shopping w-4 text-center mr-1 text-[11px] text-blue-400"></i>
+                <span>Sales UI Layout</span>
               </a>
-              <a href="{% url 'admin-panel-seller-dashboard' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/seller-dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-bullhorn w-4 text-center mr-2 text-[11px] text-emerald-400"></i> Vendor UI Layout
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-seller-dashboard' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/seller-dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-bullhorn w-4 text-center mr-1 text-[11px] text-emerald-400"></i>
+                <span>Vendor UI Layout</span>
               </a>
-              <a href="{% url 'admin-panel-both-dashboard' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/both-dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-arrows-split-up-and-left w-4 text-center mr-2 text-[11px] text-purple-400"></i> Hybrid Layout
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-both-dashboard' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/both-dashboard/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-arrows-split-up-and-left w-4 text-center mr-1 text-[11px] text-purple-400"></i>
+                <span>Hybrid Layout</span>
               </a>
-              <a href="{% url 'admin-panel-permissions' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/permissions/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-key w-4 text-center mr-2 text-[11px] text-indigo-400"></i> Permissions
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-permissions' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/permissions/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-key w-4 text-center mr-1 text-[11px] text-indigo-400"></i>
+                <span>Permissions</span>
               </a>
-              <a href="{% url 'admin-panel-email-overview' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if '/admin-panel/email/' in request.path %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-envelope w-4 text-center mr-2 text-[11px] text-blue-400"></i> Email Notifications
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-email-overview' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if '/admin-panel/email/' in request.path %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-envelope w-4 text-center mr-1 text-[11px] text-blue-400"></i>
+                <span>Email Notifications</span>
               </a>
-              <a href="{% url 'admin-panel-settings' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/settings/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-sliders w-4 text-center mr-2 text-[11px] text-rose-400"></i> Platform Settings
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-settings' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/settings/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-sliders w-4 text-center mr-1 text-[11px] text-rose-400"></i>
+                <span>Platform Settings</span>
               </a>
-              <a href="{% url 'admin-panel-auditlogs' %}" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/audit-logs/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-                <span class="flex items-center">
-                  <i class="fa-solid fa-clock-rotate-left w-4 text-center mr-2 text-[11px] text-purple-400"></i> Audit Trail
-                </span>
-                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+              <a href="{% url 'admin-panel-auditlogs' %}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition {% if request.path == '/admin-panel/audit-logs/' %}bg-red-600/20 text-red-400 font-semibold{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+                <i class="fa-solid fa-clock-rotate-left w-4 text-center mr-1 text-[11px] text-purple-400"></i>
+                <span>Audit Trail</span>
               </a>
             </div>
           </details>
@@ -479,11 +397,9 @@
       <!-- Sidebar Footer -->
       <div class="p-3 border-t border-slate-800 space-y-1 bg-slate-900/60 text-sm">
         {% if not rbac.is_super_admin %}
-        <a href="{% url 'help-support' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if request.path == '/help/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-          <span class="flex items-center">
-            <i class="fa-solid fa-headset w-5 text-center mr-2.5 text-xs text-blue-400"></i> Help &amp; Support
-          </span>
-          <i class="fa-solid fa-chevron-right text-[10px] text-slate-500"></i>
+        <a href="{% url 'help-support' %}" class="flex items-center px-3 py-2 rounded-lg text-sm transition {% if request.path == '/help/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+          <i class="fa-solid fa-headset w-5 text-center mr-2.5 text-xs text-blue-400"></i>
+          <span>Help &amp; Support</span>
         </a>
         {% endif %}
         <a href="{% url 'logout-web' %}" class="flex items-center px-3 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition">
@@ -1392,6 +1308,8 @@
 
   <!-- Real-Time Floating Toast Notifications Container -->
   <div id="toastNotificationContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2.5 pointer-events-none max-w-sm w-full"></div>
+
+  {% include "components/admin_action_loader_modal.html" %}
 
   {% block extra_scripts %}{% endblock %}
 </body>

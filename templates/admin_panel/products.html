@@ -23,9 +23,29 @@
     </div>
   </div>
 
+  <!-- Active Company Filter Pill (if selected) -->
+  {% if company_filter != 'all' %}
+  <div class="flex items-center justify-between p-3 bg-blue-50/80 border border-blue-200 rounded-2xl text-xs text-blue-900">
+    <div class="flex items-center gap-2">
+      <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+        <i class="fa-solid fa-building"></i>
+      </span>
+      <div>
+        <span class="text-[10px] text-blue-600 font-bold uppercase tracking-wider block">Filtered by Company</span>
+        <span class="font-bold text-slate-900">
+          {% for comp in all_companies %}{% if company_filter == comp.id|stringformat:"s" %}{{ comp.name }}{% endif %}{% endfor %}
+        </span>
+      </div>
+    </div>
+    <a href="{% url 'admin-panel-products' %}?q={{ q }}&availability={{ avail_filter }}" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-blue-700 hover:bg-blue-100 border border-blue-200 shadow-xs transition" title="Remove company filter">
+      <i class="fa-solid fa-xmark mr-1.5"></i> Clear Company Filter
+    </a>
+  </div>
+  {% endif %}
+
   <!-- Search & Filter Bar -->
   <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-3" onsubmit="if(window.showActionLoader){ window.showActionLoader('Applying Catalog Filters...', 'Fetching products matching criteria'); }">
       <!-- Search Input -->
       <div class="relative">
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
@@ -154,22 +174,17 @@
             <!-- Listed Date -->
             <td class="py-3.5 px-4 text-slate-500">{{ p.created_at|date:"M d, Y" }}</td>
 
-            <!-- Actions -->
+            <!-- Actions with Confirmation Modals -->
             <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
-              <form method="POST" action="" class="inline">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="toggle_deleted">
-                <input type="hidden" name="product_id" value="{{ p.id }}">
-                {% if p.is_deleted %}
-                  <button type="submit" class="inline-flex items-center px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold rounded-lg border border-emerald-200 transition cursor-pointer" title="Reactivate Product">
-                    <i class="fa-solid fa-eye mr-1 text-emerald-600"></i> Relist
-                  </button>
-                {% else %}
-                  <button type="submit" class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold rounded-lg border border-rose-200 transition cursor-pointer" title="Delist / Hide Product from Platform">
-                    <i class="fa-solid fa-eye-slash mr-1 text-rose-600"></i> Delist
-                  </button>
-                {% endif %}
-              </form>
+              {% if p.is_deleted %}
+                <button type="button" onclick="openRelistProductModal('{{ p.id }}', '{{ p.name|escapejs }}', '{{ p.sku|default:''|escapejs }}', '{% if p.company %}{{ p.company.name|escapejs }}{% endif %}')" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded-lg border border-emerald-200 transition cursor-pointer" title="Reactivate &amp; Relist Product">
+                  <i class="fa-solid fa-eye mr-1 text-emerald-600"></i> Relist
+                </button>
+              {% else %}
+                <button type="button" onclick="openDelistProductModal('{{ p.id }}', '{{ p.name|escapejs }}', '{{ p.sku|default:''|escapejs }}', '{% if p.company %}{{ p.company.name|escapejs }}{% endif %}')" class="inline-flex items-center px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold rounded-lg border border-rose-200 transition cursor-pointer" title="Delist / Hide Product from Platform">
+                  <i class="fa-solid fa-eye-slash mr-1 text-rose-600"></i> Delist
+                </button>
+              {% endif %}
             </td>
           </tr>
           {% empty %}
@@ -186,5 +201,138 @@
     {% include "admin_panel/includes/pagination.html" %}
   </div>
 
+  <!-- Delist Product Confirmation Modal -->
+  <div id="delistProductModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl shadow-sm mb-4">
+          <i class="fa-solid fa-eye-slash"></i>
+        </div>
+
+        <h3 class="text-lg font-black text-slate-900 text-center">Delist Product from Catalog</h3>
+        <p class="text-xs text-slate-500 text-center mt-0.5">Commercial moderation &amp; compliance action</p>
+
+        <div class="mt-4 p-3.5 bg-rose-50/70 rounded-2xl border border-rose-200 space-y-1.5 text-xs text-left">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Product:</span>
+            <span id="delistModalProductName" class="font-bold text-slate-900">Product Name</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">SKU / Seller:</span>
+            <span id="delistModalProductMeta" class="font-semibold text-slate-700">SKU</span>
+          </div>
+        </div>
+
+        <form id="delistProductForm" method="POST" action="" class="mt-4 space-y-3.5" onsubmit="if(window.showActionLoader){ window.showActionLoader('Delisting product from platform...', 'Updating moderation records'); }">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="toggle_deleted">
+          <input type="hidden" name="product_id" id="delistModalProductId" value="">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">
+              Moderation Reason / Remark <span class="text-rose-600">*</span>
+            </label>
+            <textarea 
+              name="remark" 
+              id="delistModalRemark" 
+              rows="2" 
+              required 
+              placeholder="e.g. Inappropriate description, trademark dispute, out of compliance..." 
+              class="w-full p-3 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button type="button" onclick="closeDelistProductModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-eye-slash"></i>
+              <span>Confirm Delist</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Relist Product Confirmation Modal -->
+  <div id="relistProductModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto text-2xl shadow-sm mb-4">
+          <i class="fa-solid fa-eye"></i>
+        </div>
+
+        <h3 class="text-lg font-black text-slate-900 text-center">Relist Product</h3>
+        <p class="text-xs text-slate-500 text-center mt-0.5">Restore product to public catalog &amp; search</p>
+
+        <div class="mt-4 p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-1.5 text-xs text-left">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Product:</span>
+            <span id="relistModalProductName" class="font-bold text-slate-900">Product Name</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">Seller:</span>
+            <span id="relistModalProductMeta" class="font-semibold text-slate-700">Company</span>
+          </div>
+        </div>
+
+        <form id="relistProductForm" method="POST" action="" class="mt-4 space-y-3.5" onsubmit="if(window.showActionLoader){ window.showActionLoader('Relisting product...', 'Publishing product to live discovery catalog'); }">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="toggle_deleted">
+          <input type="hidden" name="product_id" id="relistModalProductId" value="">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">
+              Restoration Notes (Optional)
+            </label>
+            <input 
+              type="text" 
+              name="remark" 
+              id="relistModalRemark" 
+              placeholder="e.g. Compliance verified, listing updated" 
+              class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+            >
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button type="button" onclick="closeRelistProductModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-eye"></i>
+              <span>Relist Product</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+<script>
+function openDelistProductModal(productId, productName, sku, sellerName) {
+  document.getElementById('delistModalProductId').value = productId;
+  document.getElementById('delistModalProductName').textContent = productName;
+  document.getElementById('delistModalProductMeta').textContent = (sku ? 'SKU: ' + sku : '') + (sellerName ? ' • ' + sellerName : '');
+  document.getElementById('delistModalRemark').value = '';
+  document.getElementById('delistProductModal').classList.remove('hidden');
+}
+
+function closeDelistProductModal() {
+  document.getElementById('delistProductModal').classList.add('hidden');
+}
+
+function openRelistProductModal(productId, productName, sku, sellerName) {
+  document.getElementById('relistModalProductId').value = productId;
+  document.getElementById('relistModalProductName').textContent = productName;
+  document.getElementById('relistModalProductMeta').textContent = sellerName || 'Seller';
+  document.getElementById('relistModalRemark').value = '';
+  document.getElementById('relistProductModal').classList.remove('hidden');
+}
+
+function closeRelistProductModal() {
+  document.getElementById('relistProductModal').classList.add('hidden');
+}
+</script>
 {% endblock %}

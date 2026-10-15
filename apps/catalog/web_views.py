@@ -818,18 +818,37 @@ def find_buyers_view(request):
     products = Product.objects.filter(company=company, is_deleted=False).order_by(Lower("name"))
     subscription = getattr(company, "subscription", None) if company else None
 
+    search_scope = request.POST.get("search_scope") or request.GET.get("search_scope") or "national"
+    if search_scope not in ["local", "national", "global"]:
+        search_scope = "national"
+
     # Handle save_criteria action (standalone or AJAX)
     if request.method == "POST" and request.POST.get("action") == "save_criteria":
         active_params = _sync_company_matching_criteria(company, request.POST)
+        prod_id = request.POST.get("product_id")
+        has_db_results = False
+        db_count = 0
+        if prod_id and prod_id.isdigit():
+            db_count = SearchResult.objects.filter(
+                search_job__company=company,
+                result_type=SearchResult.ResultType.LEAD,
+                search_job__product_id=int(prod_id)
+            ).count()
+            has_db_results = db_count > 0
+
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({
                 "success": True,
                 "active_count": len(active_params),
-                "message": f"Successfully updated and applied {len(active_params)} matching parameters.",
+                "has_db_results": has_db_results,
+                "db_count": db_count,
+                "message": f"Criteria saved! Displaying {db_count} matching leads from database." if has_db_results else f"Criteria saved! No leads found in database yet. Launch AI search to discover.",
             })
-        messages.success(request, f"Updated and applied {len(active_params)} matching parameters.")
-        prod_id = request.POST.get("product_id")
-        return redirect(f"{reverse('find-buyers')}?product_id={prod_id}" if prod_id else reverse('find-buyers'))
+        if has_db_results:
+            messages.success(request, f"Criteria saved! Displaying {db_count} matching leads directly from database.")
+        else:
+            messages.info(request, f"Criteria saved! No existing leads in database for this product yet. Click 'Launch AI Vendor Search' to discover.")
+        return redirect(f"{reverse('find-buyers')}?product_id={prod_id}&search_scope={search_scope}" if prod_id else f"{reverse('find-buyers')}?search_scope={search_scope}")
 
     # Handle search initiation via POST or GET ?run_search=1
     if request.method == "POST" and request.POST.get("action") == "run_search":
@@ -848,7 +867,7 @@ def find_buyers_view(request):
                     f"and AI credits exhausted ({subscription.credits_used if subscription else 0}/{subscription.credits_total if subscription else 0}). "
                     f"Please recharge your company wallet to proceed."
                 )
-                return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
+                return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}&search_scope={search_scope}")
 
             # If payload has criteria fields, sync them
             if request.POST.get("has_criteria_payload") == "1":
@@ -856,7 +875,7 @@ def find_buyers_view(request):
             else:
                 active_params = list(MatchingParameter.objects.filter(company=company, is_active=True))
 
-            job = run_find_buyers_search(target_prod, request.user, company, criteria_override=active_params)
+            job = run_find_buyers_search(target_prod, request.user, company, criteria_override=active_params, search_scope=search_scope)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
                 try:
@@ -884,7 +903,7 @@ def find_buyers_view(request):
                         context={
                             "query_title": target_prod.name,
                             "count": str(job.total_results),
-                            "cta_url": request.build_absolute_uri(f"{reverse('find-buyers')}?product_id={target_prod.id}"),
+                            "cta_url": request.build_absolute_uri(f"{reverse('find-buyers')}?product_id={target_prod.id}&search_scope={search_scope}"),
                             "details": {
                                 "Catalog Product": target_prod.name,
                                 "Buyer Leads Found": str(job.total_results),
@@ -895,10 +914,10 @@ def find_buyers_view(request):
                     )
                 except Exception:
                     pass
-            return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
+            return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}&search_scope={search_scope}")
         else:
             messages.error(request, "Please select a valid product to search for buyers.")
-            return redirect("find-buyers")
+            return redirect(f"{reverse('find-buyers')}?search_scope={search_scope}")
 
     product_id = request.GET.get("product_id")
     if request.GET.get("run_search") == "1" and product_id:
@@ -915,10 +934,10 @@ def find_buyers_view(request):
                     f"and AI credits exhausted ({subscription.credits_used if subscription else 0}/{subscription.credits_total if subscription else 0}). "
                     f"Please recharge your company wallet to proceed."
                 )
-                return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}")
+                return redirect(f"{reverse('find-buyers')}?product_id={target_prod.id}&search_scope={search_scope}")
 
             active_params = list(MatchingParameter.objects.filter(company=company, is_active=True))
-            job = run_find_buyers_search(target_prod, request.user, company, criteria_override=active_params)
+            job = run_find_buyers_search(target_prod, request.user, company, criteria_override=active_params, search_scope=search_scope)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
                 try:
@@ -971,12 +990,16 @@ def find_buyers_view(request):
         selected_product = Product.objects.filter(id=product_id, company=company, is_deleted=False).first()
         if selected_product:
             seen_company_ids = set()
+            seen_company_names = set()
             for lead in leads_qs:
                 cid = lead.external_company_id
-                if cid and cid in seen_company_ids:
+                cname = re.sub(r'[^a-z0-9]', '', (lead.external_company.name or '').lower()) if lead.external_company else ""
+                if (cid and cid in seen_company_ids) or (cname and cname in seen_company_names):
                     continue
                 if cid:
                     seen_company_ids.add(cid)
+                if cname:
+                    seen_company_names.add(cname)
                 leads.append(lead)
                 if len(leads) >= 40:
                     break
@@ -1024,6 +1047,8 @@ def find_buyers_view(request):
         "static_criteria_list": static_criteria_list,
         "custom_criteria_list": custom_criteria_list,
         "active_criteria_count": active_criteria_count,
+        "search_scope": search_scope,
+        "has_db_results": bool(leads),
         "page_title": "Find Buyers (AI Lead Engine)",
     })
 
@@ -1059,13 +1084,17 @@ def export_discovered_vendors_csv_view(request):
     saved_result_ids = set(SavedItem.objects.filter(company=company).values_list("search_result_id", flat=True)) if company else set()
 
     seen_company_ids = set()
+    seen_company_names = set()
     leads = []
     for lead in leads_qs:
         cid = lead.external_company_id
-        if cid and cid in seen_company_ids:
+        cname = re.sub(r'[^a-z0-9]', '', (lead.external_company.name or '').lower()) if lead.external_company else ""
+        if (cid and cid in seen_company_ids) or (cname and cname in seen_company_names):
             continue
         if cid:
             seen_company_ids.add(cid)
+        if cname:
+            seen_company_names.add(cname)
         leads.append(lead)
 
     response = HttpResponse(content_type="text/csv")

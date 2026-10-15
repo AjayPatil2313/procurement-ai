@@ -879,6 +879,38 @@ def find_suppliers_view(request):
     requirements = Requirement.objects.filter(company=company, is_deleted=False).order_by("-created_at")
     subscription = getattr(company, "subscription", None) if company else None
 
+    search_scope = request.POST.get("search_scope") or request.GET.get("search_scope") or "national"
+    if search_scope not in ["local", "national", "global"]:
+        search_scope = "national"
+
+    # Handle save_criteria action (standalone or AJAX)
+    if request.method == "POST" and request.POST.get("action") == "save_criteria":
+        active_params = _sync_company_matching_criteria(company, request.POST, domain="SALES")
+        req_id = request.POST.get("requirement_id")
+        has_db_results = False
+        db_count = 0
+        if req_id and req_id.isdigit():
+            db_count = SearchResult.objects.filter(
+                search_job__company=company,
+                result_type=SearchResult.ResultType.SUPPLIER,
+                search_job__requirement_id=int(req_id)
+            ).count()
+            has_db_results = db_count > 0
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "active_count": len(active_params),
+                "has_db_results": has_db_results,
+                "db_count": db_count,
+                "message": f"Criteria saved! Displaying {db_count} matching records from database." if has_db_results else f"Criteria saved! No records found in database yet. Launch AI search to discover.",
+            })
+        if has_db_results:
+            messages.success(request, f"Criteria saved! Displaying {db_count} matching customers/suppliers directly from database.")
+        else:
+            messages.info(request, f"Criteria saved! No existing records in database for this product yet. Click 'Launch AI Customer Search' to discover.")
+        return redirect(f"{reverse('find-suppliers')}?requirement_id={req_id}&search_scope={search_scope}" if req_id else f"{reverse('find-suppliers')}?search_scope={search_scope}")
+
     # Handle search initiation via POST or GET ?run_search=1
     if request.method == "POST" and request.POST.get("action") == "run_search":
         if request.POST.get("has_criteria_payload") == "1":
@@ -898,18 +930,18 @@ def find_suppliers_view(request):
                     f"and AI credits exhausted ({subscription.credits_used if subscription else 0}/{subscription.credits_total if subscription else 0}). "
                     f"Please recharge your company wallet to proceed."
                 )
-                return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
+                return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}&search_scope={search_scope}")
 
-            job = run_find_suppliers_search(target_req, request.user, company)
+            job = run_find_suppliers_search(target_req, request.user, company, search_scope=search_scope)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
             else:
                 deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
                 messages.success(request, f"Supplier discovery complete! Found {job.total_results} matching suppliers for '{target_req.item_name}'. ({deduction_notice})")
-            return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
+            return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}&search_scope={search_scope}")
         else:
             messages.error(request, "Please select an active requirement to find suppliers.")
-            return redirect("find-suppliers")
+            return redirect(f"{reverse('find-suppliers')}?search_scope={search_scope}")
 
     requirement_id = request.GET.get("requirement_id")
     if request.GET.get("run_search") == "1" and requirement_id:
@@ -926,9 +958,9 @@ def find_suppliers_view(request):
                     f"and AI credits exhausted ({subscription.credits_used if subscription else 0}/{subscription.credits_total if subscription else 0}). "
                     f"Please recharge your company wallet to proceed."
                 )
-                return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}")
+                return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}&search_scope={search_scope}")
 
-            job = run_find_suppliers_search(target_req, request.user, company)
+            job = run_find_suppliers_search(target_req, request.user, company, search_scope=search_scope)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
                 try:
@@ -979,7 +1011,21 @@ def find_suppliers_view(request):
         selected_requirement = Requirement.objects.filter(id=requirement_id, company=company, is_deleted=False).first()
         if selected_requirement:
             results_qs = results_qs.filter(search_job__requirement=selected_requirement)
-            results = list(results_qs[:50])
+            seen_company_ids = set()
+            seen_company_names = set()
+            results = []
+            for r in results_qs:
+                cid = r.external_company_id
+                cname = re.sub(r'[^a-z0-9]', '', (r.external_company.name or '').lower()) if r.external_company else ""
+                if (cid and cid in seen_company_ids) or (cname and cname in seen_company_names):
+                    continue
+                if cid:
+                    seen_company_ids.add(cid)
+                if cname:
+                    seen_company_names.add(cname)
+                results.append(r)
+                if len(results) >= 50:
+                    break
         else:
             results = []
     else:
@@ -1032,6 +1078,8 @@ def find_suppliers_view(request):
         "static_criteria_list": static_criteria_list,
         "custom_criteria_list": custom_criteria_list,
         "active_criteria_count": active_criteria_count,
+        "search_scope": search_scope,
+        "has_db_results": bool(results),
         "company": company,
         "rbac": rbac,
         "page_title": f"Find Customers — {selected_requirement.item_name}" if selected_requirement else "Find Customers (AI Matching)",
@@ -1102,8 +1150,19 @@ def export_discovered_suppliers_csv_view(request):
         "Discovery Date",
     ])
 
+    seen_company_ids = set()
+    seen_company_names = set()
     for r in qs:
         ext = r.external_company
+        cid = r.external_company_id
+        cname = re.sub(r'[^a-z0-9]', '', (ext.name or '').lower()) if ext else ""
+        if (cid and cid in seen_company_ids) or (cname and cname in seen_company_names):
+            continue
+        if cid:
+            seen_company_ids.add(cid)
+        if cname:
+            seen_company_names.add(cname)
+
         req_obj = r.search_job.requirement if r.search_job else None
         writer.writerow([
             ext.name if ext else "Unknown",

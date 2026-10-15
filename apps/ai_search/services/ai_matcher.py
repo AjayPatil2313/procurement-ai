@@ -144,33 +144,18 @@ Respond ONLY with a valid JSON object with the following fields:
 }}
 """
 
-        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 450,
-            },
-        }
-        try:
-            resp = requests.post(endpoint, json=payload, timeout=4.5)
-            if resp.status_code != 200:
-                logger.warning(f"Gemini API returned status {resp.status_code}. Falling back.")
-                return None
-        except Exception as ex:
-            logger.warning(f"Gemini request error: {ex}. Falling back.")
+        from apps.ai_search.services.ai_gateway import AIFailoverGateway
+
+        parsed, telemetry = AIFailoverGateway.generate(
+            prompt=prompt,
+            system_instruction="You are an expert B2B Procurement and Sales Matchmaker. Analyze and output ONLY a valid JSON object.",
+            temperature=0.2,
+            max_tokens=450,
+            timeout=4.5,
+        )
+
+        if not parsed or not isinstance(parsed, dict):
             return None
-
-        data = resp.json()
-        candidates = data.get("candidates", [])
-        if not candidates:
-            return None
-
-        raw_text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        clean_json_str = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.I)
-        clean_json_str = re.sub(r"\s*```$", "", clean_json_str)
-
-        parsed = json.loads(clean_json_str)
 
         match_score = int(parsed.get("match_score", 85))
         match_score = min(98, max(70, match_score))

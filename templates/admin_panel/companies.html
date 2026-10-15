@@ -219,72 +219,114 @@
                 <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                   <i class="fa-solid fa-box-archive text-[9px] mr-1.5 text-rose-500"></i> Archived
                 </span>
+              {% elif c.is_active %}
+                <button type="button" onclick="openSuspendCompanyModal('{{ c.id }}', '{{ c.name|escapejs }}')" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-emerald-200 transition group cursor-pointer" title="Click to suspend company account (requires remark)">
+                  <i class="fa-solid fa-circle text-[8px] mr-1.5 text-emerald-500 group-hover:text-rose-500"></i>
+                  <span class="group-hover:hidden">Active</span>
+                  <span class="hidden group-hover:inline">Suspend</span>
+                </button>
               {% else %}
-                <form method="POST" action="{% url 'admin-panel-toggle-company-status' c.id %}" class="inline">
-                  {% csrf_token %}
-                  {% if c.is_active %}
-                    <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-emerald-200 transition group cursor-pointer" title="Click to suspend company account">
-                      <i class="fa-solid fa-circle text-[8px] mr-1.5 text-emerald-500 group-hover:text-rose-500"></i>
-                      <span class="group-hover:hidden">Active</span>
-                      <span class="hidden group-hover:inline">Suspend</span>
-                    </button>
-                  {% else %}
-                    <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-rose-200 transition group cursor-pointer" title="Click to activate company account">
-                      <i class="fa-solid fa-ban text-[9px] mr-1.5 text-rose-500 group-hover:text-emerald-500"></i>
-                      <span class="group-hover:hidden">Suspended</span>
-                      <span class="hidden group-hover:inline">Activate</span>
-                    </button>
-                  {% endif %}
-                </form>
+                <button type="button" onclick="openReactivateCompanyModal('{{ c.id }}', '{{ c.name|escapejs }}')" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-rose-200 transition group cursor-pointer" title="Click to reactivate company account">
+                  <i class="fa-solid fa-ban text-[9px] mr-1.5 text-rose-500 group-hover:text-emerald-500"></i>
+                  <span class="group-hover:hidden">Suspended</span>
+                  <span class="hidden group-hover:inline">Activate</span>
+                </button>
               {% endif %}
             </td>
 
             <!-- Created Date -->
             <td class="py-3.5 px-4 text-slate-500">{{ c.created_at|date:"M d, Y" }}</td>
 
-            <!-- Action Buttons: View, Edit Company, Plan, Type, Soft-Delete / Restore -->
-            <td class="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
-              <!-- View Dossier Link -->
-              <a href="{% url 'admin-panel-company-detail' c.id %}" class="inline-flex items-center px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 transition" title="View complete 360 data dossier">
-                <i class="fa-solid fa-eye mr-1 text-slate-500"></i> View
-              </a>
-
-              <!-- Edit Company Link -->
-              <a href="{% url 'admin-panel-company-edit' c.id %}" class="inline-flex items-center px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold rounded-lg border border-blue-200 transition" title="Edit company details and settings">
-                <i class="fa-solid fa-pen-to-square mr-1 text-blue-600"></i> Edit
-              </a>
-
-              <!-- Change Type Action Trigger -->
-              <button type="button" onclick="openChangeTypeModal('{{ c.id }}', '{{ c.name|escapejs }}', '{{ c.company_type }}')" class="inline-flex items-center px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-semibold rounded-lg border border-purple-200 transition cursor-pointer" title="Switch Operating Type (Buyer/Seller/Both)">
-                <i class="fa-solid fa-arrows-split-up-and-left mr-1 text-purple-600"></i> Type
-              </button>
-
-              <!-- Manage Plan Link -->
-              <a href="{% url 'admin-panel-plans' %}?q={{ c.name }}" class="inline-flex items-center px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold rounded-lg border border-amber-200 transition" title="Adjust credits or plan tier">
-                <i class="fa-solid fa-credit-card mr-1 text-amber-600"></i> Plan
-              </a>
-
-              {% if not c.is_deleted %}
-              <!-- 1-Click Workspace Impersonation -->
-              <a href="{% url 'admin-panel-impersonate-company' c.id %}" class="inline-flex items-center px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold rounded-lg border border-indigo-200 transition cursor-pointer" title="Enter workspace as {{ c.name }}">
-                <i class="fa-solid fa-arrow-up-right-from-square mr-1 text-indigo-600"></i> Workspace
-              </a>
-              {% endif %}
-
-              {% if c.is_deleted %}
-                <!-- Restore Company Action -->
-                <form method="POST" action="{% url 'admin-panel-company-restore' c.id %}" class="inline">
-                  {% csrf_token %}
-                  <button type="submit" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded-lg border border-emerald-200 transition cursor-pointer" title="Restore company from archive">
-                    <i class="fa-solid fa-rotate-left mr-1 text-emerald-600"></i> Restore
-                  </button>
-                </form>
-              {% else %}
-                <!-- Soft-Delete Company Trigger Modal -->
-                <button type="button" onclick="openSoftDeleteModal('{{ c.id }}', '{{ c.name|escapejs }}')" class="inline-flex items-center px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold rounded-lg border border-rose-200 transition cursor-pointer" title="Soft-delete (archive) company">
-                  <i class="fa-solid fa-trash-can text-rose-600"></i>
+            <!-- Action Column: 3-Dot Dropdown Menu -->
+            <td class="py-3.5 px-4 text-right whitespace-nowrap relative">
+              <div class="inline-block text-left" id="action-wrapper-{{ c.id }}">
+                <button 
+                  type="button" 
+                  onclick="toggleCompanyActionMenu('{{ c.id }}', event)" 
+                  class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200 inline-flex items-center justify-center transition shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer" 
+                  title="Company Actions Menu"
+                  aria-haspopup="true"
+                >
+                  <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
-              {% endif %}
+
+                <!-- Floating Dropdown Menu -->
+                <div 
+                  id="action-menu-{{ c.id }}" 
+                  class="hidden company-action-dropdown absolute right-4 mt-1.5 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-1.5 text-xs text-left divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100"
+                >
+                  <div class="py-1">
+                    <a href="{% url 'admin-panel-company-detail' c.id %}" class="flex items-center px-3.5 py-2 hover:bg-slate-50 text-slate-700 font-semibold transition">
+                      <i class="fa-solid fa-eye w-4 text-slate-400 mr-2.5 text-xs"></i> View 360 Dossier
+                    </a>
+                    <a href="{% url 'admin-panel-company-edit' c.id %}" class="flex items-center px-3.5 py-2 hover:bg-blue-50 text-blue-700 font-semibold transition">
+                      <i class="fa-solid fa-pen-to-square w-4 text-blue-500 mr-2.5 text-xs"></i> Edit Details
+                    </a>
+                    <a href="{% url 'admin-panel-products' %}?company_id={{ c.id }}" class="flex items-center px-3.5 py-2 hover:bg-emerald-50 text-emerald-800 font-semibold transition">
+                      <i class="fa-solid fa-box-open w-4 text-emerald-500 mr-2.5 text-xs"></i> View Catalog Products
+                    </a>
+                  </div>
+
+                  <div class="py-1">
+                    <button 
+                      type="button" 
+                      onclick="openCompanyPlanModal('{{ c.id }}', '{{ c.name|escapejs }}', '{% if c.subscription %}{{ c.subscription.plan }}{% else %}free{% endif %}', '{% if c.subscription %}{{ c.subscription.credits_total }}{% else %}0{% endif %}', '{% if c.subscription %}{{ c.subscription.credits_remaining }}{% else %}0{% endif %}', '{% if c.subscription and c.subscription.valid_till %}{{ c.subscription.valid_till|date:'Y-m-d' }}{% else %}{% endif %}', '{% if c.subscription %}{{ c.subscription.status }}{% else %}active{% endif %}')" 
+                      class="w-full flex items-center px-3.5 py-2 hover:bg-amber-50 text-amber-900 font-semibold transition text-left cursor-pointer"
+                    >
+                      <i class="fa-solid fa-credit-card w-4 text-amber-500 mr-2.5 text-xs"></i> Update Plan &amp; Status
+                    </button>
+                    <button 
+                      type="button" 
+                      onclick="openChangeTypeModal('{{ c.id }}', '{{ c.name|escapejs }}', '{{ c.company_type }}')" 
+                      class="w-full flex items-center px-3.5 py-2 hover:bg-purple-50 text-purple-700 font-semibold transition text-left cursor-pointer"
+                    >
+                      <i class="fa-solid fa-arrows-split-up-and-left w-4 text-purple-500 mr-2.5 text-xs"></i> Change Operating Type
+                    </button>
+                    {% if not c.is_deleted %}
+                    <a href="{% url 'admin-panel-impersonate-company' c.id %}" class="flex items-center px-3.5 py-2 hover:bg-indigo-50 text-indigo-700 font-semibold transition">
+                      <i class="fa-solid fa-arrow-up-right-from-square w-4 text-indigo-500 mr-2.5 text-xs"></i> Enter Workspace
+                    </a>
+                    {% endif %}
+                  </div>
+
+                  <div class="py-1">
+                    {% if not c.is_deleted %}
+                      {% if c.is_active %}
+                      <button 
+                        type="button" 
+                        onclick="openSuspendCompanyModal('{{ c.id }}', '{{ c.name|escapejs }}')" 
+                        class="w-full flex items-center px-3.5 py-2 hover:bg-rose-50 text-rose-700 font-bold transition text-left cursor-pointer"
+                      >
+                        <i class="fa-solid fa-ban w-4 text-rose-500 mr-2.5 text-xs"></i> Suspend Company
+                      </button>
+                      {% else %}
+                      <button 
+                        type="button" 
+                        onclick="openReactivateCompanyModal('{{ c.id }}', '{{ c.name|escapejs }}')" 
+                        class="w-full flex items-center px-3.5 py-2 hover:bg-emerald-50 text-emerald-700 font-bold transition text-left cursor-pointer"
+                      >
+                        <i class="fa-solid fa-building-circle-check w-4 text-emerald-600 mr-2.5 text-xs"></i> Reactivate Company
+                      </button>
+                      {% endif %}
+                      <button 
+                        type="button" 
+                        onclick="openSoftDeleteModal('{{ c.id }}', '{{ c.name|escapejs }}')" 
+                        class="w-full flex items-center px-3.5 py-2 hover:bg-rose-50 text-rose-600 font-medium transition text-left cursor-pointer"
+                      >
+                        <i class="fa-solid fa-box-archive w-4 text-rose-500 mr-2.5 text-xs"></i> Soft-Delete / Archive
+                      </button>
+                    {% else %}
+                      <button 
+                        type="button" 
+                        onclick="openRestoreCompanyModal('{{ c.id }}', '{{ c.name|escapejs }}')" 
+                        class="w-full flex items-center px-3.5 py-2 hover:bg-emerald-50 text-emerald-700 font-bold transition text-left cursor-pointer"
+                      >
+                        <i class="fa-solid fa-rotate-left w-4 text-emerald-600 mr-2.5 text-xs"></i> Restore Company
+                      </button>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
             </td>
           </tr>
           {% empty %}
@@ -465,10 +507,358 @@
     </div>
   </div>
 
+  <!-- Modern Suspend Company Modal (Mandatory Remark & Session Wipe) -->
+  <div id="suspendCompanyModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <!-- Warning Icon -->
+        <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl shadow-sm mb-4 relative">
+          <i class="fa-solid fa-ban"></i>
+          <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500"></span>
+          </span>
+        </div>
+
+        <h3 class="text-lg font-black text-slate-900 text-center">Suspend Company Account</h3>
+        <p class="text-xs text-slate-500 text-center mt-0.5">Mandatory governance action &amp; session termination</p>
+
+        <div class="mt-4 p-3.5 bg-rose-50/70 rounded-2xl border border-rose-200 space-y-2">
+          <div class="text-xs font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-building text-slate-500"></i>
+            <span id="suspendModalCompanyName" class="text-rose-950 font-black">Company Name</span>
+          </div>
+          <p class="text-[11px] text-rose-900 leading-relaxed">
+            <strong>Security Enforcement:</strong> Suspending this company will immediately terminate all active user sessions (forced logout), block all access to workspaces, and dispatch an official suspension email with the remark below to registered company administrators.
+          </p>
+        </div>
+
+        <form id="suspendCompanyForm" method="POST" action="" class="mt-4 space-y-3.5" onsubmit="if(window.showActionLoader){ window.showActionLoader('Suspending company account & terminating active sessions...', 'Notifying company administrators via email'); }">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">
+              Suspension Remark / Reason <span class="text-rose-600">*</span>
+            </label>
+            <textarea 
+              name="remark" 
+              id="suspendModalRemark" 
+              rows="3" 
+              required 
+              placeholder="Enter specific reason for suspension (e.g. Non-compliance, payment default, policy violation). This exact remark will be emailed to the company." 
+              class="w-full p-3 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none"
+            ></textarea>
+            <span class="text-[10px] text-slate-500 mt-1 block">
+              <i class="fa-solid fa-envelope text-blue-500 mr-1"></i> This remark will be formatted into the official suspension notice email sent to the company.
+            </span>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button type="button" onclick="closeSuspendCompanyModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-ban"></i>
+              <span>Suspend &amp; Logout</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modern Reactivate Company Modal -->
+  <div id="reactivateCompanyModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto text-2xl shadow-sm mb-4">
+          <i class="fa-solid fa-building-circle-check"></i>
+        </div>
+
+        <h3 class="text-lg font-black text-slate-900 text-center">Reactivate Company Account</h3>
+        <p class="text-xs text-slate-500 text-center mt-0.5">Restore platform access &amp; login credentials</p>
+
+        <div class="mt-4 p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-2">
+          <div class="text-xs font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-building text-slate-500"></i>
+            <span id="reactivateModalCompanyName" class="text-emerald-950 font-black">Company Name</span>
+          </div>
+          <p class="text-[11px] text-emerald-900 leading-relaxed">
+            Reactivating this company will restore all member logins, enable catalog management, and re-activate workspace APIs.
+          </p>
+        </div>
+
+        <form id="reactivateCompanyForm" method="POST" action="" class="mt-4 space-y-3.5" onsubmit="if(window.showActionLoader){ window.showActionLoader('Reactivating company account...', 'Updating company records & permissions'); }">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">
+              Reactivation Notes / Audit Remark
+            </label>
+            <textarea 
+              name="remark" 
+              id="reactivateModalRemark" 
+              rows="2" 
+              placeholder="Optional notes regarding compliance review or resolution..." 
+              class="w-full p-3 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button type="button" onclick="closeReactivateCompanyModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-check"></i>
+              <span>Reactivate Access</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modern Plan Update & Start/Stop Modal -->
+  <div id="companyPlanModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-base shadow-sm">
+              <i class="fa-solid fa-credit-card"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Manage Subscription &amp; Status</h3>
+              <p class="text-xs text-slate-500" id="planModalCompanyName">Target Company</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeCompanyPlanModal()" class="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <form id="companyPlanForm" method="POST" action="" class="space-y-4 text-xs" onsubmit="if(window.showActionLoader){ window.showActionLoader('Updating subscription plan & status...', 'Recording credit transactions and updating billing ledger'); }">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+          <!-- Plan Tier Selection -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Subscription Plan Tier</label>
+            <select name="plan" id="planModalSelect" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-1 focus:ring-amber-500">
+              {% for p in plans_catalog %}
+                <option value="{{ p.code }}">{{ p.name }} ({{ p.included_credits }} credits - {{ p.currency }} {{ p.price }})</option>
+              {% empty %}
+                <option value="free">Free Starter Plan (Default 50 credits)</option>
+                <option value="pro">Pro Plan (Default 200 credits)</option>
+                <option value="enterprise">Enterprise Plan (Unlimited / Custom)</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Start / Stop / Status Selection -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">
+              Plan Operating Status (Start / Stop Control)
+            </label>
+            <select name="status" id="planModalStatus" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-1 focus:ring-amber-500 font-bold">
+              <option value="active" class="text-emerald-700 font-bold">🟢 Active (Start / Running)</option>
+              <option value="paused" class="text-amber-700 font-bold">⏸️ Paused (Temporarily Stop Plan)</option>
+              <option value="trial" class="text-blue-700 font-bold">🔵 Trial Period</option>
+              <option value="suspended" class="text-rose-700 font-bold">⛔ Suspended (Lock Feature Access)</option>
+              <option value="cancelled" class="text-slate-700 font-bold">❌ Cancelled</option>
+            </select>
+            <span class="text-[10px] text-slate-400 mt-0.5 block">Setting to 'Paused' or 'Suspended' stops automated feature allocations.</span>
+          </div>
+
+          <!-- Adjust Credits & Valid Till -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Adjust Credits (+ / -)</label>
+              <input type="number" name="credits_add" id="planModalCreditsAdd" value="0" step="5" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-amber-500" placeholder="e.g. 50 or -10">
+              <span class="text-[10px] text-slate-400 mt-0.5 block">Pool balance adjustment</span>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Valid Till Date</label>
+              <input type="date" name="valid_till" id="planModalValidTill" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-amber-500">
+              <span class="text-[10px] text-slate-400 mt-0.5 block">Leave empty for lifetime</span>
+            </div>
+          </div>
+
+          <!-- Notes / Reason -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Mandatory Audit Reason / Remark <span class="text-rose-500">*</span></label>
+            <input type="text" name="notes" id="planModalNotes" required placeholder="e.g. Customer requested upgrade, plan pause per email, contract renewal" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-1 focus:ring-amber-500">
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <button type="button" onclick="closeCompanyPlanModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-check"></i>
+              <span>Save Plan Updates</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modern Restore Company Modal -->
+  <div id="restoreCompanyModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto text-2xl shadow-sm mb-4">
+          <i class="fa-solid fa-rotate-left"></i>
+        </div>
+        <h3 class="text-lg font-black text-slate-900">Restore Archived Company</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Unarchive company and restore all workspace data</p>
+
+        <div class="mt-4 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-left">
+          <div class="text-xs font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-building text-slate-400"></i>
+            <span id="restoreModalCompanyName" class="text-slate-900 font-bold">Company Name</span>
+          </div>
+          <p class="text-[11px] text-slate-600 mt-2">
+            Restoring this company will remove its soft-delete status and make all historical catalogs and requirements accessible again.
+          </p>
+        </div>
+
+        <form id="restoreCompanyForm" method="POST" action="" class="mt-5 flex items-center justify-end gap-3" onsubmit="if(window.showActionLoader){ window.showActionLoader('Restoring company from archive...', 'Rebuilding company catalogs and user access'); }">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="button" onclick="closeRestoreCompanyModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+            Cancel
+          </button>
+          <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>Confirm Restore</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
+// 3-Dot Action Menu Controller
+function toggleCompanyActionMenu(companyId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const targetMenu = document.getElementById(`action-menu-${companyId}`);
+  const allMenus = document.querySelectorAll('.company-action-dropdown');
+
+  // Close all other dropdowns
+  allMenus.forEach(menu => {
+    if (menu !== targetMenu) {
+      menu.classList.add('hidden');
+    }
+  });
+
+  if (targetMenu) {
+    targetMenu.classList.toggle('hidden');
+  }
+}
+
+// Global click-outside listener to close action dropdowns
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.inline-block')) {
+    document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
+  }
+});
+
+// Close dropdown on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
+  }
+});
+
+// Suspend Modal Controller
+function openSuspendCompanyModal(companyId, companyName) {
+  document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
+  const form = document.getElementById('suspendCompanyForm');
+  form.action = `/admin-panel/companies/${companyId}/toggle-status/`;
+  document.getElementById('suspendModalCompanyName').textContent = companyName;
+  document.getElementById('suspendModalRemark').value = '';
+  document.getElementById('suspendCompanyModal').classList.remove('hidden');
+}
+
+function closeSuspendCompanyModal() {
+  document.getElementById('suspendCompanyModal').classList.add('hidden');
+}
+
+// Reactivate Modal Controller
+function openReactivateCompanyModal(companyId, companyName) {
+  document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
+  const form = document.getElementById('reactivateCompanyForm');
+  form.action = `/admin-panel/companies/${companyId}/toggle-status/`;
+  document.getElementById('reactivateModalCompanyName').textContent = companyName;
+  document.getElementById('reactivateModalRemark').value = '';
+  document.getElementById('reactivateCompanyModal').classList.remove('hidden');
+}
+
+function closeReactivateCompanyModal() {
+  document.getElementById('reactivateCompanyModal').classList.add('hidden');
+}
+
+// Company Plan Modal Controller
+function openCompanyPlanModal(companyId, companyName, currentPlan, creditsTotal, creditsRemaining, validTill, currentStatus) {
+  document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
+  const form = document.getElementById('companyPlanForm');
+  form.action = `/admin-panel/plans/${companyId}/update/`;
+  document.getElementById('planModalCompanyName').textContent = companyName;
+
+  const planSelect = document.getElementById('planModalSelect');
+  if (planSelect) {
+    planSelect.value = currentPlan || 'free';
+  }
+
+  const statusSelect = document.getElementById('planModalStatus');
+  if (statusSelect) {
+    statusSelect.value = currentStatus || 'active';
+  }
+
+  const validTillInput = document.getElementById('planModalValidTill');
+  if (validTillInput) {
+    validTillInput.value = validTill || '';
+  }
+
+  const creditsInput = document.getElementById('planModalCreditsAdd');
+  if (creditsInput) {
+    creditsInput.value = '0';
+  }
+
+  const notesInput = document.getElementById('planModalNotes');
+  if (notesInput) {
+    notesInput.value = '';
+  }
+
+  document.getElementById('companyPlanModal').classList.remove('hidden');
+}
+
+function closeCompanyPlanModal() {
+  document.getElementById('companyPlanModal').classList.add('hidden');
+}
+
+// Restore Modal Controller
+function openRestoreCompanyModal(companyId, companyName) {
+  document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
+  const form = document.getElementById('restoreCompanyForm');
+  form.action = `/admin-panel/companies/${companyId}/restore/`;
+  document.getElementById('restoreModalCompanyName').textContent = companyName;
+  document.getElementById('restoreCompanyModal').classList.remove('hidden');
+}
+
+function closeRestoreCompanyModal() {
+  document.getElementById('restoreCompanyModal').classList.add('hidden');
+}
+
+// Soft Delete Modal Controller
 function openSoftDeleteModal(companyId, companyName) {
+  document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
   const form = document.getElementById('softDeleteForm');
   form.action = `/admin-panel/companies/${companyId}/delete/`;
   document.getElementById('deleteModalCompanyName').textContent = companyName;
@@ -496,6 +886,7 @@ function closeSoftDeleteModal() {
 }
 
 function openChangeTypeModal(companyId, companyName, currentType) {
+  document.querySelectorAll('.company-action-dropdown').forEach(m => m.classList.add('hidden'));
   const form = document.getElementById('changeTypeForm');
   form.action = `/admin-panel/companies/${companyId}/change-type/`;
   document.getElementById('changeTypeCompanyName').textContent = companyName;

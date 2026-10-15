@@ -92,6 +92,8 @@ MIDDLEWARE = [
 
     "django.contrib.messages.middleware.MessageMiddleware",
 
+    "apps.companies.middleware.CompanySuspensionMiddleware",
+
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

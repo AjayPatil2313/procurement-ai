@@ -1,4 +1,5 @@
 import logging
+import re
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.utils import timezone
@@ -95,11 +96,21 @@ def _process_supplier_candidate(cand: dict, requirement: Requirement, matching_p
 
 
 def _save_or_update_external_company(cand: dict, scraped: dict, default_role: str) -> ExternalCompany:
-    """Saves or updates ExternalCompany with clean, verified scraped data."""
-    domain_key = scraped.get("domain") or cand.get("url", "")
-    ext_company = ExternalCompany.objects.filter(domain=domain_key).first()
+    """Saves or updates ExternalCompany with clean, verified scraped data. Strictly prevents duplicates."""
+    raw_url = cand.get("url", "") or scraped.get("website", "")
+    domain_key = scraped.get("domain") or ""
+    if not domain_key and raw_url:
+        domain_key = urllib.parse.urlparse(raw_url).netloc.lower().replace("www.", "")
+
+    ext_company = None
+    if domain_key:
+        ext_company = ExternalCompany.objects.filter(domain=domain_key).first()
 
     name = scraped.get("name") or cand.get("title", "Industrial Enterprise")
+    clean_name = name.strip()
+    if not ext_company and clean_name and clean_name not in ["Industrial Enterprise", "Industrial Buyer", "Supplier", "Enterprise Partner"]:
+        ext_company = ExternalCompany.objects.filter(name__iexact=clean_name).first()
+
     website = scraped.get("website") or cand.get("url", "")
     email = scraped.get("email", "")
     phone = scraped.get("phone", "")
@@ -116,7 +127,7 @@ def _save_or_update_external_company(cand: dict, scraped: dict, default_role: st
     if not ext_company:
         ext_company = ExternalCompany.objects.create(
             name=name[:200],
-            domain=domain_key[:150],
+            domain=(domain_key or raw_url)[:150],
             website=website[:255],
             email=email[:254],
             phone=phone[:50],
@@ -165,7 +176,7 @@ def _save_or_update_external_company(cand: dict, scraped: dict, default_role: st
     return ext_company
 
 
-def run_find_buyers_search(product: Product, user, company, criteria_override: list | None = None) -> SearchJob:
+def run_find_buyers_search(product: Product, user, company, criteria_override: list | None = None, search_scope: str = "national") -> SearchJob:
     """
     High-Performance Find Buyers Pipeline (Parallel Concurrency):
     1. Formulates search query based on product name, category, and target location.
@@ -175,8 +186,14 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
     4. Saves/updates ExternalCompany and SearchResult (type LEAD) in MySQL.
     """
     category_name = product.category.name if product.category else ""
-    location = product.location or (company.city if company else "India")
-    query = f"{product.name} {category_name} industrial buyers procurement rfq {location}".strip()
+    if search_scope == "local":
+        city_state = f"{company.city or ''} {company.state or ''}".strip() if company else "local"
+        query = f"{product.name} {category_name} industrial buyers procurement {city_state}".strip()
+    elif search_scope == "global":
+        query = f"{product.name} {category_name} global international worldwide industrial buyers procurement import rfq".strip()
+    else:  # national
+        location = product.location or (company.city if company else "India")
+        query = f"{product.name} {category_name} industrial buyers procurement rfq {location}".strip()
 
     # Prepaid Wallet / Credit enforcement & atomic reservation
     usage_rec = None
@@ -256,31 +273,47 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
 
         saved_results = 0
         seen_ext_company_ids = set()
+        seen_company_names = set()
         for cand, scraped, fit in processed_items:
             ext_company = _save_or_update_external_company(cand, scraped, default_role="end_user")
-            if ext_company.id in seen_ext_company_ids:
+            clean_name = re.sub(r'[^a-z0-9]', '', (ext_company.name or '').lower())
+            if ext_company.id in seen_ext_company_ids or (clean_name and clean_name in seen_company_names):
                 continue
             seen_ext_company_ids.add(ext_company.id)
+            if clean_name:
+                seen_company_names.add(clean_name)
 
             combined_raw = {
                 **scraped,
                 "matched_parameters": fit.get("matched_parameters", []),
             }
 
-            SearchResult.objects.create(
+            existing_result = SearchResult.objects.filter(
                 search_job=job,
                 external_company=ext_company,
-                result_type=SearchResult.ResultType.LEAD,
-                product_title=product.name,
-                price=fit.get("price"),
-                price_currency=fit.get("price_currency", "INR"),
-                moq=fit.get("moq", ""),
-                match_score=fit.get("match_score", 85),
-                match_reason=fit.get("match_reason", ""),
-                need_signal=fit.get("need_signal", ""),
-                source_url=cand.get("url", "")[:500],
-                raw_data=combined_raw,
-            )
+            ).first()
+
+            if existing_result:
+                existing_result.match_score = fit.get("match_score", existing_result.match_score)
+                existing_result.match_reason = fit.get("match_reason", existing_result.match_reason)
+                existing_result.need_signal = fit.get("need_signal", existing_result.need_signal)
+                existing_result.raw_data = combined_raw
+                existing_result.save()
+            else:
+                SearchResult.objects.create(
+                    search_job=job,
+                    external_company=ext_company,
+                    result_type=SearchResult.ResultType.LEAD,
+                    product_title=product.name,
+                    price=fit.get("price"),
+                    price_currency=fit.get("price_currency", "INR"),
+                    moq=fit.get("moq", ""),
+                    match_score=fit.get("match_score", 85),
+                    match_reason=fit.get("match_reason", ""),
+                    need_signal=fit.get("need_signal", ""),
+                    source_url=cand.get("url", "")[:500],
+                    raw_data=combined_raw,
+                )
             saved_results += 1
 
         job.status = SearchJob.Status.COMPLETED
@@ -326,7 +359,7 @@ def run_find_buyers_search(product: Product, user, company, criteria_override: l
     return job
 
 
-def run_find_suppliers_search(requirement: Requirement, user, company, criteria_override: list | None = None) -> SearchJob:
+def run_find_suppliers_search(requirement: Requirement, user, company, criteria_override: list | None = None, search_scope: str = "national") -> SearchJob:
     """
     High-Performance Find Suppliers Pipeline (Parallel Concurrency):
     1. Formulates search query based on requirement item name, specs, and destination.
@@ -336,8 +369,14 @@ def run_find_suppliers_search(requirement: Requirement, user, company, criteria_
     4. Saves/updates ExternalCompany and SearchResult (type SUPPLIER) in MySQL.
     """
     category_name = requirement.category.name if requirement.category else ""
-    country = requirement.delivery_country or "India"
-    query = f"{requirement.item_name} {category_name} manufacturers suppliers exporters {country}".strip()
+    if search_scope == "local":
+        city_state = f"{company.city or ''} {company.state or ''}".strip() if company else "local"
+        query = f"{requirement.item_name} {category_name} manufacturers suppliers {city_state}".strip()
+    elif search_scope == "global":
+        query = f"{requirement.item_name} {category_name} manufacturers suppliers exporters global international worldwide".strip()
+    else:  # national
+        country = requirement.delivery_country or "India"
+        query = f"{requirement.item_name} {category_name} manufacturers suppliers exporters {country}".strip()
 
     # Prepaid Wallet / Credit enforcement & atomic reservation
     usage_rec = None
@@ -417,34 +456,50 @@ def run_find_suppliers_search(requirement: Requirement, user, company, criteria_
 
         saved_results = 0
         seen_ext_company_ids = set()
+        seen_company_names = set()
         for cand, scraped, fit in processed_items:
             ext_company = _save_or_update_external_company(cand, scraped, default_role="supplier")
-            if ext_company.id in seen_ext_company_ids:
+            clean_name = re.sub(r'[^a-z0-9]', '', (ext_company.name or '').lower())
+            if ext_company.id in seen_ext_company_ids or (clean_name and clean_name in seen_company_names):
                 continue
             seen_ext_company_ids.add(ext_company.id)
+            if clean_name:
+                seen_company_names.add(clean_name)
 
             combined_raw = {
                 **scraped,
                 "matched_parameters": fit.get("matched_parameters", []),
             }
 
-            SearchResult.objects.create(
+            existing_result = SearchResult.objects.filter(
                 search_job=job,
                 external_company=ext_company,
-                result_type=SearchResult.ResultType.SUPPLIER,
-                product_title=requirement.item_name,
-                price=fit.get("price"),
-                price_currency=fit.get("price_currency", "INR"),
-                price_unit=requirement.unit or "pcs",
-                moq=fit.get("moq", ""),
-                is_global_cheaper=fit.get("is_global_cheaper", False),
-                savings_percent=fit.get("savings_percent"),
-                match_score=fit.get("match_score", 85),
-                match_reason=fit.get("match_reason", ""),
-                need_signal=fit.get("need_signal", ""),
-                source_url=cand.get("url", "")[:500],
-                raw_data=combined_raw,
-            )
+            ).first()
+
+            if existing_result:
+                existing_result.match_score = fit.get("match_score", existing_result.match_score)
+                existing_result.match_reason = fit.get("match_reason", existing_result.match_reason)
+                existing_result.need_signal = fit.get("need_signal", existing_result.need_signal)
+                existing_result.raw_data = combined_raw
+                existing_result.save()
+            else:
+                SearchResult.objects.create(
+                    search_job=job,
+                    external_company=ext_company,
+                    result_type=SearchResult.ResultType.SUPPLIER,
+                    product_title=requirement.item_name,
+                    price=fit.get("price"),
+                    price_currency=fit.get("price_currency", "INR"),
+                    price_unit=requirement.unit or "pcs",
+                    moq=fit.get("moq", ""),
+                    is_global_cheaper=fit.get("is_global_cheaper", False),
+                    savings_percent=fit.get("savings_percent"),
+                    match_score=fit.get("match_score", 85),
+                    match_reason=fit.get("match_reason", ""),
+                    need_signal=fit.get("need_signal", ""),
+                    source_url=cand.get("url", "")[:500],
+                    raw_data=combined_raw,
+                )
             saved_results += 1
 
         job.status = SearchJob.Status.COMPLETED

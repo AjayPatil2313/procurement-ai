@@ -154,8 +154,8 @@
             <button 
               type="button" 
               id="toggle_criteria_btn" 
-              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-900 font-bold text-xs transition shadow-xs hover:border-orange-300 cursor-pointer"
-              title="Configure AI matching and evaluation criteria"
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-900 font-bold text-xs transition shadow-xs hover:border-orange-300 cursor-pointer"
+              title="Configure Dynamic Field Criteria and evaluation parameters"
             >
               <i class="fa-solid fa-sliders text-orange-600"></i>
               <span>Apply Criteria</span>
@@ -165,6 +165,34 @@
               <i class="fa-solid fa-chevron-down text-[10px] text-orange-500 transition-transform duration-200" id="criteria_chevron"></i>
             </button>
           </div>
+
+          <!-- Search Scope Selector (Local / National / Global) -->
+          <div class="shrink-0">
+            <select 
+              name="search_scope" 
+              id="search_scope_select" 
+              class="w-full sm:w-auto text-xs font-bold rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-950 px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition cursor-pointer shadow-xs"
+              title="Select geographic reach: Local, National, or Global"
+            >
+              <option value="national" {% if search_scope == 'national' or not search_scope %}selected{% endif %}>🇮🇳 National Scope</option>
+              <option value="local" {% if search_scope == 'local' %}selected{% endif %}>📍 Local Scope</option>
+              <option value="global" {% if search_scope == 'global' %}selected{% endif %}>🌐 Global Scope</option>
+            </select>
+          </div>
+
+          <!-- Save Criteria Button -->
+          <div class="shrink-0">
+            <button 
+              type="button" 
+              id="save_criteria_top_btn" 
+              onclick="submitSaveCriteria()" 
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs transition shadow-xs cursor-pointer"
+              title="Save current criteria settings to database"
+            >
+              <i class="fa-regular fa-floppy-disk text-slate-500"></i>
+              <span>Save Criteria</span>
+            </button>
+          </div>
         </div>
 
         <!-- Right Side: Launch Button & Clear Filter -->
@@ -172,11 +200,11 @@
           <button 
             type="submit" 
             id="launch_search_btn" 
-            {% if subscription and subscription.credits_remaining <= 0 %}disabled title="Search disabled: AI credits exhausted"{% endif %}
-            class="flex-1 sm:flex-initial {% if subscription and subscription.credits_remaining <= 0 %}bg-slate-300 text-slate-500 cursor-not-allowed opacity-60{% else %}bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20{% endif %} font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition"
+            {% if not selected_product %}disabled title="Please select a product first"{% elif subscription and subscription.credits_remaining <= 0 %}disabled title="Search disabled: AI credits exhausted"{% endif %}
+            class="flex-1 sm:flex-initial {% if not selected_product %}bg-slate-200 text-slate-400 cursor-not-allowed opacity-60{% elif subscription and subscription.credits_remaining <= 0 %}bg-slate-300 text-slate-500 cursor-not-allowed opacity-60{% else %}{% if has_db_results %}bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20{% else %}bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30 ring-2 ring-orange-400/50 animate-pulse{% endif %}{% endif %} font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
           >
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span>Launch AI Vendor Search</span>
+            <i class="fa-solid {% if has_db_results %}fa-arrows-rotate{% else %}fa-wand-magic-sparkles{% endif %}"></i>
+            <span>{% if has_db_results %}Re-run AI Discovery{% else %}Launch AI Vendor Search{% endif %}</span>
           </button>
 
           {% if selected_product_id %}
@@ -215,13 +243,13 @@
               <span class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xs">
                 <i class="fa-solid fa-sliders"></i>
               </span>
-              <h3 class="text-sm font-bold text-slate-900 tracking-tight">AI Matching Criteria & Parameters</h3>
-              <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
-                Live AI Engine
+              <h3 class="text-sm font-bold text-slate-900 tracking-tight">Dynamic Field Criteria &amp; Parameters</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold border border-orange-200">
+                Dynamic Field Criteria
               </span>
             </div>
             <p class="text-xs text-slate-500 mt-1">
-              Select standard enterprise evaluation fields and add custom key-value criteria. The AI scoring pipeline uses these parameters to calculate vendor fit scores.
+              Select standard enterprise evaluation fields and add custom dynamic key-value parameters. The AI scoring pipeline uses these parameters to evaluate candidates.
             </p>
           </div>
 
@@ -247,6 +275,15 @@
             >
               <i class="fa-solid fa-plus text-[10px]"></i>
               <span>+ Add Criteria</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="submitSaveCriteria()" 
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+              title="Save current criteria settings to database"
+            >
+              <i class="fa-regular fa-floppy-disk text-[10px]"></i>
+              <span>Save Criteria</span>
             </button>
           </div>
         </div>
@@ -691,6 +728,14 @@ function closeSendProposalModal() {
 document.getElementById('sendProposalModal')?.addEventListener('click', function(e) {
   if (e.target === this) closeSendProposalModal();
 });
+
+window.submitSaveCriteria = function() {
+  const form = document.getElementById('find-buyers-form');
+  if (!form) return;
+  const actionInput = document.getElementById('form_action');
+  if (actionInput) actionInput.value = 'save_criteria';
+  form.submit();
+};
 
 document.addEventListener('DOMContentLoaded', function() {
   const form = document.getElementById('find-buyers-form');

@@ -55,13 +55,6 @@
         </a>
       </div>
 
-      <!-- Countdown redirect note -->
-      <div class="pt-2 text-[11px] text-slate-500 flex items-center justify-center gap-1.5" id="redirectContainer">
-        <i class="fa-regular fa-clock"></i>
-        <span>Redirecting to login in <strong id="countdown" class="text-slate-300 font-bold">5</strong>s...</span>
-        <button type="button" onclick="cancelRedirect()" class="text-blue-400 hover:underline ml-1 font-semibold">Cancel</button>
-      </div>
-
     </div>
 
     <!-- Footer Copyright -->
@@ -70,26 +63,5 @@
     </div>
 
   </div>
-
-  <script>
-    let seconds = 5;
-    const countdownEl = document.getElementById('countdown');
-    let timer = setInterval(() => {
-      seconds--;
-      if (countdownEl) countdownEl.innerText = seconds;
-      if (seconds <= 0) {
-        clearInterval(timer);
-        window.location.href = "{% url 'login' %}";
-      }
-    }, 1000);
-
-    function cancelRedirect() {
-      clearInterval(timer);
-      const container = document.getElementById('redirectContainer');
-      if (container) {
-        container.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i> Auto-redirect cancelled.</span>';
-      }
-    }
-  </script>
 </body>
 </html>

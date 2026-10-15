@@ -130,6 +130,15 @@ EVENT_BANNER_CONFIGS = {
         "cta_text": "Open Super Admin Console",
         "secondary_cta_text": "Inspect System Logs",
     },
+    "admin.company_suspended": {
+        "theme": "rose",
+        "icon": "&#9888;",  # Warning
+        "title": "Corporate Account",
+        "highlight": "Suspended!",
+        "subtitle": "Security & Governance notice regarding the immediate suspension of your corporate workspace:",
+        "cta_text": "Contact Support Desk",
+        "secondary_cta_text": "Platform Helpdesk",
+    },
     "admin.ai_provider_error": {
         "theme": "rose",
         "icon": "&#9888;",

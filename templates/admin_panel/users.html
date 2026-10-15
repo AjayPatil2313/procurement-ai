@@ -194,23 +194,18 @@
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <i class="fa-solid fa-lock text-[9px] mr-1 text-emerald-500"></i> Active (Current)
                 </span>
+              {% elif u.is_active %}
+                <button type="button" onclick="openDeactivateUserModal('{{ u.id }}', '{{ u.email|escapejs }}')" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-emerald-200 transition group cursor-pointer" title="Click to deactivate user account">
+                  <i class="fa-solid fa-circle text-[8px] mr-1.5 text-emerald-500 group-hover:text-rose-500"></i>
+                  <span class="group-hover:hidden">Active</span>
+                  <span class="hidden group-hover:inline">Deactivate</span>
+                </button>
               {% else %}
-                <form method="POST" action="{% url 'admin-panel-toggle-user-active' u.id %}" class="inline">
-                  {% csrf_token %}
-                  {% if u.is_active %}
-                    <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-emerald-200 transition group" title="Click to deactivate user account">
-                      <i class="fa-solid fa-circle text-[8px] mr-1.5 text-emerald-500 group-hover:text-rose-500"></i>
-                      <span class="group-hover:hidden">Active</span>
-                      <span class="hidden group-hover:inline">Deactivate</span>
-                    </button>
-                  {% else %}
-                    <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-rose-200 transition group" title="Click to activate user account">
-                      <i class="fa-solid fa-ban text-[9px] mr-1.5 text-rose-500 group-hover:text-emerald-500"></i>
-                      <span class="group-hover:hidden">Deactivated</span>
-                      <span class="hidden group-hover:inline">Activate</span>
-                    </button>
-                  {% endif %}
-                </form>
+                <button type="button" onclick="openActivateUserModal('{{ u.id }}', '{{ u.email|escapejs }}')" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-rose-200 transition group cursor-pointer" title="Click to activate user account">
+                  <i class="fa-solid fa-ban text-[9px] mr-1.5 text-rose-500 group-hover:text-emerald-500"></i>
+                  <span class="group-hover:hidden">Deactivated</span>
+                  <span class="hidden group-hover:inline">Activate</span>
+                </button>
               {% endif %}
             </td>
 
@@ -317,9 +312,134 @@
     </div>
   </div>
 
+  <!-- Deactivate User Confirmation Modal -->
+  <div id="deactivateUserModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl shadow-sm mb-4">
+          <i class="fa-solid fa-user-slash"></i>
+        </div>
+
+        <h3 class="text-lg font-black text-slate-900 text-center">Deactivate User Account</h3>
+        <p class="text-xs text-slate-500 text-center mt-0.5">Revoke platform login credentials &amp; wipe sessions</p>
+
+        <div class="mt-4 p-3.5 bg-rose-50/70 rounded-2xl border border-rose-200 space-y-1 text-xs text-left">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">User Account:</span>
+            <span id="deactivateModalUserEmail" class="font-bold text-rose-950 font-mono">user@example.com</span>
+          </div>
+          <p class="text-[11px] text-rose-800 pt-1 leading-relaxed">
+            Deactivating this user will terminate any active login sessions immediately and reject future login attempts until reactivated.
+          </p>
+        </div>
+
+        <form id="deactivateUserForm" method="POST" action="" class="mt-4 space-y-3.5" onsubmit="if(window.showActionLoader){ window.showActionLoader('Deactivating user account & terminating sessions...', 'Updating access control ledger'); }">
+          {% csrf_token %}
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">
+              Deactivation Remark / Reason <span class="text-rose-600">*</span>
+            </label>
+            <textarea 
+              name="remark" 
+              id="deactivateModalRemark" 
+              rows="2" 
+              required 
+              placeholder="e.g. Employee offboarding, policy violation, security precaution..." 
+              class="w-full p-3 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button type="button" onclick="closeDeactivateUserModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-user-slash"></i>
+              <span>Deactivate User</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activate User Confirmation Modal -->
+  <div id="activateUserModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-6">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto text-2xl shadow-sm mb-4">
+          <i class="fa-solid fa-user-check"></i>
+        </div>
+
+        <h3 class="text-lg font-black text-slate-900 text-center">Reactivate User Account</h3>
+        <p class="text-xs text-slate-500 text-center mt-0.5">Restore platform access &amp; login privileges</p>
+
+        <div class="mt-4 p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-1 text-xs text-left">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">User Account:</span>
+            <span id="activateModalUserEmail" class="font-bold text-emerald-950 font-mono">user@example.com</span>
+          </div>
+          <p class="text-[11px] text-emerald-800 pt-1 leading-relaxed">
+            Reactivating this account allows the user to log in again using their existing credentials.
+          </p>
+        </div>
+
+        <form id="activateUserForm" method="POST" action="" class="mt-4 space-y-3.5" onsubmit="if(window.showActionLoader){ window.showActionLoader('Reactivating user account...', 'Enabling user credentials & permissions'); }">
+          {% csrf_token %}
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">
+              Reactivation Notes (Optional)
+            </label>
+            <input 
+              type="text" 
+              name="remark" 
+              id="activateModalRemark" 
+              placeholder="e.g. Account reinstated after review" 
+              class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+            >
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-2">
+            <button type="button" onclick="closeActivateUserModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
+              Cancel
+            </button>
+            <button type="submit" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-user-check"></i>
+              <span>Activate User</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
+function openDeactivateUserModal(userId, userEmail) {
+  const form = document.getElementById('deactivateUserForm');
+  form.action = `/admin-panel/users/${userId}/toggle-active/`;
+  document.getElementById('deactivateModalUserEmail').textContent = userEmail;
+  document.getElementById('deactivateModalRemark').value = '';
+  document.getElementById('deactivateUserModal').classList.remove('hidden');
+}
+
+function closeDeactivateUserModal() {
+  document.getElementById('deactivateUserModal').classList.add('hidden');
+}
+
+function openActivateUserModal(userId, userEmail) {
+  const form = document.getElementById('activateUserForm');
+  form.action = `/admin-panel/users/${userId}/toggle-active/`;
+  document.getElementById('activateModalUserEmail').textContent = userEmail;
+  document.getElementById('activateModalRemark').value = '';
+  document.getElementById('activateUserModal').classList.remove('hidden');
+}
+
+function closeActivateUserModal() {
+  document.getElementById('activateUserModal').classList.add('hidden');
+}
+
 function openResetPasswordModal(userId, userEmail, userName) {
   const form = document.getElementById('resetPasswordForm');
   form.action = `/admin-panel/users/${userId}/reset-password/`;
