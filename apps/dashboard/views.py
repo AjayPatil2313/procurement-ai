@@ -981,7 +981,7 @@ def notifications_list_api(request):
     """
     Returns JSON list of notifications and unread count for real-time navbar polling.
     """
-    notifications = Notification.objects.filter(user=request.user)
+    notifications = Notification.objects.filter(user=request.user, is_archived=False)
     unread_count = notifications.filter(is_read=False).count()
     recent = list(notifications[:15])
 
@@ -990,10 +990,13 @@ def notifications_list_api(request):
         data.append({
             "id": n.id,
             "type": n.notification_type,
+            "priority": n.priority,
+            "event_key": n.event_key or "",
             "title": n.title,
             "message": n.message,
             "link": n.link,
             "is_read": n.is_read,
+            "is_archived": n.is_archived,
             "icon": n.icon,
             "color": n.color,
             "created_at": n.created_at.strftime("%b %d, %H:%M"),

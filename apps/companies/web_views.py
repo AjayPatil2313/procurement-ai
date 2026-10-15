@@ -147,6 +147,39 @@ def company_profile_web_view(request):
         company.preferred_currency = request.POST.get("preferred_currency", company.preferred_currency)
         company.save()
 
+        # Trigger company.profile_updated notification
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            trigger_email_notification(
+                event_key="company.profile_updated",
+                company=company,
+                user=request.user,
+                context={
+                    "updated_by": request.user.get_full_name() or request.user.email,
+                    "updated_fields": "Corporate Profile, Address, or Tax Information",
+                    "update_time": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                    "cta_url": request.build_absolute_uri("/company/profile/"),
+                },
+            )
+
+            # If company is unverified and provides GST / Tax number, alert Super Admins
+            if not company.is_verified and company.gst_vat_no:
+                trigger_email_notification(
+                    event_key="admin.verification_pending",
+                    company=company,
+                    user=request.user,
+                    context={
+                        "company_name": company.name,
+                        "gst_vat_no": company.gst_vat_no,
+                        "document_count": "Official GST / Tax details updated",
+                        "submitted_at": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                        "review_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
+                    },
+                    idempotency_key=f"verif_pend_{company.id}_{timezone.now().strftime('%Y%m%d')}",
+                )
+        except Exception:
+            pass
+
         messages.success(request, "Company profile updated successfully.")
         return redirect("company-profile-web")
 
@@ -312,6 +345,25 @@ def company_team_web_view(request):
                         else:
                             read_perm, _ = CompanyPermission.objects.get_or_create(module="general", permission="READ")
                             MemberPermission.objects.get_or_create(member=new_member, permission=read_perm)
+
+                # Dispatch company.user_added notification to Company Admins
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="company.user_added",
+                        company=company,
+                        user=request.user,
+                        context={
+                            "new_user_name": user.get_full_name() or user.email,
+                            "new_user_email": user.email,
+                            "role": role,
+                            "added_at": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                            "cta_url": request.build_absolute_uri("/company/team/"),
+                        },
+                        idempotency_key=f"user_added_{company.id}_{user.id}",
+                    )
+                except Exception:
+                    pass
 
                 messages.success(request, f"Team member '{email}' added successfully.")
                 return redirect("company-team-web")

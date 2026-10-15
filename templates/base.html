@@ -200,9 +200,14 @@
               <span>Credit Ledger</span>
             </a>
 
-            <a href="{% url 'user-notification-preferences' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/company/notification-preferences/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <i class="fa-solid fa-bell w-5 text-center text-xs text-blue-400"></i>
-              <span>Notifications</span>
+            <a href="{% url 'notifications-inbox' %}" class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition {% if '/notifications/inbox/' in request.path %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
+              <div class="flex items-center gap-2.5">
+                <i class="fa-solid fa-bell w-5 text-center text-xs text-blue-400"></i>
+                <span>Notifications</span>
+              </div>
+              {% if unread_notifications_count %}
+              <span class="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-red-500 text-white">{{ unread_notifications_count }}</span>
+              {% endif %}
             </a>
           </div>
         </div>
@@ -553,16 +558,24 @@
               </div>
 
               <!-- Footer -->
-              <div class="p-2.5 bg-slate-800/40 flex items-center justify-between text-xs px-4">
+              <div class="p-2.5 bg-slate-800/70 border-t border-slate-800 flex items-center justify-between text-xs px-4">
+                <a 
+                  href="{% url 'notifications-inbox' %}" 
+                  class="text-[11px] font-bold text-blue-400 hover:text-blue-300 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <i class="fa-solid fa-inbox text-[10px]"></i>
+                  <span>View all notifications</span>
+                  <i class="fa-solid fa-arrow-right text-[9px]"></i>
+                </a>
                 <button 
                   type="button" 
                   onclick="clearAllNotifications()" 
                   class="text-[11px] text-slate-400 hover:text-rose-400 transition flex items-center gap-1 cursor-pointer"
+                  title="Clear all read activity"
                 >
                   <i class="fa-solid fa-trash-can text-[10px]"></i>
-                  <span>Clear all</span>
+                  <span>Clear</span>
                 </button>
-                <span class="text-[10px] text-slate-500 font-medium">Live Activity Stream</span>
               </div>
             </div>
           </div>

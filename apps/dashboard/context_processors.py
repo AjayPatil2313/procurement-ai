@@ -11,7 +11,7 @@ def notifications_context(request):
             "recent_notifications": [],
         }
 
-    user_notifications = Notification.objects.filter(user=request.user)
+    user_notifications = Notification.objects.filter(user=request.user, is_archived=False)
     unread_count = user_notifications.filter(is_read=False).count()
     recent = list(user_notifications[:8])
 

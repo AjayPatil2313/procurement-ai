@@ -950,3 +950,609 @@ class EnhancedEmailFeaturesTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("text/csv", res["Content-Type"])
         self.assertIn("Email_Delivery_Logs_", res["Content-Disposition"])
+
+
+class NotificationManagementSystemTests(TestCase):
+    """
+    Comprehensive tests for the Centralized Notification Management System:
+    1. 21 Standardized Events across User, Company Admin, and Super Admin categories.
+    2. Delivery Modes: Automatic, Manual, Both.
+    3. Mandatory Auth Rules Lock (Cannot disable password_reset / email_verification).
+    4. Thresholds & Cooldown Rules (Credits Low).
+    5. Super Admin Web Views: Configure, Preview, Test Send, Manual Send.
+    """
+
+    def setUp(self):
+        from django.core.management import call_command
+        call_command("seed_email_templates")
+
+        self.client = Client()
+        self.superadmin = User.objects.create_superuser(
+            email="superadmin@tradeconnect.internal",
+            password="adminpassword123",
+            first_name="Super",
+            last_name="Admin",
+        )
+        self.company_admin_user = User.objects.create_user(
+            email="ceo@acme.com",
+            password="password123",
+            first_name="Alice",
+            last_name="Director",
+        )
+        self.company = Company.objects.create(
+            name="Acme Industrial Corp",
+            company_type=Company.CompanyType.BOTH,
+            email="contact@acme.com",
+            created_by=self.company_admin_user,
+        )
+        CompanyMember.objects.create(
+            company=self.company,
+            user=self.company_admin_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        self.regular_user = User.objects.create_user(
+            email="staff@acme.com",
+            password="password123",
+            first_name="Bob",
+            last_name="Operator",
+        )
+        CompanyMember.objects.create(
+            company=self.company,
+            user=self.regular_user,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+
+    def test_all_21_notification_events_exist_and_configured(self):
+        """Verifies that all 21 requested events across User, Company Admin, and Super Admin exist with correct audience."""
+        expected_events = {
+            # USER / COMPANY USER (6)
+            "auth.welcome": ("USER", "AUTOMATIC"),
+            "auth.email_verification": ("USER", "AUTOMATIC"),
+            "auth.password_reset": ("USER", "AUTOMATIC"),
+            "auth.password_changed": ("USER", "AUTOMATIC"),
+            "user.activation_deactivation": ("USER", "BOTH"),
+            "billing.subscription_expiry_user": ("USER", "BOTH"),
+            # COMPANY ADMIN (6)
+            "company.user_added": ("COMPANY_ADMIN", "AUTOMATIC"),
+            "company.verification_decision": ("COMPANY_ADMIN", "BOTH"),
+            "billing.credits_low": ("COMPANY_ADMIN", "AUTOMATIC"),
+            "billing.subscription_expiring_admin": ("COMPANY_ADMIN", "BOTH"),
+            "billing.payment_failed": ("COMPANY_ADMIN", "BOTH"),
+            "company.profile_updated": ("COMPANY_ADMIN", "BOTH"),
+            # SUPER ADMIN (9)
+            "admin.new_company": ("SUPER_ADMIN", "AUTOMATIC"),
+            "admin.verification_pending": ("SUPER_ADMIN", "AUTOMATIC"),
+            "admin.verification_decision": ("SUPER_ADMIN", "BOTH"),
+            "admin.new_user": ("SUPER_ADMIN", "AUTOMATIC"),
+            "admin.company_suspended": ("SUPER_ADMIN", "BOTH"),
+            "admin.subscription_change": ("SUPER_ADMIN", "BOTH"),
+            "admin.payment_issue": ("SUPER_ADMIN", "BOTH"),
+            "admin.email_delivery_failure": ("SUPER_ADMIN", "AUTOMATIC"),
+            "admin.security_alert": ("SUPER_ADMIN", "AUTOMATIC"),
+        }
+
+        for event_key, (expected_aud, expected_mode) in expected_events.items():
+            rule = NotificationRule.objects.filter(event_key=event_key).first()
+            self.assertIsNotNone(rule, f"Rule for {event_key} must exist.")
+            self.assertEqual(rule.target_audience, expected_aud, f"Rule {event_key} audience mismatch.")
+            self.assertEqual(rule.delivery_mode, expected_mode, f"Rule {event_key} default mode mismatch.")
+            self.assertTrue(rule.is_enabled, f"Rule {event_key} should be enabled by default.")
+
+    def test_mandatory_auth_rules_cannot_be_disabled(self):
+        """Mandatory authentication rules (password reset & verification) cannot be disabled via toggle API."""
+        self.client.force_login(self.superadmin)
+        pw_reset_rule = NotificationRule.objects.get(event_key="auth.password_reset")
+        self.assertTrue(pw_reset_rule.is_mandatory_auth)
+
+        # 1. Attempt toggle via AJAX POST -> returns 400 JsonResponse
+        url = reverse("admin-panel-email-trigger-toggle", kwargs={"pk": pw_reset_rule.pk})
+        res = self.client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(res.status_code, 400)
+        data = res.json()
+        self.assertEqual(data["status"], "error")
+        self.assertIn("mandatory authentication", data["message"].lower())
+
+        # 2. Attempt toggle via standard form POST -> redirects with 302 and keeps enabled
+        std_res = self.client.post(url)
+        self.assertEqual(std_res.status_code, 302)
+
+        pw_reset_rule.refresh_from_db()
+        self.assertTrue(pw_reset_rule.is_enabled)
+
+    def test_delivery_mode_automatic_blocks_manual_send(self):
+        """An AUTOMATIC event skips manual dispatch when requested manually."""
+        rule = NotificationRule.objects.get(event_key="auth.welcome")
+        self.assertEqual(rule.delivery_mode, NotificationRule.DeliveryMode.AUTOMATIC)
+
+        logs = trigger_email_notification(
+            event_key="auth.welcome",
+            company=self.company,
+            user=self.regular_user,
+            is_manual=True,
+            sent_by=self.superadmin,
+            async_dispatch=False,
+        )
+        self.assertEqual(len(logs), 0, "Manual send on AUTOMATIC-only event must be blocked.")
+
+    def test_delivery_mode_manual_blocks_automatic_event(self):
+        """A MANUAL-configured event skips automatic business event triggers."""
+        rule = NotificationRule.objects.get(event_key="company.user_added")
+        rule.delivery_mode = NotificationRule.DeliveryMode.MANUAL
+        rule.save()
+
+        # Automatic trigger attempt
+        logs = trigger_email_notification(
+            event_key="company.user_added",
+            company=self.company,
+            user=self.regular_user,
+            is_manual=False,
+            async_dispatch=False,
+        )
+        self.assertEqual(len(logs), 0, "Automatic dispatch on MANUAL-only event must be skipped.")
+
+    def test_delivery_mode_both_allows_both(self):
+        """A BOTH-configured event allows both automatic dispatch and manual resend with audit trail."""
+        rule = NotificationRule.objects.get(event_key="company.verification_decision")
+        self.assertEqual(rule.delivery_mode, NotificationRule.DeliveryMode.BOTH)
+
+        # 1. Automatic trigger
+        auto_logs = trigger_email_notification(
+            event_key="company.verification_decision",
+            company=self.company,
+            user=self.company_admin_user,
+            context={"status": "Approved", "decision_badge": "Verified"},
+            is_manual=False,
+            async_dispatch=False,
+        )
+        self.assertEqual(len(auto_logs), 1)
+        self.assertEqual(auto_logs[0].delivery_mode, "AUTOMATIC")
+
+        # 2. Manual resend by Super Admin
+        manual_logs = trigger_email_notification(
+            event_key="company.verification_decision",
+            company=self.company,
+            user=self.company_admin_user,
+            context={"status": "Approved", "decision_badge": "Verified"},
+            is_manual=True,
+            sent_by=self.superadmin,
+            async_dispatch=False,
+        )
+        self.assertEqual(len(manual_logs), 1)
+        self.assertEqual(manual_logs[0].delivery_mode, "MANUAL")
+        self.assertEqual(manual_logs[0].sent_by, self.superadmin)
+
+    def test_credits_low_cooldown_and_threshold_enforcement(self):
+        """Validates credit threshold check and cooldown window enforcement for billing.credits_low."""
+        from decimal import Decimal
+        rule = NotificationRule.objects.get(event_key="billing.credits_low")
+        rule.threshold_value = Decimal("500.00")
+        rule.cooldown_hours = 24
+        rule.save()
+
+        # 1. Balance above threshold -> should NOT trigger
+        logs_high = trigger_email_notification(
+            event_key="billing.credits_low",
+            company=self.company,
+            user=self.company_admin_user,
+            context={"current_balance": "800.00", "threshold_value": "500.00"},
+            async_dispatch=False,
+        )
+        self.assertEqual(len(logs_high), 0)
+
+        # 2. Balance below threshold -> triggers email log
+        logs_low = trigger_email_notification(
+            event_key="billing.credits_low",
+            company=self.company,
+            user=self.company_admin_user,
+            context={"current_balance": "350.00", "threshold_value": "500.00"},
+            async_dispatch=False,
+        )
+        self.assertTrue(len(logs_low) >= 1)
+
+        # 3. Repeat immediately while inside cooldown window -> skipped
+        logs_cooldown = trigger_email_notification(
+            event_key="billing.credits_low",
+            company=self.company,
+            user=self.company_admin_user,
+            context={"current_balance": "320.00", "threshold_value": "500.00"},
+            async_dispatch=False,
+        )
+        self.assertEqual(len(logs_cooldown), 0)
+
+    def test_admin_trigger_edit_view_updates_configuration(self):
+        """Super Admin can configure delivery mode, subject override, CC/BCC, and threshold settings."""
+        self.client.force_login(self.superadmin)
+        rule = NotificationRule.objects.get(event_key="billing.subscription_expiry_user")
+
+        post_data = {
+            "delivery_mode": "BOTH",
+            "subject_override": "Custom Warning: Subscription Ending Soon!",
+            "cc_recipients": "accounting@tradeconnect.internal",
+            "bcc_recipients": "archive@tradeconnect.internal",
+            "threshold_value": "100.00",
+            "cooldown_hours": "12",
+            "reminder_days_before": "7",
+            "is_enabled": "on",
+        }
+        url = reverse("admin-panel-email-trigger-edit", kwargs={"pk": rule.pk})
+        res = self.client.post(url, post_data)
+        self.assertEqual(res.status_code, 302)
+
+        rule.refresh_from_db()
+        self.assertEqual(rule.delivery_mode, "BOTH")
+        self.assertEqual(rule.subject_override, "Custom Warning: Subscription Ending Soon!")
+        self.assertEqual(rule.cc_recipients, "accounting@tradeconnect.internal")
+        self.assertEqual(rule.bcc_recipients, "archive@tradeconnect.internal")
+        self.assertEqual(rule.reminder_days_before, 7)
+
+    def test_admin_trigger_preview_and_test_send_api(self):
+        """Super Admin preview and test-send APIs return rendered HTML and dispatch test email."""
+        self.client.force_login(self.superadmin)
+        rule = NotificationRule.objects.get(event_key="admin.new_company")
+
+        # 1. Preview API
+        preview_url = reverse("admin-panel-email-trigger-preview", kwargs={"pk": rule.pk})
+        p_res = self.client.get(preview_url)
+        self.assertEqual(p_res.status_code, 200)
+        p_data = p_res.json()
+        self.assertEqual(p_data["status"], "success")
+        self.assertIn("TradeConnect", p_data["html"])
+
+        # 2. Test Send API (mocked SMTP)
+        with patch("apps.notifications.services.email_engine.get_active_email_connection") as mock_conn:
+            mock_backend = MagicMock()
+            mock_backend.send_messages.return_value = 1
+            mock_conn.return_value = (mock_backend, "noreply@tradeconnect.com")
+            with patch("django.core.mail.EmailMultiAlternatives.send", return_value=1) as mock_send:
+                test_send_url = reverse("admin-panel-email-trigger-test-send", kwargs={"pk": rule.pk})
+                ts_res = self.client.post(
+                    test_send_url,
+                    {"target_email": "tester@domain.com"},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+                self.assertEqual(ts_res.status_code, 200)
+                ts_data = ts_res.json()
+                self.assertEqual(ts_data["status"], "success")
+                self.assertIn("tester@domain.com", ts_data["message"])
+
+
+class InAppNotificationCenterTests(TestCase):
+    """
+    Automated test suite for the In-App System Notification Center:
+    - In-app notification creation on business event triggers
+    - Multi-channel routing (IN_APP, EMAIL, BOTH)
+    - DRF APIs (list, unread-count, mark-read, mark-unread, mark-all-read, archive/delete)
+    - Web inbox view, tabs, and filters
+    - Company & user isolation security
+    """
+
+    def setUp(self):
+        from apps.dashboard.models import Notification
+
+        self.user_a = User.objects.create_user(
+            email="usera@companyalpha.com",
+            password="password123",
+            first_name="User",
+            last_name="Alpha",
+        )
+        self.company_a = Company.objects.create(
+            name="Alpha Corp",
+            company_type=Company.CompanyType.BUYER,
+            email="ops@companyalpha.com",
+            created_by=self.user_a,
+        )
+        CompanyMember.objects.create(
+            company=self.company_a,
+            user=self.user_a,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        self.user_b = User.objects.create_user(
+            email="userb@companybeta.com",
+            password="password123",
+            first_name="User",
+            last_name="Beta",
+        )
+        self.company_b = Company.objects.create(
+            name="Beta Corp",
+            company_type=Company.CompanyType.SELLER,
+            email="sales@companybeta.com",
+            created_by=self.user_b,
+        )
+        CompanyMember.objects.create(
+            company=self.company_b,
+            user=self.user_b,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Create template & rules for tests
+        self.template = NotificationTemplate.objects.create(
+            name="Inquiry Alert",
+            event_key="seller.inquiry_received",
+            category=NotificationTemplate.Category.SELLER,
+            subject="New Inquiry from {{ company_name }}",
+            html_content="<p>A new buyer inquiry was received.</p>",
+            text_content="A new buyer inquiry was received.",
+            is_active=True,
+        )
+
+        self.rule_both = NotificationRule.objects.create(
+            name="Inquiry Alert Both",
+            event_key="seller.inquiry_received",
+            template=self.template,
+            delivery_mode=NotificationRule.DeliveryMode.AUTOMATIC,
+            channel=NotificationRule.Channel.BOTH,
+            target_audience=NotificationRule.TargetAudience.USER,
+            recipient_type=NotificationRule.RecipientType.ACTING_USER,
+            severity=NotificationRule.Severity.WARNING,
+            priority=NotificationRule.Priority.HIGH,
+            is_enabled=True,
+        )
+
+        self.client_a = Client()
+        self.client_a.force_login(self.user_a)
+
+        self.client_b = Client()
+        self.client_b.force_login(self.user_b)
+
+    def test_in_app_notification_creation_on_trigger(self):
+        """Triggering notification with channel=BOTH creates both Notification and NotificationLog."""
+        from apps.dashboard.models import Notification
+
+        Notification.objects.filter(user=self.user_a).delete()
+        NotificationLog.objects.filter(user=self.user_a).delete()
+
+        with patch("django.core.mail.EmailMultiAlternatives.send", return_value=1):
+            with patch("apps.notifications.services.email_engine.deliver_notification_log", return_value=True):
+                logs = trigger_email_notification(
+                    event_key="seller.inquiry_received",
+                    company=self.company_a,
+                    user=self.user_a,
+                    context={"summary": "Buyer requested bulk quote for 500 units.", "cta_url": "/inquiries/123/"},
+                    async_dispatch=False,
+                )
+
+        # Verify email log created
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0].recipient_email, self.user_a.email)
+
+        # Verify in-app notification created
+        notifs = Notification.objects.filter(user=self.user_a)
+        self.assertEqual(notifs.count(), 1)
+        notif = notifs.first()
+        self.assertEqual(notif.event_key, "seller.inquiry_received")
+        self.assertEqual(notif.priority, Notification.Priority.WARNING)
+        self.assertIn("Buyer requested bulk quote", notif.message)
+        self.assertEqual(notif.link, "/inquiries/123/")
+        self.assertFalse(notif.is_read)
+        self.assertFalse(notif.is_archived)
+
+    def test_channel_routing_in_app_only(self):
+        """Rule with channel=IN_APP creates in-app Notification but skips NotificationLog & email."""
+        from apps.dashboard.models import Notification
+
+        self.rule_both.channel = NotificationRule.Channel.IN_APP
+        self.rule_both.save()
+
+        Notification.objects.filter(user=self.user_a).delete()
+        NotificationLog.objects.filter(user=self.user_a).delete()
+
+        logs = trigger_email_notification(
+            event_key="seller.inquiry_received",
+            company=self.company_a,
+            user=self.user_a,
+            context={"summary": "In-app only alert test."},
+            async_dispatch=False,
+        )
+
+        self.assertEqual(len(logs), 0)
+        self.assertEqual(NotificationLog.objects.filter(user=self.user_a).count(), 0)
+
+        notifs = Notification.objects.filter(user=self.user_a)
+        self.assertEqual(notifs.count(), 1)
+        self.assertEqual(notifs.first().message, "In-app only alert test.")
+
+    def test_channel_routing_email_only(self):
+        """Rule with channel=EMAIL creates NotificationLog but skips in-app Notification."""
+        from apps.dashboard.models import Notification
+
+        self.rule_both.channel = NotificationRule.Channel.EMAIL
+        self.rule_both.save()
+
+        Notification.objects.filter(user=self.user_a).delete()
+        NotificationLog.objects.filter(user=self.user_a).delete()
+
+        with patch("django.core.mail.EmailMultiAlternatives.send", return_value=1):
+            with patch("apps.notifications.services.email_engine.deliver_notification_log", return_value=True):
+                logs = trigger_email_notification(
+                    event_key="seller.inquiry_received",
+                    company=self.company_a,
+                    user=self.user_a,
+                    context={"summary": "Email only alert test."},
+                    async_dispatch=False,
+                )
+
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(Notification.objects.filter(user=self.user_a).count(), 0)
+
+    def test_drf_api_list_and_unread_count(self):
+        """DRF APIs return serialized notifications, unread counts, and priority filters."""
+        from apps.dashboard.models import Notification
+
+        Notification.objects.filter(user=self.user_a).delete()
+
+        Notification.objects.create(
+            user=self.user_a,
+            company=self.company_a,
+            title="Normal Info Alert",
+            message="Testing info alert",
+            priority=Notification.Priority.INFO,
+            is_read=False,
+        )
+        Notification.objects.create(
+            user=self.user_a,
+            company=self.company_a,
+            title="Urgent Security Alert",
+            message="Testing urgent alert",
+            priority=Notification.Priority.CRITICAL,
+            is_read=False,
+        )
+        Notification.objects.create(
+            user=self.user_a,
+            company=self.company_a,
+            title="Read Alert",
+            message="Already read",
+            priority=Notification.Priority.SUCCESS,
+            is_read=True,
+        )
+
+        # 1. Unread count API
+        count_url = reverse("api-notifications-unread-count")
+        res = self.client_a.get(count_url)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["unread_count"], 2)
+        self.assertEqual(data["critical_count"], 1)
+
+        # 2. List API - All
+        list_url = reverse("api-notifications-list")
+        res = self.client_a.get(list_url)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["total_count"], 3)
+        self.assertEqual(data["unread_count"], 2)
+
+        # 3. List API - Unread filter
+        res = self.client_a.get(list_url + "?status=unread")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["total_count"], 2)
+
+        # 4. List API - Priority filter
+        res = self.client_a.get(list_url + "?priority=CRITICAL")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["total_count"], 1)
+        self.assertEqual(res.json()["results"][0]["priority"], "CRITICAL")
+
+    def test_drf_api_mark_read_and_archive(self):
+        """DRF APIs allow marking as read, unread, marking all read, and archiving."""
+        from apps.dashboard.models import Notification
+
+        notif1 = Notification.objects.create(
+            user=self.user_a,
+            company=self.company_a,
+            title="Alert 1",
+            message="Message 1",
+            is_read=False,
+        )
+        notif2 = Notification.objects.create(
+            user=self.user_a,
+            company=self.company_a,
+            title="Alert 2",
+            message="Message 2",
+            is_read=False,
+        )
+
+        # Mark read single
+        mark_read_url = reverse("api-notification-mark-read", kwargs={"pk": notif1.pk})
+        res = self.client_a.post(mark_read_url)
+        self.assertEqual(res.status_code, 200)
+        notif1.refresh_from_db()
+        self.assertTrue(notif1.is_read)
+        self.assertEqual(res.json()["unread_count"], 1)
+
+        # Mark unread single
+        mark_unread_url = reverse("api-notification-mark-unread", kwargs={"pk": notif1.pk})
+        res = self.client_a.post(mark_unread_url)
+        self.assertEqual(res.status_code, 200)
+        notif1.refresh_from_db()
+        self.assertFalse(notif1.is_read)
+
+        # Mark all read
+        mark_all_url = reverse("api-notifications-mark-all-read")
+        res = self.client_a.post(mark_all_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["unread_count"], 0)
+        notif1.refresh_from_db()
+        notif2.refresh_from_db()
+        self.assertTrue(notif1.is_read)
+        self.assertTrue(notif2.is_read)
+
+        # Archive
+        archive_url = reverse("api-notification-archive", kwargs={"pk": notif1.pk})
+        res = self.client_a.post(archive_url)
+        self.assertEqual(res.status_code, 200)
+        notif1.refresh_from_db()
+        self.assertTrue(notif1.is_archived)
+
+    def test_user_and_company_isolation_security(self):
+        """User B cannot access, read, or archive User A's notifications."""
+        from apps.dashboard.models import Notification
+
+        notif_a = Notification.objects.create(
+            user=self.user_a,
+            company=self.company_a,
+            title="Private Alert for Alpha",
+            message="Alpha confidential message",
+            is_read=False,
+        )
+
+        # User B attempts to mark User A's notification as read
+        cross_read_url = reverse("api-notification-mark-read", kwargs={"pk": notif_a.pk})
+        res = self.client_b.post(cross_read_url)
+        self.assertEqual(res.status_code, 404)
+
+        # User B attempts to archive User A's notification
+        cross_archive_url = reverse("api-notification-archive", kwargs={"pk": notif_a.pk})
+        res = self.client_b.post(cross_archive_url)
+        self.assertEqual(res.status_code, 404)
+
+        # User B's list does not contain User A's notification
+        list_url = reverse("api-notifications-list")
+        res = self.client_b.get(list_url)
+        self.assertEqual(res.status_code, 200)
+        ids = [item["id"] for item in res.json()["results"]]
+        self.assertNotIn(notif_a.id, ids)
+
+    def test_web_inbox_view_and_actions(self):
+        """Web inbox displays tabs and handles toggle-read, archive, and restore."""
+        from apps.dashboard.models import Notification
+
+        notif = Notification.objects.create(
+            user=self.user_a,
+            company=self.company_a,
+            title="Inbox Test Alert",
+            message="Testing web inbox view",
+            priority=Notification.Priority.WARNING,
+            is_read=False,
+        )
+
+        inbox_url = reverse("notifications-inbox")
+        res = self.client_a.get(inbox_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Inbox Test Alert")
+        self.assertContains(res, "WARNING")
+
+        # Toggle read
+        toggle_url = reverse("notification-toggle-read", kwargs={"pk": notif.pk})
+        res = self.client_a.get(toggle_url)
+        self.assertEqual(res.status_code, 302)
+        notif.refresh_from_db()
+        self.assertTrue(notif.is_read)
+
+        # Archive
+        archive_url = reverse("notification-archive", kwargs={"pk": notif.pk})
+        res = self.client_a.get(archive_url)
+        self.assertEqual(res.status_code, 302)
+        notif.refresh_from_db()
+        self.assertTrue(notif.is_archived)
+
+        # Restore
+        restore_url = reverse("notification-restore", kwargs={"pk": notif.pk})
+        res = self.client_a.get(restore_url)
+        self.assertEqual(res.status_code, 302)
+        notif.refresh_from_db()
+        self.assertFalse(notif.is_archived)

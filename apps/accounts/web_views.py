@@ -31,6 +31,8 @@ def login_view(request):
         
         user = authenticate(request, email=email, password=password)
         if user is not None:
+            from django.core.cache import cache
+            cache.delete(f"login_failures_{email}")
             login(request, user)
             messages.success(request, f"Welcome back, {user.first_name or user.email}!")
             if user.is_superuser or user.is_staff:
@@ -41,6 +43,30 @@ def login_view(request):
             else:
                 return redirect(next_url or "dashboard")
         else:
+            from django.core.cache import cache
+            fail_key = f"login_failures_{email}"
+            attempts = cache.get(fail_key, 0) + 1
+            cache.set(fail_key, attempts, timeout=900)
+            if attempts >= 5:
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="admin.security_alert",
+                        context={
+                            "alert_title": f"Repeated Failed Logins ({attempts} attempts)",
+                            "incident_code": "SEC-BRUTE-01",
+                            "target_account": email,
+                            "source_ip": request.META.get("REMOTE_ADDR", "Recorded"),
+                            "incident_time": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                            "account_state": "Monitored / Throttled",
+                            "cta_url": "/admin-panel/audit-logs/",
+                        },
+                        severity="CRITICAL",
+                        idempotency_key=f"sec_alert_{email}_{attempts}",
+                    )
+                except Exception:
+                    pass
+
             existing_user = User.objects.filter(email=email).first()
             if existing_user and existing_user.check_password(password) and not existing_user.is_active:
                 messages.error(request, "This account is inactive. Please contact your company administrator.")
@@ -171,7 +197,7 @@ def register_view(request):
             from apps.notifications.services.email_engine import trigger_email_notification
             # Welcome email to the newly registered user
             trigger_email_notification(
-                event_key="auth.welcome_registration",
+                event_key="auth.welcome",
                 company=company,
                 user=user,
                 context={
@@ -186,15 +212,17 @@ def register_view(request):
                 },
                 idempotency_key=f"welcome_{user.id}",
             )
-            # Platform alert to Super Admins
+            # Platform alert to Super Admins: New Company Registered
             trigger_email_notification(
-                event_key="admin.company_registered",
+                event_key="admin.new_company",
                 company=company,
                 user=user,
                 context={
                     "company_name": company.name,
                     "company_type": company.get_company_type_display(),
-                    "contact_email": user.email,
+                    "admin_name": user.get_full_name() or user.first_name,
+                    "admin_email": user.email,
+                    "location": f"{company.city}, {company.country}",
                     "registered_at": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "cta_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
                     "details": {
@@ -204,7 +232,21 @@ def register_view(request):
                         "City / Country": f"{company.city}, {company.country}",
                     },
                 },
-                idempotency_key=f"admin_reg_{company.id}",
+                idempotency_key=f"admin_newcomp_{company.id}",
+            )
+            # Platform alert to Super Admins: New User Registered
+            trigger_email_notification(
+                event_key="admin.new_user",
+                company=company,
+                user=user,
+                context={
+                    "user_name": user.get_full_name() or user.email,
+                    "user_email": user.email,
+                    "company_name": company.name,
+                    "registered_at": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "cta_url": request.build_absolute_uri("/admin-panel/users/"),
+                },
+                idempotency_key=f"admin_newuser_{user.id}",
             )
         except Exception as exc:
             pass
@@ -354,6 +396,26 @@ def reset_password_view(request, token):
 
         user.set_password(new_password)
         user.save()
+
+        # Trigger Password Changed Confirmation Email
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            trigger_email_notification(
+                event_key="auth.password_changed",
+                user=user,
+                company=getattr(user, "company", None),
+                context={
+                    "user_name": user.get_full_name() or user.first_name or "Enterprise User",
+                    "changed_at": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                    "ip_address": request.META.get("REMOTE_ADDR", "Recorded"),
+                    "device_info": request.META.get("HTTP_USER_AGENT", "Standard Browser")[:60],
+                    "cta_url": request.build_absolute_uri("/login/"),
+                    "support_url": request.build_absolute_uri("/help-support/"),
+                },
+                idempotency_key=f"pwd_changed_{user.id}_{int(timezone.now().timestamp())}",
+            )
+        except Exception:
+            pass
 
         messages.success(request, "Your password has been successfully reset! You can now sign in with your new password.")
         return redirect("login")

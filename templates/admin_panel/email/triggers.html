@@ -1,39 +1,109 @@
 {% extends "base.html" %}
 
-{% block title %}Event Triggers & Routing — Super Admin{% endblock %}
+{% block title %}Centralized Notification Management — Super Admin{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
   <!-- Header Banner -->
-  <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
-      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 mb-3">
-        <i class="fa-solid fa-bolt mr-1.5 text-amber-400"></i> Event Automation Rules
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 mb-3">
+        <i class="fa-solid fa-bell-concierge mr-1.5 text-indigo-400"></i> Platform Notification Hub
       </div>
-      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Event Triggers &amp; Routing Matrix</h1>
-      <p class="text-xs md:text-sm text-slate-300 mt-1">
-        Configure automated trigger policies, recipient resolution strategies, priority escalation, and global rule enable/disable switches.
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Centralized Notification Management</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
+        Configure operational notifications, target audiences, delivery modes (Automatic, Manual, Both), threshold triggers, and mandatory security controls across all platform events.
       </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 px-4 py-2.5 rounded-xl text-center">
+        <span class="text-[10px] uppercase tracking-wider text-slate-400 block font-bold">Total Rules</span>
+        <span class="text-lg font-black text-white">{{ total_count }}</span>
+      </div>
+      <div class="bg-emerald-950/60 border border-emerald-700/50 px-4 py-2.5 rounded-xl text-center">
+        <span class="text-[10px] uppercase tracking-wider text-emerald-400 block font-bold">User Events</span>
+        <span class="text-lg font-black text-emerald-300">{{ user_count }}</span>
+      </div>
+      <div class="bg-blue-950/60 border border-blue-700/50 px-4 py-2.5 rounded-xl text-center">
+        <span class="text-[10px] uppercase tracking-wider text-blue-400 block font-bold">Company Admin</span>
+        <span class="text-lg font-black text-blue-300">{{ company_admin_count }}</span>
+      </div>
+      <div class="bg-purple-950/60 border border-purple-700/50 px-4 py-2.5 rounded-xl text-center">
+        <span class="text-[10px] uppercase tracking-wider text-purple-400 block font-bold">Super Admin</span>
+        <span class="text-lg font-black text-purple-300">{{ super_admin_count }}</span>
+      </div>
     </div>
   </div>
 
-  <!-- Navigation Tabs -->
+  <!-- Sub-Navigation Tabs -->
   {% include "admin_panel/email/nav_tabs.html" %}
 
+  <!-- Audience Category Filter Tabs -->
+  <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+    <a href="?{% if selected_mode %}mode={{ selected_mode }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
+       class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if not selected_audience %}bg-slate-900 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+      <i class="fa-solid fa-layer-group text-[11px]"></i> All Categories
+      <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if not selected_audience %}bg-slate-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ total_count }}</span>
+    </a>
+    <a href="?audience=USER{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+       class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if selected_audience == 'USER' %}bg-emerald-600 text-white shadow-sm shadow-emerald-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+      <i class="fa-solid fa-user text-[11px]"></i> User / Company User
+      <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if selected_audience == 'USER' %}bg-emerald-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ user_count }}</span>
+    </a>
+    <a href="?audience=COMPANY_ADMIN{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+       class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if selected_audience == 'COMPANY_ADMIN' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+      <i class="fa-solid fa-building-user text-[11px]"></i> Company Admin
+      <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if selected_audience == 'COMPANY_ADMIN' %}bg-blue-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ company_admin_count }}</span>
+    </a>
+    <a href="?audience=SUPER_ADMIN{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+       class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if selected_audience == 'SUPER_ADMIN' %}bg-purple-600 text-white shadow-sm shadow-purple-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+      <i class="fa-solid fa-shield-halved text-[11px]"></i> Super Admin Platform Alerts
+      <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if selected_audience == 'SUPER_ADMIN' %}bg-purple-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ super_admin_count }}</span>
+    </a>
+  </div>
+
   <!-- Filters Toolbar -->
-  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <!-- Mode Filters -->
     <div class="flex flex-wrap items-center gap-2">
-      <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Module:</span>
-      <a href="{% url 'admin-panel-email-triggers' %}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if not selected_module %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-        All Modules
+      <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Delivery Mode:</span>
+      <a href="?{% if selected_audience %}audience={{ selected_audience }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if not selected_mode %}bg-indigo-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        All Modes
       </a>
-      {% for code, label in modules %}
-      <a href="?module={{ code }}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_module == code %}bg-blue-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-        {{ label }}
+      <a href="?mode=AUTOMATIC{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'AUTOMATIC' %}bg-cyan-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        <i class="fa-solid fa-bolt-auto mr-1"></i> Automatic Only
       </a>
-      {% endfor %}
+      <a href="?mode=MANUAL{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'MANUAL' %}bg-purple-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        <i class="fa-solid fa-hand mr-1"></i> Manual Only
+      </a>
+      <a href="?mode=BOTH{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'BOTH' %}bg-emerald-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+        <i class="fa-solid fa-arrows-split-up-and-left mr-1"></i> Both (Auto &amp; Manual)
+      </a>
     </div>
+
+    <!-- Search Toolbar Form -->
+    <form method="GET" class="flex items-center gap-2 w-full md:w-auto">
+      {% if selected_audience %}<input type="hidden" name="audience" value="{{ selected_audience }}">{% endif %}
+      {% if selected_mode %}<input type="hidden" name="mode" value="{{ selected_mode }}">{% endif %}
+      <div class="relative w-full md:w-72">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, event, subject..."
+               class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+      </div>
+      <button type="submit" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition">
+        Filter
+      </button>
+      {% if search_query or selected_mode or selected_audience %}
+      <a href="{% url 'admin-panel-email-triggers' %}" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition" title="Clear all filters">
+        Reset
+      </a>
+      {% endif %}
+    </form>
   </div>
 
   <!-- Rules Table -->
@@ -42,87 +112,259 @@
       <table class="w-full text-left border-collapse text-xs">
         <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
           <tr>
-            <th class="p-3.5">Module</th>
-            <th class="p-3.5">Trigger Rule / Event Key</th>
-            <th class="p-3.5">Recipient Strategy</th>
-            <th class="p-3.5">Linked Template</th>
-            <th class="p-3.5">Severity</th>
+            <th class="p-3.5">Notification / Event Key</th>
+            <th class="p-3.5">Audience &amp; Mode</th>
+            <th class="p-3.5">Recipient Rules &amp; CC</th>
+            <th class="p-3.5">Linked Template &amp; Subject</th>
+            <th class="p-3.5">Conditions &amp; Cooldown</th>
             <th class="p-3.5">Status</th>
-            <th class="p-3.5 text-right">Toggle Action</th>
+            <th class="p-3.5 text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100 text-slate-700">
           {% for r in rules %}
-          <tr class="hover:bg-slate-50/80 transition">
-            <td class="p-3.5 whitespace-nowrap">
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
-                {{ r.get_module_display }}
-              </span>
+          <tr class="hover:bg-slate-50/80 transition" id="rule-row-{{ r.id }}">
+            
+            <!-- 1. Notification Name & Key -->
+            <td class="p-3.5 max-w-xs">
+              <div class="flex items-start gap-2">
+                <div>
+                  <span class="font-extrabold text-slate-900 block text-xs leading-snug">{{ r.name }}</span>
+                  <div class="flex items-center gap-1.5 mt-1">
+                    <code class="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded font-mono font-semibold border border-indigo-100">{{ r.event_key }}</code>
+                    {% if r.is_mandatory_auth %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Mandatory Security Authentication Notification — Cannot be casually disabled">
+                      <i class="fa-solid fa-lock mr-1 text-[8px]"></i> Mandatory Auth
+                    </span>
+                    {% endif %}
+                  </div>
+                  {% if r.description %}
+                  <p class="text-[11px] text-slate-500 mt-1 line-clamp-1" title="{{ r.description }}">{{ r.description }}</p>
+                  {% endif %}
+                </div>
+              </div>
             </td>
+
+            <!-- 2. Target Audience & Delivery Mode -->
+            <td class="p-3.5 whitespace-nowrap">
+              <div class="space-y-1">
+                <div>
+                  {% if r.target_audience == 'USER' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <i class="fa-solid fa-user mr-1 text-[9px]"></i> User
+                  </span>
+                  {% elif r.target_audience == 'COMPANY_ADMIN' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    <i class="fa-solid fa-building-user mr-1 text-[9px]"></i> Company Admin
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                    <i class="fa-solid fa-shield-halved mr-1 text-[9px]"></i> Super Admin
+                  </span>
+                  {% endif %}
+                </div>
+                <div>
+                  {% if r.delivery_mode == 'AUTOMATIC' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-cyan-100 text-cyan-900 border border-cyan-200">
+                    <i class="fa-solid fa-bolt-auto mr-1 text-[9px]"></i> Automatic
+                  </span>
+                  {% elif r.delivery_mode == 'MANUAL' %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-900 border border-purple-200">
+                    <i class="fa-solid fa-hand mr-1 text-[9px]"></i> Manual Only
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-200">
+                    <i class="fa-solid fa-arrows-split-up-and-left mr-1 text-[9px]"></i> Both (Auto+Manual)
+                  </span>
+                  {% endif %}
+                </div>
+                <div class="mt-0.5">
+                  {% if r.channel == 'BOTH' %}
+                  <span class="inline-flex items-center text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                    <i class="fa-solid fa-layer-group mr-1 text-[9px]"></i> In-App &amp; Email
+                  </span>
+                  {% elif r.channel == 'IN_APP' %}
+                  <span class="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                    <i class="fa-solid fa-bell mr-1 text-[9px]"></i> In-App Only
+                  </span>
+                  {% elif r.channel == 'EMAIL' %}
+                  <span class="inline-flex items-center text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                    <i class="fa-solid fa-envelope mr-1 text-[9px]"></i> Email Only
+                  </span>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+
+            <!-- 3. Recipient Strategy & CC/BCC -->
             <td class="p-3.5">
-              <span class="font-bold text-slate-900 block text-xs">{{ r.name }}</span>
-              <code class="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono">{{ r.event_key }}</code>
-            </td>
-            <td class="p-3.5 whitespace-nowrap">
-              <span class="inline-flex items-center text-xs font-semibold text-slate-800">
-                <i class="fa-solid fa-users text-slate-400 mr-1.5 text-[11px]"></i>
+              <span class="font-semibold text-slate-800 block text-xs">
+                <i class="fa-solid fa-users text-slate-400 mr-1 text-[11px]"></i>
                 {{ r.get_recipient_type_display }}
               </span>
+              {% if r.cc_recipients %}
+              <div class="text-[10px] text-slate-500 mt-0.5 font-mono truncate max-w-[150px]" title="CC: {{ r.cc_recipients }}">
+                CC: {{ r.cc_recipients }}
+              </div>
+              {% endif %}
+              {% if r.bcc_recipients %}
+              <div class="text-[10px] text-slate-500 font-mono truncate max-w-[150px]" title="BCC: {{ r.bcc_recipients }}">
+                BCC: {{ r.bcc_recipients }}
+              </div>
+              {% endif %}
             </td>
-            <td class="p-3.5">
+
+            <!-- 4. Linked Template & Subject Override -->
+            <td class="p-3.5 max-w-xs">
               {% if r.template %}
-              <a href="{% url 'admin-panel-email-template-edit' r.template.id %}" class="text-blue-600 hover:underline font-medium">
+              <a href="{% url 'admin-panel-email-template-edit' r.template.id %}" class="text-indigo-600 hover:text-indigo-800 font-bold hover:underline block truncate">
                 {{ r.template.name }}
               </a>
+              {% if r.subject_override %}
+              <span class="text-[10px] text-amber-700 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 block truncate mt-0.5" title="Subject Override: {{ r.subject_override }}">
+                Override: {{ r.subject_override }}
+              </span>
               {% else %}
-              <span class="text-slate-400">None</span>
+              <span class="text-[10px] text-slate-500 block truncate mt-0.5" title="{{ r.template.subject }}">
+                Subject: {{ r.template.subject }}
+              </span>
+              {% endif %}
+              {% else %}
+              <span class="text-slate-400 italic">No template linked</span>
               {% endif %}
             </td>
-            <td class="p-3.5 whitespace-nowrap">
-              {% if r.severity == 'CRITICAL' %}
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                  CRITICAL
-                </span>
-              {% elif r.severity == 'WARNING' %}
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                  WARNING
-                </span>
+
+            <!-- 5. Conditions & Cooldown -->
+            <td class="p-3.5 whitespace-nowrap text-[11px]">
+              {% if r.threshold_value %}
+              <div class="font-bold text-slate-800">
+                Cutoff: <span class="text-rose-600 font-extrabold">&le; {{ r.threshold_value }}</span>
+              </div>
+              <div class="text-[10px] text-slate-500">Cooldown: {{ r.cooldown_hours }}h</div>
+              {% elif r.reminder_days_before %}
+              <div class="font-bold text-amber-700">
+                Reminder: <span class="font-extrabold">{{ r.reminder_days_before }} days prior</span>
+              </div>
               {% else %}
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                  INFO
-                </span>
+              <span class="text-slate-400 italic">Event-Driven</span>
               {% endif %}
             </td>
+
+            <!-- 6. Status & Security Lock -->
             <td class="p-3.5 whitespace-nowrap">
               {% if r.is_enabled %}
-                <span class="inline-flex items-center text-[11px] font-bold text-emerald-600">
-                  <i class="fa-solid fa-circle-check mr-1"></i> Active
-                </span>
+              <span class="inline-flex items-center text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                <i class="fa-solid fa-circle-check mr-1.5 text-[10px]"></i> Active
+              </span>
               {% else %}
-                <span class="inline-flex items-center text-[11px] font-bold text-slate-400">
-                  <i class="fa-solid fa-circle-pause mr-1"></i> Disabled
-                </span>
+              <span class="inline-flex items-center text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                <i class="fa-solid fa-circle-pause mr-1.5 text-[10px]"></i> Disabled
+              </span>
               {% endif %}
             </td>
+
+            <!-- 7. Action Buttons -->
             <td class="p-3.5 text-right whitespace-nowrap">
-              <form action="{% url 'admin-panel-email-trigger-toggle' r.id %}" method="POST" class="inline">
-                {% csrf_token %}
-                {% if r.is_enabled %}
-                <button type="submit" class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
-                  <i class="fa-solid fa-pause mr-1 text-[10px]"></i> Disable
+              <div class="inline-flex items-center gap-1">
+                
+                <!-- Configure Button -->
+                <button type="button"
+                        onclick="openConfigureModal('{{ r.id }}')"
+                        class="p-1.5 rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition"
+                        title="Configure Notification Settings">
+                  <i class="fa-solid fa-gear text-[11px]"></i>
                 </button>
-                {% else %}
-                <button type="submit" class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition">
-                  <i class="fa-solid fa-play mr-1 text-[10px]"></i> Enable
+
+                <!-- Live Preview Button -->
+                <button type="button"
+                        onclick="openPreviewModal('{{ r.id }}')"
+                        class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 transition"
+                        title="Live Preview Branded Email">
+                  <i class="fa-solid fa-eye text-[11px]"></i>
+                </button>
+
+                <!-- Send Test Button -->
+                <button type="button"
+                        onclick="openTestSendModal('{{ r.id }}', '{{ r.name|escapejs }}')"
+                        class="p-1.5 rounded-lg text-slate-600 hover:text-amber-600 hover:bg-amber-50 border border-slate-200 transition"
+                        title="Send Test Email to Admin">
+                  <i class="fa-solid fa-paper-plane text-[11px]"></i>
+                </button>
+
+                <!-- Manual Send Button (Only for MANUAL or BOTH mode) -->
+                {% if r.delivery_mode == 'MANUAL' or r.delivery_mode == 'BOTH' %}
+                <button type="button"
+                        onclick="openManualSendModal('{{ r.id }}', '{{ r.name|escapejs }}', '{{ r.delivery_mode }}')"
+                        class="p-1.5 rounded-lg text-slate-600 hover:text-purple-600 hover:bg-purple-50 border border-slate-200 transition"
+                        title="Manual Notification Dispatch">
+                  <i class="fa-solid fa-bullhorn text-[11px]"></i>
                 </button>
                 {% endif %}
-              </form>
+
+                <!-- Outbox Logs Link -->
+                <a href="{% url 'admin-panel-email-logs' %}?q={{ r.event_key }}"
+                   class="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition"
+                   title="View Delivery History Logs">
+                  <i class="fa-solid fa-clock-rotate-left text-[11px]"></i>
+                </a>
+
+                <!-- Toggle Switch Action -->
+                {% if r.is_mandatory_auth %}
+                <span class="p-1.5 rounded-lg text-slate-300 border border-slate-100 cursor-not-allowed" title="Mandatory Security Notification (Cannot be disabled)">
+                  <i class="fa-solid fa-lock text-[11px]"></i>
+                </span>
+                {% else %}
+                <form action="{% url 'admin-panel-email-trigger-toggle' r.id %}" method="POST" class="inline">
+                  {% csrf_token %}
+                  {% if r.is_enabled %}
+                  <button type="submit" class="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 transition" title="Disable Rule">
+                    <i class="fa-solid fa-pause text-[11px]"></i>
+                  </button>
+                  {% else %}
+                  <button type="submit" class="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 border border-emerald-200 transition" title="Enable Rule">
+                    <i class="fa-solid fa-play text-[11px]"></i>
+                  </button>
+                  {% endif %}
+                </form>
+                {% endif %}
+
+              </div>
             </td>
+
           </tr>
+
+          <!-- Hidden JSON rule payload for modal binding -->
+          <script id="rule-data-{{ r.id }}" type="application/json">
+            {
+              "id": {{ r.id }},
+              "name": "{{ r.name|escapejs }}",
+              "event_key": "{{ r.event_key|escapejs }}",
+              "description": "{{ r.description|escapejs }}",
+              "target_audience": "{{ r.target_audience|escapejs }}",
+              "delivery_mode": "{{ r.delivery_mode|escapejs }}",
+              "channel": "{{ r.channel|default:'BOTH'|escapejs }}",
+              "template_id": {% if r.template %}{{ r.template.id }}{% else %}null{% endif %},
+              "recipient_type": "{{ r.recipient_type|escapejs }}",
+              "custom_recipients": "{{ r.custom_recipients|escapejs }}",
+              "subject_override": "{{ r.subject_override|escapejs }}",
+              "cc_recipients": "{{ r.cc_recipients|escapejs }}",
+              "bcc_recipients": "{{ r.bcc_recipients|escapejs }}",
+              "threshold_value": "{% if r.threshold_value %}{{ r.threshold_value }}{% endif %}",
+              "cooldown_hours": {{ r.cooldown_hours|default:24 }},
+              "reminder_days_before": {{ r.reminder_days_before|default:5 }},
+              "severity": "{{ r.severity|escapejs }}",
+              "priority": "{{ r.priority|escapejs }}",
+              "is_enabled": {{ r.is_enabled|yesno:"true,false" }},
+              "is_mandatory_auth": {{ r.is_mandatory_auth|yesno:"true,false" }},
+              "allow_manual_send": {{ r.allow_manual_send|yesno:"true,false" }}
+            }
+          </script>
           {% empty %}
           <tr>
-            <td colspan="7" class="p-8 text-center text-slate-400">
-              <p class="font-medium">No event triggers configured for this module.</p>
+            <td colspan="7" class="p-10 text-center text-slate-400">
+              <i class="fa-solid fa-inbox text-3xl mb-2 text-slate-300 block"></i>
+              <p class="font-bold text-slate-600">No notification events match the selected criteria.</p>
+              <p class="text-xs text-slate-400 mt-1">Try resetting category or mode filters.</p>
             </td>
           </tr>
           {% endfor %}
@@ -136,10 +378,10 @@
       <span>Showing Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
       <div class="flex items-center gap-1">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">&larr; Prev</a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold">&larr; Prev</a>
         {% endif %}
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">Next &rarr;</a>
+        <a href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-semibold">Next &rarr;</a>
         {% endif %}
       </div>
     </div>
@@ -147,4 +389,474 @@
   </div>
 
 </div>
+
+
+<!-- ========================================================================= -->
+<!-- MODAL 1: CONFIGURE NOTIFICATION MODAL -->
+<!-- ========================================================================= -->
+<div id="configureModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    
+    <!-- Modal Header -->
+    <div class="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div>
+        <h3 class="text-base font-black text-slate-900" id="cfgModalTitle">Configure Notification</h3>
+        <p class="text-xs text-slate-500 font-mono mt-0.5" id="cfgModalEventKey"></p>
+      </div>
+      <button type="button" onclick="closeConfigureModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Modal Form Body -->
+    <form id="cfgForm" method="POST" action="" class="p-6 overflow-y-auto space-y-4 text-xs">
+      {% csrf_token %}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Notification Name -->
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-700 mb-1">Notification Name</label>
+          <input type="text" name="name" id="cfg_name" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Description -->
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-700 mb-1">Description / Purpose</label>
+          <textarea name="description" id="cfg_description" rows="2" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <!-- Target Audience -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Target Audience</label>
+          <select name="target_audience" id="cfg_target_audience" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+            {% for code, label in target_audiences %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Delivery Mode -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Delivery Mode</label>
+          <select name="delivery_mode" id="cfg_delivery_mode" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 bg-indigo-50/50">
+            {% for code, label in delivery_modes %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <span class="text-[10px] text-slate-500 mt-1 block">Automatic (event-only), Manual (UI only), Both (Auto + Resend).</span>
+        </div>
+
+        <!-- Delivery Channel -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Delivery Channel</label>
+          <select name="channel" id="cfg_channel" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-blue-700 bg-blue-50/50">
+            {% for code, label in channels %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <span class="text-[10px] text-slate-500 mt-1 block">Notification channels: In-App, Email, or Both.</span>
+        </div>
+
+        <!-- Template Selector -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Linked Email Template</label>
+          <select name="template_id" id="cfg_template_id" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+            {% for t in all_templates %}
+            <option value="{{ t.id }}">{{ t.name }} ({{ t.event_key }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Recipient Type Strategy -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Recipient Strategy</label>
+          <select name="recipient_type" id="cfg_recipient_type" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+            {% for code, label in recipient_types %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Subject Override -->
+        <div class="md:col-span-2">
+          <label class="block font-bold text-slate-700 mb-1">Subject Override <span class="font-normal text-slate-400">(Leave blank to use default template subject)</span></label>
+          <input type="text" name="subject_override" id="cfg_subject_override" placeholder="{{ company_name }} Notification..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- CC Recipients -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">CC Email Addresses <span class="font-normal text-slate-400">(Comma-separated)</span></label>
+          <input type="text" name="cc_recipients" id="cfg_cc_recipients" placeholder="ops@company.com, admin@tradeconnect.com" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- BCC Recipients -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">BCC Email Addresses <span class="font-normal text-slate-400">(Comma-separated)</span></label>
+          <input type="text" name="bcc_recipients" id="cfg_bcc_recipients" placeholder="archive@tradeconnect.com" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Threshold Value (e.g. low credits) -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Threshold Cutoff <span class="font-normal text-slate-400">(For credit alerts)</span></label>
+          <input type="number" step="0.01" name="threshold_value" id="cfg_threshold_value" placeholder="e.g. 50.00" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Cooldown Hours -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Cooldown Duration <span class="font-normal text-slate-400">(Hours between duplicate alerts)</span></label>
+          <input type="number" name="cooldown_hours" id="cfg_cooldown_hours" min="1" value="24" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Reminder Days Before Expiry -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Reminder Timing <span class="font-normal text-slate-400">(Days before expiry)</span></label>
+          <input type="number" name="reminder_days_before" id="cfg_reminder_days_before" min="1" value="5" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Severity & Priority -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Severity</label>
+            <select name="severity" id="cfg_severity" class="w-full px-2 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+              {% for code, label in severities %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Priority</label>
+            <select name="priority" id="cfg_priority" class="w-full px-2 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+              {% for code, label in priorities %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Status & Manual Send Switches -->
+        <div class="md:col-span-2 pt-2 border-t border-slate-200 flex flex-wrap items-center gap-6">
+          <label class="flex items-center gap-2 cursor-pointer" id="cfg_is_enabled_label">
+            <input type="checkbox" name="is_enabled" id="cfg_is_enabled" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+            <span class="font-bold text-slate-800">Rule Enabled &amp; Active</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="allow_manual_send" id="cfg_allow_manual_send" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+            <span class="font-bold text-slate-800">Allow Manual Resend by Admins</span>
+          </label>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeConfigureModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+          Cancel
+        </button>
+        <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-check text-[11px]"></i> Save Configuration
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- MODAL 2: LIVE PREVIEW MODAL -->
+<!-- ========================================================================= -->
+<div id="previewModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+    
+    <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div>
+        <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-eye text-indigo-600"></i> Branded Live Email Preview
+        </h3>
+        <span class="text-[11px] text-slate-500" id="previewEventKey"></span>
+      </div>
+      <button type="button" onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Subject Banner -->
+    <div class="px-5 py-2.5 bg-indigo-50/60 border-b border-indigo-100 text-xs text-indigo-950 font-bold flex items-center gap-2">
+      <span class="text-indigo-600 uppercase tracking-wider text-[10px]">Subject:</span>
+      <span id="previewSubjectText" class="font-bold"></span>
+    </div>
+
+    <!-- Sandboxed Render Container -->
+    <div class="flex-1 overflow-y-auto p-4 bg-slate-100">
+      <div id="previewHtmlContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[450px]">
+        <!-- Rendered HTML inserted dynamically -->
+      </div>
+    </div>
+
+    <div class="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+      <span class="text-slate-500 text-[11px]">Rendered using TradeConnect dynamic master layout &amp; trust badges.</span>
+      <button type="button" onclick="closePreviewModal()" class="px-4 py-1.5 rounded-xl font-bold text-slate-700 bg-slate-200 hover:bg-slate-300 transition">
+        Close Preview
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- MODAL 3: SEND TEST EMAIL MODAL -->
+<!-- ========================================================================= -->
+<div id="testSendModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+    
+    <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+      <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-paper-plane text-amber-500"></i> Dispatch Test Email
+      </h3>
+      <button type="button" onclick="closeTestSendModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="testSendForm" method="POST" action="" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      <p class="text-slate-600">
+        Dispatches an immediate live test transmission of <strong id="testSendRuleName" class="text-slate-900"></strong> via active SMTP credentials.
+      </p>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Target Test Email Address</label>
+        <input type="email" name="target_email" value="{{ request.user.email }}" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-semibold">
+      </div>
+
+      <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeTestSendModal()" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+          Cancel
+        </button>
+        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-md shadow-amber-600/20 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane text-[10px]"></i> Send Test Now
+        </button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- MODAL 4: MANUAL NOTIFICATION DISPATCH MODAL -->
+<!-- ========================================================================= -->
+<div id="manualSendModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+    
+    <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div>
+        <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-bullhorn text-purple-600"></i> Manual Notification Dispatch
+        </h3>
+        <p class="text-xs text-slate-500 font-medium mt-0.5" id="manualSendRuleTitle"></p>
+      </div>
+      <button type="button" onclick="closeManualSendModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <form id="manualSendForm" method="POST" action="" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      
+      <div class="bg-purple-50/70 border border-purple-200 p-3 rounded-xl text-purple-950 text-[11px] leading-relaxed">
+        <i class="fa-solid fa-shield-check text-purple-600 mr-1 font-bold"></i>
+        <strong>Audit Compliance:</strong> Manual dispatches are recorded with your Super Admin operator identity (<code class="font-bold">{{ request.user.email }}</code>) in the permanent delivery outbox audit log.
+      </div>
+
+      <!-- Target Company Picker -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Target Organization (Optional)</label>
+        <select name="target_company_id" id="manual_company_id" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500">
+          <option value="">-- No specific company (Use explicit target email) --</option>
+          {% for c in companies %}
+          <option value="{{ c.id }}">{{ c.name }} ({{ c.get_company_type_display }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Target Specific Recipient Email -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Target Recipient Email Address</label>
+        <input type="email" name="target_email" id="manual_target_email" placeholder="client-admin@company.com" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 font-semibold">
+        <span class="text-[10px] text-slate-500 mt-1 block">Leave empty to resolve designated organization members automatically.</span>
+      </div>
+
+      <!-- Custom Subject Override -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Subject Line (Optional Override)</label>
+        <input type="text" name="override_subject" id="manual_subject" placeholder="Leave empty for standard subject" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500">
+      </div>
+
+      <!-- Reason / Justification Note -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Operator Justification Note (Recorded in Audit Trail)</label>
+        <textarea name="reason_note" id="manual_reason" rows="2" placeholder="e.g. Manual resend requested by client finance manager during phone consultation..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500" required></textarea>
+      </div>
+
+      <!-- Confirmation Checkbox -->
+      <div class="pt-2">
+        <label class="flex items-start gap-2 cursor-pointer bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+          <input type="checkbox" id="manual_confirm_check" required class="mt-0.5 rounded text-purple-600 focus:ring-purple-500">
+          <span class="text-[11px] text-slate-700 font-bold leading-snug">
+            I confirm that this manual email dispatch is authorized and adheres to platform operational policies.
+          </span>
+        </label>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeManualSendModal()" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+          Cancel
+        </button>
+        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-md shadow-purple-600/20 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane text-[10px]"></i> Dispatch Notification
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+
+<!-- JavaScript Modal Handlers & AJAX Preview -->
+<script>
+  // 1. Configure Modal
+  function openConfigureModal(ruleId) {
+    const rawData = document.getElementById('rule-data-' + ruleId);
+    if (!rawData) return;
+    const rule = JSON.parse(rawData.textContent);
+
+    document.getElementById('cfgModalTitle').textContent = 'Configure: ' + rule.name;
+    document.getElementById('cfgModalEventKey').textContent = 'Event Key: ' + rule.event_key;
+    document.getElementById('cfgForm').action = '/admin-panel/email/triggers/' + rule.id + '/edit/';
+
+    document.getElementById('cfg_name').value = rule.name || '';
+    document.getElementById('cfg_description').value = rule.description || '';
+    document.getElementById('cfg_target_audience').value = rule.target_audience || 'USER';
+    document.getElementById('cfg_delivery_mode').value = rule.delivery_mode || 'AUTOMATIC';
+    document.getElementById('cfg_channel').value = rule.channel || 'BOTH';
+    if (rule.template_id) {
+      document.getElementById('cfg_template_id').value = rule.template_id;
+    }
+    document.getElementById('cfg_recipient_type').value = rule.recipient_type || 'ACTING_USER';
+    document.getElementById('cfg_subject_override').value = rule.subject_override || '';
+    document.getElementById('cfg_cc_recipients').value = rule.cc_recipients || '';
+    document.getElementById('cfg_bcc_recipients').value = rule.bcc_recipients || '';
+    document.getElementById('cfg_threshold_value').value = rule.threshold_value || '';
+    document.getElementById('cfg_cooldown_hours').value = rule.cooldown_hours || 24;
+    document.getElementById('cfg_reminder_days_before').value = rule.reminder_days_before || 5;
+    document.getElementById('cfg_severity').value = rule.severity || 'INFO';
+    document.getElementById('cfg_priority').value = rule.priority || 'NORMAL';
+
+    const enabledCheckbox = document.getElementById('cfg_is_enabled');
+    enabledCheckbox.checked = !!rule.is_enabled;
+    if (rule.is_mandatory_auth) {
+      enabledCheckbox.disabled = true;
+      document.getElementById('cfg_is_enabled_label').title = 'Security Authentication Email: Mandatory Active';
+    } else {
+      enabledCheckbox.disabled = false;
+      document.getElementById('cfg_is_enabled_label').title = '';
+    }
+
+    document.getElementById('cfg_allow_manual_send').checked = !!rule.allow_manual_send;
+
+    const modal = document.getElementById('configureModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeConfigureModal() {
+    const modal = document.getElementById('configureModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  // 2. Live Preview Modal
+  function openPreviewModal(ruleId) {
+    const modal = document.getElementById('previewModal');
+    const container = document.getElementById('previewHtmlContainer');
+    const subjectEl = document.getElementById('previewSubjectText');
+    const eventKeyEl = document.getElementById('previewEventKey');
+
+    container.innerHTML = '<div class="p-10 text-center text-slate-400 font-bold"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Rendering live template layout...</div>';
+    subjectEl.textContent = 'Loading...';
+    eventKeyEl.textContent = 'Event #' + ruleId;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    fetch('/admin-panel/email/triggers/' + ruleId + '/preview/')
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'success') {
+          subjectEl.textContent = data.subject || '(No subject)';
+          eventKeyEl.textContent = data.event_key + ' [' + data.delivery_mode + ']';
+          container.innerHTML = data.html;
+        } else {
+          container.innerHTML = '<div class="p-6 text-rose-600 font-bold">Failed to render preview.</div>';
+        }
+      })
+      .catch(err => {
+        container.innerHTML = '<div class="p-6 text-rose-600 font-bold">Error loading preview: ' + err + '</div>';
+      });
+  }
+
+  function closePreviewModal() {
+    const modal = document.getElementById('previewModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  // 3. Send Test Modal
+  function openTestSendModal(ruleId, ruleName) {
+    document.getElementById('testSendRuleName').textContent = ruleName;
+    document.getElementById('testSendForm').action = '/admin-panel/email/triggers/' + ruleId + '/test-send/';
+    const modal = document.getElementById('testSendModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeTestSendModal() {
+    const modal = document.getElementById('testSendModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  // 4. Manual Send Modal
+  function openManualSendModal(ruleId, ruleName, deliveryMode) {
+    document.getElementById('manualSendRuleTitle').textContent = ruleName + ' (' + deliveryMode + ' Mode)';
+    document.getElementById('manualSendForm').action = '/admin-panel/email/triggers/' + ruleId + '/manual-send/';
+    document.getElementById('manual_target_email').value = '';
+    document.getElementById('manual_subject').value = '';
+    document.getElementById('manual_reason').value = '';
+    document.getElementById('manual_confirm_check').checked = false;
+
+    const modal = document.getElementById('manualSendModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeManualSendModal() {
+    const modal = document.getElementById('manualSendModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  // Close modals on escape key press
+  window.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeConfigureModal();
+      closePreviewModal();
+      closeTestSendModal();
+      closeManualSendModal();
+    }
+  });
+</script>
 {% endblock %}

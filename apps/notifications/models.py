@@ -94,8 +94,43 @@ class NotificationRule(models.Model):
         HIGH = "HIGH", "High Priority"
         URGENT = "URGENT", "Urgent / Instant Dispatch"
 
+    class DeliveryMode(models.TextChoices):
+        AUTOMATIC = "AUTOMATIC", "Automatic"
+        MANUAL = "MANUAL", "Manual"
+        BOTH = "BOTH", "Both (Auto & Manual)"
+
+    class Channel(models.TextChoices):
+        EMAIL = "EMAIL", "Email Only"
+        IN_APP = "IN_APP", "In-App Only"
+        BOTH = "BOTH", "Both (Email & In-App)"
+
+    class TargetAudience(models.TextChoices):
+        USER = "USER", "User / Company User"
+        COMPANY_ADMIN = "COMPANY_ADMIN", "Company Admin"
+        SUPER_ADMIN = "SUPER_ADMIN", "Super Admin Platform Alert"
+
     name = models.CharField(max_length=150)
     event_key = models.CharField(max_length=100, db_index=True)
+    description = models.TextField(blank=True, default="")
+    target_audience = models.CharField(
+        max_length=30,
+        choices=TargetAudience.choices,
+        default=TargetAudience.USER,
+        db_index=True,
+    )
+    delivery_mode = models.CharField(
+        max_length=20,
+        choices=DeliveryMode.choices,
+        default=DeliveryMode.AUTOMATIC,
+        db_index=True,
+    )
+    channel = models.CharField(
+        max_length=20,
+        choices=Channel.choices,
+        default=Channel.BOTH,
+        db_index=True,
+        help_text="Notification delivery channels: Email, In-App, or Both",
+    )
     module = models.CharField(
         max_length=30,
         choices=ModuleType.choices,
@@ -120,6 +155,45 @@ class NotificationRule(models.Model):
         blank=True,
         help_text="Comma-separated emails when recipient_type is CUSTOM or extra alert emails",
     )
+    subject_override = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Custom subject override. If empty, linked template subject is used.",
+    )
+    cc_recipients = models.TextField(
+        blank=True,
+        default="",
+        help_text="Comma-separated CC email addresses",
+    )
+    bcc_recipients = models.TextField(
+        blank=True,
+        default="",
+        help_text="Comma-separated BCC email addresses",
+    )
+    threshold_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Threshold value e.g. low credits cutoff",
+    )
+    cooldown_hours = models.PositiveIntegerField(
+        default=24,
+        help_text="Hours to wait before sending duplicate threshold alert",
+    )
+    reminder_days_before = models.PositiveIntegerField(
+        default=5,
+        help_text="Days prior to expiry for reminder dispatch",
+    )
+    is_mandatory_auth = models.BooleanField(
+        default=False,
+        help_text="Security-critical auth notification that cannot be disabled to prevent authentication breakage",
+    )
+    allow_manual_send = models.BooleanField(
+        default=True,
+        help_text="Allow authorized admins to manually trigger/resend this notification",
+    )
     severity = models.CharField(
         max_length=20,
         choices=Severity.choices,
@@ -135,12 +209,12 @@ class NotificationRule(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["module", "name"]
+        ordering = ["target_audience", "name"]
         verbose_name = "Notification Rule"
         verbose_name_plural = "Notification Rules"
 
     def __str__(self):
-        return f"{self.name} [{self.event_key} -> {self.recipient_type}]"
+        return f"{self.name} [{self.event_key} -> {self.delivery_mode}]"
 
 
 class NotificationPreference(models.Model):
@@ -188,6 +262,14 @@ class NotificationPreference(models.Model):
         pref = cls.objects.filter(user=user, category=category).first()
         return pref.email_enabled if pref else True
 
+    @classmethod
+    def is_in_app_permitted(cls, user, category):
+        """Mandatory categories (SECURITY, BILLING) are always permitted."""
+        if category in (cls.Category.SECURITY, cls.Category.BILLING):
+            return True
+        pref = cls.objects.filter(user=user, category=category).first()
+        return pref.in_app_enabled if pref else True
+
 
 class NotificationLog(models.Model):
     class Status(models.TextChoices):
@@ -229,6 +311,20 @@ class NotificationLog(models.Model):
     subject = models.CharField(max_length=255)
     html_body = models.TextField()
     text_body = models.TextField()
+    delivery_mode = models.CharField(
+        max_length=20,
+        default="AUTOMATIC",
+        db_index=True,
+    )
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_notifications",
+    )
+    cc_recipients = models.TextField(blank=True, default="")
+    bcc_recipients = models.TextField(blank=True, default="")
     context_data = models.JSONField(default=dict, blank=True)
     status = models.CharField(
         max_length=20,

@@ -146,6 +146,12 @@ class Notification(models.Model):
         INVOICE_GENERATED = "invoice_generated", "Invoice Generated"
         SYSTEM = "system", "System Notification"
 
+    class Priority(models.TextChoices):
+        INFO = "INFO", "Info"
+        SUCCESS = "SUCCESS", "Success"
+        WARNING = "WARNING", "Warning"
+        CRITICAL = "CRITICAL", "Critical"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -163,10 +169,23 @@ class Notification(models.Model):
         choices=NotificationType.choices,
         default=NotificationType.SYSTEM,
     )
+    priority = models.CharField(
+        max_length=20,
+        choices=Priority.choices,
+        default=Priority.INFO,
+        db_index=True,
+    )
+    event_key = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
     title = models.CharField(max_length=255)
     message = models.TextField()
     link = models.CharField(max_length=500, blank=True)
-    is_read = models.BooleanField(default=False)
+    is_read = models.BooleanField(default=False, db_index=True)
+    is_archived = models.BooleanField(default=False, db_index=True)
     icon = models.CharField(max_length=50, default="fa-bell")
     color = models.CharField(max_length=30, default="blue")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -181,6 +200,21 @@ class Notification(models.Model):
         if not self.is_read:
             self.is_read = True
             self.save(update_fields=["is_read"])
+
+    def mark_as_unread(self):
+        if self.is_read:
+            self.is_read = False
+            self.save(update_fields=["is_read"])
+
+    def archive(self):
+        if not self.is_archived:
+            self.is_archived = True
+            self.save(update_fields=["is_archived"])
+
+    def restore(self):
+        if self.is_archived:
+            self.is_archived = False
+            self.save(update_fields=["is_archived"])
 
 
 class FAQ(models.Model):

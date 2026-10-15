@@ -225,23 +225,39 @@ class TransactionalEmailService:
         Routes through central notification engine with fallback.
         """
         from apps.notifications.services.email_engine import trigger_email_notification
+        # 1. Company Admin alert
         logs = trigger_email_notification(
-            event_key="billing.subscription_expiring",
+            event_key="billing.subscription_expiring_admin",
             context={
-                "summary": f"Your {subscription.get_plan_display()} subscription for {company.name} is scheduled to renew or expire on {subscription.valid_till} (in {days_left} days).",
-                "details": {
-                    "Company": company.name,
-                    "Subscription Plan": subscription.get_plan_display(),
-                    "Days Remaining": str(days_left),
-                    "Expiry Date": str(subscription.valid_till),
-                },
+                "company_name": company.name,
+                "plan_name": subscription.get_plan_display(),
+                "expiry_date": str(subscription.valid_till),
+                "days_left": str(days_left),
+                "auto_renew_status": "Active" if subscription.auto_renew else "Inactive (Manual Renewal Required)",
+                "renewal_amount": str(getattr(subscription.plan_tier, "price", "0.00")),
                 "cta_url": "/company/billing/",
-                "cta_text": "Renew Subscription",
             },
             company=company,
             severity="WARNING",
+            idempotency_key=f"sub_exp_admin_{company.id}_{days_left}_{timezone.now().strftime('%Y%m%d')}",
             async_dispatch=False if getattr(settings, "TESTING", False) else True,
         )
+        # 2. Team member alert if within 5 days
+        if days_left <= 5:
+            trigger_email_notification(
+                event_key="billing.subscription_expiry_user",
+                context={
+                    "company_name": company.name,
+                    "plan_name": subscription.get_plan_display(),
+                    "expiry_date": str(subscription.valid_till),
+                    "days_left": str(days_left),
+                    "cta_url": "/company/billing/",
+                },
+                company=company,
+                severity="WARNING",
+                idempotency_key=f"sub_exp_user_{company.id}_{days_left}_{timezone.now().strftime('%Y%m%d')}",
+                async_dispatch=False if getattr(settings, "TESTING", False) else True,
+            )
         if logs:
             return True
 

@@ -554,26 +554,86 @@ def admin_email_template_test_send_view(request, pk):
 @superadmin_required
 def admin_email_triggers_view(request):
     """
-    Super Admin Notification Triggers & Routing Matrix:
-    Lists all event triggers, enabled status, target recipient types, and priority.
+    Super Admin Centralized Notification Management:
+    Lists all event triggers with Category tabs (User, Company Admin, Super Admin),
+    Delivery Mode filters (Automatic, Manual, Both), search, active toggle,
+    full configuration modal, preview modal, manual send modal, test send modal.
     """
-    rules_qs = NotificationRule.objects.select_related("template").order_by("module", "name")
-    
-    module_filter = request.GET.get("module", "").strip().upper()
-    if module_filter:
-        rules_qs = rules_qs.filter(module=module_filter)
+    rules_qs = NotificationRule.objects.select_related("template").order_by("target_audience", "name")
 
-    modules = NotificationRule.ModuleType.choices
-    page_obj, query_string = paginate_and_preserve(request, rules_qs, per_page=10)
+    # Counts for Audience Category tabs
+    total_count = NotificationRule.objects.count()
+    user_count = NotificationRule.objects.filter(target_audience=NotificationRule.TargetAudience.USER).count()
+    company_admin_count = NotificationRule.objects.filter(target_audience=NotificationRule.TargetAudience.COMPANY_ADMIN).count()
+    super_admin_count = NotificationRule.objects.filter(target_audience=NotificationRule.TargetAudience.SUPER_ADMIN).count()
+
+    # Category / Target Audience filter
+    audience_filter = request.GET.get("audience", "").strip().upper()
+    if audience_filter in ["USER", "COMPANY_ADMIN", "SUPER_ADMIN"]:
+        rules_qs = rules_qs.filter(target_audience=audience_filter)
+
+    # Delivery Mode filter
+    mode_filter = request.GET.get("mode", "").strip().upper()
+    if mode_filter in ["AUTOMATIC", "MANUAL", "BOTH"]:
+        rules_qs = rules_qs.filter(delivery_mode=mode_filter)
+
+    # Search query
+    q = request.GET.get("q", "").strip()
+    if q:
+        rules_qs = rules_qs.filter(
+            Q(name__icontains=q)
+            | Q(event_key__icontains=q)
+            | Q(description__icontains=q)
+            | Q(template__subject__icontains=q)
+        )
+
+    # Status filter
+    status_filter = request.GET.get("status", "").strip().lower()
+    if status_filter == "enabled":
+        rules_qs = rules_qs.filter(is_enabled=True)
+    elif status_filter == "disabled":
+        rules_qs = rules_qs.filter(is_enabled=False)
+
+    page_obj, query_string = paginate_and_preserve(request, rules_qs, per_page=12)
+
+    # Templates and choices for configuration modal
+    all_templates = NotificationTemplate.objects.filter(is_active=True).order_by("name")
+    recipient_types = NotificationRule.RecipientType.choices
+    delivery_modes = NotificationRule.DeliveryMode.choices
+    target_audiences = NotificationRule.TargetAudience.choices
+    severities = NotificationRule.Severity.choices
+    priorities = NotificationRule.Priority.choices
+
+    # Sample companies and users for manual send modal
+    from apps.companies.models import Company
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    companies = Company.objects.filter(is_deleted=False).order_by("name")[:30]
+    sample_users = User.objects.filter(is_active=True).select_related("company").order_by("first_name", "last_name")[:30]
 
     context = {
-        "page_title": "Notification Event Rules & Triggers",
+        "page_title": "Centralized Notification Management",
         "active_tab": "triggers",
         "rules": page_obj,
         "page_obj": page_obj,
         "query_string": query_string,
-        "modules": modules,
-        "selected_module": module_filter,
+        "selected_audience": audience_filter,
+        "selected_mode": mode_filter,
+        "selected_status": status_filter,
+        "search_query": q,
+        "total_count": total_count,
+        "user_count": user_count,
+        "company_admin_count": company_admin_count,
+        "super_admin_count": super_admin_count,
+        "all_templates": all_templates,
+        "recipient_types": recipient_types,
+        "delivery_modes": delivery_modes,
+        "target_audiences": target_audiences,
+        "channels": NotificationRule.Channel.choices,
+        "severities": severities,
+        "priorities": priorities,
+        "companies": companies,
+        "sample_users": sample_users,
     }
     return render(request, "admin_panel/email/triggers.html", context)
 
@@ -584,13 +644,293 @@ def admin_email_triggers_view(request):
 def admin_email_trigger_toggle_view(request, pk):
     """
     POST action to toggle an event trigger rule on or off.
+    Enforces business security rule: Mandatory authentication emails cannot be disabled.
+    Supports both traditional POST redirect and AJAX/JSON API responses.
     """
     rule_obj = get_object_or_404(NotificationRule, pk=pk)
+    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", "")
+
+    if rule_obj.is_mandatory_auth and rule_obj.is_enabled:
+        msg = f"Security Alert: '{rule_obj.name}' is a mandatory authentication notification and cannot be disabled."
+        if is_ajax:
+            return JsonResponse({"status": "error", "message": msg}, status=400)
+        messages.error(request, msg)
+        return redirect("admin-panel-email-triggers")
+
     rule_obj.is_enabled = not rule_obj.is_enabled
     rule_obj.save(update_fields=["is_enabled"])
 
     status_str = "Enabled" if rule_obj.is_enabled else "Disabled"
-    messages.success(request, f"Rule '{rule_obj.name}' is now {status_str}.")
+    msg = f"Notification '{rule_obj.name}' is now {status_str}."
+    if is_ajax:
+        return JsonResponse({"status": "success", "is_enabled": rule_obj.is_enabled, "message": msg})
+    messages.success(request, msg)
+    return redirect("admin-panel-email-triggers")
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_trigger_edit_view(request, pk):
+    """
+    Saves full notification rule configuration from modal.
+    """
+    from decimal import Decimal
+    rule = get_object_or_404(NotificationRule, pk=pk)
+
+    rule.name = request.POST.get("name", rule.name).strip()
+    rule.description = request.POST.get("description", rule.description).strip()
+    
+    deliv_mode = request.POST.get("delivery_mode", rule.delivery_mode)
+    if deliv_mode in dict(NotificationRule.DeliveryMode.choices):
+        rule.delivery_mode = deliv_mode
+
+    chan = request.POST.get("channel", rule.channel)
+    if chan in dict(NotificationRule.Channel.choices):
+        rule.channel = chan
+
+    aud = request.POST.get("target_audience", rule.target_audience)
+    if aud in dict(NotificationRule.TargetAudience.choices):
+        rule.target_audience = aud
+
+    tpl_id = request.POST.get("template_id")
+    if tpl_id:
+        tpl = NotificationTemplate.objects.filter(id=tpl_id).first()
+        if tpl:
+            rule.template = tpl
+
+    rec_type = request.POST.get("recipient_type", rule.recipient_type)
+    if rec_type in dict(NotificationRule.RecipientType.choices):
+        rule.recipient_type = rec_type
+
+    rule.custom_recipients = request.POST.get("custom_recipients", "").strip()
+    rule.subject_override = request.POST.get("subject_override", "").strip()
+    rule.cc_recipients = request.POST.get("cc_recipients", "").strip()
+    rule.bcc_recipients = request.POST.get("bcc_recipients", "").strip()
+
+    thresh = request.POST.get("threshold_value", "").strip()
+    if thresh:
+        try:
+            rule.threshold_value = Decimal(thresh)
+        except Exception:
+            pass
+    else:
+        rule.threshold_value = None
+
+    cooldown = request.POST.get("cooldown_hours", "").strip()
+    if cooldown and cooldown.isdigit():
+        rule.cooldown_hours = max(1, int(cooldown))
+
+    remind_days = request.POST.get("reminder_days_before", "").strip()
+    if remind_days and remind_days.isdigit():
+        rule.reminder_days_before = max(1, int(remind_days))
+
+    sev = request.POST.get("severity", rule.severity)
+    if sev in dict(NotificationRule.Severity.choices):
+        rule.severity = sev
+
+    pri = request.POST.get("priority", rule.priority)
+    if pri in dict(NotificationRule.Priority.choices):
+        rule.priority = pri
+
+    is_en = request.POST.get("is_enabled") in ["on", "true", "1"]
+    if rule.is_mandatory_auth:
+        rule.is_enabled = True
+    else:
+        rule.is_enabled = is_en
+
+    rule.allow_manual_send = request.POST.get("allow_manual_send") in ["on", "true", "1"]
+    rule.save()
+
+    messages.success(request, f"Configuration for '{rule.name}' saved successfully.")
+    return redirect("admin-panel-email-triggers")
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_trigger_manual_send_view(request, pk):
+    """
+    Manually dispatches an authorized notification (for MANUAL or BOTH mode).
+    Validates recipient permissions, logs audit entry with sent_by, and delivers email.
+    """
+    rule = get_object_or_404(NotificationRule, pk=pk)
+
+    if rule.delivery_mode == NotificationRule.DeliveryMode.AUTOMATIC:
+        messages.error(request, f"'{rule.name}' is configured for Automatic delivery only. Manual dispatch is disabled.")
+        return redirect("admin-panel-email-triggers")
+
+    target_email = request.POST.get("target_email", "").strip()
+    target_company_id = request.POST.get("target_company_id", "").strip()
+    custom_subject = request.POST.get("override_subject", "").strip()
+    reason_note = request.POST.get("reason_note", "").strip()
+
+    from apps.companies.models import Company
+    company = None
+    if target_company_id:
+        company = Company.objects.filter(id=target_company_id).first()
+
+    from apps.notifications.services.email_engine import trigger_email_notification
+    custom_emails = [target_email] if target_email else None
+
+    logs = trigger_email_notification(
+        event_key=rule.event_key,
+        company=company,
+        user=None,
+        is_manual=True,
+        sent_by=request.user,
+        custom_recipient_emails=custom_emails,
+        override_subject=custom_subject if custom_subject else None,
+        context={
+            "manual_sender": request.user.get_full_name() or request.user.email,
+            "manual_reason": reason_note,
+            "cta_url": request.build_absolute_uri("/dashboard/"),
+        },
+        async_dispatch=False,
+    )
+
+    if logs:
+        sent_ok = any(l.status == NotificationLog.Status.SENT for l in logs)
+        if sent_ok:
+            rec_str = ", ".join(l.recipient_email for l in logs)
+            messages.success(request, f"Manual dispatch for '{rule.name}' succeeded! Dispatched to: {rec_str}.")
+        else:
+            messages.warning(request, f"Manual dispatch initiated ({len(logs)} log entries created). Last status: {logs[0].status}.")
+    else:
+        messages.error(request, f"Manual dispatch could not be sent. Check recipient criteria or delivery mode.")
+
+    return redirect("admin-panel-email-triggers")
+
+
+@login_required
+@superadmin_required
+def admin_email_trigger_preview_api(request, pk):
+    """
+    JSON preview endpoint for a Notification Rule.
+    Renders subject and full HTML layout with contextual sample data.
+    """
+    rule = get_object_or_404(NotificationRule, pk=pk)
+    tpl = rule.template
+
+    now = timezone.now()
+    sample_context = {
+        "recipient_name": request.user.get_full_name() or "Admin User",
+        "recipient_email": request.user.email,
+        "company_name": "Sample Enterprise Ltd.",
+        "user_name": request.user.first_name or "Enterprise User",
+        "role_name": "Procurement Manager",
+        "role": "Procurement Specialist",
+        "status_state": "Active",
+        "action_date": now.strftime("%d %b %Y, %I:%M %p"),
+        "operator_name": request.user.get_full_name() or "Super Administrator",
+        "reason": "Administrative account update",
+        "decision_status": "Approved",
+        "decision": "Approved",
+        "verified_badge": "Active (Verified)",
+        "admin_operator": request.user.get_full_name() or "Platform Administrator",
+        "decision_date": now.strftime("%d %b %Y"),
+        "new_user_name": "Priya Patel",
+        "new_user_email": "priya.patel@enterprise.com",
+        "plan_name": "Enterprise Pro Growth",
+        "expiry_date": (now + timedelta(days=7)).strftime("%d %b %Y"),
+        "days_left": "7",
+        "renewal_amount": "15,000.00",
+        "auto_renew_status": "Active (Prepaid Auto-Pay)",
+        "amount": "15,000.00",
+        "current_credits": "35",
+        "threshold_credits": str(rule.threshold_value or 50),
+        "failure_reason": "Card expired / insufficient funds",
+        "invoice_id": "INV-2026-0098",
+        "gateway_ref": "GW-FAIL-9821",
+        "error_code": "INSUFFICIENT_FUNDS",
+        "error_message": "Automated renewal failed due to insufficient wallet funds",
+        "failed_event": rule.event_key,
+        "attempts_count": "3",
+        "log_id": "8412",
+        "alert_title": "Repeated Authentication Failures",
+        "incident_code": "SEC-WARN-091",
+        "source_ip": "103.21.144.10",
+        "incident_time": now.strftime("%d %b %Y, %I:%M %p"),
+        "verification_url": "https://tradeconnect.com/auth/verify-email/sample-token/",
+        "reset_url": "https://tradeconnect.com/auth/reset-password/sample-token/",
+        "cta_url": "https://tradeconnect.com/dashboard/",
+        "topup_url": "https://tradeconnect.com/company/billing/",
+        "review_url": "https://tradeconnect.com/admin-panel/companies/",
+        "audit_url": "https://tradeconnect.com/admin-panel/audit-logs/",
+        "dashboard_url": "https://tradeconnect.com/dashboard/",
+        "current_year": now.year,
+        "platform_name": "AI Procurement & Sales Platform",
+    }
+
+    subj_raw = rule.subject_override or tpl.subject
+    subject_rendered = render_string_template(subj_raw, sample_context).strip()
+    body_rendered = render_string_template(tpl.html_content, sample_context)
+
+    if "<html" not in body_rendered.lower():
+        full_html = build_branded_html(
+            title=subject_rendered,
+            summary="Operational preview of rendered notification rule.",
+            cta_url=sample_context.get("cta_url"),
+            cta_text="View in Platform",
+            severity=rule.severity,
+            custom_content=body_rendered,
+            event_key=rule.event_key,
+            template_obj=tpl,
+        )
+    else:
+        full_html = body_rendered
+
+    return JsonResponse({
+        "status": "success",
+        "name": rule.name,
+        "event_key": rule.event_key,
+        "delivery_mode": rule.delivery_mode,
+        "subject": subject_rendered,
+        "html": full_html,
+    })
+
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_email_trigger_test_send_api(request, pk):
+    """
+    Sends an immediate live test email for this notification rule to the logged-in admin.
+    """
+    rule = get_object_or_404(NotificationRule, pk=pk)
+    target_email = request.POST.get("target_email", "").strip() or request.user.email
+
+    from apps.notifications.services.email_engine import trigger_email_notification
+    logs = trigger_email_notification(
+        event_key=rule.event_key,
+        company=None,
+        user=request.user,
+        is_manual=True,
+        sent_by=request.user,
+        custom_recipient_emails=[target_email],
+        context={
+            "user_name": request.user.get_full_name() or "Admin Tester",
+            "recipient_name": request.user.get_full_name() or "Admin Tester",
+            "company_name": "TradeConnect Test Workspace",
+            "cta_url": request.build_absolute_uri("/dashboard/"),
+        },
+        async_dispatch=False,
+    )
+
+    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", "")
+
+    if logs and any(l.status == NotificationLog.Status.SENT for l in logs):
+        msg = f"Test email for '{rule.name}' successfully sent to {target_email}!"
+        if is_ajax:
+            return JsonResponse({"status": "success", "message": msg})
+        messages.success(request, msg)
+    else:
+        err = logs[0].last_error if logs else "No dispatch log created"
+        msg = f"Test email initiated for {target_email}. Status: {logs[0].status if logs else 'None'}. Info: {err}"
+        if is_ajax:
+            return JsonResponse({"status": "warning", "message": msg})
+        messages.warning(request, msg)
+
     return redirect("admin-panel-email-triggers")
 
 

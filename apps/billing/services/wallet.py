@@ -446,6 +446,28 @@ class CreditWalletService:
                     color="amber",
                 )
 
+            # Trigger Super Admin notification for subscription change
+            try:
+                from apps.notifications.services.email_engine import trigger_email_notification
+                trigger_email_notification(
+                    event_key="admin.subscription_change",
+                    company=company,
+                    context={
+                        "company_name": company.name,
+                        "plan_name": plan_tier.name,
+                        "action_type": "Renewed" if is_renewal else "Purchased / Upgraded",
+                        "billing_cycle": getattr(plan_tier, "billing_cycle", "Monthly"),
+                        "amount": f"{plan_tier.price:,.2f}",
+                        "effective_date": timezone.now().strftime("%d %b %Y"),
+                        "credits_allocated": f"{plan_tier.included_credits} Credits",
+                        "cta_url": f"/admin-panel/companies/{company.id}/",
+                    },
+                    severity="INFO",
+                    idempotency_key=f"admin_subchange_{company.id}_{int(timezone.now().timestamp())}",
+                )
+            except Exception as exc:
+                logger.warning(f"Failed to trigger subscription change notification: {exc}")
+
     @classmethod
     def adjust_credits_admin(cls, company, delta, reason="Super Admin Adjustment", admin_user=None):
         """
@@ -779,6 +801,24 @@ class CreditWalletService:
                         icon="fa-battery-quarter",
                         color="rose",
                     )
+
+                # Trigger automated email notification for billing.credits_low
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    trigger_email_notification(
+                        event_key="billing.credits_low",
+                        company=company,
+                        context={
+                            "current_credits": str(wallet.total_available),
+                            "threshold_credits": "50",
+                            "company_name": company.name,
+                            "topup_url": "/company/billing/",
+                        },
+                        severity="WARNING",
+                        idempotency_key=f"credits_low_{company.id}_{timezone.now().strftime('%Y%m%d')}",
+                    )
+                except Exception as exc:
+                    logger.warning(f"Failed to trigger credits_low notification email: {exc}")
 
 
 class CompanyWalletService:
@@ -1420,6 +1460,43 @@ class CompanyWalletService:
                         icon="fa-triangle-exclamation",
                         color="rose",
                     )
+
+                # Trigger automated email notifications
+                try:
+                    from apps.notifications.services.email_engine import trigger_email_notification
+                    # 1. Company Admin alert: Payment Failed
+                    trigger_email_notification(
+                        event_key="billing.payment_failed",
+                        company=company,
+                        context={
+                            "company_name": company.name,
+                            "amount": f"{total_amount:,.2f}",
+                            "invoice_id": f"RENEW-{subscription.id}",
+                            "failure_reason": f"Insufficient wallet balance (Available: ₹{wallet.available_balance:,.2f}, Required: ₹{total_amount:,.2f})",
+                            "attempt_time": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                            "retry_url": "/company/billing/",
+                        },
+                        severity="CRITICAL",
+                        idempotency_key=f"pay_fail_{company.id}_{timezone.now().strftime('%Y%m%d')}",
+                    )
+                    # 2. Super Admin escalation: Payment Issue
+                    trigger_email_notification(
+                        event_key="admin.payment_issue",
+                        company=company,
+                        context={
+                            "company_name": company.name,
+                            "amount": f"{total_amount:,.2f}",
+                            "gateway_ref": f"AUTOPAY-FAIL-{subscription.id}",
+                            "error_code": "INSUFFICIENT_WALLET_BALANCE",
+                            "error_message": f"Auto-Pay failed and cancelled for {company.name}. Deficit: ₹{deficit:,.2f}",
+                            "retry_count": "1 of 1 (Cancelled)",
+                            "cta_url": f"/admin-panel/companies/{company.id}/",
+                        },
+                        severity="CRITICAL",
+                        idempotency_key=f"admin_payissue_{company.id}_{timezone.now().strftime('%Y%m%d')}",
+                    )
+                except Exception as exc:
+                    logger.warning(f"Failed to trigger payment failure email notifications: {exc}")
 
                 logger.warning(
                     "Auto-Pay failed and cancelled for %s: Required ₹%s, Available ₹%s",

@@ -187,6 +187,15 @@ EVENT_BANNER_CONFIGS = {
         "cta_text": "Review & Verify Company",
         "secondary_cta_text": "View All Companies",
     },
+    "admin.new_company": {
+        "theme": "blue",
+        "icon": "&#127970;",
+        "title": "New Company",
+        "highlight": "Registered!",
+        "subtitle": "A new enterprise organization has registered on the platform and awaits review:",
+        "cta_text": "Review & Verify Company",
+        "secondary_cta_text": "View All Companies",
+    },
     # 12. Export Report Ready
     "reports.export_ready": {
         "theme": "teal",
@@ -196,6 +205,204 @@ EVENT_BANNER_CONFIGS = {
         "subtitle": "Your requested data export has been compiled and is ready for secure download:",
         "cta_text": "Download Report Now",
         "secondary_cta_text": "Go to Reports Desk",
+    },
+    # 13. Registration & Welcome
+    "auth.welcome": {
+        "theme": "blue",
+        "icon": "&#128100;",
+        "title": "Welcome to TradeConnect",
+        "highlight": "Welcome!",
+        "subtitle": "Your account has been created and is ready for immediate deployment:",
+        "cta_text": "Explore Your Dashboard",
+        "secondary_cta_text": "Complete Profile",
+    },
+    "auth.welcome_registration": {
+        "theme": "blue",
+        "icon": "&#128100;",
+        "title": "Welcome to TradeConnect",
+        "highlight": "Welcome!",
+        "subtitle": "Your account has been created and is ready for immediate deployment:",
+        "cta_text": "Explore Your Dashboard",
+        "secondary_cta_text": "Complete Profile",
+    },
+    # 14. Email Verification
+    "auth.email_verification": {
+        "theme": "blue",
+        "icon": "&#9993;",
+        "title": "Email Verification",
+        "highlight": "Verify Email!",
+        "subtitle": "Please confirm your email address to authenticate your enterprise account:",
+        "cta_text": "Verify Email Address",
+        "secondary_cta_text": "Help Center",
+    },
+    # 15. Password Changed
+    "auth.password_changed": {
+        "theme": "emerald",
+        "icon": "&#128272;",
+        "title": "Password Updated",
+        "highlight": "Confirmed!",
+        "subtitle": "The password for your TradeConnect account was modified successfully:",
+        "cta_text": "Review Account Security",
+        "secondary_cta_text": "Contact Support",
+    },
+    # 16. Account Activation / Deactivation
+    "user.activation_deactivation": {
+        "theme": "blue",
+        "icon": "&#128100;",
+        "title": "Account Status",
+        "highlight": "Updated!",
+        "subtitle": "Your team member workspace access state has been modified:",
+        "cta_text": "Access Workspace",
+        "secondary_cta_text": "Contact Administrator",
+    },
+    # 17. Subscription Expiry Reminder (User)
+    "billing.subscription_expiry_user": {
+        "theme": "amber",
+        "icon": "&#128337;",
+        "title": "Subscription Expiry",
+        "highlight": "Notice!",
+        "subtitle": "Your company subscription is approaching expiration. Inform your billing administrator:",
+        "cta_text": "View Plan Status",
+        "secondary_cta_text": "Billing Details",
+    },
+    # 18. New Company User Added
+    "company.user_added": {
+        "theme": "blue",
+        "icon": "&#128101;",
+        "title": "New Team Member",
+        "highlight": "Added!",
+        "subtitle": "A new team member has joined your corporate workspace on TradeConnect:",
+        "cta_text": "Manage Team Members",
+        "secondary_cta_text": "View Company Settings",
+    },
+    # 19. Company Verification Decision
+    "company.verification_decision": {
+        "theme": "emerald",
+        "icon": "&#128737;",
+        "title": "Corporate Verification",
+        "highlight": "Decision!",
+        "subtitle": "Platform administrators have reviewed your company verification credentials:",
+        "cta_text": "View Verification Status",
+        "secondary_cta_text": "Company Profile",
+    },
+    # 20. Credits Low
+    "billing.credits_low": {
+        "theme": "amber",
+        "icon": "&#128267;",
+        "title": "Low AI Credits",
+        "highlight": "Alert!",
+        "subtitle": "Your available AI search and discovery credits have crossed the low threshold:",
+        "cta_text": "Recharge Credits Now",
+        "secondary_cta_text": "View Credit Ledger",
+    },
+    # 21. Subscription Expiring (Admin)
+    "billing.subscription_expiring_admin": {
+        "theme": "amber",
+        "icon": "&#128197;",
+        "title": "Subscription Renewal",
+        "highlight": "Upcoming!",
+        "subtitle": "Your enterprise subscription plan is approaching renewal or expiration:",
+        "cta_text": "Manage Subscription & Billing",
+        "secondary_cta_text": "View Plans",
+    },
+    # 22. Payment Failed
+    "billing.payment_failed": {
+        "theme": "rose",
+        "icon": "&#9888;",
+        "title": "Payment Failed",
+        "highlight": "Notice!",
+        "subtitle": "A recent subscription payment or wallet recharge attempt could not be processed:",
+        "cta_text": "Retry Payment Now",
+        "secondary_cta_text": "Recharge Wallet",
+    },
+    # 23. Company Profile Updated
+    "company.profile_updated": {
+        "theme": "blue",
+        "icon": "&#128221;",
+        "title": "Profile Updated",
+        "highlight": "Notice!",
+        "subtitle": "Critical corporate information or tax credentials were recently updated:",
+        "cta_text": "Review Company Profile",
+        "secondary_cta_text": "Team Management",
+    },
+    # 24. Super Admin: Verification Pending
+    "admin.verification_pending": {
+        "theme": "amber",
+        "icon": "&#128737;",
+        "title": "Verification Pending",
+        "highlight": "KYC Review!",
+        "subtitle": "An enterprise organization has submitted documents requesting verification:",
+        "cta_text": "Review Verification Dossier",
+        "secondary_cta_text": "All Companies",
+    },
+    # 25. Super Admin: Verification Decision Audit
+    "admin.verification_decision": {
+        "theme": "slate",
+        "icon": "&#128221;",
+        "title": "Verification Decision",
+        "highlight": "Audit Copy!",
+        "subtitle": "An audited corporate verification decision was recorded by an administrator:",
+        "cta_text": "View Audit Trail",
+        "secondary_cta_text": "Compliance Console",
+    },
+    # 26. Super Admin: New User Registration
+    "admin.new_user": {
+        "theme": "blue",
+        "icon": "&#128100;",
+        "title": "New User",
+        "highlight": "Registered!",
+        "subtitle": "A new individual user account has registered or joined a workspace:",
+        "cta_text": "View Users in Admin Panel",
+        "secondary_cta_text": "User Management",
+    },
+    # 27. Super Admin: Subscription Change
+    "admin.subscription_change": {
+        "theme": "emerald",
+        "icon": "&#128176;",
+        "title": "Subscription Event",
+        "highlight": "Revenue!",
+        "subtitle": "A corporate subscription purchase, upgrade, or cancellation was processed:",
+        "cta_text": "View Billing Analytics",
+        "secondary_cta_text": "Invoice Ledger",
+    },
+    # 28. Super Admin: Payment Issue
+    "admin.payment_issue": {
+        "theme": "rose",
+        "icon": "&#9888;",
+        "title": "Billing Issue",
+        "highlight": "Critical!",
+        "subtitle": "A customer payment failure or auto-renewal billing issue requires intervention:",
+        "cta_text": "Inspect Payment in Admin Panel",
+        "secondary_cta_text": "Billing Desk",
+    },
+    # 29. Super Admin: Email Delivery Failure
+    "admin.email_delivery_failure": {
+        "theme": "rose",
+        "icon": "&#9888;",
+        "title": "Delivery Failure",
+        "highlight": "SMTP Alert!",
+        "subtitle": "A transactional email delivery exhausted all retry attempts and failed permanently:",
+        "cta_text": "Inspect Failed Log",
+        "secondary_cta_text": "SMTP Provider Settings",
+    },
+    "admin.delivery_retry_exhausted": {
+        "theme": "rose",
+        "icon": "&#9888;",
+        "title": "Delivery Failure",
+        "highlight": "SMTP Alert!",
+        "subtitle": "A transactional email delivery exhausted all retry attempts and failed permanently:",
+        "cta_text": "Inspect Failed Log",
+        "secondary_cta_text": "SMTP Provider Settings",
+    },
+    # 30. Super Admin: Security Alert
+    "admin.security_alert": {
+        "theme": "rose",
+        "icon": "&#128680;",
+        "title": "Security Incident",
+        "highlight": "Threat Alert!",
+        "subtitle": "Repeated authentication failures or suspicious platform telemetry detected:",
+        "cta_text": "View Security Audit Logs",
+        "secondary_cta_text": "Access Control Desk",
     },
 }
 
@@ -648,17 +855,22 @@ def trigger_email_notification(
     priority=None,
     async_dispatch=True,
     attachments=None,
+    is_manual=False,
+    sent_by=None,
+    custom_recipient_emails=None,
+    override_subject=None,
 ):
     """
-    Central entry point for all platform modules to trigger automated email notifications.
-    Matches active rules, resolves recipients, renders templates, writes to outbox (NotificationLog),
+    Central entry point for all platform modules to trigger automated or manual email notifications.
+    Matches active rules, resolves recipients, enforces delivery modes (AUTOMATIC, MANUAL, BOTH),
+    checks cooldowns/thresholds, renders templates, writes to outbox (NotificationLog),
     and initiates delivery without blocking the calling request. Supports binary/file attachments.
     """
     context = context or {}
     created_logs = []
 
-    # 1. Look up active rules matching this event key
-    rules = NotificationRule.objects.filter(event_key=event_key, is_enabled=True).select_related("template")
+    # 1. Look up rules matching this event key
+    rules = list(NotificationRule.objects.filter(event_key=event_key).select_related("template"))
 
     # If company is provided, filter rules matching company_type scope
     if company:
@@ -681,6 +893,8 @@ def trigger_email_notification(
             recipient_type=NotificationRule.RecipientType.ACTING_USER if user else NotificationRule.RecipientType.COMPANY_ADMINS,
             severity=severity or NotificationRule.Severity.INFO,
             priority=priority or NotificationRule.Priority.NORMAL,
+            delivery_mode=NotificationRule.DeliveryMode.AUTOMATIC,
+            is_enabled=True,
         )
         rules = [synthetic_rule]
 
@@ -689,8 +903,69 @@ def trigger_email_notification(
         if not tpl or not tpl.is_active:
             continue
 
+        # Check enable switch: Mandatory auth emails (like password reset, email verification) cannot be disabled
+        if not rule.is_enabled and not rule.is_mandatory_auth:
+            logger.info(f"Skipping dispatch: rule '{rule.name}' ({event_key}) is disabled.")
+            continue
+
+        # Delivery Mode contract:
+        # AUTOMATIC: triggered only on business events; manual send blocked.
+        # MANUAL: triggered only on explicit admin UI actions; automatic trigger skipped.
+        # BOTH: supports both automatic business trigger and manual admin resend.
+        if not is_manual:
+            if rule.delivery_mode == NotificationRule.DeliveryMode.MANUAL:
+                logger.info(f"Skipping automatic dispatch for '{rule.name}' because delivery_mode is MANUAL only.")
+                continue
+        else:
+            is_staff_test = bool(custom_recipient_emails and sent_by and (getattr(sent_by, "is_staff", False) or getattr(sent_by, "is_superuser", False)))
+            if not is_staff_test and (not rule.allow_manual_send or rule.delivery_mode == NotificationRule.DeliveryMode.AUTOMATIC):
+                logger.info(f"Skipping manual dispatch for '{rule.name}' because delivery_mode is AUTOMATIC only.")
+                continue
+
+        # Business Rule: Low Credits Threshold & Cooldown Check
+        if event_key == "billing.credits_low" and company:
+            from decimal import Decimal
+            threshold = Decimal(str(rule.threshold_value)) if rule.threshold_value is not None else Decimal("50.00")
+            from apps.billing.models import CompanyCreditWallet
+            wallet = CompanyCreditWallet.objects.filter(company=company).first()
+            current_bal = None
+            if "current_balance" in context:
+                try:
+                    current_bal = Decimal(str(context["current_balance"]))
+                except Exception:
+                    pass
+            if current_bal is None and wallet:
+                current_bal = Decimal(str(wallet.total_available))
+
+            if current_bal is not None and current_bal > threshold:
+                logger.info(f"Skipping low credits alert: company {company.name} available credits {current_bal} > threshold {threshold}")
+                continue
+
+            cooldown_hrs = rule.cooldown_hours or 24
+            recent_alert = NotificationLog.objects.filter(
+                company=company,
+                event_key=event_key,
+                created_at__gte=timezone.now() - timezone.timedelta(hours=cooldown_hrs)
+            ).exists()
+            if recent_alert:
+                logger.info(f"Skipping low credits notification for {company.name} due to active {cooldown_hrs}h cooldown.")
+                continue
+
         # 2. Resolve recipients
-        recipients = resolve_rule_recipients(rule, company=company, user=user, context=context)
+        if custom_recipient_emails:
+            recipients = [
+                {"email": em.strip(), "name": em.strip().split("@")[0].title(), "user": None}
+                for em in custom_recipient_emails if em and em.strip()
+            ]
+        else:
+            recipients = resolve_rule_recipients(rule, company=company, user=user, context=context)
+
+        # Parse CC / BCC
+        cc_list = [c.strip() for c in (rule.cc_recipients or "").split(",") if c.strip()]
+        bcc_list = [b.strip() for b in (rule.bcc_recipients or "").split(",") if b.strip()]
+
+        # Determine channel configuration (default: BOTH)
+        rule_channel = getattr(rule, "channel", NotificationRule.Channel.BOTH)
 
         for rec in recipients:
             email = rec["email"]
@@ -716,9 +991,79 @@ def trigger_email_notification(
             }
 
             # 5. Render Subject and Content
-            subject_rendered = render_string_template(tpl.subject, merged_context).strip()
+            subj_raw = override_subject or rule.subject_override or tpl.subject
+            subject_rendered = render_string_template(subj_raw, merged_context).strip()
             body_rendered = render_string_template(tpl.html_content, merged_context)
             text_rendered = render_string_template(tpl.text_content, merged_context) if tpl.text_content else ""
+
+            # --- IN-APP SYSTEM NOTIFICATION CHANNEL ---
+            if rule_channel in (NotificationRule.Channel.IN_APP, NotificationRule.Channel.BOTH) and user_obj:
+                try:
+                    from apps.dashboard.models import Notification
+                    from apps.notifications.models import NotificationPreference
+                    if NotificationPreference.is_in_app_permitted(user_obj, tpl.category if tpl else "SYSTEM"):
+                        # Map priority
+                        if rule.priority == NotificationRule.Priority.URGENT or rule.severity == NotificationRule.Severity.CRITICAL:
+                            notif_priority = Notification.Priority.CRITICAL
+                        elif rule.priority == NotificationRule.Priority.HIGH or rule.severity == NotificationRule.Severity.WARNING:
+                            notif_priority = Notification.Priority.WARNING
+                        elif any(w in event_key.lower() for w in ["success", "won", "approved", "recharge"]):
+                            notif_priority = Notification.Priority.SUCCESS
+                        else:
+                            notif_priority = Notification.Priority.INFO
+
+                        banner_cfg = EVENT_BANNER_CONFIGS.get(event_key, {})
+                        theme = banner_cfg.get("theme", "blue")
+                        theme_color_map = {
+                            "blue": "blue",
+                            "emerald": "emerald",
+                            "amber": "amber",
+                            "rose": "rose",
+                            "purple": "purple",
+                            "teal": "emerald",
+                        }
+                        theme_icon_map = {
+                            "blue": "fa-bell",
+                            "emerald": "fa-circle-check",
+                            "amber": "fa-triangle-exclamation",
+                            "rose": "fa-circle-exclamation",
+                            "purple": "fa-wand-magic-sparkles",
+                            "teal": "fa-file-invoice",
+                        }
+                        in_app_color = theme_color_map.get(theme, "blue")
+                        in_app_icon = theme_icon_map.get(theme, "fa-bell")
+
+                        # Duplicate prevention
+                        already_notified = False
+                        if per_rec_idempotency:
+                            already_notified = Notification.objects.filter(
+                                user=user_obj,
+                                event_key=event_key,
+                                created_at__gte=timezone.now() - timezone.timedelta(minutes=15)
+                            ).exists()
+
+                        if not already_notified:
+                            summary_msg = str(context.get("summary") or subject_rendered)
+                            cta_nav_link = str(context.get("cta_url") or "")
+                            Notification.objects.create(
+                                user=user_obj,
+                                company=company or getattr(user_obj, "company", None),
+                                notification_type=Notification.NotificationType.SYSTEM,
+                                priority=notif_priority,
+                                event_key=event_key,
+                                title=subject_rendered[:250],
+                                message=summary_msg[:1000],
+                                link=cta_nav_link[:500],
+                                icon=in_app_icon,
+                                color=in_app_color,
+                            )
+                except Exception as notif_err:
+                    logger.warning(f"Error creating in-app notification: {notif_err}")
+
+            # If channel is IN_APP only, skip email outbox log & dispatch!
+            if rule_channel == NotificationRule.Channel.IN_APP:
+                logger.info(f"Notification rule '{rule.name}' delivery is IN_APP only. Email dispatch skipped.")
+                continue
 
             # Resolve 1-click tokenized unsubscribe URL for recipient
             from apps.notifications.services.unsubscribe_service import generate_unsubscribe_token
@@ -776,6 +1121,10 @@ def trigger_email_notification(
                 idempotency_key=per_rec_idempotency,
                 has_attachments=bool(attachments),
                 attachment_names=att_names,
+                delivery_mode=NotificationRule.DeliveryMode.MANUAL if is_manual else NotificationRule.DeliveryMode.AUTOMATIC,
+                sent_by=sent_by,
+                cc_recipients=",".join(cc_list),
+                bcc_recipients=",".join(bcc_list),
             )
             created_logs.append(log)
 
@@ -789,6 +1138,10 @@ def trigger_email_notification(
                 ).start()
             else:
                 deliver_notification_log(log.id, attachments=attachments)
+                try:
+                    log.refresh_from_db()
+                except Exception:
+                    pass
 
     return created_logs
 
@@ -797,7 +1150,7 @@ def deliver_notification_log(log_id, attachments=None):
     """
     Executes actual email transmission for a given NotificationLog record.
     Logs success or records delivery failure attempt with sanitized traceback.
-    Includes RFC 8058 headers and supports binary attachments.
+    Includes RFC 8058 headers and supports binary attachments, CC, and BCC.
     """
     try:
         log = NotificationLog.objects.select_related("template").get(id=log_id)
@@ -820,11 +1173,16 @@ def deliver_notification_log(log_id, attachments=None):
         log.status = NotificationLog.Status.SENDING
         log.save(update_fields=["status"])
 
+        cc_list = [c.strip() for c in (log.cc_recipients or "").split(",") if c.strip()]
+        bcc_list = [b.strip() for b in (log.bcc_recipients or "").split(",") if b.strip()]
+
         msg = EmailMultiAlternatives(
             subject=log.subject,
             body=log.text_body,
             from_email=from_email,
             to=[log.recipient_email],
+            cc=cc_list if cc_list else None,
+            bcc=bcc_list if bcc_list else None,
             connection=connection,
         )
         msg.attach_alternative(log.html_body, "text/html")
@@ -899,18 +1257,17 @@ def deliver_notification_log(log_id, attachments=None):
         if log.status == NotificationLog.Status.FAILED and not log.event_key.startswith("admin."):
             try:
                 trigger_email_notification(
-                    event_key="admin.delivery_retry_exhausted",
+                    event_key="admin.email_delivery_failure",
                     context={
-                        "summary": f"Email delivery failed after {log.max_attempts} attempts for recipient: {log.recipient_email}",
-                        "details": {
-                            "Failed Event": log.event_key,
-                            "Recipient": log.recipient_email,
-                            "Subject": log.subject,
-                            "Error": err_msg[:120],
-                        },
+                        "failed_event": log.event_key,
+                        "recipient_email": log.recipient_email,
+                        "subject": log.subject,
+                        "attempts_count": str(log.max_attempts),
+                        "log_id": str(log.id),
+                        "error_message": err_msg[:120],
                         "cta_url": "/admin-panel/email/logs/",
                     },
-                    severity=NotificationRule.Severity.WARNING,
+                    severity=NotificationRule.Severity.CRITICAL,
                     idempotency_key=f"alert_exhausted_{log.id}",
                     async_dispatch=False,
                 )
@@ -948,3 +1305,39 @@ def retry_failed_notification_log(log_or_id, async_dispatch=False):
     except Exception as exc:
         logger.error(f"Error retrying log #{getattr(log_or_id, 'id', log_or_id)}: {exc}")
         return False
+
+
+def create_in_app_notification(
+    user,
+    title,
+    message,
+    link="",
+    priority="INFO",
+    event_key="",
+    icon="fa-bell",
+    color="blue",
+    company=None,
+):
+    """
+    Direct helper to create an in-app system notification for a specific user.
+    """
+    from apps.dashboard.models import Notification
+    from apps.notifications.models import NotificationPreference
+
+    target_company = company or getattr(user, "company", None)
+    return Notification.objects.create(
+        user=user,
+        company=target_company,
+        notification_type=Notification.NotificationType.SYSTEM,
+        priority=priority,
+        event_key=event_key,
+        title=str(title)[:250],
+        message=str(message)[:1000],
+        link=str(link)[:500],
+        icon=icon,
+        color=color,
+    )
+
+
+# Unified alias for all platform events
+trigger_system_notification = trigger_email_notification

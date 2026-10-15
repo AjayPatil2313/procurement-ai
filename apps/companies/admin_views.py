@@ -1125,6 +1125,43 @@ def admin_panel_toggle_company_verification_view(request, pk):
             color="blue" if company.is_verified else "amber",
         )
         cache.delete("superadmin_dashboard_kpis_7d")
+
+        # Trigger verification decision notifications
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            # 1. Company Admin notification
+            trigger_email_notification(
+                event_key="company.verification_decision",
+                company=company,
+                user=request.user,
+                context={
+                    "company_name": company.name,
+                    "decision_status": "Approved" if company.is_verified else "Verification Revoked",
+                    "verified_badge": "Active (Verified)" if company.is_verified else "Inactive",
+                    "action_date": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                    "reviewer_notes": "Corporate documentation authenticated by Platform Super Administrator." if company.is_verified else "Verification badge was revoked by Platform Super Administrator.",
+                    "cta_url": request.build_absolute_uri("/company/profile/"),
+                },
+                idempotency_key=f"comp_verif_{company.id}_{int(timezone.now().timestamp())}",
+            )
+            # 2. Super Admin audit notification
+            trigger_email_notification(
+                event_key="admin.verification_decision",
+                company=company,
+                user=request.user,
+                context={
+                    "company_name": company.name,
+                    "decision": "Approved" if company.is_verified else "Revoked",
+                    "admin_operator": request.user.get_full_name() or request.user.email,
+                    "decision_date": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                    "audit_id": f"AUD-VERIF-{company.id}",
+                    "audit_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
+                },
+                idempotency_key=f"admin_verif_{company.id}_{int(timezone.now().timestamp())}",
+            )
+        except Exception:
+            pass
+
         messages.success(request, f"Company '{company.name}' badge updated: {action_name}.")
     return redirect("admin-panel-companies")
 
@@ -1809,6 +1846,28 @@ def admin_panel_toggle_user_active_view(request, pk):
                 color="emerald" if target_user.is_active else "rose",
             )
         cache.delete("superadmin_dashboard_kpis_7d")
+
+        # Trigger user.activation_deactivation notification
+        try:
+            from apps.notifications.services.email_engine import trigger_email_notification
+            trigger_email_notification(
+                event_key="user.activation_deactivation",
+                user=target_user,
+                company=comp,
+                context={
+                    "user_name": target_user.get_full_name() or target_user.email,
+                    "company_name": comp.name if comp else "Your Workspace",
+                    "status_state": "Activated" if target_user.is_active else "Deactivated",
+                    "action_date": timezone.now().strftime("%d %b %Y, %I:%M %p"),
+                    "operator_name": request.user.get_full_name() or request.user.email,
+                    "reason": remark or ("Account activated by Platform Administrator" if target_user.is_active else "Account deactivated by Platform Administrator"),
+                    "cta_url": request.build_absolute_uri("/login/"),
+                },
+                idempotency_key=f"user_act_{target_user.id}_{int(timezone.now().timestamp())}",
+            )
+        except Exception:
+            pass
+
         msg = f"User account {target_user.email} has been {state}."
         if remark:
             msg += f" (Remark: {remark})"
