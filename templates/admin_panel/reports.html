@@ -150,6 +150,99 @@
       </div>
     </div>
 
+    <!-- 5. Catalog Products Portfolio Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-xl">
+            <i class="fa-solid fa-box-open"></i>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-700">
+            {{ total_products }} Products
+          </span>
+        </div>
+
+        <h3 class="text-base font-black text-slate-900">Catalog Products Portfolio</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Comprehensive inventory catalog of all vendor SKUs, product descriptions, min/max price bands, categories, and real-time marketplace availability states.
+        </p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+          <span class="font-bold text-slate-700">Dataset Attributes:</span> ID, SKU, Product Name, Vendor Company, Category, Price Range, Currency, Availability, Moderation Status, Created Date.
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-mono">Format: .CSV</span>
+        <a href="{% url 'admin-panel-reports' %}?export=products_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Export Products CSV</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 6. Sourcing Demands & RFQs Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 text-xl">
+            <i class="fa-solid fa-clipboard-list"></i>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-700">
+            {{ total_requirements }} Demands
+          </span>
+        </div>
+
+        <h3 class="text-base font-black text-slate-900">Sourcing Demands &amp; RFQs</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Complete database of all buyer requirements, requested quantities, units of measure, target pricing, delivery locations, and pipeline procurement statuses.
+        </p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+          <span class="font-bold text-slate-700">Dataset Attributes:</span> ID, Item Name, Buyer Company, Category, Target Qty, Unit, Target Price, Delivery Location, Status, Posted Date.
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-mono">Format: .CSV</span>
+        <a href="{% url 'admin-panel-reports' %}?export=requirements_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Export Requirements CSV</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 7. Company Wallets & Balances Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 text-xl">
+            <i class="fa-solid fa-wallet"></i>
+          </div>
+          <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-700">
+            {{ total_wallets }} Wallets
+          </span>
+        </div>
+
+        <h3 class="text-base font-black text-slate-900">Company Wallets &amp; Balances</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Platform-wide prepaid INR wallet balances, reserved funds holds, cumulative credited amounts, total committed AI spends, and liquidity health.
+        </p>
+
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600">
+          <span class="font-bold text-slate-700">Dataset Attributes:</span> Wallet ID, Company Name, City, Country, Available Balance, Reserved Hold, Total Credited, Total Spent, Currency, Status.
+        </div>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-xs text-slate-400 font-mono">Format: .CSV</span>
+        <a href="{% url 'admin-panel-reports' %}?export=wallets_csv" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Export Wallets CSV</span>
+        </a>
+      </div>
+    </div>
+
   </div>
 
   <!-- Financial Ledger Quick Download Pill -->

@@ -296,6 +296,13 @@
             <p class="text-[10px] text-slate-400 mt-1">If left blank, a high-entropy 12-character password will be generated automatically and displayed upon completion.</p>
           </div>
 
+          <div class="flex items-center gap-2 pt-0.5">
+            <input type="checkbox" id="sendUserEmail" name="send_email" value="1" checked class="rounded border-slate-300 text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer">
+            <label for="sendUserEmail" class="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+              Email temporary credentials to user directly
+            </label>
+          </div>
+
           <div class="pt-2 flex items-center justify-end gap-3">
             <button type="button" onclick="closeResetPasswordModal()" class="w-1/2 py-2.5 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
               Cancel

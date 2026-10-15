@@ -81,34 +81,47 @@
   <!-- Navigation Tabs -->
   <div class="border-b border-slate-200">
     <nav class="flex space-x-6 text-sm font-bold">
-      <a href="?tab=wallet_tx{% if q %}&q={{ q }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'wallet_tx' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
+      <a href="?tab=wallet_tx{% if q %}&q={{ q }}{% endif %}{% if range_filter != 'all' %}&range={{ range_filter }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'wallet_tx' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
         <i class="fa-solid fa-wallet"></i> Company Wallet Ledger
       </a>
-      <a href="?tab=invoices{% if q %}&q={{ q }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'invoices' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
+      <a href="?tab=invoices{% if q %}&q={{ q }}{% endif %}{% if range_filter != 'all' %}&range={{ range_filter }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'invoices' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
         <i class="fa-solid fa-file-invoice-dollar"></i> Tax Invoices Ledger
       </a>
-      <a href="?tab=credits{% if q %}&q={{ q }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'credits' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
+      <a href="?tab=credits{% if q %}&q={{ q }}{% endif %}{% if range_filter != 'all' %}&range={{ range_filter }}{% endif %}" class="pb-3 border-b-2 transition flex items-center gap-2 {% if active_tab == 'credits' %}border-indigo-600 text-indigo-600{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">
         <i class="fa-solid fa-coins"></i> AI Search Credit Ledger
       </a>
     </nav>
   </div>
 
-  <!-- Search Filter Form -->
-  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <div class="text-xs text-slate-500">
-      Viewing <span class="font-bold text-slate-800">{% if active_tab == 'wallet_tx' %}Wallet Ledger Transactions{% elif active_tab == 'invoices' %}Billing Invoices{% else %}Credit Usage Records{% endif %}</span>
+  <!-- Search Filter Form & Date Horizon Toolbar -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="text-xs text-slate-500">
+        Viewing <span class="font-bold text-slate-800">{% if active_tab == 'wallet_tx' %}Wallet Ledger Transactions{% elif active_tab == 'invoices' %}Billing Invoices{% else %}Credit Usage Records{% endif %}</span>
+      </div>
+
+      <!-- Quick Date Horizon Filter Pills -->
+      <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-bold">
+        <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&range=all" class="px-2.5 py-1 rounded-lg transition {% if range_filter == 'all' %}bg-white text-indigo-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">All</a>
+        <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&range=today" class="px-2.5 py-1 rounded-lg transition {% if range_filter == 'today' %}bg-white text-indigo-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">Today</a>
+        <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&range=7d" class="px-2.5 py-1 rounded-lg transition {% if range_filter == '7d' %}bg-white text-indigo-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">7D</a>
+        <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&range=30d" class="px-2.5 py-1 rounded-lg transition {% if range_filter == '30d' %}bg-white text-indigo-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">30D</a>
+        <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&range=90d" class="px-2.5 py-1 rounded-lg transition {% if range_filter == '90d' %}bg-white text-indigo-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">90D</a>
+        <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&range=ytd" class="px-2.5 py-1 rounded-lg transition {% if range_filter == 'ytd' %}bg-white text-indigo-600 shadow-sm{% else %}text-slate-600 hover:text-slate-900{% endif %}">YTD</a>
+      </div>
     </div>
 
     <div class="flex items-center gap-2">
       <form method="GET" class="flex items-center gap-2">
         <input type="hidden" name="tab" value="{{ active_tab }}">
-        <input type="text" name="q" value="{{ q }}" placeholder="Search by reference, company, description..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-72">
+        <input type="hidden" name="range" value="{{ range_filter }}">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search by reference, company, description..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-64 md:w-72">
         <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
-        {% if q %}
-        <a href="?tab={{ active_tab }}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
+        {% if q or range_filter != 'all' %}
+        <a href="?tab={{ active_tab }}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Reset</a>
         {% endif %}
       </form>
-      <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}&export=csv" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm hover:border-slate-300 cursor-pointer" title="Export current ledger to CSV">
+      <a href="?tab={{ active_tab }}{% if q %}&q={{ q }}{% endif %}{% if range_filter != 'all' %}&range={{ range_filter }}{% endif %}&export=csv" class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm hover:border-slate-300 cursor-pointer" title="Export current ledger to CSV">
         <i class="fa-solid fa-file-arrow-down text-emerald-600"></i> Export CSV
       </a>
     </div>

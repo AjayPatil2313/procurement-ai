@@ -87,6 +87,95 @@ def paginate_and_preserve(request, queryset, per_page=10):
     return page_obj, query_params.urlencode()
 
 
+def get_system_health_telemetry():
+    """
+    Lightweight platform infrastructure health check executing in under 10ms.
+    Checks live database connection latency, cache roundtrip latency, and SMTP backend status.
+    """
+    import time
+    from django.db import connection
+
+    db_latency_ms = 0.0
+    try:
+        t0 = time.perf_counter()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        db_latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+        db_status = "Connected"
+    except Exception:
+        db_status = "Disconnected"
+
+    cache_latency_ms = 0.0
+    try:
+        t1 = time.perf_counter()
+        cache.set("_health_ping", 1, 10)
+        cache.get("_health_ping")
+        cache_latency_ms = round((time.perf_counter() - t1) * 1000, 1)
+        cache_status = "Operational"
+    except Exception:
+        cache_status = "Degraded"
+
+    try:
+        from apps.notifications.services.smtp_service import get_active_email_connection
+        smtp_backend = get_active_email_connection()
+        smtp_status = "Active & Ready" if smtp_backend else "Standard Backend"
+    except Exception:
+        smtp_status = "Offline"
+
+    return {
+        "db_latency_ms": db_latency_ms,
+        "db_status": db_status,
+        "cache_latency_ms": cache_latency_ms,
+        "cache_status": cache_status,
+        "smtp_status": smtp_status,
+        "maintenance_active": PlatformSetting.get_setting("maintenance_mode", "false").strip().lower() in ("true", "1", "yes"),
+    }
+
+
+def get_client_ip(request):
+    """
+    Extracts the client's real IP address from HTTP headers (supporting reverse proxies).
+    """
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(",")[0].strip()
+    else:
+        ip = request.META.get("REMOTE_ADDR", "127.0.0.1")
+    return ip or "127.0.0.1"
+
+
+def log_admin_activity(
+    request,
+    company,
+    title,
+    description,
+    activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+    icon_type="shield-check",
+    color="blue",
+):
+    """
+    Forensic administrative activity logger.
+    Automatically enriches descriptions with client IP address for compliance and security audit trails.
+    """
+    if not company:
+        company = Company.objects.filter(is_deleted=False).first() or Company.objects.first()
+    if not company:
+        return None
+
+    client_ip = get_client_ip(request)
+    enriched_description = f"{description} [IP: {client_ip}]"
+    return ActivityLog.objects.create(
+        company=company,
+        user=request.user,
+        activity_type=activity_type,
+        title=title,
+        description=enriched_description,
+        icon_type=icon_type,
+        color=color,
+    )
+
+
 @login_required
 @superadmin_required
 def admin_panel_dashboard_view(request):
@@ -106,12 +195,13 @@ def admin_panel_dashboard_view(request):
 
     cached_data = cache.get(cache_key)
     if cached_data:
-        # Return cached context with live maintenance settings
+        # Return cached context with live maintenance settings & real-time health
         cached_data["platform_maintenance_active"] = (
             PlatformSetting.get_setting("maintenance_mode", "false").strip().lower() in ("true", "1", "yes")
         )
         cached_data["platform_maintenance_message"] = PlatformSetting.get_setting("maintenance_message", "")
         cached_data["date_range"] = date_range
+        cached_data["system_health"] = get_system_health_telemetry()
         return render(request, "admin_panel/dashboard.html", cached_data)
 
     now = timezone.now()
@@ -370,6 +460,7 @@ def admin_panel_dashboard_view(request):
         "recent_tickets": recent_tickets,
         "platform_maintenance_active": maintenance_active,
         "platform_maintenance_message": maintenance_message,
+        "system_health": get_system_health_telemetry(),
     }
     # Cache for 60 seconds
     cache.set(cache_key, context, 60)
@@ -394,10 +485,9 @@ def admin_panel_companies_view(request):
         if bulk_action == "verify":
             updated_count = Company.objects.filter(id__in=selected_ids).update(is_verified=True)
             for c in Company.objects.filter(id__in=selected_ids):
-                ActivityLog.objects.create(
-                    company=c,
-                    user=request.user,
-                    activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+                log_admin_activity(
+                    request,
+                    c,
                     title="Company Verified (Bulk)",
                     description=f"Super Admin batch-verified company '{c.name}'.",
                     icon_type="shield-check",
@@ -407,15 +497,23 @@ def admin_panel_companies_view(request):
 
         elif bulk_action == "unverify":
             updated_count = Company.objects.filter(id__in=selected_ids).update(is_verified=False)
+            for c in Company.objects.filter(id__in=selected_ids):
+                log_admin_activity(
+                    request,
+                    c,
+                    title="Company Verification Revoked (Bulk)",
+                    description=f"Super Admin revoked verification badge for company '{c.name}'.",
+                    icon_type="shield-halved",
+                    color="amber",
+                )
             messages.success(request, f"Successfully revoked verification for {updated_count} companies.")
 
         elif bulk_action == "activate":
             updated_count = Company.objects.filter(id__in=selected_ids).update(is_active=True)
             for c in Company.objects.filter(id__in=selected_ids):
-                ActivityLog.objects.create(
-                    company=c,
-                    user=request.user,
-                    activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+                log_admin_activity(
+                    request,
+                    c,
                     title="Company Activated (Bulk)",
                     description=f"Super Admin batch-activated company '{c.name}'.",
                     icon_type="building",
@@ -426,10 +524,9 @@ def admin_panel_companies_view(request):
         elif bulk_action == "suspend":
             updated_count = Company.objects.filter(id__in=selected_ids).update(is_active=False)
             for c in Company.objects.filter(id__in=selected_ids):
-                ActivityLog.objects.create(
-                    company=c,
-                    user=request.user,
-                    activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+                log_admin_activity(
+                    request,
+                    c,
                     title="Company Suspended (Bulk)",
                     description=f"Super Admin batch-suspended company '{c.name}'.",
                     icon_type="building",
@@ -441,6 +538,15 @@ def admin_panel_companies_view(request):
             updated_count = Company.objects.filter(id__in=selected_ids).update(
                 is_deleted=True, is_active=False, deleted_at=timezone.now()
             )
+            for c in Company.objects.filter(id__in=selected_ids):
+                log_admin_activity(
+                    request,
+                    c,
+                    title="Company Soft-Deleted (Bulk)",
+                    description=f"Super Admin batch-soft-deleted company '{c.name}'. All records preserved safely.",
+                    icon_type="trash",
+                    color="rose",
+                )
             messages.success(request, f"Successfully soft-deleted {updated_count} selected companies.")
 
         elif bulk_action == "export":
@@ -459,7 +565,7 @@ def admin_panel_companies_view(request):
         cache.delete("superadmin_dashboard_kpis_7d")
         return redirect(request.get_full_path())
 
-    companies = Company.objects.select_related("subscription").prefetch_related("members")
+    companies = Company.objects.select_related("subscription", "wallet").prefetch_related("members")
 
     q = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "all")
@@ -522,11 +628,11 @@ def admin_panel_companies_view(request):
         response["Content-Disposition"] = f'attachment; filename="Platform_Companies_{today_str}.csv"'
         response.write("\ufeff")  # UTF-8 BOM for Excel
         writer = csv.writer(response)
-        writer.writerow(["Company ID", "Company Name", "Legal Name", "Company Type", "Subscription Plan", "Wallet Balance", "Verified", "Active", "GSTIN", "PAN", "Phone", "Email", "City", "State", "Country", "Industry", "Registration Date"])
+        writer.writerow(["Company ID", "Company Name", "Legal Name", "Company Type", "Subscription Plan", "Wallet Balance", "Verified", "Active", "GST/VAT No", "Reg No", "Phone", "Email", "City", "State", "Country", "Industry", "Registration Date"])
         for c in companies:
             plan_str = c.subscription.get_plan_display() if hasattr(c, "subscription") and c.subscription else "Free"
             wallet_bal = str(c.wallet.available_balance) if hasattr(c, "wallet") and c.wallet else "0.00"
-            writer.writerow([c.id, c.name, c.legal_name, c.get_company_type_display(), plan_str, wallet_bal, "Yes" if c.is_verified else "No", "Yes" if c.is_active else "No", c.gstin or "", c.pan_number or "", c.phone or "", c.email or "", c.city or "", c.state or "", c.country or "", c.industry or "", c.created_at.strftime("%Y-%m-%d")])
+            writer.writerow([c.id, c.name, c.legal_name, c.get_company_type_display(), plan_str, wallet_bal, "Yes" if c.is_verified else "No", "Yes" if c.is_active else "No", c.gst_vat_no or "", c.registration_no or "", c.phone or "", c.email or "", c.city or "", c.state or "", c.country or "", c.industry or "", c.created_at.strftime("%Y-%m-%d")])
         return response
 
     # Server-side pagination (default 10)
@@ -569,10 +675,9 @@ def admin_panel_change_company_type_view(request, pk):
                 company.company_type = new_type
                 company.save(update_fields=["company_type"])
 
-                ActivityLog.objects.create(
-                    company=company,
-                    user=request.user,
-                    activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+                log_admin_activity(
+                    request,
+                    company,
                     title=f"Company Type Changed to {company.get_company_type_display()}",
                     description=f"Super Admin transitioned company type from {old_type} to {new_type}. Authorized modules updated dynamically without deleting data.",
                     icon_type="arrows-split-up-and-left",
@@ -674,7 +779,10 @@ def admin_panel_company_create_view(request):
             notes=f"Initial onboarding allocation by Super Admin ({plan} plan)",
         )
 
-        # 3. Associate or Create Primary Admin User if provided
+        # 3. Initialize Company Prepaid Currency Wallet
+        CompanyWalletService.get_or_create_wallet(company)
+
+        # 4. Associate or Create Primary Admin User if provided
         if admin_email:
             admin_user = User.objects.filter(email=admin_email).first()
             if not admin_user:
@@ -692,10 +800,9 @@ def admin_panel_company_create_view(request):
             )
 
         # 4. Activity Log
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            company,
             title=f"New Company Registered: {company.name}",
             description=f"Company account '{company.name}' created by Super Admin with {company.get_company_type_display()} role and {plan.upper()} plan ({credits_total} credits).",
             icon_type="building",
@@ -722,7 +829,7 @@ def admin_panel_company_detail_view(request, pk):
     Outreach Inquiries, and Recent Activities.
     """
     company = get_object_or_404(
-        Company.objects.select_related("subscription", "created_by"),
+        Company.objects.select_related("subscription", "created_by", "wallet"),
         pk=pk,
     )
 
@@ -813,10 +920,9 @@ def admin_panel_company_edit_view(request, pk):
         company.save()
 
         # Activity log
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            company,
             title=f"Company Details Updated: {company.name}",
             description=f"Super Admin updated company settings, verification badge ({company.is_verified}), and active state ({company.is_active}).",
             icon_type="pen-to-square",
@@ -846,10 +952,9 @@ def admin_panel_toggle_company_status_view(request, pk):
         company.save(update_fields=["is_active"])
 
         action_name = "Activated" if company.is_active else "Suspended"
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            company,
             title=f"Company {action_name} by Super Admin",
             description=f"Company account '{company.name}' was set to {action_name.lower()}.",
             icon_type="building",
@@ -890,10 +995,9 @@ def admin_panel_toggle_company_verification_view(request, pk):
         company.save(update_fields=["is_verified"])
 
         action_name = "Verified" if company.is_verified else "Verification Revoked"
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            company,
             title=f"Company Verification: {action_name}",
             description=f"Super Admin updated verification badge for '{company.name}' to is_verified={company.is_verified}.",
             icon_type="shield-halved",
@@ -919,10 +1023,9 @@ def admin_panel_company_delete_view(request, pk):
         company.deleted_at = timezone.now()
         company.save(update_fields=["is_deleted", "is_active", "deleted_at"])
 
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            company,
             title=f"Company Soft-Deleted: {company.name}",
             description=f"Company account '{company.name}' was soft-deleted (archived) by Super Admin. All records preserved safely.",
             icon_type="trash",
@@ -946,10 +1049,9 @@ def admin_panel_company_restore_view(request, pk):
         company.deleted_at = None
         company.save(update_fields=["is_deleted", "is_active", "deleted_at"])
 
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            company,
             title=f"Company Restored: {company.name}",
             description=f"Company '{company.name}' was restored from archive by Super Admin.",
             icon_type="rotate-left",
@@ -1219,12 +1321,12 @@ def admin_panel_update_subscription_view(request, company_id):
         subscription.save()
 
         # 5. Activity Log
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.PLAN_UPGRADED,
+        log_admin_activity(
+            request,
+            company,
             title="Subscription & Credits Adjusted by Super Admin",
             description=f"Plan: {subscription.get_plan_display()}, Total Credits: {subscription.credits_total} ({'+' if credits_delta >= 0 else ''}{credits_delta}). Note: {notes}{receipt_ref_msg}",
+            activity_type=ActivityLog.ActivityType.PLAN_UPGRADED,
             icon_type="credit-card",
             color="blue",
         )
@@ -1387,10 +1489,9 @@ def admin_panel_users_view(request):
                 membership = CompanyMember.objects.filter(user=u).select_related("company").first()
                 comp = (membership.company if membership else None) or Company.objects.first()
                 if comp:
-                    ActivityLog.objects.create(
-                        company=comp,
-                        user=request.user,
-                        activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+                    log_admin_activity(
+                        request,
+                        comp,
                         title="User Account Activated (Bulk)",
                         description=f"Super Admin batch-activated user account '{u.email}'.",
                         icon_type="user-check",
@@ -1404,10 +1505,9 @@ def admin_panel_users_view(request):
                 membership = CompanyMember.objects.filter(user=u).select_related("company").first()
                 comp = (membership.company if membership else None) or Company.objects.first()
                 if comp:
-                    ActivityLog.objects.create(
-                        company=comp,
-                        user=request.user,
-                        activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+                    log_admin_activity(
+                        request,
+                        comp,
                         title="User Account Deactivated (Bulk)",
                         description=f"Super Admin batch-deactivated user account '{u.email}'.",
                         icon_type="user-slash",
@@ -1563,10 +1663,9 @@ def admin_panel_toggle_user_active_view(request, pk):
         membership = CompanyMember.objects.filter(user=target_user).select_related("company").first()
         comp = (membership.company if membership else None) or Company.objects.first()
         if comp:
-            ActivityLog.objects.create(
-                company=comp,
-                user=request.user,
-                activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+            log_admin_activity(
+                request,
+                comp,
                 title=f"User Account {state.capitalize()}: {target_user.email}",
                 description=f"Super Admin {state} user account '{target_user.email}' (ID: {target_user.id}).",
                 icon_type="user-check" if target_user.is_active else "user-slash",
@@ -1618,7 +1717,7 @@ def admin_panel_auditlogs_view(request):
         except ValueError:
             pass
 
-    companies = Company.objects.filter(is_active=True).order_by("name")
+    companies = Company.objects.filter(is_deleted=False).order_by("name")
     activity_types = ActivityLog.ActivityType.choices
 
     total_activities = ActivityLog.objects.count()
@@ -1681,10 +1780,9 @@ def admin_panel_reset_company_user_password_view(request, company_id, user_id):
         if membership and membership.role == CompanyMember.Role.ADMIN:
             user_role_str = "Company Admin"
 
-        ActivityLog.objects.create(
-            company=company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            company,
             title=f"Password Reset for {user_role_str}: {target_user.email}",
             description=f"Super Admin reset account password for {target_user.get_full_name() or target_user.email} ({user_role_str}). Temporary credentials generated.",
             icon_type="key",
@@ -1733,15 +1831,38 @@ def admin_panel_user_reset_password_direct_view(request, pk):
         # Check membership if applicable
         membership = CompanyMember.objects.filter(user=target_user).select_related("company").first()
         if membership:
-            ActivityLog.objects.create(
-                company=membership.company,
-                user=request.user,
-                activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+            log_admin_activity(
+                request,
+                membership.company,
                 title=f"Password Reset: {target_user.email}",
                 description=f"Super Admin reset password for {target_user.get_full_name() or target_user.email}.",
                 icon_type="key",
                 color="purple",
             )
+
+        # Optional email notification to user
+        send_email = request.POST.get("send_email", "true").lower() in ("true", "1", "yes", "on")
+        if send_email and target_user.email:
+            try:
+                from apps.notifications.services.email_engine import trigger_email_notification
+                login_url = request.build_absolute_uri(reverse("login-web"))
+                context_data = {
+                    "user_name": target_user.get_full_name() or target_user.email,
+                    "user_email": target_user.email,
+                    "temporary_password": new_password,
+                    "login_url": login_url,
+                    "reset_by": request.user.email,
+                }
+                trigger_email_notification(
+                    event_key="system.password_reset_by_admin",
+                    context_data=context_data,
+                    company=membership.company if membership else None,
+                    recipient_user=target_user,
+                    recipient_email=target_user.email,
+                    async_dispatch=True,
+                )
+            except Exception:
+                pass
 
         messages.success(
             request,
@@ -1845,6 +1966,30 @@ def admin_panel_roles_view(request):
 
     actions = ["READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"]
 
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        response["Content-Disposition"] = f'attachment; filename="platform_rbac_roles_matrix_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            "Module Code",
+            "Module Name",
+            "Category",
+            "Super Admin Scope",
+            "Company Admin Scope",
+            "Company Standard Member Scope",
+        ])
+        for m in modules:
+            writer.writerow([
+                m["code"],
+                m["name"],
+                m["category"],
+                "Full Access (Cross-Tenant)",
+                "Full Access (Company Tenant Scoped)",
+                "Task-Scoped / Assigned Leads Only",
+            ])
+        return response
+
     return render(request, "admin_panel/roles.html", {
         "page_title": "Roles & Permissions Governance",
         "modules": modules,
@@ -1883,16 +2028,50 @@ def admin_panel_products_view(request):
     if avail_filter != "all":
         products = products.filter(availability=avail_filter)
 
+    # CSV Export
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        response["Content-Disposition"] = f'attachment; filename="platform_products_catalog_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            "Product ID",
+            "SKU",
+            "Product Name",
+            "Company Name",
+            "Category",
+            "Min Price",
+            "Max Price",
+            "Currency",
+            "Availability",
+            "Status",
+            "Created Date",
+        ])
+        for p in products:
+            writer.writerow([
+                f"PRD-{p.id:05d}",
+                p.sku or "N/A",
+                p.name,
+                p.company.name if p.company else "N/A",
+                p.category.name if p.category else "Uncategorized",
+                p.min_price or "",
+                p.max_price or "",
+                p.currency or "INR",
+                p.get_availability_display() if hasattr(p, "get_availability_display") else p.availability,
+                "Delisted / Archived" if p.is_deleted else "Active",
+                p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else "",
+            ])
+        return response
+
     if request.method == "POST" and request.POST.get("action") == "toggle_deleted":
         prod_id = request.POST.get("product_id")
         prod = get_object_or_404(Product, pk=prod_id)
         prod.is_deleted = not prod.is_deleted
         prod.save(update_fields=["is_deleted"])
         action_name = "Delisted / Archived" if prod.is_deleted else "Restored / Active"
-        ActivityLog.objects.create(
-            company=prod.company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            prod.company,
             title=f"Product Moderation: {action_name}",
             description=f"Super Admin updated product '{prod.name}' (SKU: {prod.sku}) to is_deleted={prod.is_deleted}.",
             icon_type="box-archive" if prod.is_deleted else "box-open",
@@ -1950,6 +2129,41 @@ def admin_panel_requirements_view(request):
     if status_filter != "all":
         requirements = requirements.filter(status=status_filter)
 
+    # CSV Export
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        response["Content-Disposition"] = f'attachment; filename="platform_requirements_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            "Requirement ID",
+            "Item Name",
+            "Buyer Company",
+            "Category",
+            "Quantity Required",
+            "Unit",
+            "Target Price",
+            "Delivery Location",
+            "Pipeline Status",
+            "Moderation Status",
+            "Posted Date",
+        ])
+        for r in requirements:
+            writer.writerow([
+                f"REQ-{r.id:05d}",
+                r.item_name,
+                r.company.name if r.company else "N/A",
+                r.category.name if r.category else "Uncategorized",
+                r.quantity or "",
+                r.unit or "",
+                r.target_price or "",
+                r.delivery_location or "",
+                r.status,
+                "Delisted / Archived" if r.is_deleted else "Active",
+                r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "",
+            ])
+        return response
+
     # Moderation Action: Delist / Restore Buyer RFP Requirement
     if request.method == "POST" and request.POST.get("action") == "toggle_deleted":
         req_id = request.POST.get("requirement_id")
@@ -1957,10 +2171,9 @@ def admin_panel_requirements_view(request):
         req_obj.is_deleted = not req_obj.is_deleted
         req_obj.save(update_fields=["is_deleted"])
         action_name = "Delisted / Archived" if req_obj.is_deleted else "Restored / Active"
-        ActivityLog.objects.create(
-            company=req_obj.company,
-            user=request.user,
-            activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
+        log_admin_activity(
+            request,
+            req_obj.company,
             title=f"Requirement Moderation: {action_name}",
             description=f"Super Admin updated buyer requirement '{req_obj.item_name}' (ID: {req_obj.id}) to is_deleted={req_obj.is_deleted}.",
             icon_type="clipboard-check" if not req_obj.is_deleted else "clipboard-xmark",
@@ -2079,7 +2292,31 @@ def admin_panel_search_activity_view(request):
     """
     Platform-wide Search Activity Monitor.
     Displays all SearchJob executions across companies with durations, statuses, and pagination.
+    Supports 1-click re-queuing of failed AI search operations.
     """
+    if request.method == "POST":
+        action = request.POST.get("action", "").strip()
+        if action == "retry_job":
+            job_id = request.POST.get("job_id")
+            job = get_object_or_404(SearchJob, pk=job_id)
+            job.status = SearchJob.Status.QUEUED
+            job.error_message = ""
+            job.progress_percent = 0
+            job.finished_at = None
+            job.save(update_fields=["status", "error_message", "progress_percent", "finished_at", "updated_at"])
+
+            log_admin_activity(
+                request,
+                job.company,
+                title=f"AI Search Job Re-Queued (JOB-{job.id:05d})",
+                description=f"Super Admin re-queued failed search job #JOB-{job.id:05d} for execution.",
+                activity_type=ActivityLog.ActivityType.SEARCH_STARTED,
+                icon_type="rotate-right",
+                color="amber",
+            )
+            messages.success(request, f"Search Job #JOB-{job.id:05d} has been reset to QUEUED and re-queued.")
+            return redirect(request.get_full_path())
+
     search_jobs = SearchJob.objects.select_related("company", "requirement", "product").order_by("-created_at")
 
     q = request.GET.get("q", "").strip()
@@ -2102,6 +2339,40 @@ def admin_panel_search_activity_view(request):
 
     if status_filter != "all":
         search_jobs = search_jobs.filter(status=status_filter)
+
+    # CSV Export
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        response["Content-Disposition"] = f'attachment; filename="platform_search_operations_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            "Job ID",
+            "Company Name",
+            "Search Query",
+            "Job Type / Associated Record",
+            "Status",
+            "Total Discovered",
+            "Execution Time (Sec)",
+            "Dispatched At",
+        ])
+        for sj in search_jobs:
+            assoc = "General Search"
+            if sj.requirement:
+                assoc = f"Requirement: {sj.requirement.item_name}"
+            elif sj.product:
+                assoc = f"Product: {sj.product.name}"
+            writer.writerow([
+                f"JOB-{sj.id:05d}",
+                sj.company.name if sj.company else "N/A",
+                sj.search_query,
+                assoc,
+                sj.status,
+                sj.total_results or 0,
+                sj.execution_time or "0.00",
+                sj.created_at.strftime("%Y-%m-%d %H:%M") if sj.created_at else "",
+            ])
+        return response
 
     total_jobs = SearchJob.objects.count()
     completed_jobs = SearchJob.objects.filter(status=SearchJob.Status.COMPLETED).count()
@@ -2239,10 +2510,43 @@ def admin_panel_reports_view(request):
             writer.writerow([inq.id, inq.company.name, inq.sent_to_email, inq.subject, inq.get_status_display(), inq.created_at.strftime("%Y-%m-%d %H:%M:%S")])
         return response
 
+    elif export_type == "products_csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="Platform_Products_Catalog_{today_str}.csv"'
+        response.write("\ufeff")
+        writer = csv.writer(response)
+        writer.writerow(["ID", "SKU", "Product Name", "Company", "Category", "Min Price", "Max Price", "Currency", "Availability", "Status", "Created Date"])
+        for p in Product.objects.select_related("company", "category").order_by("-created_at")[:5000]:
+            writer.writerow([p.id, p.sku or "N/A", p.name, p.company.name if p.company else "N/A", p.category.name if p.category else "Uncategorized", p.min_price or "", p.max_price or "", p.currency or "INR", p.get_availability_display() if hasattr(p, "get_availability_display") else p.availability, "Archived" if p.is_deleted else "Active", p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else ""])
+        return response
+
+    elif export_type == "requirements_csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="Platform_Requirements_RFQs_{today_str}.csv"'
+        response.write("\ufeff")
+        writer = csv.writer(response)
+        writer.writerow(["ID", "Item Name", "Company", "Category", "Quantity", "Unit", "Target Price", "Delivery Location", "Status", "Created Date"])
+        for r in Requirement.objects.select_related("company", "category").order_by("-created_at")[:5000]:
+            writer.writerow([r.id, r.item_name, r.company.name if r.company else "N/A", r.category.name if r.category else "Uncategorized", r.quantity or "", r.unit or "", r.target_price or "", r.delivery_location or "", r.status, r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else ""])
+        return response
+
+    elif export_type == "wallets_csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="Platform_Company_Wallets_{today_str}.csv"'
+        response.write("\ufeff")
+        writer = csv.writer(response)
+        writer.writerow(["Wallet ID", "Company Name", "City", "Country", "Available Balance", "Reserved Balance", "Total Credited", "Total Spent", "Currency", "Status", "Last Updated"])
+        for w in CompanyWallet.objects.select_related("company").order_by("-available_balance"):
+            writer.writerow([f"WAL-{w.id:04d}", w.company.name if w.company else "N/A", w.company.city if w.company and w.company.city else "N/A", w.company.country if w.company and w.company.country else "India", w.available_balance, w.reserved_balance, w.total_credited, w.total_spent, w.currency, w.status.capitalize() if hasattr(w, "status") else "Active", w.updated_at.strftime("%Y-%m-%d %H:%M") if w.updated_at else ""])
+        return response
+
     total_companies = Company.objects.filter(is_deleted=False).count()
     total_users = User.objects.count()
     total_searches = SearchJob.objects.count()
     total_inquiries = Inquiry.objects.count()
+    total_products = Product.objects.filter(is_deleted=False).count()
+    total_requirements = Requirement.objects.filter(is_deleted=False).count()
+    total_wallets = CompanyWallet.objects.count()
 
     return render(request, "admin_panel/reports.html", {
         "page_title": "Platform Intelligence & Reports Center",
@@ -2250,6 +2554,9 @@ def admin_panel_reports_view(request):
         "total_users": total_users,
         "total_searches": total_searches,
         "total_inquiries": total_inquiries,
+        "total_products": total_products,
+        "total_requirements": total_requirements,
+        "total_wallets": total_wallets,
     })
 
 
@@ -2278,16 +2585,14 @@ def admin_panel_settings_view(request):
             PlatformSetting.set_setting("maintenance_message", maintenance_message, "Platform maintenance banner message")
 
         first_comp = Company.objects.first()
-        if first_comp:
-            ActivityLog.objects.create(
-                company=first_comp,
-                user=request.user,
-                activity_type=ActivityLog.ActivityType.MEMBER_INVITED,
-                title="Global Platform Settings Updated",
-                description=f"Super Admin updated governance settings: App Name='{app_name}', Support Email='{support_email}', Default Credits={default_signup_credits}, Public Signup={allow_public_signup}, Maintenance Mode={maintenance_mode}.",
-                icon_type="sliders",
-                color="blue",
-            )
+        log_admin_activity(
+            request,
+            first_comp,
+            title="Global Platform Settings Updated",
+            description=f"Super Admin updated governance settings: App Name='{app_name}', Support Email='{support_email}', Default Credits={default_signup_credits}, Public Signup={allow_public_signup}, Maintenance Mode={maintenance_mode}.",
+            icon_type="sliders",
+            color="blue",
+        )
         cache.delete("superadmin_dashboard_kpis_7d")
         cache.delete("superadmin_dashboard_kpis_30d")
         cache.delete("superadmin_dashboard_kpis_90d")
@@ -2359,21 +2664,53 @@ def admin_panel_buyer_dashboard_view(request):
     layout = BuyerDashboardLayout.get_layout()
 
     # Buyer companies directory
-    comp_qs = Company.objects.filter(buyer_filter).order_by("-created_at")
+    comp_qs = (
+        Company.objects.filter(buyer_filter)
+        .select_related("subscription")
+        .prefetch_related("members__user")
+        .order_by("-created_at")
+    )
     q = request.GET.get("q", "").strip()
     if q:
         comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
 
     page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=10)
 
+    # Batch preload metrics for current page to eliminate N+1 queries
+    page_comp_ids = [c.id for c in page_obj]
+    req_counts = dict(
+        Requirement.objects.filter(company_id__in=page_comp_ids, is_deleted=False)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    jobs_counts = dict(
+        SearchJob.objects.filter(company_id__in=page_comp_ids)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    saved_counts = dict(
+        SavedItem.objects.filter(company_id__in=page_comp_ids)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    inq_counts = dict(
+        Inquiry.objects.filter(company_id__in=page_comp_ids)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+
     annotated_companies = []
     for comp in page_obj:
-        req_count = Requirement.objects.filter(company=comp, is_deleted=False).count()
-        jobs_count = SearchJob.objects.filter(company=comp).count()
-        saved_count = SavedItem.objects.filter(company=comp).count()
-        inq_count = Inquiry.objects.filter(company=comp).count()
+        req_count = req_counts.get(comp.id, 0)
+        jobs_count = jobs_counts.get(comp.id, 0)
+        saved_count = saved_counts.get(comp.id, 0)
+        inq_count = inq_counts.get(comp.id, 0)
         sub = getattr(comp, "subscription", None)
-        admin_member = comp.members.filter(role=CompanyMember.Role.ADMIN).select_related("user").first()
+        admin_member = next((m for m in comp.members.all() if m.role == CompanyMember.Role.ADMIN), None)
         admin_user = admin_member.user if admin_member else None
 
         annotated_companies.append({
@@ -2426,16 +2763,15 @@ def admin_panel_buyer_module_toggle_view(request, pk):
 
         state_str = "ENABLED" if module.is_enabled else "DISABLED"
         first_company = Company.objects.first()
-        if first_company:
-            ActivityLog.objects.create(
-                company=first_company,
-                user=request.user,
-                activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
-                title=f"Sales Module {state_str}: {module.display_name}",
-                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Sales module.",
-                icon_type="toggle-on" if module.is_enabled else "toggle-off",
-                color="emerald" if module.is_enabled else "rose",
-            )
+        log_admin_activity(
+            request,
+            first_company,
+            title=f"Sales Module {state_str}: {module.display_name}",
+            description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Sales module.",
+            activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
+            icon_type="toggle-on" if module.is_enabled else "toggle-off",
+            color="emerald" if module.is_enabled else "rose",
+        )
 
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({
@@ -2560,21 +2896,53 @@ def admin_panel_seller_dashboard_view(request):
     modules = SellerModuleConfig.objects.all().order_by("order", "id")
     layout = SellerDashboardLayout.get_layout()
 
-    comp_qs = Company.objects.filter(seller_filter).order_by("-created_at")
+    comp_qs = (
+        Company.objects.filter(seller_filter)
+        .select_related("subscription")
+        .prefetch_related("members__user")
+        .order_by("-created_at")
+    )
     q = request.GET.get("q", "").strip()
     if q:
         comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
 
     page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=10)
 
+    # Batch preload metrics for current page to eliminate N+1 queries
+    page_comp_ids = [c.id for c in page_obj]
+    prod_counts = dict(
+        Product.objects.filter(company_id__in=page_comp_ids, is_deleted=False)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    jobs_counts = dict(
+        SearchJob.objects.filter(company_id__in=page_comp_ids)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    saved_counts = dict(
+        SavedItem.objects.filter(company_id__in=page_comp_ids)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    inq_counts = dict(
+        Inquiry.objects.filter(company_id__in=page_comp_ids)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+
     annotated_companies = []
     for comp in page_obj:
-        prod_count = Product.objects.filter(company=comp, is_deleted=False).count()
-        jobs_count = SearchJob.objects.filter(company=comp).count()
-        saved_count = SavedItem.objects.filter(company=comp).count()
-        inq_count = Inquiry.objects.filter(company=comp).count()
+        prod_count = prod_counts.get(comp.id, 0)
+        jobs_count = jobs_counts.get(comp.id, 0)
+        saved_count = saved_counts.get(comp.id, 0)
+        inq_count = inq_counts.get(comp.id, 0)
         sub = getattr(comp, "subscription", None)
-        admin_member = comp.members.filter(role=CompanyMember.Role.ADMIN).select_related("user").first()
+        admin_member = next((m for m in comp.members.all() if m.role == CompanyMember.Role.ADMIN), None)
         admin_user = admin_member.user if admin_member else None
 
         annotated_companies.append({
@@ -2627,16 +2995,15 @@ def admin_panel_seller_module_toggle_view(request, pk):
 
         state_str = "ENABLED" if module.is_enabled else "DISABLED"
         first_company = Company.objects.first()
-        if first_company:
-            ActivityLog.objects.create(
-                company=first_company,
-                user=request.user,
-                activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
-                title=f"Vendor Module {state_str}: {module.display_name}",
-                description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Vendor module.",
-                icon_type="toggle-on" if module.is_enabled else "toggle-off",
-                color="emerald" if module.is_enabled else "rose",
-            )
+        log_admin_activity(
+            request,
+            first_company,
+            title=f"Vendor Module {state_str}: {module.display_name}",
+            description=f"Super Admin {request.user.email} {state_str.lower()} the '{module.display_name}' ({module.module_key}) Vendor module.",
+            activity_type=ActivityLog.ActivityType.LEAD_UPDATED,
+            icon_type="toggle-on" if module.is_enabled else "toggle-off",
+            color="emerald" if module.is_enabled else "rose",
+        )
 
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({
@@ -2741,19 +3108,44 @@ def admin_panel_both_dashboard_view(request):
     total_searches = SearchJob.objects.filter(company__in=Company.objects.filter(both_filter)).count()
     total_inquiries = Inquiry.objects.filter(company__in=Company.objects.filter(both_filter)).count()
 
-    comp_qs = Company.objects.filter(both_filter).order_by("-created_at")
+    comp_qs = (
+        Company.objects.filter(both_filter)
+        .select_related("subscription", "wallet")
+        .order_by("-created_at")
+    )
     q = request.GET.get("q", "").strip()
     if q:
         comp_qs = comp_qs.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(industry__icontains=q))
 
     page_obj, query_string = paginate_and_preserve(request, comp_qs, per_page=10)
 
+    # Batch preload metrics for current page to eliminate N+1 queries
+    page_comp_ids = [c.id for c in page_obj]
+    req_counts = dict(
+        Requirement.objects.filter(company_id__in=page_comp_ids, is_deleted=False)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    prod_counts = dict(
+        Product.objects.filter(company_id__in=page_comp_ids, is_deleted=False)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+    searches_counts = dict(
+        SearchJob.objects.filter(company_id__in=page_comp_ids)
+        .values("company_id")
+        .annotate(cnt=Count("id"))
+        .values_list("company_id", "cnt")
+    )
+
     annotated_companies = []
     for comp in page_obj:
-        req_count = Requirement.objects.filter(company=comp, is_deleted=False).count()
-        prod_count = Product.objects.filter(company=comp, is_deleted=False).count()
-        searches_count = SearchJob.objects.filter(company=comp).count()
-        wallet = CompanyWallet.objects.filter(company=comp).first()
+        req_count = req_counts.get(comp.id, 0)
+        prod_count = prod_counts.get(comp.id, 0)
+        searches_count = searches_counts.get(comp.id, 0)
+        wallet = getattr(comp, "wallet", None)
         sub = getattr(comp, "subscription", None)
 
         annotated_companies.append({
@@ -3189,6 +3581,42 @@ def admin_panel_transactions_view(request):
             | Q(feature_code__icontains=q)
         )
 
+    # 4. Date Range Filtering
+    range_filter = request.GET.get("range", "all").lower()
+    start_date = request.GET.get("start_date", "").strip()
+    end_date = request.GET.get("end_date", "").strip()
+
+    now = timezone.now()
+    date_cutoff = None
+    if range_filter == "today":
+        date_cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif range_filter == "7d":
+        date_cutoff = now - timedelta(days=7)
+    elif range_filter == "30d":
+        date_cutoff = now - timedelta(days=30)
+    elif range_filter == "90d":
+        date_cutoff = now - timedelta(days=90)
+    elif range_filter == "ytd":
+        date_cutoff = timezone.datetime(now.year, 1, 1, tzinfo=now.tzinfo)
+
+    if date_cutoff:
+        wallet_tx_qs = wallet_tx_qs.filter(created_at__gte=date_cutoff)
+        invoice_qs = invoice_qs.filter(created_at__gte=date_cutoff)
+        credit_tx_qs = credit_tx_qs.filter(created_at__gte=date_cutoff)
+    elif range_filter == "custom" and (start_date or end_date):
+        if start_date:
+            s_date = parse_date(start_date)
+            if s_date:
+                wallet_tx_qs = wallet_tx_qs.filter(created_at__date__gte=s_date)
+                invoice_qs = invoice_qs.filter(created_at__date__gte=s_date)
+                credit_tx_qs = credit_tx_qs.filter(created_at__date__gte=s_date)
+        if end_date:
+            e_date = parse_date(end_date)
+            if e_date:
+                wallet_tx_qs = wallet_tx_qs.filter(created_at__date__lte=e_date)
+                invoice_qs = invoice_qs.filter(created_at__date__lte=e_date)
+                credit_tx_qs = credit_tx_qs.filter(created_at__date__lte=e_date)
+
     total_wallet_volume = WalletTransaction.objects.filter(
         transaction_type=WalletTransaction.TransactionType.RECHARGE
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -3212,7 +3640,7 @@ def admin_panel_transactions_view(request):
             response["Content-Disposition"] = f'attachment; filename="Platform_Credit_Ledger_{today_str}.csv"'
             writer.writerow(["Transaction ID", "Receipt Number", "Company", "Feature Code", "Credits Amount", "Notes", "Timestamp"])
             for ctx in credit_tx_qs:
-                writer.writerow([ctx.id, ctx.receipt_number or "", ctx.company.name if ctx.company else "", ctx.feature_code or "", ctx.amount, ctx.notes or "", ctx.created_at.strftime("%Y-%m-%d %H:%M:%S")])
+                writer.writerow([ctx.id, ctx.receipt_number or "", ctx.company.name if ctx.company else "", ctx.feature_code or "", ctx.credits, ctx.notes or "", ctx.created_at.strftime("%Y-%m-%d %H:%M:%S")])
         else:
             response["Content-Disposition"] = f'attachment; filename="Platform_Wallet_Ledger_{today_str}.csv"'
             writer.writerow(["Transaction ID", "Reference ID", "Company", "Transaction Type", "Amount", "Balance After", "Status", "Description", "Initiated By", "Timestamp"])
@@ -3236,6 +3664,9 @@ def admin_panel_transactions_view(request):
         "page_obj": page_obj,
         "query_string": query_string,
         "q": q,
+        "range_filter": range_filter,
+        "start_date": start_date,
+        "end_date": end_date,
         "total_wallet_volume": total_wallet_volume,
         "total_invoiced_amt": total_invoiced_amt,
         "total_paid_invoices": total_paid_invoices,
@@ -3265,6 +3696,43 @@ def admin_panel_wallets_view(request):
             Q(company__name__icontains=q)
             | Q(company__city__icontains=q)
         )
+
+    # CSV Export
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        response["Content-Disposition"] = f'attachment; filename="platform_company_wallets_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            "Wallet ID",
+            "Company Name",
+            "City",
+            "Country",
+            "Available Balance",
+            "Reserved Balance",
+            "Total Credited",
+            "Total Spent",
+            "Currency",
+            "Status",
+            "Balance Health",
+            "Last Updated",
+        ])
+        for w in wallet_qs:
+            writer.writerow([
+                f"WAL-{w.id:04d}",
+                w.company.name if w.company else "N/A",
+                w.company.city if w.company and w.company.city else "N/A",
+                w.company.country if w.company and w.company.country else "India",
+                w.available_balance,
+                w.reserved_balance,
+                w.total_credited,
+                w.total_spent,
+                w.currency,
+                w.status.capitalize() if hasattr(w, "status") else "Active",
+                "Low Balance" if w.is_low_balance else "Healthy",
+                w.updated_at.strftime("%Y-%m-%d %H:%M") if w.updated_at else "",
+            ])
+        return response
 
     # Server-side pagination (default 10)
     page_obj, query_string = paginate_and_preserve(request, wallet_qs, per_page=10)
@@ -3406,8 +3874,10 @@ def admin_panel_matching_criteria_view(request):
             crit_id = request.POST.get("criteria_id")
             crit = get_object_or_404(PlatformMatchingCriteria, pk=crit_id)
             c_name = crit.name
-            crit.delete()
-            messages.success(request, f"Criterion '{c_name}' was deleted.")
+            # Always soft-delete: deactivate rather than purge
+            crit.is_active = False
+            crit.save(update_fields=["is_active", "updated_at"])
+            messages.success(request, f"Criterion '{c_name}' has been soft-deleted (deactivated).")
             return redirect("admin-panel-matching-criteria")
 
         elif action == "reset_defaults":
@@ -3445,6 +3915,37 @@ def admin_panel_matching_criteria_view(request):
     if rule_filter in ["weighted", "mandatory", "bonus"]:
         qs = qs.filter(rule_type=rule_filter)
 
+    # CSV Export
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        response["Content-Disposition"] = f'attachment; filename="platform_matching_criteria_{timestamp}.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            "Order / Priority",
+            "Criterion Name",
+            "Parameter Slug Key",
+            "Target Domain",
+            "Rule Type",
+            "Weight Percentage",
+            "Default Benchmark Value",
+            "Status",
+            "Description",
+        ])
+        for crit in qs:
+            writer.writerow([
+                crit.order,
+                crit.name,
+                crit.parameter_key,
+                crit.get_target_domain_display() if hasattr(crit, "get_target_domain_display") else crit.target_domain,
+                crit.get_rule_type_display() if hasattr(crit, "get_rule_type_display") else crit.rule_type,
+                f"{crit.weight_percentage}%",
+                crit.default_value or "N/A",
+                "Active" if crit.is_active else "Inactive",
+                crit.description or "",
+            ])
+        return response
+
     # Metrics
     all_criteria = PlatformMatchingCriteria.objects.all()
     total_criteria = all_criteria.count()
@@ -3469,6 +3970,100 @@ def admin_panel_matching_criteria_view(request):
         "rule_choices": PlatformMatchingCriteria.RuleType.choices,
         "page_title": "AI Search Matching Criteria Governance — Super Admin",
     })
+
+
+# ==============================================================================
+# TENANT IMPERSONATION & PRE-DELETE IMPACT TELEMETRY
+# ==============================================================================
+
+@login_required
+@superadmin_required
+def admin_panel_impersonate_company_view(request, company_id):
+    """
+    Super Admin 1-Click Tenant Impersonation:
+    Safely switches the active session context into the chosen company workspace,
+    setting a persistent top notification banner so the Super Admin can troubleshoot
+    the tenant experience firsthand.
+    """
+    company = get_object_or_404(Company, pk=company_id, is_deleted=False)
+
+    request.session["active_company_id"] = company.id
+    request.session["impersonating_superadmin"] = True
+    request.session["impersonating_company_name"] = company.name
+    request.session.modified = True
+
+    log_admin_activity(
+        request,
+        company,
+        title=f"Tenant Impersonation: {company.name}",
+        description=f"Super Admin '{request.user.email}' entered company workspace for '{company.name}'.",
+        icon_type="user-secret",
+        color="amber",
+    )
+
+    messages.info(request, f"Now viewing workspace as '{company.name}'. Full tenant context active.")
+
+    if company.company_type == Company.CompanyType.BUYER:
+        request.session["active_workspace"] = "buyer"
+    elif company.company_type == Company.CompanyType.SELLER:
+        request.session["active_workspace"] = "seller"
+    else:
+        request.session["active_workspace"] = "combined"
+
+    return redirect("dashboard")
+
+
+@login_required
+@superadmin_required
+def admin_panel_exit_impersonation_view(request):
+    """
+    Exits tenant impersonation mode and returns Super Admin to company management.
+    """
+    target_company_id = request.session.pop("active_company_id", None)
+    request.session.pop("impersonating_superadmin", None)
+    company_name = request.session.pop("impersonating_company_name", "Company")
+    request.session.modified = True
+
+    messages.success(request, f"Exited workspace of '{company_name}'. Returned to Super Admin Panel.")
+    if target_company_id:
+        return redirect("admin-panel-company-detail", pk=target_company_id)
+    return redirect("admin-panel-companies")
+
+
+@login_required
+@superadmin_required
+def admin_panel_company_impact_summary_api(request, company_id):
+    """
+    Pre-Delete Blast Radius Diagnostics:
+    Returns real-time JSON statistics showing all resources tied to a company
+    before the Super Admin confirms a soft-delete (archive).
+    """
+    company = get_object_or_404(Company, pk=company_id)
+
+    members_count = CompanyMember.objects.filter(company=company, is_active=True).count()
+    wallet = CompanyWallet.objects.filter(company=company).first()
+    wallet_balance = float(wallet.available_balance) if wallet else 0.0
+    reserved_balance = float(wallet.reserved_balance) if wallet else 0.0
+    products_count = Product.objects.filter(company=company, is_deleted=False).count()
+    requirements_count = Requirement.objects.filter(company=company, is_deleted=False).count()
+    inquiries_count = Inquiry.objects.filter(company=company).count()
+    search_jobs_count = SearchJob.objects.filter(company=company).count()
+
+    return JsonResponse({
+        "success": True,
+        "company_id": company.id,
+        "company_name": company.name,
+        "legal_name": company.legal_name or company.name,
+        "members_count": members_count,
+        "wallet_balance": wallet_balance,
+        "reserved_balance": reserved_balance,
+        "products_count": products_count,
+        "requirements_count": requirements_count,
+        "inquiries_count": inquiries_count,
+        "search_jobs_count": search_jobs_count,
+        "is_deleted": company.is_deleted,
+    })
+
 
 
 

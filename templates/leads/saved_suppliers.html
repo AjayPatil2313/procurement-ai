@@ -59,7 +59,7 @@
             id="saved_req_filter_input" 
             autocomplete="off"
             placeholder="Type requirement item name to filter pipeline (A-Z)..."
-            value="{% if selected_requirement %}{{ selected_requirement.item_name }}{% endif %}"
+            value="{% if selected_requirement %}{{ selected_requirement.item_name }}{% elif is_unassigned_view %}Other Prequalified Customers{% endif %}"
             class="w-full pl-9 pr-20 text-xs font-semibold rounded-xl border border-slate-300 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-slate-800 placeholder-slate-400"
           >
 
@@ -99,6 +99,33 @@
           id="saved_dropdown_menu" 
           class="hidden absolute z-30 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl divide-y divide-slate-100"
         >
+          <!-- All Requirements Consolidated Option -->
+          <a 
+            href="{% url 'saved-suppliers' %}" 
+            class="saved-req-option px-3.5 py-2.5 hover:bg-blue-50/70 flex items-center justify-between transition group {% if not selected_requirement and not is_unassigned_view %}bg-blue-50 text-blue-950 font-bold{% endif %}"
+            data-id=""
+            data-name="all requirements consolidated"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                <i class="fa-solid fa-layer-group"></i>
+              </span>
+              <div class="truncate">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition truncate">
+                  All Requirements (Consolidated)
+                </div>
+                <div class="text-[10px] text-slate-400 font-normal">
+                  View all saved customers across all requirements
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                {{ total_saved_count }} Total
+              </span>
+            </div>
+          </a>
+
           {% for r in requirements %}
           <a 
             href="{% url 'saved-suppliers' %}?requirement_id={{ r.id }}" 
@@ -136,6 +163,32 @@
             No requirements created yet.
           </div>
           {% endfor %}
+
+          {% if unassigned_count > 0 %}
+          <a 
+            href="{% url 'saved-suppliers' %}?requirement_id=unassigned" 
+            class="saved-req-option px-3.5 py-2.5 hover:bg-blue-50/70 flex items-center justify-between transition group {% if is_unassigned_view %}bg-blue-50 text-blue-950 font-bold{% endif %}"
+            data-id="unassigned"
+            data-name="other prequalified customers"
+          >
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <span class="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-600 flex items-center justify-center text-[10px] shrink-0 font-bold">
+                <i class="fa-solid fa-bookmark"></i>
+              </span>
+              <div class="truncate">
+                <div class="text-xs font-bold text-slate-800 truncate">
+                  Other Prequalified Customers
+                </div>
+                <div class="text-[10px] text-slate-400 font-normal">
+                  General candidate bookmarks
+                </div>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">
+              {{ unassigned_count }} Saved
+            </span>
+          </a>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -145,6 +198,18 @@
       <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
         <i class="fa-solid fa-tags text-[10px]"></i> Quick Tabs:
       </span>
+
+      <!-- All Requirements (Consolidated) Tab -->
+      <a 
+        href="{% url 'saved-suppliers' %}" 
+        class="shrink-0 px-3 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 {% if not selected_requirement and not is_unassigned_view %}bg-blue-600 text-white font-bold shadow-xs{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}"
+      >
+        <i class="fa-solid fa-layer-group text-[10px]"></i>
+        <span>All Requirements</span>
+        <span class="px-1.5 py-0.2 rounded-full text-[10px] {% if not selected_requirement and not is_unassigned_view %}bg-white/20 text-white font-bold{% else %}bg-slate-200 text-slate-600{% endif %}">
+          {{ total_saved_count }}
+        </span>
+      </a>
 
       {% for r in requirements %}
       <a 
@@ -159,38 +224,43 @@
       {% empty %}
       <span class="text-xs text-slate-400 italic">No requirements created yet.</span>
       {% endfor %}
+
+      {% if unassigned_count > 0 %}
+      <a 
+        href="{% url 'saved-suppliers' %}?requirement_id=unassigned" 
+        class="shrink-0 px-3 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 {% if is_unassigned_view %}bg-blue-600 text-white font-bold shadow-xs{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}"
+      >
+        <span>Other Saved</span>
+        <span class="px-1.5 py-0.2 rounded-full text-[10px] {% if is_unassigned_view %}bg-white/20 text-white font-bold{% else %}bg-slate-200 text-slate-600{% endif %}">
+          {{ unassigned_count }}
+        </span>
+      </a>
+      {% endif %}
     </div>
   </div>
 
-  {% if not selected_requirement and not is_unassigned_view %}
-  <!-- MODULE FUNCTIONALITY PROMPT CARD: NO REQUIREMENT SELECTED -->
-  <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
-    <div class="max-w-2xl mx-auto space-y-4">
-      <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
-        <i class="fa-solid fa-bookmark"></i>
+  {% if total_saved_count == 0 %}
+  <!-- EMPTY PIPELINE STATE: NO SAVED CUSTOMERS YET -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-12 shadow-sm text-center">
+    <div class="max-w-md mx-auto space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mx-auto shadow-sm border border-blue-100">
+        <i class="fa-regular fa-bookmark"></i>
       </div>
       <div>
         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 mb-2">
           <i class="fa-solid fa-layer-group text-[11px]"></i> Saved Customers Pipeline
         </span>
-        <h2 class="text-xl font-black text-slate-900 tracking-tight">Select a Requirement to View Saved Customers</h2>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">No Saved Customers in Pipeline</h2>
         <p class="text-xs text-slate-500 mt-2 leading-relaxed">
-          Please select a requirement from the searchable dropdown or quick tabs above to view its saved customer pipeline, manage deal stages, assign reps, and send RFQs.
+          You haven't bookmarked any prequalified customers yet. Search for verified candidates with AI and click <strong>"Save"</strong> to manage them here.
         </p>
       </div>
-      {% if requirements %}
-      <div class="pt-2 flex flex-wrap items-center justify-center gap-2">
-        {% for r in requirements %}
-        <a href="{% url 'saved-suppliers' %}?requirement_id={{ r.id }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-700 hover:text-blue-700 text-xs font-semibold transition">
-          <i class="fa-solid fa-box text-[10px] text-blue-500"></i>
-          <span>{{ r.item_name }}</span>
-          {% if r.saved_count > 0 %}
-          <span class="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">{{ r.saved_count }}</span>
-          {% endif %}
+      <div class="pt-2">
+        <a href="{% url 'find-suppliers' %}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>Discover Qualified Customers</span>
         </a>
-        {% endfor %}
       </div>
-      {% endif %}
     </div>
   </div>
   {% else %}
@@ -898,6 +968,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (chevron) chevron.style.transform = 'rotate(0deg)';
     }
   });
+});
+
 // Pipeline View Switcher (Table vs Kanban)
 function switchPipelineView(view) {
   const tableContainer = document.getElementById('pipeline-table-container');

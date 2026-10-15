@@ -76,6 +76,18 @@
 
   <!-- Search Jobs Table Card -->
   <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <!-- Table Header Toolbar -->
+    <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-xs font-bold text-slate-800">Search Operations Log Registry</h2>
+        <p class="text-[11px] text-slate-500">Showing {{ page_obj.paginator.count }} AI search jobs across all modules</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="?{% if query_string %}{{ query_string }}&{% endif %}export=csv" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm transition hover:border-slate-300 cursor-pointer" title="Export matching search operations to CSV">
+          <i class="fa-solid fa-file-arrow-down mr-1.5 text-emerald-600"></i> Export Search Jobs (CSV)
+        </a>
+      </div>
+    </div>
     <div class="overflow-x-auto">
       <table class="w-full text-left text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
@@ -139,10 +151,11 @@
 
             <!-- Status -->
             <td class="py-3.5 px-4">
-              <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold {% if job.status == 'COMPLETED' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif job.status == 'FAILED' %}bg-rose-50 text-rose-700 border border-rose-200{% elif job.status == 'IN_PROGRESS' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
-                {% if job.status == 'COMPLETED' %}<i class="fa-solid fa-circle-check text-[9px] mr-1 text-emerald-500"></i>
-                {% elif job.status == 'FAILED' %}<i class="fa-solid fa-circle-exclamation text-[9px] mr-1 text-rose-500"></i>
-                {% elif job.status == 'IN_PROGRESS' %}<i class="fa-solid fa-spinner fa-spin text-[9px] mr-1 text-amber-500"></i>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold {% if job.status == 'COMPLETED' or job.status == 'completed' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif job.status == 'FAILED' or job.status == 'failed' %}bg-rose-50 text-rose-700 border border-rose-200{% elif job.status == 'IN_PROGRESS' or job.status == 'running' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                {% if job.status == 'COMPLETED' or job.status == 'completed' %}<i class="fa-solid fa-circle-check text-[9px] mr-1 text-emerald-500"></i>
+                {% elif job.status == 'FAILED' or job.status == 'failed' %}<i class="fa-solid fa-circle-exclamation text-[9px] mr-1 text-rose-500"></i>
+                {% elif job.status == 'IN_PROGRESS' or job.status == 'running' %}<i class="fa-solid fa-spinner fa-spin text-[9px] mr-1 text-amber-500"></i>
+                {% else %}<i class="fa-solid fa-clock text-[9px] mr-1 text-slate-500"></i>
                 {% endif %}
                 {{ job.get_status_display|default:job.status }}
               </span>
@@ -172,6 +185,16 @@
               <button type="button" onclick="showJobDetail('{{ job.id }}', '{{ job.company.name|escapejs }}', '{{ job.search_query|default:""|escapejs }}', '{{ job.get_status_display|default:job.status }}', '{{ job.total_results|default:0 }}', '{{ job.error_message|default:""|escapejs }}')" class="inline-flex items-center px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded-lg border border-slate-200 transition cursor-pointer" title="Inspect Search Job Telemetry">
                 <i class="fa-solid fa-info-circle mr-1 text-slate-500"></i> Info
               </button>
+              {% if job.status == 'FAILED' or job.status == 'failed' %}
+              <form method="POST" class="inline-block" onsubmit="return confirm('Re-queue failed AI Search Job #JOB-{{ job.id|stringformat:"05d" }} for execution?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="retry_job">
+                <input type="hidden" name="job_id" value="{{ job.id }}">
+                <button type="submit" class="inline-flex items-center px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-semibold rounded-lg border border-amber-200 transition cursor-pointer" title="Re-queue failed search job">
+                  <i class="fa-solid fa-rotate-right mr-1 text-amber-600"></i> Retry
+                </button>
+              </form>
+              {% endif %}
             </td>
           </tr>
           {% empty %}

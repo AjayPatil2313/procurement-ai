@@ -108,13 +108,18 @@
         <p class="text-xs text-slate-500">Real-time ledger balances and single-click administrative credit adjustments</p>
       </div>
 
-      <form method="GET" class="flex items-center gap-2">
-        <input type="text" name="q" value="{{ q }}" placeholder="Search company, city..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-64">
-        <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
-        {% if q %}
-        <a href="{% url 'admin-panel-wallets' %}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
-        {% endif %}
-      </form>
+      <div class="flex items-center gap-3">
+        <form method="GET" class="flex items-center gap-2">
+          <input type="text" name="q" value="{{ q }}" placeholder="Search company, city..." class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none w-56">
+          <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">Search</button>
+          {% if q %}
+          <a href="{% url 'admin-panel-wallets' %}" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">Clear</a>
+          {% endif %}
+        </form>
+        <a href="?{% if query_string %}{{ query_string }}&{% endif %}export=csv" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm transition hover:border-slate-300 cursor-pointer shrink-0" title="Export tenant wallets to CSV">
+          <i class="fa-solid fa-file-arrow-down mr-1.5 text-emerald-600"></i> Export Wallets (CSV)
+        </a>
+      </div>
     </div>
 
     <!-- Table -->

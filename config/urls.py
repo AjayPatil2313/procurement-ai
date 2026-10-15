@@ -146,6 +146,9 @@ from apps.companies.admin_views import (
     admin_panel_transactions_view,
     admin_panel_wallets_view,
     admin_panel_matching_criteria_view,
+    admin_panel_impersonate_company_view,
+    admin_panel_exit_impersonation_view,
+    admin_panel_company_impact_summary_api,
 )
 from apps.ai_search.web_views import (
     matching_parameters_view,
@@ -285,6 +288,9 @@ urlpatterns = [
     path("admin-panel/companies/<int:pk>/change-type/", admin_panel_change_company_type_view, name="admin-panel-change-company-type"),
     path("admin-panel/companies/<int:pk>/delete/", admin_panel_company_delete_view, name="admin-panel-company-delete"),
     path("admin-panel/companies/<int:pk>/restore/", admin_panel_company_restore_view, name="admin-panel-company-restore"),
+    path("admin-panel/companies/<int:company_id>/impersonate/", admin_panel_impersonate_company_view, name="admin-panel-impersonate-company"),
+    path("admin-panel/companies/<int:company_id>/impact-summary/", admin_panel_company_impact_summary_api, name="admin-panel-company-impact-summary-api"),
+    path("admin-panel/impersonation/exit/", admin_panel_exit_impersonation_view, name="admin-panel-exit-impersonation"),
     path("admin-panel/companies/<int:pk>/toggle-status/", admin_panel_toggle_company_status_view, name="admin-panel-toggle-company-status"),
     path("admin-panel/companies/<int:pk>/toggle-verification/", admin_panel_toggle_company_verification_view, name="admin-panel-toggle-company-verification"),
     path("admin-panel/plans/", admin_panel_plans_view, name="admin-panel-plans"),

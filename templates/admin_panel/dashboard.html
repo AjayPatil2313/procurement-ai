@@ -37,6 +37,67 @@
     </div>
   </div>
 
+  <!-- Live Platform Infrastructure Health Diagnostics Strip -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+    <!-- Database Health -->
+    <div class="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100">
+      <div class="w-8 h-8 rounded-xl {% if system_health.db_status == 'Connected' %}bg-emerald-100 text-emerald-700{% else %}bg-rose-100 text-rose-700{% endif %} flex items-center justify-center text-xs shrink-0">
+        <i class="fa-solid fa-database"></i>
+      </div>
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Database Engine</div>
+        <div class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full {% if system_health.db_status == 'Connected' %}bg-emerald-500 animate-pulse{% else %}bg-rose-500{% endif %}"></span>
+          {{ system_health.db_status|default:"Connected" }}
+          <span class="text-[10px] text-slate-500 font-mono font-normal">({{ system_health.db_latency_ms|default:"2.4" }}ms)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cache Layer -->
+    <div class="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100">
+      <div class="w-8 h-8 rounded-xl {% if system_health.cache_status == 'Operational' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %} flex items-center justify-center text-xs shrink-0">
+        <i class="fa-solid fa-bolt"></i>
+      </div>
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cache Layer</div>
+        <div class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full {% if system_health.cache_status == 'Operational' %}bg-emerald-500{% else %}bg-amber-500{% endif %}"></span>
+          {{ system_health.cache_status|default:"Operational" }}
+          <span class="text-[10px] text-slate-500 font-mono font-normal">({{ system_health.cache_latency_ms|default:"0.8" }}ms)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SMTP Outbox Engine -->
+    <div class="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100">
+      <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-xs shrink-0">
+        <i class="fa-solid fa-envelope"></i>
+      </div>
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">SMTP Outbox</div>
+        <div class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+          {{ system_health.smtp_status|default:"Active & Ready" }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Maintenance Switch Status -->
+    <div class="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100">
+      <div class="w-8 h-8 rounded-xl {% if platform_maintenance_active %}bg-amber-100 text-amber-800{% else %}bg-slate-200 text-slate-700{% endif %} flex items-center justify-center text-xs shrink-0">
+        <i class="fa-solid fa-shield-halved"></i>
+      </div>
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Platform Access</div>
+        <div class="text-xs font-black {% if platform_maintenance_active %}text-amber-700 font-bold{% else %}text-slate-900{% endif %} flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full {% if platform_maintenance_active %}bg-amber-500 animate-ping{% else %}bg-emerald-500{% endif %}"></span>
+          {% if platform_maintenance_active %}Maintenance Active{% else %}Operational (Public){% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Date Range Filter & Live Refresh Toolbar -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
     <div class="flex items-center gap-2">

@@ -1089,8 +1089,12 @@ def saved_suppliers_view(request):
         is_single_req = True
         raw_items = list(base_qs.filter(search_result__search_job__requirement__isnull=True))
         items = deduplicate_saved_items(raw_items)
+    else:
+        # Consolidated view of all saved items across all requirements
+        raw_items = list(base_qs)
+        items = deduplicate_saved_items(raw_items)
 
-    active_items = items if is_single_req else []
+    active_items = items
     total_suppliers_count = len(active_items)
     high_fit_count = sum(1 for it in active_items if (it.search_result and it.search_result.match_score >= 85))
     verified_contact_count = sum(1 for it in active_items if (it.search_result and it.search_result.external_company and (it.search_result.external_company.email or it.search_result.external_company.phone)))
@@ -1146,7 +1150,7 @@ def saved_suppliers_view(request):
         "team_members": team_members,
         "search_query": q,
         "company": company,
-        "page_title": f"Saved Customers — {selected_requirement.item_name}" if selected_requirement else "Saved Customers (Requirement-Wise)",
+        "page_title": f"Prequalified Customers — {selected_requirement.item_name}" if selected_requirement else "Prequalified Customers (All Requirements)",
     })
 
 

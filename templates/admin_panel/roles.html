@@ -53,10 +53,13 @@
         <h2 class="text-sm font-black text-slate-900">Module Access & Permissions Matrix</h2>
         <p class="text-[11px] text-slate-500">Detailed capability breakdown per functional module across user roles</p>
       </div>
-      <div class="flex items-center gap-3 text-xs">
+      <div class="flex flex-wrap items-center gap-3 text-xs">
         <span class="flex items-center gap-1.5 text-emerald-700 font-semibold"><i class="fa-solid fa-check-circle text-emerald-500"></i> Full Access</span>
         <span class="flex items-center gap-1.5 text-blue-700 font-semibold"><i class="fa-solid fa-circle-dot text-blue-500"></i> Tenant-Scoped</span>
         <span class="flex items-center gap-1.5 text-slate-500 font-semibold"><i class="fa-solid fa-circle-minus text-slate-400"></i> Restricted</span>
+        <a href="?export=csv" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm transition hover:border-slate-300 cursor-pointer ml-1" title="Export RBAC permissions matrix to CSV">
+          <i class="fa-solid fa-file-arrow-down mr-1.5 text-emerald-600"></i> Export Matrix (CSV)
+        </a>
       </div>
     </div>
 

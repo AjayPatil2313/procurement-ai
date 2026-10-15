@@ -1,9 +1,10 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 
+from decimal import Decimal
 from apps.accounts.models import User
 from apps.companies.models import Company, CompanyMember
-from apps.billing.models import Subscription, CreditTransaction
+from apps.billing.models import Subscription, CreditTransaction, CompanyWallet
 from apps.ai_search.models import APILog, SearchJob
 from apps.dashboard.models import ActivityLog, PlatformSetting, BuyerModuleConfig, SellerModuleConfig, BothDashboardLayout
 from apps.catalog.models import Product
@@ -828,6 +829,10 @@ class SuperAdminDashboardSyncTestCase(TestCase):
             is_active=True,
         )
 
+        self.company = self.buyer_comp
+        self.regular_user = self.buyer_user
+        CompanyWallet.objects.get_or_create(company=self.buyer_comp, defaults={"available_balance": Decimal("5000.00")})
+
     def test_super_admin_governance_views_access_control(self):
         """Super Admin can access all dashboard governance views; regular users receive 403."""
         admin_urls = [
@@ -943,15 +948,15 @@ class SuperAdminDashboardSyncTestCase(TestCase):
         self.assertIn("text/csv", res_all["Content-Type"])
         self.assertIn("Platform_Users_All_", res_all["Content-Disposition"])
         content_all = res_all.content.decode("utf-8")
-        self.assertIn("superadmin@platform.ai", content_all)
-        self.assertIn("regular@vendor.com", content_all)
+        self.assertIn("superadmin_sync@platform.ai", content_all)
+        self.assertIn("buyer_sync@buyer.com", content_all)
 
         # 2. Export Company-Wise Users
         res_comp = self.client.get(reverse("admin-panel-users") + f"?company_id={self.company.id}&export=csv")
         self.assertEqual(res_comp.status_code, 200)
         self.assertIn("text/csv", res_comp["Content-Type"])
         content_comp = res_comp.content.decode("utf-8")
-        self.assertIn("regular@vendor.com", content_comp)
+        self.assertIn("buyer_sync@buyer.com", content_comp)
 
         # 3. Bulk Selected Users Export
         res_bulk = self.client.post(
@@ -962,7 +967,7 @@ class SuperAdminDashboardSyncTestCase(TestCase):
         self.assertIn("text/csv", res_bulk["Content-Type"])
         self.assertIn("Selected_Users_", res_bulk["Content-Disposition"])
         content_bulk = res_bulk.content.decode("utf-8")
-        self.assertIn("regular@vendor.com", content_bulk)
+        self.assertIn("buyer_sync@buyer.com", content_bulk)
 
     def test_admin_panel_module_exports_csv(self):
         """Validates CSV exports across companies, transactions, and audit logs."""
@@ -973,7 +978,7 @@ class SuperAdminDashboardSyncTestCase(TestCase):
         self.assertEqual(res_comp.status_code, 200)
         self.assertIn("text/csv", res_comp["Content-Type"])
         self.assertIn("Platform_Companies_", res_comp["Content-Disposition"])
-        self.assertIn("Apex Engineering Ltd", res_comp.content.decode("utf-8"))
+        self.assertIn("Buyer Corp India", res_comp.content.decode("utf-8"))
 
         # Transactions Export (Wallet & Invoices)
         res_tx = self.client.get(reverse("admin-panel-transactions") + "?tab=wallet_tx&export=csv")
@@ -993,6 +998,278 @@ class SuperAdminDashboardSyncTestCase(TestCase):
         res = self.client.get(reverse("admin-panel-dashboard"))
         self.assertEqual(res.status_code, 200)
         html = res.content.decode("utf-8")
-        sidebar_part = html.split('<aside id="appSidebar"')[1].split('</aside>')[0]
+        sidebar_part = html.split('<aside id="sidebar"')[1].split('</aside>')[0]
         count_in_sidebar = sidebar_part.count("/admin-panel/support/")
         self.assertEqual(count_in_sidebar, 1, f"Expected 1 support desk link in sidebar, found {count_in_sidebar}")
+
+    def test_universal_export_parity_across_moderation_tables(self):
+        """Validates that Products, Requirements, Wallets, Search Activity, Matching Criteria, and Roles all export to CSV."""
+        self.client.force_login(self.superadmin)
+
+        # 1. Products Catalog Export
+        res_prd = self.client.get(reverse("admin-panel-products") + "?export=csv")
+        self.assertEqual(res_prd.status_code, 200)
+        self.assertIn("text/csv", res_prd["Content-Type"])
+        self.assertIn("platform_products_catalog_", res_prd["Content-Disposition"])
+
+        # 2. Buyer Requirements Export
+        res_req = self.client.get(reverse("admin-panel-requirements") + "?export=csv")
+        self.assertEqual(res_req.status_code, 200)
+        self.assertIn("text/csv", res_req["Content-Type"])
+        self.assertIn("platform_requirements_", res_req["Content-Disposition"])
+
+        # 3. Company Wallets Export
+        res_wal = self.client.get(reverse("admin-panel-wallets") + "?export=csv")
+        self.assertEqual(res_wal.status_code, 200)
+        self.assertIn("text/csv", res_wal["Content-Type"])
+        self.assertIn("platform_company_wallets_", res_wal["Content-Disposition"])
+
+        # 4. Search Operations Activity Export
+        res_srch = self.client.get(reverse("admin-panel-search-activity") + "?export=csv")
+        self.assertEqual(res_srch.status_code, 200)
+        self.assertIn("text/csv", res_srch["Content-Type"])
+        self.assertIn("platform_search_operations_", res_srch["Content-Disposition"])
+
+        # 5. Matching Criteria Governance Export
+        res_crit = self.client.get(reverse("admin-panel-matching-criteria") + "?export=csv")
+        self.assertEqual(res_crit.status_code, 200)
+        self.assertIn("text/csv", res_crit["Content-Type"])
+        self.assertIn("platform_matching_criteria_", res_crit["Content-Disposition"])
+
+        # 6. Roles & Permissions Matrix Export
+        res_roles = self.client.get(reverse("admin-panel-roles") + "?export=csv")
+        self.assertEqual(res_roles.status_code, 200)
+        self.assertIn("text/csv", res_roles["Content-Type"])
+        self.assertIn("platform_rbac_roles_matrix_", res_roles["Content-Disposition"])
+
+    def test_tenant_impersonation_lifecycle(self):
+        """Super Admin can jump into company workspace with 1 click and safely return."""
+        self.client.force_login(self.superadmin)
+
+        # 1. Impersonate company
+        res_imp = self.client.get(reverse("admin-panel-impersonate-company", kwargs={"company_id": self.company.id}), follow=True)
+        self.assertEqual(res_imp.status_code, 200)
+        self.assertEqual(self.client.session.get("active_company_id"), self.company.id)
+        self.assertTrue(self.client.session.get("impersonating_superadmin"))
+        self.assertEqual(self.client.session.get("impersonating_company_name"), self.company.name)
+
+        # Verify impersonation top banner rendered
+        self.assertContains(res_imp, "Super Admin Impersonation Active")
+
+        # 2. Exit impersonation
+        res_exit = self.client.get(reverse("admin-panel-exit-impersonation"), follow=True)
+        self.assertEqual(res_exit.status_code, 200)
+        self.assertIsNone(self.client.session.get("impersonating_superadmin"))
+        self.assertIsNone(self.client.session.get("active_company_id"))
+
+    def test_predelete_impact_summary_and_soft_delete_guarantee(self):
+        """Validates that impact summary API provides live counts and delete action is strictly soft-delete."""
+        self.client.force_login(self.superadmin)
+
+        # 1. Impact Summary API
+        res_impact = self.client.get(reverse("admin-panel-company-impact-summary-api", kwargs={"company_id": self.company.id}))
+        self.assertEqual(res_impact.status_code, 200)
+        data = res_impact.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["company_name"], self.company.name)
+        self.assertIn("members_count", data)
+        self.assertIn("wallet_balance", data)
+        self.assertIn("products_count", data)
+
+        # 2. Soft-delete Company
+        res_del = self.client.post(reverse("admin-panel-company-delete", kwargs={"pk": self.company.id}), follow=True)
+        self.assertEqual(res_del.status_code, 200)
+
+        # CRITICAL VERIFICATION: Soft-delete only, never hard deleted!
+        self.company.refresh_from_db()
+        self.assertTrue(self.company.is_deleted)
+        self.assertFalse(self.company.is_active)
+        self.assertIsNotNone(self.company.deleted_at)
+        # Record still exists in database
+        self.assertTrue(Company.objects.filter(id=self.company.id).exists())
+
+    def test_matching_criteria_soft_delete_preservation(self):
+        """Deleting a matching criterion sets is_active=False instead of database purge."""
+        from apps.ai_search.models import PlatformMatchingCriteria
+        self.client.force_login(self.superadmin)
+
+        crit = PlatformMatchingCriteria.objects.create(
+            name="Testing Soft Delete Criterion",
+            parameter_key="test_soft_delete_param",
+            weight_percentage=15,
+            is_active=True,
+        )
+
+        res = self.client.post(
+            reverse("admin-panel-matching-criteria"),
+            {"action": "delete", "criteria_id": crit.id},
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        # Verify record still exists in DB, but is soft-deleted (deactivated)
+        crit.refresh_from_db()
+        self.assertFalse(crit.is_active)
+        self.assertTrue(PlatformMatchingCriteria.objects.filter(id=crit.id).exists())
+
+    def test_credit_transaction_export_attribute_integrity(self):
+        """Validates that Credit Transactions CSV export generates cleanly with ctx.credits."""
+        self.client.force_login(self.superadmin)
+        CreditTransaction.objects.create(
+            company=self.buyer_comp,
+            user=self.buyer_user,
+            transaction_type=CreditTransaction.TransactionType.DEDUCTION,
+            credits=-15,
+            notes="AI Supplier Discovery test run",
+        )
+        res = self.client.get(reverse("admin-panel-transactions") + "?tab=credits&export=csv")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/csv", res["Content-Type"])
+        self.assertIn("Platform_Credit_Ledger_", res["Content-Disposition"])
+        content = res.content.decode("utf-8")
+        self.assertIn("-15", content)
+        self.assertIn("AI Supplier Discovery test run", content)
+
+    def test_audit_logs_includes_suspended_companies_in_filter(self):
+        """Suspended companies (is_active=False, is_deleted=False) must remain available in audit log filter."""
+        self.client.force_login(self.superadmin)
+        self.seller_comp.is_active = False
+        self.seller_comp.save()
+
+        res = self.client.get(reverse("admin-panel-auditlogs"))
+        self.assertEqual(res.status_code, 200)
+        companies_in_context = res.context["companies"]
+        self.assertIn(self.seller_comp, companies_in_context)
+
+    def test_central_reports_exports_products_requirements_wallets(self):
+        """Validates centralized exports for products, requirements, and wallets in reports hub."""
+        self.client.force_login(self.superadmin)
+
+        # 1. Products CSV
+        res_prd = self.client.get(reverse("admin-panel-reports") + "?export=products_csv")
+        self.assertEqual(res_prd.status_code, 200)
+        self.assertIn("Platform_Products_Catalog_", res_prd["Content-Disposition"])
+
+        # 2. Requirements CSV
+        res_req = self.client.get(reverse("admin-panel-reports") + "?export=requirements_csv")
+        self.assertEqual(res_req.status_code, 200)
+        self.assertIn("Platform_Requirements_RFQs_", res_req["Content-Disposition"])
+
+        # 3. Wallets CSV
+        res_wal = self.client.get(reverse("admin-panel-reports") + "?export=wallets_csv")
+        self.assertEqual(res_wal.status_code, 200)
+        self.assertIn("Platform_Company_Wallets_", res_wal["Content-Disposition"])
+
+    def test_dashboards_batch_query_optimization_and_annotations(self):
+        """Validates that Buyer, Seller, and Both governance dashboards compute annotated metrics efficiently."""
+        self.client.force_login(self.superadmin)
+
+        # Buyer Dashboard
+        res_buyer = self.client.get(reverse("admin-panel-buyer-dashboard"))
+        self.assertEqual(res_buyer.status_code, 200)
+        self.assertIn("annotated_companies", res_buyer.context)
+
+        # Seller Dashboard
+        res_seller = self.client.get(reverse("admin-panel-seller-dashboard"))
+        self.assertEqual(res_seller.status_code, 200)
+        self.assertIn("annotated_companies", res_seller.context)
+
+        # Both Dashboard
+        res_both = self.client.get(reverse("admin-panel-both-dashboard"))
+        self.assertEqual(res_both.status_code, 200)
+        self.assertIn("annotated_companies", res_both.context)
+
+    def test_transactions_date_range_filtering(self):
+        """Validates that date horizon filtering correctly restricts transactions querysets."""
+        from django.utils import timezone
+        from datetime import timedelta
+        from apps.billing.models import WalletTransaction, Invoice, CompanyWallet
+
+        self.client.force_login(self.superadmin)
+        now = timezone.now()
+
+        # Create a wallet for seller_comp inline (setUp only creates one for buyer_comp)
+        seller_wallet, _ = CompanyWallet.objects.get_or_create(
+            company=self.seller_comp,
+            defaults={"available_balance": Decimal("5000.00")},
+        )
+
+        # Create old transaction (60 days ago) and recent transaction (1 day ago)
+        old_tx = WalletTransaction.objects.create(
+            wallet=seller_wallet,
+            company=self.seller_comp,
+            transaction_type=WalletTransaction.TransactionType.RECHARGE,
+            amount=Decimal("100.00"),
+            balance_after=Decimal("100.00"),
+            status=WalletTransaction.TransactionStatus.COMPLETED,
+            description="Test old recharge",
+            reference_id="OLD-TX-001",
+        )
+        WalletTransaction.objects.filter(id=old_tx.id).update(created_at=now - timedelta(days=60))
+
+        recent_tx = WalletTransaction.objects.create(
+            wallet=seller_wallet,
+            company=self.seller_comp,
+            transaction_type=WalletTransaction.TransactionType.RECHARGE,
+            amount=Decimal("200.00"),
+            balance_after=Decimal("300.00"),
+            status=WalletTransaction.TransactionStatus.COMPLETED,
+            description="Test recent recharge",
+            reference_id="REC-TX-002",
+        )
+
+        # 1. 7 Days Filter should include recent_tx and exclude old_tx
+        res_7d = self.client.get(reverse("admin-panel-transactions") + "?tab=wallet_tx&range=7d")
+        self.assertEqual(res_7d.status_code, 200)
+        page_ids = [tx.id for tx in res_7d.context["page_obj"]]
+        self.assertIn(recent_tx.id, page_ids)
+        self.assertNotIn(old_tx.id, page_ids)
+
+        # 2. All Time Filter should include both
+        res_all = self.client.get(reverse("admin-panel-transactions") + "?tab=wallet_tx&range=all")
+        self.assertEqual(res_all.status_code, 200)
+        page_ids_all = [tx.id for tx in res_all.context["page_obj"]]
+        self.assertIn(recent_tx.id, page_ids_all)
+        self.assertIn(old_tx.id, page_ids_all)
+
+    def test_ai_search_job_retry_action(self):
+        """Super Admin can retry a failed search job to reset it to QUEUED status."""
+        self.client.force_login(self.superadmin)
+
+        failed_job = SearchJob.objects.create(
+            company=self.seller_comp,
+            job_type=SearchJob.JobType.FIND_BUYERS,
+            search_query="Automated Industrial Pumps",
+            status=SearchJob.Status.FAILED,
+            error_message="Gateway timeout: Google API 504",
+        )
+
+        res = self.client.post(
+            reverse("admin-panel-search-activity"),
+            {"action": "retry_job", "job_id": failed_job.id},
+            follow=True,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        failed_job.refresh_from_db()
+        self.assertEqual(failed_job.status, SearchJob.Status.QUEUED)
+        self.assertEqual(failed_job.error_message, "")
+        self.assertEqual(failed_job.progress_percent, 0)
+
+    def test_forensic_audit_log_client_ip_enrichment(self):
+        """Administrative actions automatically append client IP address to audit descriptions."""
+        self.client.force_login(self.superadmin)
+        test_ip = "198.51.100.42"
+
+        res = self.client.post(
+            reverse("admin-panel-toggle-company-status", kwargs={"pk": self.seller_comp.pk}),
+            follow=True,
+            REMOTE_ADDR=test_ip,
+        )
+        self.assertEqual(res.status_code, 200)
+
+        latest_log = ActivityLog.objects.filter(company=self.seller_comp).order_by("-created_at").first()
+        self.assertIsNotNone(latest_log)
+        self.assertIn(f"[IP: {test_ip}]", latest_log.description)
+
+
