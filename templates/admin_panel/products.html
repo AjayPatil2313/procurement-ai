@@ -108,7 +108,6 @@
           <tr>
             <th class="py-3 px-4">Product Details</th>
             <th class="py-3 px-4">Seller Company</th>
-            <th class="py-3 px-4">Price / Unit</th>
             <th class="py-3 px-4">Stock Availability</th>
             <th class="py-3 px-4">Moderation Status</th>
             <th class="py-3 px-4">Listed Date</th>
@@ -140,15 +139,6 @@
                 <span>{{ p.company.name }}</span>
                 <i class="fa-solid fa-arrow-up-right-from-square text-[9px] text-slate-400 group-hover:text-blue-500"></i>
               </a>
-            </td>
-
-            <!-- Price -->
-            <td class="py-3.5 px-4 font-semibold text-slate-900">
-              {% if p.price %}
-                {{ p.currency|default:"₹" }} {{ p.price }}
-              {% else %}
-                <span class="text-slate-400 italic">Quote on RFQ</span>
-              {% endif %}
             </td>
 
             <!-- Availability -->
@@ -189,7 +179,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="py-12 text-center text-slate-400">
+            <td colspan="6" class="py-12 text-center text-slate-400">
               <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300 block"></i>
               No products found matching criteria.
             </td>

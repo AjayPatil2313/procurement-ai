@@ -516,7 +516,7 @@
                 {% for notif in recent_notifications %}
                 <div 
                   id="notif-item-{{ notif.id }}"
-                  onclick="handleNotificationClick('{{ notif.id }}', '{{ notif.link|default:''|escapejs }}')"
+                  onclick="handleNotificationClick('{{ notif.id }}', '{{ notif.clean_link|default:notif.link|default:''|escapejs }}')"
                   class="p-3 hover:bg-slate-800/60 transition cursor-pointer flex items-start gap-3 relative group {% if not notif.is_read %}bg-slate-800/40{% endif %}"
                 >
                   <div class="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center font-bold text-xs mt-0.5
@@ -652,11 +652,11 @@
                     <div class="mt-1.5 flex items-center gap-1.5">
                       <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold 
                         {% if rbac.is_super_admin %}bg-red-500/20 text-red-300 border border-red-500/30
-                        {% elif rbac.role_label == 'Buyer' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30
-                        {% elif rbac.role_label == 'Seller' %}bg-purple-500/20 text-purple-300 border border-purple-500/30
+                        {% elif rbac.role_label == 'Sales' or rbac.role_label == 'Buyer' %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30
+                        {% elif rbac.role_label == 'Vendor' or rbac.role_label == 'Seller' %}bg-purple-500/20 text-purple-300 border border-purple-500/30
                         {% elif rbac.is_company_admin %}bg-blue-500/20 text-blue-300 border border-blue-500/30
                         {% else %}bg-indigo-500/20 text-indigo-300 border border-indigo-500/30{% endif %}">
-                        <i class="fa-solid {% if rbac.is_super_admin %}fa-crown text-red-400{% elif rbac.role_label == 'Buyer' %}fa-cart-shopping text-emerald-400{% elif rbac.role_label == 'Seller' %}fa-bullhorn text-purple-400{% elif rbac.is_company_admin %}fa-user-tie text-blue-400{% else %}fa-user text-indigo-400{% endif %} text-[9px] mr-1"></i>
+                        <i class="fa-solid {% if rbac.is_super_admin %}fa-crown text-red-400{% elif rbac.role_label == 'Sales' or rbac.role_label == 'Buyer' %}fa-cart-shopping text-emerald-400{% elif rbac.role_label == 'Vendor' or rbac.role_label == 'Seller' %}fa-bullhorn text-purple-400{% elif rbac.is_company_admin %}fa-user-tie text-blue-400{% else %}fa-user text-indigo-400{% endif %} text-[9px] mr-1"></i>
                         {{ rbac.role_label }}
                       </span>
                       <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold {% if rbac.is_super_admin %}bg-red-500/20 text-red-300 border border-red-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
@@ -1134,6 +1134,17 @@
 
     // Handle individual notification click
     function handleNotificationClick(notifId, targetUrl) {
+      // Normalize targetUrl: If it has http:// or https:// with localhost/127.0.0.1 or same hostname, convert to relative path!
+      let resolvedUrl = targetUrl;
+      if (resolvedUrl && (resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://'))) {
+        try {
+          const parsed = new URL(resolvedUrl);
+          if (parsed.hostname === window.location.hostname || parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') {
+            resolvedUrl = parsed.pathname + parsed.search + parsed.hash;
+          }
+        } catch(e) {}
+      }
+
       fetch(`/dashboard/notifications/${notifId}/read/`, {
         method: 'POST',
         headers: {
@@ -1155,8 +1166,8 @@
       })
       .catch(() => {})
       .finally(() => {
-        if (targetUrl && targetUrl !== '#' && targetUrl !== '') {
-          window.location.href = targetUrl;
+        if (resolvedUrl && resolvedUrl !== '#' && resolvedUrl !== '') {
+          window.location.href = resolvedUrl;
         }
       });
     }

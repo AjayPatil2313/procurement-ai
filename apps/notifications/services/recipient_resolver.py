@@ -84,9 +84,23 @@ def resolve_rule_recipients(rule, company=None, user=None, context=None):
     # 5. SUPER ADMINS
     elif rtype == NotificationRule.RecipientType.SUPER_ADMINS:
         super_admins = User.objects.filter(is_superuser=True, is_active=True)
+        active_smtp = None
         for sa in super_admins:
-            if sa.email:
-                add_recipient(sa.email, sa.get_full_name() or "Platform Super Admin", sa)
+            target_email = sa.email.strip().lower() if sa.email else ""
+            if not target_email:
+                continue
+            # If superuser email has an unroutable placeholder domain (e.g. procurement.ai, example.com),
+            # route to active SMTP sender or administrator email to avoid external mail delivery bounce.
+            if any(target_email.endswith(f"@{dom}") for dom in ["procurement.ai", "example.com", "testcorp.com"]):
+                if active_smtp is None:
+                    from apps.notifications.models import SMTPSetting
+                    active_smtp = SMTPSetting.get_active_config()
+                if active_smtp and active_smtp.sender_email and "@" in active_smtp.sender_email:
+                    fallback_email = active_smtp.sender_email.strip().lower()
+                    if not any(fallback_email.endswith(f"@{dom}") for dom in ["procurement.ai", "example.com"]):
+                        add_recipient(fallback_email, sa.get_full_name() or "Platform Super Admin", sa)
+                        continue
+            add_recipient(target_email, sa.get_full_name() or "Platform Super Admin", sa)
 
     # 6. CUSTOM EMAILS
     elif rtype == NotificationRule.RecipientType.CUSTOM:

@@ -191,7 +191,7 @@ def requirement_restore_view(request, pk):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     can_restore = (
@@ -231,7 +231,7 @@ def requirements_export_csv_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     can_export = (
@@ -356,7 +356,7 @@ def requirements_import_csv_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     can_import = (
@@ -571,7 +571,7 @@ def requirement_create_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     can_create = (
@@ -701,7 +701,7 @@ def requirement_edit_view(request, pk):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     can_edit = (
@@ -822,7 +822,7 @@ def requirement_delete_view(request, pk):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     can_delete = (
@@ -861,7 +861,7 @@ def find_suppliers_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     # AJAX criteria save action
@@ -1098,7 +1098,7 @@ def export_discovered_suppliers_csv_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_buyer"]:
-        messages.error(request, "Access restricted: Buyer module permission required.")
+        messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
     can_export = (

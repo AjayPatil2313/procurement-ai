@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Buyer Requirements — Super Admin Panel{% endblock %}
+{% block title %}Sales Requirements — Super Admin Panel{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,7 +11,7 @@
       <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 mb-2">
         <i class="fa-solid fa-crown mr-1"></i> Super Admin Area
       </div>
-      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Buyer Requirements</h1>
+      <h1 class="text-2xl font-black text-slate-900 tracking-tight">Sales Requirements</h1>
       <p class="text-xs text-slate-500 mt-0.5">Audit procurement intents, evaluate sourcing pipelines, and ensure platform RFP compliance</p>
     </div>
 
@@ -29,13 +29,13 @@
       <!-- Search Input -->
       <div class="relative">
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
-        <input type="text" name="q" value="{{ q }}" placeholder="Search item, buyer company, specs..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search item, company, specs..." class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-1 focus:ring-blue-500 outline-none">
       </div>
 
       <!-- Company Filter -->
       <div>
         <select name="company_id" onchange="this.form.submit()" class="w-full py-1.5 px-3 text-xs border border-slate-300 rounded-xl bg-white text-slate-700 outline-none">
-          <option value="all" {% if company_filter == 'all' %}selected{% endif %}>All Buyer Companies</option>
+          <option value="all" {% if company_filter == 'all' %}selected{% endif %}>All Companies</option>
           {% for comp in all_companies %}
           <option value="{{ comp.id }}" {% if company_filter == comp.id|stringformat:"s" %}selected{% endif %}>{{ comp.name }}</option>
           {% endfor %}
@@ -74,7 +74,7 @@
     <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <h2 class="text-xs font-bold text-slate-800">Procurement Requirements Directory</h2>
-        <p class="text-[11px] text-slate-500">Showing {{ page_obj.paginator.count }} RFQs across corporate buyers</p>
+        <p class="text-[11px] text-slate-500">Showing {{ page_obj.paginator.count }} RFQs across companies</p>
       </div>
       <div class="flex items-center gap-2">
         <a href="?{% if query_string %}{{ query_string }}&{% endif %}export=csv" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm transition hover:border-slate-300 cursor-pointer" title="Export matching requirements to CSV">
@@ -87,7 +87,7 @@
         <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
           <tr>
             <th class="py-3 px-4">Requirement Item</th>
-            <th class="py-3 px-4">Buyer Company</th>
+            <th class="py-3 px-4">Sales Company</th>
             <th class="py-3 px-4">Volume Required</th>
             <th class="py-3 px-4">Delivery Location</th>
             <th class="py-3 px-4">Pipeline Status</th>
@@ -114,7 +114,7 @@
               </div>
             </td>
 
-            <!-- Buyer Company -->
+            <!-- Sales Company -->
             <td class="py-3.5 px-4 font-medium text-slate-700">
               <a href="{% url 'admin-panel-company-detail' r.company.id %}" class="hover:text-blue-600 flex items-center gap-1 group">
                 <span>{{ r.company.name }}</span>
@@ -172,7 +172,7 @@
           <tr>
             <td colspan="7" class="py-12 text-center text-slate-400">
               <i class="fa-solid fa-clipboard-question text-3xl mb-2 text-slate-300 block"></i>
-              No buyer sourcing requirements found matching query.
+              No sourcing requirements found matching query.
             </td>
           </tr>
           {% endfor %}
@@ -201,7 +201,7 @@
         <div class="mt-4 space-y-3 text-xs">
           <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200">
             <div>
-              <span class="text-slate-400 block text-[10px]">Buyer Company</span>
+              <span class="text-slate-400 block text-[10px]">Sales Company</span>
               <span class="font-bold text-slate-900" id="reqModalCompany">Company</span>
             </div>
             <div>

@@ -37,11 +37,11 @@ def send_inquiry_email(inquiry, user=None, custom_body=None, attachment_file=Non
     sender_name = (user.get_full_name() or user.email) if user else company_name
     active_message = custom_body or inquiry.message or ""
 
-    # Determine whether this is a Seller proposal or Buyer RFQ
+    # Determine whether this is a Vendor proposal or Sales RFQ
     is_seller = False
     if inquiry.search_result and inquiry.search_result.result_type == SearchResult.ResultType.LEAD:
         is_seller = True
-    elif inquiry.company and getattr(inquiry.company, "company_type", "") == "seller":
+    elif inquiry.company and (getattr(inquiry.company, "is_vendor_type", False) or getattr(inquiry.company, "company_type", "").lower() in ["seller", "vendor"]):
         is_seller = True
 
     # Commercial specifics
@@ -85,14 +85,14 @@ def send_inquiry_email(inquiry, user=None, custom_body=None, attachment_file=Non
 
     # Plain text version
     if is_seller:
-        header_text = f"Official Commercial Proposal & Quotation Offer\nFrom Seller: {sender_name} ({company_name})\nOffered Product: {product_title}"
+        header_text = f"Official Commercial Proposal & Quotation Offer\nFrom Vendor: {sender_name} ({company_name})\nOffered Product: {product_title}"
         if price_display:
             header_text += f"\nQuoted Commercial Price: {price_display}"
         if delivery_terms:
             header_text += f"\nDelivery & Logistics Terms: {delivery_terms}"
         cta_text = f"Please reply directly to this email to accept or discuss terms with {company_name}."
     else:
-        header_text = f"Official Request for Quotation (RFQ)\nFrom Buyer: {sender_name} ({company_name})\nTarget Procurement Item: {product_title}"
+        header_text = f"Official Request for Quotation (RFQ)\nFrom Sales: {sender_name} ({company_name})\nTarget Procurement Item: {product_title}"
         if delivery_terms:
             header_text += f"\nRequired Delivery Terms: {delivery_terms}"
         cta_text = "Please reply directly to this email to submit your quotation, lead times, and payment terms."
@@ -118,14 +118,14 @@ Sent via AI Procurement & Sales Platform on behalf of {company_name}.
     # HTML formatted version
     formatted_message = escape(active_message).replace("\n", "<br>")
 
-    # Colors and branding based on Seller vs Buyer
+    # Colors and branding based on Vendor vs Sales
     if is_seller:
         primary_color = "#ea580c"
         badge_bg = "#ffedd5"
         badge_text = "#9a3412"
         badge_label = "Commercial Proposal"
         title_text = "Commercial Proposal & Quotation"
-        role_label = "Seller Organization:"
+        role_label = "Vendor Organization:"
         rep_label = "Sales Representative:"
         cta_html = f"Please reply directly to this email to accept this proposal or discuss pricing and delivery terms with <strong>{escape(company_name)}</strong>."
     else:
@@ -134,7 +134,7 @@ Sent via AI Procurement & Sales Platform on behalf of {company_name}.
         badge_text = "#1e40af"
         badge_label = "Official RFQ"
         title_text = "Request for Quotation (RFQ)"
-        role_label = "Buyer Organization:"
+        role_label = "Sales Organization:"
         rep_label = "Procurement Officer:"
         cta_html = "Please reply directly to this email with your formal quotation, turnaround schedule, and payment terms."
 

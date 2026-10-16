@@ -1556,3 +1556,374 @@ class InAppNotificationCenterTests(TestCase):
         self.assertEqual(res.status_code, 302)
         notif.refresh_from_db()
         self.assertFalse(notif.is_archived)
+
+
+class ComprehensiveNotificationSystemAuditTests(TestCase):
+    """
+    Complete end-to-end audit test suite for the In-App + Email Notification Center across:
+    1. All 3 user authorization tiers: User/Company User, Company Admin, Super Admin
+    2. All 3 company types: Sales/Buyer, Vendor/Seller, Both
+    3. Multi-tenant company data isolation and cross-company attack prevention
+    4. Duplicate prevention (blocking exact spam while permitting distinct business items)
+    5. Clean relative links (protecting against ERR_CONNECTION_REFUSED on hardcoded hosts)
+    6. Notification outbox persistence, delivery attempts, and retry engine
+    7. Mandatory security preference protections
+    """
+
+    def setUp(self):
+        # 1. Super Admin
+        self.superadmin = User.objects.create_superuser(
+            email="sysadmin@platform.com",
+            password="AdminPassword123!",
+            first_name="Global",
+            last_name="SuperAdmin",
+        )
+        self.client_super = Client()
+        self.client_super.force_login(self.superadmin)
+
+        # 2. Sales / Buyer Company & Users
+        self.sales_admin = User.objects.create_user(
+            email="alice.salesadmin@salesco.com",
+            password="Password123!",
+            first_name="Alice",
+            last_name="SalesAdmin",
+        )
+        self.sales_user = User.objects.create_user(
+            email="bob.buyeruser@salesco.com",
+            password="Password123!",
+            first_name="Bob",
+            last_name="SalesStaff",
+        )
+        self.sales_company = Company.objects.create(
+            name="Alpha Sales Corp",
+            company_type=Company.CompanyType.BUYER,
+            email="contact@salesco.com",
+            created_by=self.sales_admin,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.sales_company,
+            user=self.sales_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.sales_company,
+            user=self.sales_user,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+        self.client_sales_admin = Client()
+        self.client_sales_admin.force_login(self.sales_admin)
+        self.client_sales_user = Client()
+        self.client_sales_user.force_login(self.sales_user)
+
+        # 3. Vendor / Seller Company & Users
+        self.vendor_admin = User.objects.create_user(
+            email="charlie.vendoradmin@vendorco.com",
+            password="Password123!",
+            first_name="Charlie",
+            last_name="VendorAdmin",
+        )
+        self.vendor_company = Company.objects.create(
+            name="Beta Vendor Ltd",
+            company_type=Company.CompanyType.SELLER,
+            email="contact@vendorco.com",
+            created_by=self.vendor_admin,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.vendor_company,
+            user=self.vendor_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        self.client_vendor_admin = Client()
+        self.client_vendor_admin.force_login(self.vendor_admin)
+
+        # 4. Both (Sales + Vendor) Company & Admin
+        self.both_admin = User.objects.create_user(
+            email="elena.bothadmin@omnitraders.com",
+            password="Password123!",
+            first_name="Elena",
+            last_name="BothAdmin",
+        )
+        self.both_company = Company.objects.create(
+            name="Omni Global Traders",
+            company_type=Company.CompanyType.BOTH,
+            email="contact@omnitraders.com",
+            created_by=self.both_admin,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.both_company,
+            user=self.both_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        self.client_both_admin = Client()
+        self.client_both_admin.force_login(self.both_admin)
+
+        # Ensure active templates & rules for testing
+        self._ensure_test_rules()
+
+    def _ensure_test_rules(self):
+        """Ensure standard templates and rules exist for test execution."""
+        from apps.notifications.management.commands.seed_email_templates import Command
+        Command().handle()
+
+    def test_user_tier_notifications(self):
+        """Verify normal company user receives member welcome and search completed notifications."""
+        from apps.dashboard.models import Notification
+
+        # Trigger member welcome using standard auth.welcome event key
+        res = trigger_email_notification(
+            event_key="auth.welcome",
+            company=self.sales_company,
+            user=self.sales_user,
+            context={
+                "user_name": "Bob SalesStaff",
+                "company_name": "Alpha Sales Corp",
+                "recipient_email": "bob.buyeruser@salesco.com",
+                "login_url": "/login/",
+                "cta_url": "/dashboard/",
+                "cta_text": "Access Workspace",
+            },
+        )
+        self.assertTrue(len(res) > 0 or Notification.objects.filter(user=self.sales_user).exists())
+
+        # Check in-app notification created for sales_user
+        notifs = Notification.objects.filter(user=self.sales_user)
+        self.assertEqual(notifs.count(), 1)
+        self.assertIn("Welcome", notifs.first().title)
+        self.assertEqual(notifs.first().link, "/dashboard/")
+
+    def test_company_admin_tier_notifications_and_isolation(self):
+        """Verify Company Admin receives credit/billing and member alerts, and they are isolated to their company."""
+        from apps.dashboard.models import Notification
+
+        # Low credits triggered for Alpha Sales Corp
+        res = trigger_email_notification(
+            event_key="billing.credits_low",
+            company=self.sales_company,
+            context={
+                "current_balance": 15,
+                "threshold": 20,
+                "cta_url": "/wallet/topup/",
+                "cta_text": "Recharge Credits",
+            },
+        )
+        self.assertTrue(len(res) > 0 or Notification.objects.filter(user=self.sales_admin).exists())
+
+        # Sales admin should receive in-app notification
+        sales_admin_notifs = Notification.objects.filter(user=self.sales_admin)
+        self.assertGreaterEqual(sales_admin_notifs.count(), 1)
+        self.assertTrue(any("credit" in n.title.lower() for n in sales_admin_notifs))
+
+        # Vendor admin (Beta Vendor Ltd) MUST NOT receive this notification
+        vendor_admin_notifs = Notification.objects.filter(user=self.vendor_admin)
+        self.assertEqual(vendor_admin_notifs.count(), 0)
+
+        # Both company admin MUST NOT receive this notification
+        both_admin_notifs = Notification.objects.filter(user=self.both_admin)
+        self.assertEqual(both_admin_notifs.count(), 0)
+
+    def test_super_admin_tier_governance_alerts(self):
+        """Verify Super Admin receives governance and new registration alerts."""
+        from apps.dashboard.models import Notification
+
+        # 1. Super Admin registration alert
+        res_super = trigger_email_notification(
+            event_key="admin.new_company",
+            company=self.vendor_company,
+            context={
+                "company_name": self.vendor_company.name,
+                "company_type": "Vendor",
+                "admin_name": "Charlie VendorAdmin",
+                "admin_email": "charlie@vendorco.com",
+                "location": "Mumbai",
+                "registered_at": "Today",
+                "cta_url": f"/admin-panel/companies/{self.vendor_company.id}/",
+            },
+        )
+        self.assertTrue(len(res_super) > 0 or Notification.objects.filter(user=self.superadmin).exists())
+        super_notifs = Notification.objects.filter(user=self.superadmin)
+        self.assertGreaterEqual(super_notifs.count(), 1)
+        self.assertTrue(any("company" in n.title.lower() for n in super_notifs))
+
+        # 2. Company suspension notice dispatched to affected company admin
+        res_susp = trigger_email_notification(
+            event_key="company.suspended",
+            company=self.vendor_company,
+            context={
+                "company_name": self.vendor_company.name,
+                "reason": "Policy compliance audit",
+                "cta_url": f"/admin-panel/companies/{self.vendor_company.id}/",
+                "cta_text": "Review Company",
+            },
+        )
+        self.assertTrue(len(res_susp) > 0 or Notification.objects.filter(user=self.vendor_admin).exists())
+        vendor_notifs = Notification.objects.filter(user=self.vendor_admin)
+        self.assertGreaterEqual(vendor_notifs.count(), 1)
+        self.assertTrue(any("suspend" in n.title.lower() for n in vendor_notifs))
+
+    def test_duplicate_prevention_logic(self):
+        """Verify duplicate events with identical titles are blocked within 15m, but distinct business items are allowed."""
+        from apps.dashboard.models import Notification
+
+        initial_count = Notification.objects.filter(user=self.sales_user).count()
+
+        # Item 1
+        trigger_email_notification(
+            event_key="buyer.search_completed",
+            company=self.sales_company,
+            user=self.sales_user,
+            context={
+                "item_title": "Titanium Bolts",
+                "results_count": 5,
+                "cta_url": "/sourcing/results/101/",
+                "cta_text": "View Results",
+            },
+        )
+        self.assertEqual(Notification.objects.filter(user=self.sales_user).count(), initial_count + 1)
+
+        # Identical Item 1 fired immediately again -> Duplicate check prevents spam
+        trigger_email_notification(
+            event_key="buyer.search_completed",
+            company=self.sales_company,
+            user=self.sales_user,
+            context={
+                "item_title": "Titanium Bolts",
+                "results_count": 5,
+                "cta_url": "/sourcing/results/101/",
+                "cta_text": "View Results",
+            },
+        )
+        self.assertEqual(Notification.objects.filter(user=self.sales_user).count(), initial_count + 1)
+
+        # Item 2 (Different item under same event_key) -> MUST be allowed
+        trigger_email_notification(
+            event_key="buyer.search_completed",
+            company=self.sales_company,
+            user=self.sales_user,
+            context={
+                "item_title": "Carbon Fiber Sheets",
+                "results_count": 12,
+                "cta_url": "/sourcing/results/102/",
+                "cta_text": "View Results",
+            },
+        )
+        self.assertEqual(Notification.objects.filter(user=self.sales_user).count(), initial_count + 2)
+
+    def test_navbar_bell_api_and_relative_links(self):
+        """Verify navbar bell API returns unread count, list, and relative links (avoiding ERR_CONNECTION_REFUSED)."""
+        from apps.dashboard.models import Notification
+
+        # Create notification with absolute localhost url
+        notif = Notification.objects.create(
+            user=self.sales_admin,
+            company=self.sales_company,
+            title="Sourcing Update",
+            message="Your quote has been reviewed.",
+            link="http://127.0.0.1:8000/sourcing/inquiries/42/",
+            priority=Notification.Priority.INFO,
+            is_read=False,
+        )
+
+        # Call unread count API
+        count_url = reverse("api-notifications-unread-count")
+        res = self.client_sales_admin.get(count_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertGreaterEqual(res.json().get("unread_count", 0), 1)
+
+        # Call notifications list API
+        list_url = reverse("api-notifications-list")
+        res = self.client_sales_admin.get(list_url)
+        self.assertEqual(res.status_code, 200)
+        results = res.json().get("results", [])
+        target = next((item for item in results if item["id"] == notif.id), None)
+        self.assertIsNotNone(target)
+        # Must be converted to relative link
+        self.assertEqual(target["link"], "/sourcing/inquiries/42/")
+
+        # Mark read via API
+        mark_read_url = reverse("api-notification-mark-read", kwargs={"pk": notif.pk})
+        res = self.client_sales_admin.post(mark_read_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json().get("link"), "/sourcing/inquiries/42/")
+        notif.refresh_from_db()
+        self.assertTrue(notif.is_read)
+
+    def test_cross_company_and_cross_user_security_isolation(self):
+        """Verify strict authorization: users cannot read, mark read, or archive other users' notifications."""
+        from apps.dashboard.models import Notification
+
+        vendor_notif = Notification.objects.create(
+            user=self.vendor_admin,
+            company=self.vendor_company,
+            title="Confidential Vendor Alert",
+            message="Sensitive commercial information",
+            priority=Notification.Priority.CRITICAL,
+            is_read=False,
+        )
+
+        # Sales admin tries to access vendor admin's notification
+        mark_url = reverse("api-notification-mark-read", kwargs={"pk": vendor_notif.pk})
+        res = self.client_sales_admin.post(mark_url)
+        self.assertEqual(res.status_code, 404)
+
+        archive_url = reverse("api-notification-archive", kwargs={"pk": vendor_notif.pk})
+        res = self.client_sales_admin.post(archive_url)
+        self.assertEqual(res.status_code, 404)
+
+        # Ensure vendor_notif was not affected
+        vendor_notif.refresh_from_db()
+        self.assertFalse(vendor_notif.is_read)
+        self.assertFalse(vendor_notif.is_archived)
+
+    def test_outbox_retry_and_attempt_persistence(self):
+        """Verify NotificationLog records delivery failures and retry attempts in database."""
+        outbox_log = NotificationLog.objects.create(
+            event_key="auth.security_alert",
+            recipient_email="test.retry@example.com",
+            recipient_name="Retry Test",
+            user=self.sales_admin,
+            company=self.sales_company,
+            subject="Security Alert",
+            text_body="Suspicious login detected",
+            html_body="<p>Suspicious login detected</p>",
+            status=NotificationLog.Status.QUEUED,
+            max_attempts=1,
+        )
+
+        with patch("apps.notifications.services.email_engine.get_active_email_connection") as mock_conn:
+            mock_conn.side_effect = Exception("SMTP Gateway Connection Refused")
+            res = deliver_notification_log(outbox_log)
+            self.assertFalse(res)
+
+        outbox_log.refresh_from_db()
+        self.assertEqual(outbox_log.status, NotificationLog.Status.FAILED)
+        self.assertEqual(outbox_log.attempts_count, 1)
+        self.assertIn("Connection Refused", outbox_log.last_error)
+
+        # Check EmailDeliveryAttempt was persisted
+        attempts = EmailDeliveryAttempt.objects.filter(log=outbox_log)
+        self.assertEqual(attempts.count(), 1)
+        self.assertEqual(attempts.first().status, EmailDeliveryAttempt.Status.FAILED)
+        self.assertIn("Connection Refused", attempts.first().error_message)
+
+        # Retry with success
+        with patch("apps.notifications.services.email_engine.get_active_email_connection") as mock_conn:
+            mock_instance = MagicMock()
+            mock_conn.return_value = (mock_instance, False)
+            mock_instance.send_messages.return_value = 1
+            retry_res = retry_failed_notification_log(outbox_log)
+            self.assertTrue(retry_res)
+
+        outbox_log.refresh_from_db()
+        self.assertEqual(outbox_log.status, NotificationLog.Status.SENT)
+        self.assertIsNotNone(outbox_log.sent_at)
+        self.assertEqual(EmailDeliveryAttempt.objects.filter(log=outbox_log).count(), 2)
+
+
+

@@ -19,13 +19,13 @@
 
     <!-- Quick Action Shortcut Buttons -->
     <div class="flex flex-wrap items-center gap-2">
-      <a href="{% url 'dashboard' %}?workspace=seller" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
+      <a href="{% url 'dashboard' %}?workspace=vendor" target="_blank" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
         <i class="fa-solid fa-up-right-from-square mr-1.5"></i> Live Vendor View
       </a>
-      <a href="{% url 'admin-panel-modules' %}?tab=seller" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+      <a href="{% url 'admin-panel-modules' %}?tab=vendor" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
         <i class="fa-solid fa-cubes mr-1.5 text-emerald-400"></i> Module Matrix
       </a>
-      <a href="{% url 'admin-panel-companies' %}?type=SELLER" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+      <a href="{% url 'admin-panel-companies' %}?type=VENDOR" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
         <i class="fa-solid fa-sitemap mr-1.5 text-emerald-400"></i> Vendor Companies
       </a>
     </div>
@@ -60,19 +60,19 @@
       <div class="text-[11px] text-slate-500 mt-1">Catalog items listed</div>
     </div>
 
-    <!-- Buyer Discovery Searches -->
+    <!-- Sales Discovery Searches -->
     <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
       <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
-        <span>Buyer Searches</span>
+        <span>Sales Searches</span>
         <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
           <i class="fa-solid fa-magnifying-glass-chart"></i>
         </span>
       </div>
       <div class="text-2xl font-black text-indigo-600">{{ total_searches_run }}</div>
-      <div class="text-[11px] text-slate-500 mt-1">Find buyers operations</div>
+      <div class="text-[11px] text-slate-500 mt-1">Find sales opportunities</div>
     </div>
 
-    <!-- Discovered Buyer Leads -->
+    <!-- Discovered Sales Leads -->
     <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
       <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
         <span>Leads Found</span>
@@ -81,7 +81,7 @@
         </span>
       </div>
       <div class="text-2xl font-black text-emerald-600">{{ total_leads_discovered }}</div>
-      <div class="text-[11px] text-slate-500 mt-1">Prospective buyer leads</div>
+      <div class="text-[11px] text-slate-500 mt-1">Prospective sales leads</div>
     </div>
 
     <!-- Prequalified Leads -->
@@ -105,7 +105,7 @@
         </span>
       </div>
       <div class="text-2xl font-black text-rose-600">{{ total_inquiries_received }}</div>
-      <div class="text-[11px] text-slate-500 mt-1">Buyer RFQs received</div>
+      <div class="text-[11px] text-slate-500 mt-1">Sales Inquiries / RFQs received</div>
     </div>
 
     <!-- Remaining AI Credits -->
@@ -301,7 +301,7 @@
   <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-4xl">
     <div class="border-b border-slate-200 pb-4 mb-6">
       <h3 class="text-base font-bold text-slate-900">Vendor Dashboard Layout &amp; Card Switches</h3>
-      <p class="text-xs text-slate-500 mt-1">Configure which KPI metrics and analytical widgets render on the live Vendor Dashboard (/dashboard/?workspace=seller)</p>
+      <p class="text-xs text-slate-500 mt-1">Configure which KPI metrics and analytical widgets render on the live Vendor Dashboard (/dashboard/?workspace=vendor)</p>
     </div>
 
     <form method="POST" action="{% url 'admin-panel-seller-layout-update' %}" class="space-y-6">
@@ -321,8 +321,8 @@
 
           <label class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
             <div>
-              <div class="text-xs font-bold text-slate-800">Buyer Searches Run Card</div>
-              <div class="text-[11px] text-slate-500">Show total Find Buyers search jobs run</div>
+              <div class="text-xs font-bold text-slate-800">Sales Searches Run Card</div>
+              <div class="text-[11px] text-slate-500">Show total Find Sales Opportunities search jobs run</div>
             </div>
             <input type="checkbox" name="show_kpi_searches" {% if layout.show_kpi_searches %}checked{% endif %} class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
           </label>
@@ -330,7 +330,7 @@
           <label class="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
             <div>
               <div class="text-xs font-bold text-slate-800">Leads Discovered Card</div>
-              <div class="text-[11px] text-slate-500">Show prospective buyer leads discovered</div>
+              <div class="text-[11px] text-slate-500">Show prospective sales leads discovered</div>
             </div>
             <input type="checkbox" name="show_kpi_leads_discovered" {% if layout.show_kpi_leads_discovered %}checked{% endif %} class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
           </label>
@@ -457,7 +457,7 @@
               <div class="text-[11px] font-normal text-slate-500">{{ item.company.city|default:"India" }} &bull; {{ item.company.industry|default:"General" }}</div>
             </td>
             <td class="py-3 px-4">
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if item.company.company_type == 'SELLER' %}bg-emerald-100 text-emerald-800{% else %}bg-purple-100 text-purple-800{% endif %}">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if item.company.company_type == 'SELLER' or item.company.company_type == 'VENDOR' %}bg-emerald-100 text-emerald-800{% else %}bg-purple-100 text-purple-800{% endif %}">
                 {{ item.company.get_company_type_display }}
               </span>
             </td>

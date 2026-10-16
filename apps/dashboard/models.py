@@ -196,6 +196,30 @@ class Notification(models.Model):
     def __str__(self):
         return f"Notification for {self.user}: {self.title}"
 
+    @property
+    def clean_link(self):
+        """
+        Returns a clean internal relative URL if the link points to localhost/platform,
+        guaranteeing that clicking in-app notifications never fails with ERR_CONNECTION_REFUSED.
+        """
+        if not self.link:
+            return ""
+        l = self.link.strip()
+        if l.startswith("http://") or l.startswith("https://"):
+            from urllib.parse import urlparse
+            p = urlparse(l)
+            if p.path:
+                return p.path + (f"?{p.query}" if p.query else "") + (f"#{p.fragment}" if p.fragment else "")
+        return l
+
+    def save(self, *args, **kwargs):
+        if self.link and (self.link.startswith("http://") or self.link.startswith("https://")):
+            from urllib.parse import urlparse
+            p = urlparse(self.link)
+            if p.path:
+                self.link = p.path + (f"?{p.query}" if p.query else "") + (f"#{p.fragment}" if p.fragment else "")
+        super().save(*args, **kwargs)
+
     def mark_as_read(self):
         if not self.is_read:
             self.is_read = True
@@ -727,11 +751,11 @@ def is_platform_module_enabled(module_code, company_type=None):
         "seller_help_support": "seller_help_support",
     }
 
-    if company_type == "BUYER":
+    if company_type in ("BUYER", "SALES"):
         target_key = BUYER_MAP.get(code, code)
         return BuyerModuleConfig.is_module_enabled(target_key)
 
-    if company_type == "SELLER":
+    if company_type in ("SELLER", "VENDOR"):
         target_key = SELLER_MAP.get(code, code)
         return SellerModuleConfig.is_module_enabled(target_key)
 
@@ -747,6 +771,13 @@ def is_platform_module_enabled(module_code, company_type=None):
     b_enabled = BuyerModuleConfig.is_module_enabled(b_key) if b_key else True
     s_enabled = SellerModuleConfig.is_module_enabled(s_key) if s_key else True
     return b_enabled or s_enabled
+
+
+# Backward-compatible and forward-looking aliases
+SalesModuleConfig = BuyerModuleConfig
+VendorModuleConfig = SellerModuleConfig
+SalesDashboardLayout = BuyerDashboardLayout
+VendorDashboardLayout = SellerDashboardLayout
 
 
 

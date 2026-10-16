@@ -5,9 +5,12 @@ from django.db import models
 class Company(models.Model):
 
     class CompanyType(models.TextChoices):
+        SALES = "SALES", "Sales"
+        VENDOR = "VENDOR", "Vendor"
+        BOTH = "BOTH", "Sales & Vendor"
+        # Legacy aliases preserved for backward-compatibility
         BUYER = "BUYER", "Sales"
         SELLER = "SELLER", "Vendor"
-        BOTH = "BOTH", "Sales & Vendor"
 
     class CompanySize(models.TextChoices):
         SMALL_1_10 = "1-10", "1-10"
@@ -22,8 +25,24 @@ class Company(models.Model):
     company_type = models.CharField(
         max_length=20,
         choices=CompanyType.choices,
-        default=CompanyType.BUYER,
+        default=CompanyType.SALES,
     )
+
+    @property
+    def is_sales_type(self):
+        return self.company_type in [self.CompanyType.SALES, self.CompanyType.BUYER, self.CompanyType.BOTH, "buyer", "sales", "BUYER", "SALES"]
+
+    @property
+    def is_vendor_type(self):
+        return self.company_type in [self.CompanyType.VENDOR, self.CompanyType.SELLER, self.CompanyType.BOTH, "seller", "vendor", "SELLER", "VENDOR"]
+
+    @property
+    def display_type(self):
+        if self.company_type in [self.CompanyType.BOTH, "both", "BOTH"]:
+            return "Sales & Vendor"
+        elif self.is_vendor_type:
+            return "Vendor"
+        return "Sales"
 
     registration_no = models.CharField(
         max_length=100,

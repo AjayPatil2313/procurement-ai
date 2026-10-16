@@ -253,8 +253,8 @@
           {% if notif.link %}
           <div class="pt-1.5">
             <a 
-              href="{{ notif.link }}" 
-              onclick="handleNotificationClick('{{ notif.id }}', '{{ notif.link|escapejs }}')"
+              href="{{ notif.clean_link|default:notif.link }}" 
+              onclick="handleNotificationClick('{{ notif.id }}', '{{ notif.clean_link|default:notif.link|escapejs }}')"
               class="inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition hover:underline"
             >
               <span>View in Platform</span>

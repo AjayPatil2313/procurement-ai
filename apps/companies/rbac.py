@@ -2,6 +2,7 @@ from functools import wraps
 from django.db import models
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
+from django.contrib import messages
 from rest_framework.permissions import BasePermission
 from apps.companies.models import CompanyMember, MemberPermission, Company, CompanyPermission
 from apps.dashboard.models import BuyerModuleConfig, SellerModuleConfig, is_platform_module_enabled
@@ -43,8 +44,8 @@ class IsCompanyAdmin(BasePermission):
 
 
 class IsBuyerCompany(BasePermission):
-    """Allows access only to companies that are BUYER or BOTH (or Super Admins)."""
-    message = "Access restricted: This API is only available for Buyer accounts."
+    """Allows access only to companies that are SALES/BUYER or BOTH (or Super Admins)."""
+    message = "Access restricted: This API is only available for Sales accounts."
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -52,12 +53,12 @@ class IsBuyerCompany(BasePermission):
         if request.user.is_superuser:
             return True
         rbac = get_user_rbac_context(request.user)
-        return bool(rbac.get("can_view_buyer", False))
+        return bool(rbac.get("can_view_sales", rbac.get("can_view_buyer", False)))
 
 
 class IsSellerCompany(BasePermission):
-    """Allows access only to companies that are SELLER or BOTH (or Super Admins)."""
-    message = "Access restricted: This API is only available for Seller accounts."
+    """Allows access only to companies that are VENDOR/SELLER or BOTH (or Super Admins)."""
+    message = "Access restricted: This API is only available for Vendor accounts."
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -65,7 +66,12 @@ class IsSellerCompany(BasePermission):
         if request.user.is_superuser:
             return True
         rbac = get_user_rbac_context(request.user)
-        return bool(rbac.get("can_view_seller", False))
+        return bool(rbac.get("can_view_vendor", rbac.get("can_view_seller", False)))
+
+
+# Aliases with new naming
+IsSalesCompany = IsBuyerCompany
+IsVendorCompany = IsSellerCompany
 
 
 class HasModulePermission(BasePermission):
@@ -260,28 +266,28 @@ def get_user_rbac_context(user, company_id=None):
             if membership.custom_role:
                 role_label = membership.custom_role.name
             else:
-                # Determine specific role label (Buyer, Seller, or Company User)
+                # Determine specific role label (Sales, Vendor, or Company User)
                 has_buyer_perm = any(p.startswith("requirements:") for p in permissions_set)
                 has_seller_perm = any(p.startswith("products:") or p.startswith("leads:") for p in permissions_set)
                 if has_buyer_perm and not has_seller_perm:
-                    role_label = "Buyer"
-                elif has_seller_perm and not has_buyer_perm:
-                    role_label = "Seller"
-                elif company and company.company_type == Company.CompanyType.BUYER:
                     role_label = "Sales"
-                elif company and company.company_type == Company.CompanyType.SELLER:
+                elif has_seller_perm and not has_buyer_perm:
+                    role_label = "Vendor"
+                elif company and getattr(company, "is_sales_type", False) and not getattr(company, "is_vendor_type", False):
+                    role_label = "Sales"
+                elif company and getattr(company, "is_vendor_type", False) and not getattr(company, "is_sales_type", False):
                     role_label = "Vendor"
                 else:
                     role_label = "Company User"
 
     # Scope module visibility strictly by company type and permissions
     company_type = company.company_type if company else "BOTH"
-    is_buyer_company = (company_type in [Company.CompanyType.BUYER, Company.CompanyType.BOTH]) or is_super_admin
-    is_seller_company = (company_type in [Company.CompanyType.SELLER, Company.CompanyType.BOTH]) or is_super_admin
+    is_buyer_company = (company_type in [Company.CompanyType.SALES, Company.CompanyType.BUYER, Company.CompanyType.BOTH, "SALES", "BUYER", "BOTH"]) or is_super_admin
+    is_seller_company = (company_type in [Company.CompanyType.VENDOR, Company.CompanyType.SELLER, Company.CompanyType.BOTH, "VENDOR", "SELLER", "BOTH"]) or is_super_admin
 
-    is_buyer_only = bool(company and company.company_type == Company.CompanyType.BUYER and not is_super_admin)
-    is_seller_only = bool(company and company.company_type == Company.CompanyType.SELLER and not is_super_admin)
-    is_both = bool((company and company.company_type == Company.CompanyType.BOTH) or is_super_admin)
+    is_buyer_only = bool(company and company.company_type in [Company.CompanyType.SALES, Company.CompanyType.BUYER, "SALES", "BUYER"] and not is_super_admin)
+    is_seller_only = bool(company and company.company_type in [Company.CompanyType.VENDOR, Company.CompanyType.SELLER, "VENDOR", "SELLER"] and not is_super_admin)
+    is_both = bool((company and company.company_type in [Company.CompanyType.BOTH, "BOTH"]) or is_super_admin)
 
     can_view_buyer = is_buyer_company and (
         is_company_admin or "READ" in permissions_set or "requirements:READ" in permissions_set or "search:READ" in permissions_set
@@ -402,13 +408,19 @@ def get_user_rbac_context(user, company_id=None):
         "permissions": permissions_set,
         "can_view_buyer": can_view_buyer,
         "can_view_seller": can_view_seller,
+        "can_view_sales": can_view_buyer,
+        "can_view_vendor": can_view_seller,
         "is_buyer_only": is_buyer_only,
         "is_seller_only": is_seller_only,
+        "is_sales_only": is_buyer_only,
+        "is_vendor_only": is_seller_only,
         "is_both": is_both,
         "visible_modules": visible_modules,
         "navigation": navigation,
         "buyer_modules": buyer_modules_map,
         "seller_modules": seller_modules_map,
+        "sales_modules": buyer_modules_map,
+        "vendor_modules": seller_modules_map,
     }
 
 
@@ -452,9 +464,11 @@ def module_permission_required(module, permission_type="READ"):
                 if company and not company.is_active:
                     raise PermissionDenied("Your company account has been suspended by Platform Administrator.")
                 if module in BUYER_MODULES and not rbac["can_view_buyer"]:
-                    raise PermissionDenied("Access restricted: This module is only available for Sales accounts.")
+                    messages.error(request, "Access restricted: This module is only available for Sales accounts.")
+                    return redirect("dashboard")
                 if module in SELLER_MODULES and not rbac["can_view_seller"]:
-                    raise PermissionDenied("Access restricted: This module is only available for Vendor accounts.")
+                    messages.error(request, "Access restricted: This module is only available for Vendor accounts.")
+                    return redirect("dashboard")
                 if not is_platform_module_enabled(module, company.company_type if company else None):
                     raise PermissionDenied(f"Access restricted: Module '{module}' has been disabled by Platform Administrator.")
 

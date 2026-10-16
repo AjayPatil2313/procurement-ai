@@ -24,7 +24,7 @@ def serialize_notification(n):
         "notification_type": n.notification_type,
         "title": n.title,
         "message": n.message,
-        "link": n.link or "",
+        "link": n.clean_link or "",
         "is_read": n.is_read,
         "is_archived": n.is_archived,
         "icon": n.icon or "fa-bell",
@@ -156,7 +156,7 @@ class NotificationMarkReadAPIView(APIView):
             "id": notif.id,
             "is_read": True,
             "unread_count": unread_count,
-            "link": notif.link,
+            "link": notif.clean_link,
         })
 
 

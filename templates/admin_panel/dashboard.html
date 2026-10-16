@@ -340,17 +340,17 @@
         </div>
       </div>
 
-      <!-- 12. Buyer Searches -->
+      <!-- 12. Sales Searches -->
       <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Buyer Searches</span>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Sales Searches</span>
           <span class="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center text-sm">
             <i class="fa-solid fa-crosshairs"></i>
           </span>
         </div>
         <div class="mt-2.5">
           <div class="text-2xl font-black text-violet-700">{{ buyer_searches }}</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Vendor Lead Searches</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Sales Lead Searches</div>
         </div>
       </div>
 
@@ -476,11 +476,11 @@
       <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-            <i class="fa-solid fa-magnifying-glass-chart text-cyan-600"></i> Supplier vs Buyer Search Activity
+            <i class="fa-solid fa-magnifying-glass-chart text-cyan-600"></i> Supplier vs Sales Search Activity
           </h3>
           <span class="text-[10px] font-semibold text-slate-400 uppercase">Last 7 Days</span>
         </div>
-        <p class="text-[11px] text-slate-500 mb-3">Daily comparison between supplier searches and buyer lead searches</p>
+        <p class="text-[11px] text-slate-500 mb-3">Daily comparison between supplier searches and sales lead searches</p>
         <div class="relative h-56 w-full">
           <canvas id="chartSearchActivity"></canvas>
         </div>
@@ -551,7 +551,7 @@
                 <div class="text-[11px] font-normal text-slate-400">{{ c.country|default:"Global" }}</div>
               </td>
               <td class="py-3 px-3 font-medium text-slate-700">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if c.company_type == 'BUYER' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif c.company_type == 'SELLER' %}bg-purple-50 text-purple-800 border border-purple-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold {% if c.company_type == 'BUYER' or c.company_type == 'SALES' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif c.company_type == 'SELLER' or c.company_type == 'VENDOR' %}bg-purple-50 text-purple-800 border border-purple-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
                   {{ c.get_company_type_display }}
                 </span>
               </td>
@@ -890,7 +890,7 @@ document.addEventListener("DOMContentLoaded", function() {
           borderRadius: 6,
         },
         {
-          label: 'Buyer Searches',
+          label: 'Sales Searches',
           data: JSON.parse('{{ chart4_buyer|escapejs }}'),
           backgroundColor: '#8B5CF6',
           borderRadius: 6,

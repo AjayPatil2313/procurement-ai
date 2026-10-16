@@ -31,6 +31,21 @@ def login_view(request):
         
         user = authenticate(request, email=email, password=password)
         if user is not None:
+            # Multi-tenant isolation: check if user's company is suspended
+            if not (user.is_superuser or user.is_staff):
+                membership = getattr(user, "company_membership", None)
+                company = getattr(membership, "company", None) if membership else getattr(user, "company", None)
+                if company and (not company.is_active or company.is_deleted):
+                    reason = getattr(company, "suspension_reason", "") or "Account suspended by platform governance."
+                    messages.error(
+                        request,
+                        f"Login Blocked: Your organization '{company.name}' has been suspended by the platform administrator. Reason: {reason}. Please contact support."
+                    )
+                    return render(request, "auth/login.html", {
+                        "next": next_url,
+                        "login_type": login_type,
+                    })
+
             from django.core.cache import cache
             cache.delete(f"login_failures_{email}")
             login(request, user)

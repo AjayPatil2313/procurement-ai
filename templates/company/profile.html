@@ -135,9 +135,9 @@
               {% if not rbac.is_company_admin and not rbac.is_super_admin %}disabled{% endif %}
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition {% if not rbac.is_company_admin and not rbac.is_super_admin %}cursor-not-allowed bg-slate-100 text-slate-500{% endif %}"
             >
-              <option value="BUYER" {% if company.company_type == 'BUYER' %}selected{% endif %}>Buyer (Procurement Only)</option>
-              <option value="SELLER" {% if company.company_type == 'SELLER' %}selected{% endif %}>Seller (Sales Only)</option>
-              <option value="BOTH" {% if company.company_type == 'BOTH' %}selected{% endif %}>Both (Buyer &amp; Seller)</option>
+              <option value="SALES" {% if company.company_type == 'SALES' or company.company_type == 'BUYER' %}selected{% endif %}>Sales (Procurement Only)</option>
+              <option value="VENDOR" {% if company.company_type == 'VENDOR' or company.company_type == 'SELLER' %}selected{% endif %}>Vendor (Sales Only)</option>
+              <option value="BOTH" {% if company.company_type == 'BOTH' %}selected{% endif %}>Both (Sales &amp; Vendor)</option>
             </select>
           </div>
 

@@ -90,13 +90,16 @@ def get_dashboard_data_for_company(company, workspace="combined"):
     inquiries_count = Inquiry.objects.filter(company=company).count()
 
     # Scope breakdown
-    if workspace == "seller" or (company.company_type == Company.CompanyType.SELLER and workspace != "buyer"):
+    is_vendor_ws = workspace in ("vendor", "seller") or (getattr(company, "is_vendor_type", company.company_type == Company.CompanyType.SELLER) and workspace not in ("sales", "buyer"))
+    is_sales_ws = workspace in ("sales", "buyer") or (getattr(company, "is_sales_type", company.company_type == Company.CompanyType.BUYER) and workspace not in ("vendor", "seller"))
+
+    if is_vendor_ws and not is_sales_ws:
         nearby_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.NEARBY, is_deleted=False).count()
         country_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.COUNTRY, is_deleted=False).count()
         global_count = Product.objects.filter(company=company, search_scope=Product.SearchScope.GLOBAL, is_deleted=False).count()
         found_suppliers_count = real_products_count
         active_leads_count = active_saved_count
-    elif workspace == "buyer" or (company.company_type == Company.CompanyType.BUYER and workspace != "seller"):
+    elif is_sales_ws and not is_vendor_ws:
         nearby_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.NEARBY, is_deleted=False).count()
         country_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.COUNTRY, is_deleted=False).count()
         global_count = Requirement.objects.filter(company=company, search_scope=Requirement.SearchScope.GLOBAL, is_deleted=False).count()
@@ -294,25 +297,29 @@ def dashboard_view(request):
 
     # Determine active workspace
     workspace = request.GET.get("workspace", "").lower().strip()
-    if company.company_type == Company.CompanyType.BUYER:
-        active_workspace = "buyer"
-        request.session["active_workspace"] = "buyer"
-    elif company.company_type == Company.CompanyType.SELLER:
-        active_workspace = "seller"
-        request.session["active_workspace"] = "seller"
+    is_sales = getattr(company, "is_sales_type", company.company_type in [Company.CompanyType.BUYER, "SALES"])
+    is_vendor = getattr(company, "is_vendor_type", company.company_type in [Company.CompanyType.SELLER, "VENDOR"])
+
+    if is_sales and not is_vendor:
+        active_workspace = "buyer" if company.company_type == Company.CompanyType.BUYER else "sales"
+        request.session["active_workspace"] = active_workspace
+    elif is_vendor and not is_sales:
+        active_workspace = "seller" if company.company_type == Company.CompanyType.SELLER else "vendor"
+        request.session["active_workspace"] = active_workspace
     else:
-        # BOTH
-        if workspace in ["buyer", "seller", "combined"]:
-            request.session["active_workspace"] = workspace
+        # BOTH / Combined
+        if workspace in ["sales", "buyer", "vendor", "seller", "combined"]:
             active_workspace = workspace
+            request.session["active_workspace"] = workspace
         else:
             session_ws = request.session.get("active_workspace")
-            if session_ws in ["buyer", "seller", "combined"]:
+            if session_ws in ["sales", "buyer", "vendor", "seller", "combined"]:
                 active_workspace = session_ws
             else:
                 from apps.dashboard.models import BothDashboardLayout
                 both_layout = BothDashboardLayout.get_layout()
-                active_workspace = both_layout.default_active_view or "combined"
+                default_view = both_layout.default_active_view or "combined"
+                active_workspace = default_view
                 request.session["active_workspace"] = active_workspace
 
     dashboard_data = get_dashboard_data_for_company(company, workspace=active_workspace)
@@ -994,7 +1001,7 @@ def notifications_list_api(request):
             "event_key": n.event_key or "",
             "title": n.title,
             "message": n.message,
-            "link": n.link,
+            "link": n.clean_link,
             "is_read": n.is_read,
             "is_archived": n.is_archived,
             "icon": n.icon,
@@ -1018,17 +1025,18 @@ def mark_notification_read_view(request, pk):
     notif = get_object_or_404(Notification, pk=pk, user=request.user)
     notif.mark_as_read()
 
+    target_link = notif.clean_link
     if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.GET.get("format") == "json":
         unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
         return JsonResponse({
             "success": True,
             "id": notif.id,
             "unread_count": unread_count,
-            "link": notif.link,
+            "link": target_link,
         })
 
-    if notif.link:
-        return redirect(notif.link)
+    if target_link:
+        return redirect(target_link)
     return redirect("dashboard")
 
 

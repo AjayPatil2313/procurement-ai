@@ -689,6 +689,92 @@ DEFAULT_TEMPLATES = [
         },
     },
 
+    # 12B. Company Account Suspended Notice
+    {
+        "event_key": "company.suspended",
+        "category": NotificationTemplate.Category.SYSTEM,
+        "name": "Company Account Suspended Notice",
+        "subject": "CRITICAL NOTICE: Corporate Account Suspended — {{ company_name }}",
+        "html_content": build_card_body_html(
+            greeting_name_expr="{{ recipient_name|default:'Company Administrator' }}",
+            intro_text="This official notice is to inform you that your company account on TradeConnect has been suspended by the Platform Administrator effective immediately.",
+            card1_icon="&#9888;",
+            card1_title="Suspension Notice",
+            card1_items=[
+                ("Company Entity", "{{ company_name|default:'Your Enterprise' }}"),
+                ("Account Status", "Suspended (Access Revoked)"),
+                ("Effective Time", "{{ timestamp|default:'Immediately' }}"),
+                ("Security Action", "All User Sessions Terminated"),
+            ],
+            card2_icon="&#128221;",
+            card2_title="Reason & Administrative Remark",
+            card2_items=[
+                ("Suspension Reason", "{{ reason|default:'Platform governance policy enforcement' }}"),
+                ("Appeal / Review", "Contact Platform Administration"),
+            ],
+            next_step_desc="While suspended, all team members belonging to this organization have been logged out and cannot perform any procurement or sales operations. To appeal, contact the support desk.",
+            cta_label="Contact Support Desk",
+            cta_url_expr="{{ cta_url|default:'/support/' }}",
+            cta_bg="#dc2626",
+        ),
+        "text_content": "CRITICAL NOTICE: Corporate Account Suspended - {{ company_name }}\n\nReason: {{ reason }}\nTimestamp: {{ timestamp }}\n\nAll active user sessions have been terminated. Contact platform administration for questions.",
+        "variables": ["recipient_name", "company_name", "reason", "timestamp", "cta_url"],
+        "rule": {
+            "name": "Notify Company Admin on Account Suspension",
+            "description": "Critical security notice sent immediately to company admins when their organization is suspended by Super Admin.",
+            "target_audience": NotificationRule.TargetAudience.COMPANY_ADMIN,
+            "delivery_mode": NotificationRule.DeliveryMode.BOTH,
+            "module": NotificationRule.ModuleType.PLATFORM,
+            "company_type": NotificationRule.CompanyTypeScope.ALL,
+            "recipient_type": NotificationRule.RecipientType.COMPANY_ADMINS,
+            "severity": NotificationRule.Severity.CRITICAL,
+            "priority": NotificationRule.Priority.URGENT,
+        },
+    },
+
+    # 12C. Company Account Reactivated Notice
+    {
+        "event_key": "company.reactivated",
+        "category": NotificationTemplate.Category.SYSTEM,
+        "name": "Company Account Reactivated Notice",
+        "subject": "Account Restored: Corporate Account Reactivated — {{ company_name }}",
+        "html_content": build_card_body_html(
+            greeting_name_expr="{{ recipient_name|default:'Company Administrator' }}",
+            intro_text="We are pleased to inform you that your company account on TradeConnect has been reactivated. Full access to platform features, procurement tools, and vendor operations has been restored.",
+            card1_icon="&#10004;",
+            card1_title="Account Status",
+            card1_items=[
+                ("Company Entity", "{{ company_name|default:'Your Enterprise' }}"),
+                ("Account Status", "Active (Access Restored)"),
+                ("Restoration Time", "{{ timestamp|default:'Today' }}"),
+                ("Team Access", "Login Enabled"),
+            ],
+            card2_icon="&#128221;",
+            card2_title="Administrator Remark",
+            card2_items=[
+                ("Administrative Remark", "{{ reason|default:'Account restored by Platform Administration.' }}"),
+                ("Catalog & RFQs", "Fully Accessible"),
+            ],
+            next_step_desc="All authorized users belonging to your company may now log in to the platform and resume their day-to-day procurement, quotation, and catalog management activities.",
+            cta_label="Log In to Company Dashboard",
+            cta_url_expr="{{ cta_url|default:'/company/dashboard/' }}",
+            cta_bg="#059669",
+        ),
+        "text_content": "Account Restored: Corporate Account Reactivated - {{ company_name }}\n\nRemark: {{ reason }}\nTimestamp: {{ timestamp }}\n\nYour team members may now log in to the platform.",
+        "variables": ["recipient_name", "company_name", "reason", "timestamp", "cta_url"],
+        "rule": {
+            "name": "Notify Company Admin on Account Reactivation",
+            "description": "Notice dispatched to company admins when their organization is restored/reactivated by Super Admin.",
+            "target_audience": NotificationRule.TargetAudience.COMPANY_ADMIN,
+            "delivery_mode": NotificationRule.DeliveryMode.BOTH,
+            "module": NotificationRule.ModuleType.PLATFORM,
+            "company_type": NotificationRule.CompanyTypeScope.ALL,
+            "recipient_type": NotificationRule.RecipientType.COMPANY_ADMINS,
+            "severity": NotificationRule.Severity.INFO,
+            "priority": NotificationRule.Priority.HIGH,
+        },
+    },
+
     # =========================================================================
     # SECTION 3: SUPER ADMIN (9 Events)
     # =========================================================================

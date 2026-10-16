@@ -406,7 +406,6 @@
             <tr>
               <th class="py-3 px-4">Product Name</th>
               <th class="py-3 px-4">Category</th>
-              <th class="py-3 px-4">Price & Currency</th>
               <th class="py-3 px-4">MOQ</th>
               <th class="py-3 px-4">Availability</th>
               <th class="py-3 px-4">Listed Date</th>
@@ -422,15 +421,6 @@
               <td class="py-3 px-4 text-slate-600 font-medium">
                 {{ p.category.name|default:"Uncategorized" }}
               </td>
-              <td class="py-3 px-4 font-bold text-slate-900 font-mono">
-                {% if p.price %}
-                  {{ p.currency }} {{ p.price }} / {{ p.unit }}
-                {% elif p.price_min and p.price_max %}
-                  {{ p.currency }} {{ p.price_min }} - {{ p.price_max }}
-                {% else %}
-                  <span class="text-slate-400 font-normal">Contact for Quote</span>
-                {% endif %}
-              </td>
               <td class="py-3 px-4 text-slate-600 font-medium">
                 {{ p.moq|default:"1" }} {{ p.unit }}
               </td>
@@ -445,7 +435,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="6" class="py-8 text-center text-slate-400 text-xs">
+              <td colspan="5" class="py-8 text-center text-slate-400 text-xs">
                 No catalog items uploaded by this company yet.
               </td>
             </tr>

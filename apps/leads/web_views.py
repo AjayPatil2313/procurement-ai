@@ -205,8 +205,8 @@ def saved_leads_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
-        messages.error(request, "Access restricted: Saved Leads is only available for Seller accounts.")
+    if not (rbac["can_view_seller"] or rbac["can_view_vendor"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Saved Leads is only available for Vendor accounts.")
         return redirect("dashboard")
 
     # Fetch company products sorted strictly A to Z
@@ -590,8 +590,8 @@ def leads_list_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
-        messages.error(request, "Access restricted: Vendor list is only available for Seller accounts.")
+    if not (rbac["can_view_seller"] or rbac["can_view_vendor"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Vendor list is only available for Vendor accounts.")
         return redirect("dashboard")
 
     # Fetch company products sorted strictly alphabetically A to Z
@@ -731,8 +731,8 @@ def customers_list_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
-        messages.error(request, "Access restricted: Customer list is only available for Buyer accounts.")
+    if not (rbac["can_view_buyer"] or rbac["can_view_sales"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Customer list is only available for Sales accounts.")
         return redirect("dashboard")
 
     # Fetch company requirements (displayed as products) sorted strictly alphabetically A to Z
@@ -1009,8 +1009,8 @@ def saved_suppliers_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
-        messages.error(request, "Access restricted: Saved Suppliers is only available for Buyer accounts.")
+    if not (rbac["can_view_buyer"] or rbac["can_view_sales"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Saved Suppliers is only available for Sales accounts.")
         return redirect("dashboard")
 
     requirements = list(Requirement.objects.filter(company=company, is_deleted=False).order_by(Lower("item_name"))) if company else []
@@ -1748,6 +1748,8 @@ def inquiries_list_view(request):
             is_single_item = True
             inquiries = list(base_qs.filter(search_result__search_job__requirement__isnull=True).order_by("-sent_at"))
         else:
+            is_single_item = True
+            inquiries = list(base_qs.order_by("-sent_at"))
             for r in items_list:
                 if r.inquiry_count > 0:
                     r_inqs = list(base_qs.filter(search_result__search_job__requirement=r).order_by("-sent_at"))
@@ -2333,8 +2335,8 @@ def price_comparison_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
-        messages.error(request, "Access restricted: Price Comparison is only available for Buyer accounts.")
+    if not (rbac["can_view_buyer"] or rbac["can_view_sales"] or rbac["is_super_admin"]):
+        messages.error(request, "Access restricted: Price Comparison is only available for Sales accounts.")
         return redirect("dashboard")
 
     # Load all company procurement requirements sorted strictly A to Z
@@ -2812,7 +2814,7 @@ def export_reports_view(request):
         elif report_type == "catalog":
             if is_seller_context or isinstance(selected_item, Product):
                 response["Content-Disposition"] = f'attachment; filename="Product_Catalog_{item_slug}.csv"'
-                writer.writerow(["Product Name", "Category", "Type", "Price", "Currency", "MOQ", "Unit", "Availability", "Location", "Search Scope", "Description", "Specifications", "Created At"])
+                writer.writerow(["Product Name", "Category", "Type", "MOQ", "Unit", "Availability", "Location", "Search Scope", "Description", "Specifications", "Created At"])
                 prods_to_export = Product.objects.filter(company=company, is_deleted=False)
                 if selected_item:
                     prods_to_export = prods_to_export.filter(id=selected_item.id)
@@ -2821,8 +2823,6 @@ def export_reports_view(request):
                         p.name,
                         p.category.name if p.category else "General",
                         p.get_type_display(),
-                        p.price or "",
-                        p.currency,
                         p.minimum_order_quantity or p.moq or 1,
                         p.unit,
                         p.get_availability_display(),

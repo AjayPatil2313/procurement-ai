@@ -918,7 +918,6 @@
                   <th class="py-2.5 px-3 w-20">SKU Ref</th>
                   <th class="py-2.5 px-3">Product Name</th>
                   <th class="py-2.5 px-3">Category</th>
-                  <th class="py-2.5 px-3">Target Price</th>
                   <th class="py-2.5 px-3">MOQ &amp; Unit</th>
                   <th class="py-2.5 px-3">Availability</th>
                 </tr>
@@ -962,7 +961,6 @@
                     <td class="py-2 px-3 font-mono font-bold text-slate-800">#PRD-{{ p.id }}</td>
                     <td class="py-2 px-3 font-bold text-slate-900">{{ p.name }}</td>
                     <td class="py-2 px-3 text-slate-600">{{ p.category.name|default:"General Enterprise" }}</td>
-                    <td class="py-2 px-3 font-bold text-slate-800">{{ p.currency }} {{ p.price|default:p.price_min|default:"Commercial Terms" }}</td>
                     <td class="py-2 px-3 text-slate-600">{{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"units" }}</td>
                     <td class="py-2 px-3 font-semibold text-emerald-700">{{ p.get_availability_display|default:"Active" }}</td>
                   </tr>
@@ -1174,12 +1172,11 @@
           <th style="padding: 7px 6px; text-align: left; width: 22%;">Demand Signal / Reason</th>
           <th style="padding: 7px 6px; text-align: left; width: 19%;">Direct Contacts</th>
           {% elif report_type == 'catalog' %}
-          <th style="padding: 7px 6px; text-align: left; width: 12%;">SKU Ref</th>
-          <th style="padding: 7px 6px; text-align: left; width: 30%;">Product Title &amp; Category</th>
-          <th style="padding: 7px 6px; text-align: left; width: 18%;">Target Pricing</th>
-          <th style="padding: 7px 6px; text-align: left; width: 15%;">MOQ &amp; Unit</th>
-          <th style="padding: 7px 6px; text-align: left; width: 12%;">Status</th>
-          <th style="padding: 7px 6px; text-align: left; width: 13%;">Scope</th>
+          <th style="padding: 7px 6px; text-align: left; width: 15%;">SKU Ref</th>
+          <th style="padding: 7px 6px; text-align: left; width: 38%;">Product Title &amp; Category</th>
+          <th style="padding: 7px 6px; text-align: left; width: 17%;">MOQ &amp; Unit</th>
+          <th style="padding: 7px 6px; text-align: left; width: 15%;">Status</th>
+          <th style="padding: 7px 6px; text-align: left; width: 15%;">Scope</th>
           {% else %}
           <th style="padding: 7px 6px; text-align: left; width: 8%;">ID</th>
           <th style="padding: 7px 6px; text-align: left; width: 25%;">Recipient Company</th>
@@ -1225,7 +1222,6 @@
               {{ p.name }}
               <div style="font-size: 7pt; color: #64748b; font-weight: 400;">{{ p.category.name|default:"General Enterprise" }}</div>
             </td>
-            <td style="padding: 6px 6px; font-weight: 700; color: #0f172a;">{{ p.currency }} {{ p.price|default:p.price_min|default:"Commercial Terms" }}</td>
             <td style="padding: 6px 6px; color: #334155;">{{ p.minimum_order_quantity|default:p.moq|default:"1" }} {{ p.unit|default:"units" }}</td>
             <td style="padding: 6px 6px; color: #065f46; font-weight: 700;">{{ p.get_availability_display|default:"Active" }}</td>
             <td style="padding: 6px 6px; color: #334155;">{{ p.get_search_scope_display|default:"Country" }}</td>

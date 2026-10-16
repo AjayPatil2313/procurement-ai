@@ -72,9 +72,9 @@
 
     <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
-        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Vendor Domain (Buyers)</div>
+        <div class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Vendor Domain (Sales Leads)</div>
         <div class="text-2xl font-black text-orange-600">{{ vendor_criteria }}</div>
-        <div class="text-[11px] text-slate-500 mt-1">Active in Find Buyers drawer</div>
+        <div class="text-[11px] text-slate-500 mt-1">Active in Find Sales Leads drawer</div>
       </div>
       <span class="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-lg">
         <i class="fa-solid fa-store"></i>
@@ -103,7 +103,7 @@
           <option value="ALL" {% if domain_filter == "ALL" %}selected{% endif %}>All Domains (Universal)</option>
           <option value="BOTH" {% if domain_filter == "BOTH" %}selected{% endif %}>Both (Sales &amp; Vendor)</option>
           <option value="SALES" {% if domain_filter == "SALES" %}selected{% endif %}>Sales Only (Find Suppliers)</option>
-          <option value="VENDOR" {% if domain_filter == "VENDOR" %}selected{% endif %}>Vendor Only (Find Buyers)</option>
+          <option value="VENDOR" {% if domain_filter == "VENDOR" %}selected{% endif %}>Vendor Only (Find Sales Leads)</option>
         </select>
       </div>
 
@@ -157,7 +157,7 @@
             </span>
             <div>
               <h3 class="text-sm font-black text-slate-900">AI Fit Score Playground &amp; Real-Time Simulator</h3>
-              <p class="text-[11px] text-slate-500">Test how evaluation weights aggregate into buyer-seller fit scores before publishing criteria</p>
+              <p class="text-[11px] text-slate-500">Test how evaluation weights aggregate into partnership fit scores before publishing criteria</p>
             </div>
           </div>
           <button type="button" onclick="toggleSimulator()" class="text-slate-400 hover:text-slate-700 text-xs p-1">
@@ -273,7 +273,7 @@
               </span>
               {% elif crit.target_domain == "VENDOR" %}
               <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
-                <i class="fa-solid fa-store text-[9px] mr-1"></i> Vendor (Find Buyers)
+                <i class="fa-solid fa-store text-[9px] mr-1"></i> Vendor (Find Sales Leads)
               </span>
               {% else %}
               <span class="text-slate-400 font-mono text-[10px]">{{ crit.target_domain }}</span>
@@ -405,7 +405,7 @@
           <select name="target_domain" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             <option value="BOTH">Both (Sales &amp; Vendor)</option>
             <option value="SALES">Sales (Find Suppliers)</option>
-            <option value="VENDOR">Vendor (Find Buyers)</option>
+            <option value="VENDOR">Vendor (Find Sales Leads)</option>
           </select>
         </div>
       </div>
@@ -510,7 +510,7 @@
           <select id="edit_target_domain" name="target_domain" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none">
             <option value="BOTH">Both (Sales &amp; Vendor)</option>
             <option value="SALES">Sales (Find Suppliers)</option>
-            <option value="VENDOR">Vendor (Find Buyers)</option>
+            <option value="VENDOR">Vendor (Find Sales Leads)</option>
           </select>
         </div>
       </div>

@@ -39,8 +39,8 @@ def products_list_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Your company or user account does not have Sales module access.")
+    if not (rbac.get("can_view_vendor") or rbac.get("can_view_seller")):
+        messages.error(request, "Access restricted: Your company or user account does not have Vendor module access.")
         return redirect("dashboard")
 
     # Permissions check for viewing
@@ -180,7 +180,7 @@ def product_create_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_create = (
@@ -348,7 +348,7 @@ def product_detail_view(request, pk):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_read = (
@@ -413,7 +413,7 @@ def product_edit_view(request, pk):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_edit = (
@@ -542,7 +542,7 @@ def product_delete_view(request, pk):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_delete = (
@@ -583,7 +583,7 @@ def product_restore_view(request, pk):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_restore = (
@@ -812,7 +812,7 @@ def find_buyers_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     products = Product.objects.filter(company=company, is_deleted=False).order_by(Lower("name"))
@@ -1066,7 +1066,7 @@ def export_discovered_vendors_csv_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     product_id = request.GET.get("product_id")
@@ -1161,7 +1161,7 @@ def product_toggle_availability_view(request, pk):
     if not rbac["can_view_seller"]:
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({"success": False, "error": "Access restricted"}, status=403)
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_edit = (
@@ -1217,7 +1217,7 @@ def products_export_csv_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_export = (
@@ -1243,8 +1243,6 @@ def products_export_csv_view(request):
         "SKU",
         "Category",
         "Type",
-        "Price",
-        "Currency",
         "MOQ",
         "Unit",
         "Availability",
@@ -1261,8 +1259,6 @@ def products_export_csv_view(request):
             p.sku or "",
             p.category.name if p.category else "General",
             p.get_type_display(),
-            p.price or "",
-            p.currency,
             p.minimum_order_quantity or p.moq or 1,
             p.unit,
             p.get_availability_display(),
@@ -1289,8 +1285,6 @@ def products_import_template_view(request):
         "Product Name",
         "SKU",
         "Category",
-        "Price",
-        "Currency",
         "MOQ",
         "Unit",
         "Availability",
@@ -1303,8 +1297,6 @@ def products_import_template_view(request):
         "Industrial SS Gate Valve 2-inch",
         "VLV-SS-002",
         "Industrial Machinery",
-        "14500.00",
-        "INR",
         "5",
         "pcs",
         "IN_STOCK",
@@ -1317,8 +1309,6 @@ def products_import_template_view(request):
         "High-Grade Aluminum Casting Rods",
         "AL-ROD-6061",
         "Metals & Alloys",
-        "320.00",
-        "INR",
         "100",
         "kg",
         "MADE_TO_ORDER",
@@ -1342,7 +1332,7 @@ def products_import_csv_view(request):
     company = rbac["company"]
 
     if not rbac["can_view_seller"]:
-        messages.error(request, "Access restricted: Sales module permission required.")
+        messages.error(request, "Access restricted: Vendor module permission required.")
         return redirect("dashboard")
 
     can_import = (

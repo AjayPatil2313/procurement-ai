@@ -55,7 +55,7 @@ def create_notification(
 def notify_proposal_sent(inquiry, user=None):
     """Triggered when a Seller sends a Proposal or a Buyer dispatches an RFQ."""
     company = inquiry.company
-    is_seller = getattr(company, "company_type", "") == "seller" or (
+    is_seller = getattr(company, "is_vendor_type", False) or getattr(company, "company_type", "").lower() in ["seller", "vendor"] or (
         inquiry.search_result and inquiry.search_result.result_type == "lead"
     )
     product_title = inquiry.search_result.product_title if inquiry.search_result else "Commercial Requirement"
@@ -121,7 +121,7 @@ def notify_proposal_sent(inquiry, user=None):
 def notify_quote_recorded(inquiry, user=None):
     """Triggered when a quote is recorded for an inquiry."""
     company = inquiry.company
-    is_seller = getattr(company, "company_type", "") == "seller"
+    is_seller = getattr(company, "is_vendor_type", False) or getattr(company, "company_type", "").lower() in ["seller", "vendor"]
     product_title = inquiry.search_result.product_title if inquiry.search_result else "Item"
     target_company = (
         inquiry.search_result.external_company.name
@@ -179,7 +179,7 @@ def notify_quote_recorded(inquiry, user=None):
 def notify_status_changed(inquiry, old_status_display, user=None):
     """Triggered when inquiry status transitions (e.g. Won, Lost, In Discussion)."""
     company = inquiry.company
-    is_seller = getattr(company, "company_type", "") == "seller"
+    is_seller = getattr(company, "is_vendor_type", False) or getattr(company, "company_type", "").lower() in ["seller", "vendor"]
     target_company = (
         inquiry.search_result.external_company.name
         if inquiry.search_result and inquiry.search_result.external_company
@@ -250,7 +250,7 @@ def notify_status_changed(inquiry, old_status_display, user=None):
 def notify_message_logged(inquiry, inquiry_msg, user=None):
     """Triggered when a follow-up or reply message is added to an inquiry thread."""
     company = inquiry.company
-    is_seller = getattr(company, "company_type", "") == "seller"
+    is_seller = getattr(company, "is_vendor_type", False) or getattr(company, "company_type", "").lower() in ["seller", "vendor"]
     target_company = (
         inquiry.search_result.external_company.name
         if inquiry.search_result and inquiry.search_result.external_company

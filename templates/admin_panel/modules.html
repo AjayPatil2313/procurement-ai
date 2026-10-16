@@ -132,7 +132,7 @@
             <!-- Module Name & Key -->
             <td class="py-3.5 px-4">
               <div class="flex items-center gap-2.5">
-                <span class="w-8 h-8 rounded-lg {% if item.type == 'buyer' %}bg-blue-50 text-blue-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-xs shrink-0">
+                <span class="w-8 h-8 rounded-lg {% if item.type == 'buyer' or item.type == 'sales' %}bg-blue-50 text-blue-600{% else %}bg-emerald-50 text-emerald-600{% endif %} flex items-center justify-center text-xs shrink-0">
                   <i class="fa-solid {{ item.icon_class }}"></i>
                 </span>
                 <div>
@@ -144,7 +144,7 @@
 
             <!-- Company Type -->
             <td class="py-3.5 px-4">
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if item.type == 'buyer' %}bg-blue-100 text-blue-800{% else %}bg-emerald-100 text-emerald-800{% endif %}">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if item.type == 'buyer' or item.type == 'sales' %}bg-blue-100 text-blue-800{% else %}bg-emerald-100 text-emerald-800{% endif %}">
                 {{ item.type_label }}
               </span>
             </td>
@@ -242,7 +242,7 @@
 
             <!-- Actions -->
             <td class="py-3.5 px-4 text-right">
-              {% if item.type == 'buyer' %}
+              {% if item.type == 'buyer' or item.type == 'sales' %}
               <a href="{% url 'admin-panel-buyer-dashboard' %}?tab=modules" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 font-bold transition text-[11px]">
                 <i class="fa-solid fa-gear mr-1"></i> Configure
               </a>

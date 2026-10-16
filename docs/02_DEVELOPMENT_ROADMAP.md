@@ -106,7 +106,16 @@ timeline
   - Created dedicated full-featured Notification Center Inbox page (`/notifications/inbox/`) with status tabs (All, Unread, Read, Important, Archived) and search filtering.
   - Enhanced `Notification` model with priority levels (`INFO`, `SUCCESS`, `WARNING`, `CRITICAL`), event keys, and soft-archive flags (`is_archived`).
   - Delivered complete REST APIs: `GET /api/notifications/`, `GET /api/notifications/unread-count/`, `POST /api/notifications/<id>/mark-read/`, `POST /api/notifications/<id>/mark-unread/`, `POST /api/notifications/mark-all-read/`, and `POST /api/notifications/<id>/archive/`.
-  - Built comprehensive automated test suite verifying tenant isolation, multi-channel dispatch, and REST APIs (50/50 tests passing).
+
+### Phase 12: Notification System Comprehensive Audit & Multi-Tier Hardening
+- **Architectural Scope**:
+  - Complete verification across User/Company User, Company Admin, and Super Admin authorization levels.
+  - Full company-type coverage across Sales/Buyer, Vendor/Seller, and Both entities.
+  - Fixed duplicate notification query bug to protect distinct inquiries while stopping true duplicate spam within 15 minutes.
+  - Sanitized notification click-through URIs via `clean_link` relative path serialization to eradicate browser `ERR_CONNECTION_REFUSED` errors.
+  - Hardened email outbox retry engine by encapsulating SMTP socket initialization inside the transactional `try...except` block, ensuring delivery failures and backoffs are persisted to `EmailDeliveryAttempt`.
+  - Added `ComprehensiveNotificationSystemAuditTests` covering role-based delivery, tenant data isolation, link relative formatting, duplicate suppression, and outbox persistence.
+  - Total notification test suite increased to 57 passing tests; full platform test suite expanded to 216 passing tests (100% pass rate).
 
 ---
 
@@ -123,3 +132,5 @@ timeline
 | AI Search & Cloud Failover Gateway | `c7bb68b` | Gateway mock error tests (`apps.ai_search`) | Verified |
 | 21-Event Email Notification Hub | Latest | 43 automated unit/integration tests | Verified |
 | In-App Notification Center & APIs | Latest | 50 automated tests (`apps.notifications.tests`) | Verified |
+| Comprehensive Multi-Tier Notification Audit | Latest | 57 notification tests, 216 total tests | Verified |
+

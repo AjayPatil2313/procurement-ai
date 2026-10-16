@@ -4,6 +4,8 @@ from django.db import models
 
 class NotificationTemplate(models.Model):
     class Category(models.TextChoices):
+        SALES = "SALES", "Sales"
+        VENDOR = "VENDOR", "Vendor"
         BUYER = "BUYER", "Sales (Buyer)"
         SELLER = "SELLER", "Vendor (Seller)"
         BOTH = "BOTH", "Sales & Vendor"
@@ -70,8 +72,10 @@ class NotificationRule(models.Model):
         PLATFORM = "PLATFORM", "Platform-Wide"
 
     class CompanyTypeScope(models.TextChoices):
-        BUYER = "BUYER", "Sales Only"
-        SELLER = "SELLER", "Vendor Only"
+        SALES = "SALES", "Sales Only"
+        VENDOR = "VENDOR", "Vendor Only"
+        BUYER = "BUYER", "Sales Only (Legacy)"
+        SELLER = "SELLER", "Vendor Only (Legacy)"
         BOTH = "BOTH", "Hybrid (Both)"
         ALL = "ALL", "All Company Types"
 

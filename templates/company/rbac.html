@@ -19,17 +19,17 @@
       </h1>
       <p class="text-xs text-slate-500 mt-1">
         Configure granular 6-action permissions for company users across 
-        <strong class="text-slate-700">{% if company.company_type == 'BUYER' %}Sales (Procurement){% elif company.company_type == 'SELLER' %}Vendor (Sales & Catalog){% else %}Sales & Vendor (Both){% endif %}</strong> modules.
+        <strong class="text-slate-700">{% if company.company_type == 'BUYER' or company.company_type == 'SALES' %}Sales (Procurement){% elif company.company_type == 'SELLER' or company.company_type == 'VENDOR' %}Vendor (Sales & Catalog){% else %}Sales & Vendor (Both){% endif %}</strong> modules.
       </p>
     </div>
 
     <!-- Company Badge -->
     <div class="flex items-center gap-2">
       <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold 
-        {% if company.company_type == 'BUYER' %}bg-emerald-50 text-emerald-700 border border-emerald-200
-        {% elif company.company_type == 'SELLER' %}bg-purple-50 text-purple-700 border border-purple-200
+        {% if company.company_type == 'BUYER' or company.company_type == 'SALES' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+        {% elif company.company_type == 'SELLER' or company.company_type == 'VENDOR' %}bg-purple-50 text-purple-700 border border-purple-200
         {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
-        <i class="fa-solid {% if company.company_type == 'BUYER' %}fa-cart-shopping{% elif company.company_type == 'SELLER' %}fa-store{% else %}fa-handshake{% endif %} mr-2"></i>
+        <i class="fa-solid {% if company.company_type == 'BUYER' or company.company_type == 'SALES' %}fa-cart-shopping{% elif company.company_type == 'SELLER' or company.company_type == 'VENDOR' %}fa-store{% else %}fa-handshake{% endif %} mr-2"></i>
         {{ company.get_company_type_display }} Workspace
       </span>
       <a href="{% url 'company-team-web' %}" class="text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-xl bg-white border border-slate-200 transition">
@@ -279,7 +279,7 @@
         <span>Changes take effect immediately across all Web views and REST API endpoints.</span>
       </div>
       <div>
-        Scope: <strong class="text-slate-700">{% if company.company_type == 'BUYER' %}Buyer Modules{% elif company.company_type == 'SELLER' %}Seller Modules{% else %}Buyer & Seller Modules{% endif %}</strong>
+        Scope: <strong class="text-slate-700">{% if company.company_type == 'BUYER' or company.company_type == 'SALES' %}Sales Modules{% elif company.company_type == 'SELLER' or company.company_type == 'VENDOR' %}Vendor Modules{% else %}Sales &amp; Vendor Modules{% endif %}</strong>
       </div>
     </div>
 

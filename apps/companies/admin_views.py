@@ -595,8 +595,12 @@ def admin_panel_companies_view(request):
     else:
         companies = companies.filter(is_deleted=False)
 
-    if type_filter in [Company.CompanyType.BUYER, Company.CompanyType.SELLER, Company.CompanyType.BOTH]:
-        companies = companies.filter(company_type=type_filter)
+    if type_filter in ["SALES", "BUYER", Company.CompanyType.SALES, Company.CompanyType.BUYER]:
+        companies = companies.filter(company_type__in=["SALES", "BUYER", Company.CompanyType.SALES, Company.CompanyType.BUYER])
+    elif type_filter in ["VENDOR", "SELLER", Company.CompanyType.VENDOR, Company.CompanyType.SELLER]:
+        companies = companies.filter(company_type__in=["VENDOR", "SELLER", Company.CompanyType.VENDOR, Company.CompanyType.SELLER])
+    elif type_filter in ["BOTH", Company.CompanyType.BOTH]:
+        companies = companies.filter(company_type__in=["BOTH", Company.CompanyType.BOTH])
 
     if verified_filter == "verified":
         companies = companies.filter(is_verified=True)
@@ -674,10 +678,18 @@ def admin_panel_change_company_type_view(request, pk):
     company = get_object_or_404(Company, pk=pk)
     if request.method == "POST":
         new_type = request.POST.get("company_type", "").strip().upper()
-        if new_type in [Company.CompanyType.BUYER, Company.CompanyType.SELLER, Company.CompanyType.BOTH]:
+        type_mapping = {
+            "SALES": Company.CompanyType.SALES,
+            "BUYER": Company.CompanyType.BUYER,
+            "VENDOR": Company.CompanyType.VENDOR,
+            "SELLER": Company.CompanyType.SELLER,
+            "BOTH": Company.CompanyType.BOTH,
+        }
+        if new_type in type_mapping:
+            target_type = type_mapping[new_type]
             old_type = company.company_type
-            if old_type != new_type:
-                company.company_type = new_type
+            if old_type != target_type:
+                company.company_type = target_type
                 company.save(update_fields=["company_type"])
 
                 log_admin_activity(
@@ -714,8 +726,14 @@ def admin_panel_company_create_view(request):
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
         legal_name = request.POST.get("legal_name", "").strip()
-        company_type = request.POST.get("company_type", Company.CompanyType.BOTH)
         industry = request.POST.get("industry", "").strip()
+        raw_type = request.POST.get("company_type", "BOTH").strip().upper()
+        if raw_type in ["SALES", "BUYER"]:
+            company_type = Company.CompanyType.SALES
+        elif raw_type in ["VENDOR", "SELLER"]:
+            company_type = Company.CompanyType.VENDOR
+        else:
+            company_type = Company.CompanyType.BOTH
         country = request.POST.get("country", "India").strip()
         city = request.POST.get("city", "").strip()
         state = request.POST.get("state", "").strip()
@@ -896,9 +914,13 @@ def admin_panel_company_edit_view(request, pk):
     if request.method == "POST":
         company.name = request.POST.get("name", "").strip() or company.name
         company.legal_name = request.POST.get("legal_name", "").strip()
-        company_type = request.POST.get("company_type", company.company_type)
-        if company_type in [Company.CompanyType.BUYER, Company.CompanyType.SELLER, Company.CompanyType.BOTH]:
-            company.company_type = company_type
+        raw_type = request.POST.get("company_type", company.company_type).strip().upper()
+        if raw_type in ["SALES", "BUYER", Company.CompanyType.SALES, Company.CompanyType.BUYER]:
+            company.company_type = Company.CompanyType.SALES
+        elif raw_type in ["VENDOR", "SELLER", Company.CompanyType.VENDOR, Company.CompanyType.SELLER]:
+            company.company_type = Company.CompanyType.VENDOR
+        elif raw_type in ["BOTH", Company.CompanyType.BOTH]:
+            company.company_type = Company.CompanyType.BOTH
 
         company.industry = request.POST.get("industry", "").strip()
         company.company_size = request.POST.get("company_size", company.company_size)
@@ -954,12 +976,14 @@ def admin_panel_toggle_company_status_view(request, pk):
     """
     if request.method == "POST":
         company = get_object_or_404(Company, pk=pk)
-        remark = request.POST.get("remark", "").strip() or request.POST.get("reason", "").strip()
+        has_remark_field = ("remark" in request.POST) or ("reason" in request.POST)
+        raw_remark = request.POST.get("remark", "").strip() or request.POST.get("reason", "").strip()
+        remark = raw_remark or ("Suspended by Super Admin" if company.is_active else "Reactivated by Super Admin")
 
         # CASE 1: Suspending an Active Company
         if company.is_active:
-            if not remark:
-                messages.error(request, "A mandatory suspension remark / reason is required to suspend a company.")
+            if has_remark_field and not raw_remark:
+                messages.error(request, "A reason/remark is mandatory before suspending a company.")
                 return redirect(request.POST.get("next") or "admin-panel-companies")
 
             company.is_active = False
@@ -967,91 +991,71 @@ def admin_panel_toggle_company_status_view(request, pk):
             company.suspended_at = timezone.now()
             company.save(update_fields=["is_active", "suspension_reason", "suspended_at"])
 
-            # 1. Force-terminate all active sessions for users of this company
+            # 1. Force-terminate active sessions for users belonging EXCLUSIVELY to this company
             from django.contrib.sessions.models import Session
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+
+            # Target only non-superuser members of this company
             member_user_ids = set(company.members.values_list("user_id", flat=True))
             if company.created_by_id:
-                member_user_ids.add(company.created_by_id)
+                creator = User.objects.filter(id=company.created_by_id).first()
+                if creator and not (creator.is_superuser or creator.is_staff):
+                    member_user_ids.add(company.created_by_id)
+
+            # CRITICAL TENANT ISOLATION SAFEGUARD:
+            # Super Admins and staff must NEVER have their sessions terminated when suspending a tenant!
+            superuser_ids = set(User.objects.filter(is_superuser=True).values_list("id", flat=True))
+            staff_ids = set(User.objects.filter(is_staff=True).values_list("id", flat=True))
+            excluded_ids = superuser_ids | staff_ids
+            if request.user and request.user.id:
+                excluded_ids.add(request.user.id)
+
+            member_user_ids = member_user_ids - excluded_ids
 
             terminated_sessions = 0
+            current_session_key = getattr(request.session, "session_key", None)
             now = timezone.now()
-            for s in Session.objects.filter(expire_date__gte=now):
-                try:
-                    s_data = s.get_decoded()
-                    u_id = s_data.get("_auth_user_id")
-                    if u_id and int(u_id) in member_user_ids:
-                        s.delete()
-                        terminated_sessions += 1
-                except Exception:
-                    continue
 
-            # 2. Dispatch Suspension Email to Company & Admins
-            from django.core.mail import EmailMultiAlternatives
-            from apps.notifications.services.smtp_service import get_active_email_connection, get_default_from_email
+            if member_user_ids:
+                for s in Session.objects.filter(expire_date__gte=now):
+                    # Never terminate the current Super Admin's active session!
+                    if current_session_key and s.session_key == current_session_key:
+                        continue
+                    try:
+                        s_data = s.get_decoded()
+                        u_id = s_data.get("_auth_user_id")
+                        if u_id and int(u_id) in member_user_ids:
+                            s.delete()
+                            terminated_sessions += 1
+                    except Exception:
+                        continue
+
+            # 2. Dispatch Suspension Email to Company & Admins using unified notification engine
             from apps.notifications.services.email_engine import trigger_email_notification
 
-            company_recipients = set()
-            if company.email and "@" in company.email:
-                company_recipients.add(company.email.strip().lower())
-            for adm in company.members.filter(role="ADMIN", is_active=True).select_related("user"):
-                if adm.user and adm.user.email and "@" in adm.user.email:
-                    company_recipients.add(adm.user.email.strip().lower())
-
             suspension_time_str = timezone.now().strftime("%B %d, %Y at %I:%M %p UTC")
-            subject = f"CRITICAL NOTICE: Corporate Account Suspended — {company.name}"
 
-            html_email = f"""
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #fee2e2; border-radius: 16px;">
-                <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9;">
-                    <div style="display: inline-block; width: 48px; height: 48px; line-height: 48px; border-radius: 12px; background: #fee2e2; color: #dc2626; font-size: 22px; margin-bottom: 12px;">⚠️</div>
-                    <h2 style="margin: 0; color: #991b1b; font-size: 20px; font-weight: 800;">Corporate Account Suspended</h2>
-                    <p style="margin: 6px 0 0 0; color: #64748b; font-size: 13px;">Platform Governance Notice</p>
-                </div>
-                <div style="padding: 24px 0; color: #334155; font-size: 14px; line-height: 1.6;">
-                    <p>Dear <strong>{company.name}</strong> Administrator,</p>
-                    <p>This official notice is to inform you that your company account on the platform has been <strong>suspended</strong> by the Platform Super Administrator effective immediately.</p>
-                    
-                    <div style="background: #fff1f2; border: 1px solid #fecdd3; border-left: 5px solid #e11d48; border-radius: 8px; padding: 16px; margin: 20px 0;">
-                        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #9f1239; margin-bottom: 6px; letter-spacing: 0.5px;">Suspension Reason / Remark:</div>
-                        <div style="font-size: 14px; color: #4c0519; font-weight: 600; white-space: pre-wrap;">{remark}</div>
-                    </div>
+            # A) Send Official Corporate Account Suspended notification to company admins & company email
+            try:
+                trigger_email_notification(
+                    event_key="company.suspended",
+                    company=company,
+                    context={
+                        "company_name": company.name,
+                        "reason": remark,
+                        "timestamp": suspension_time_str,
+                        "cta_url": request.build_absolute_uri("/support/"),
+                        "summary": f"Your company account '{company.name}' has been suspended. Reason: {remark}",
+                    },
+                    severity="CRITICAL",
+                    priority="URGENT",
+                    sent_by=request.user,
+                )
+            except Exception as mail_err:
+                logger.error(f"Error triggering company.suspended notification: {mail_err}")
 
-                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; font-size: 12px; color: #475569; margin-bottom: 20px;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr><td style="padding: 3px 0; color: #64748b; width: 140px;">Company Entity:</td><td style="font-weight: 600; color: #0f172a;">{company.name}</td></tr>
-                            <tr><td style="padding: 3px 0; color: #64748b;">Action Timestamp:</td><td style="font-weight: 600; color: #0f172a;">{suspension_time_str}</td></tr>
-                            <tr><td style="padding: 3px 0; color: #64748b;">Security Action:</td><td style="font-weight: 600; color: #dc2626;">All user sessions terminated &amp; access revoked</td></tr>
-                        </table>
-                    </div>
-
-                    <p style="color: #64748b; font-size: 13px;">
-                        While suspended, all users belonging to this organization have been logged out and cannot perform any platform operations.
-                    </p>
-                </div>
-                <div style="padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; color: #94a3b8; font-size: 12px;">
-                    If you believe this suspension is in error or wish to appeal, please contact the Platform Administration Team.
-                </div>
-            </div>
-            """
-
-            text_email = f"CRITICAL NOTICE: Corporate Account Suspended - {company.name}\n\nSuspension Reason:\n{remark}\n\nTimestamp: {suspension_time_str}\n\nAll active user sessions have been terminated."
-
-            if company_recipients:
-                try:
-                    conn_res = get_active_email_connection()
-                    conn = conn_res[0] if isinstance(conn_res, tuple) else conn_res
-                    mail = EmailMultiAlternatives(
-                        subject=subject,
-                        body=text_email,
-                        from_email=get_default_from_email(),
-                        to=list(company_recipients),
-                        connection=conn,
-                    )
-                    mail.attach_alternative(html_email, "text/html")
-                    mail.send(fail_silently=True)
-                except Exception as mail_err:
-                    logger.error(f"Error sending company suspension notice: {mail_err}")
-
+            # B) Send Platform Governance Alert copy to Super Admins
             try:
                 trigger_email_notification(
                     event_key="admin.company_suspended",
@@ -1059,14 +1063,17 @@ def admin_panel_toggle_company_status_view(request, pk):
                     user=request.user,
                     context={
                         "company_name": company.name,
+                        "action_type": "SUSPENDED",
                         "reason": remark,
                         "suspended_by": request.user.get_full_name() or request.user.email,
                         "cta_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
+                        "summary": f"Governance Alert: Company '{company.name}' was suspended. Reason: {remark}. {terminated_sessions} session(s) wiped.",
                     },
                     severity="CRITICAL",
+                    sent_by=request.user,
                 )
-            except Exception:
-                pass
+            except Exception as admin_err:
+                logger.error(f"Error triggering admin.company_suspended notification: {admin_err}")
 
             log_admin_activity(
                 request,
@@ -1091,6 +1098,48 @@ def admin_panel_toggle_company_status_view(request, pk):
             company.suspended_at = None
             company.save(update_fields=["is_active", "suspension_reason", "suspended_at"])
 
+            from apps.notifications.services.email_engine import trigger_email_notification
+            reactivate_time_str = timezone.now().strftime("%B %d, %Y at %I:%M %p UTC")
+
+            # A) Send Official Corporate Account Reactivated notification to company admins & company email
+            try:
+                trigger_email_notification(
+                    event_key="company.reactivated",
+                    company=company,
+                    context={
+                        "company_name": company.name,
+                        "reason": reactivate_remark,
+                        "timestamp": reactivate_time_str,
+                        "cta_url": request.build_absolute_uri("/company/dashboard/"),
+                        "summary": f"Your company account '{company.name}' has been reactivated. Team members may now log in.",
+                    },
+                    severity="INFO",
+                    priority="HIGH",
+                    sent_by=request.user,
+                )
+            except Exception as mail_err:
+                logger.error(f"Error triggering company.reactivated notification: {mail_err}")
+
+            # B) Send Platform Governance Alert copy to Super Admins
+            try:
+                trigger_email_notification(
+                    event_key="admin.company_suspended",
+                    company=company,
+                    user=request.user,
+                    context={
+                        "company_name": company.name,
+                        "action_type": "REACTIVATED",
+                        "reason": reactivate_remark,
+                        "suspended_by": request.user.get_full_name() or request.user.email,
+                        "cta_url": request.build_absolute_uri(f"/admin-panel/companies/{company.id}/"),
+                        "summary": f"Governance Alert: Company '{company.name}' was reactivated. Remark: {reactivate_remark}",
+                    },
+                    severity="INFO",
+                    sent_by=request.user,
+                )
+            except Exception as admin_err:
+                logger.error(f"Error triggering admin.company_suspended notification: {admin_err}")
+
             log_admin_activity(
                 request,
                 company,
@@ -1099,7 +1148,7 @@ def admin_panel_toggle_company_status_view(request, pk):
                 icon_type="building-circle-check",
                 color="emerald",
             )
-            messages.success(request, f"Company '{company.name}' has been reactivated. Team members may now log in.")
+            messages.success(request, f"Company '{company.name}' has been reactivated. Team members may now log in and notification email dispatched.")
 
     return redirect(request.POST.get("next") or "admin-panel-companies")
 
@@ -2239,9 +2288,6 @@ def admin_panel_products_view(request):
             "Product Name",
             "Company Name",
             "Category",
-            "Min Price",
-            "Max Price",
-            "Currency",
             "Availability",
             "Status",
             "Created Date",
@@ -2253,9 +2299,6 @@ def admin_panel_products_view(request):
                 p.name,
                 p.company.name if p.company else "N/A",
                 p.category.name if p.category else "Uncategorized",
-                p.min_price or "",
-                p.max_price or "",
-                p.currency or "INR",
                 p.get_availability_display() if hasattr(p, "get_availability_display") else p.availability,
                 "Delisted / Archived" if p.is_deleted else "Active",
                 p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else "",
@@ -2772,9 +2815,9 @@ def admin_panel_reports_view(request):
         response["Content-Disposition"] = f'attachment; filename="Platform_Products_Catalog_{today_str}.csv"'
         response.write("\ufeff")
         writer = csv.writer(response)
-        writer.writerow(["ID", "SKU", "Product Name", "Company", "Category", "Min Price", "Max Price", "Currency", "Availability", "Status", "Created Date"])
+        writer.writerow(["ID", "SKU", "Product Name", "Company", "Category", "Availability", "Status", "Created Date"])
         for p in Product.objects.select_related("company", "category").order_by("-created_at")[:5000]:
-            writer.writerow([p.id, p.sku or "N/A", p.name, p.company.name if p.company else "N/A", p.category.name if p.category else "Uncategorized", p.min_price or "", p.max_price or "", p.currency or "INR", p.get_availability_display() if hasattr(p, "get_availability_display") else p.availability, "Archived" if p.is_deleted else "Active", p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else ""])
+            writer.writerow([p.id, p.sku or "N/A", p.name, p.company.name if p.company else "N/A", p.category.name if p.category else "Uncategorized", p.get_availability_display() if hasattr(p, "get_availability_display") else p.availability, "Archived" if p.is_deleted else "Active", p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else ""])
         return response
 
     elif export_type == "requirements_csv":
@@ -2892,11 +2935,12 @@ def admin_panel_buyer_dashboard_view(request):
     if active_tab not in ["overview", "modules", "layout", "companies"]:
         active_tab = "overview"
 
-    # Aggregations across BUYER and BOTH companies
-    buyer_filter = Q(company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH], is_deleted=False)
+    # Aggregations across SALES/BUYER and BOTH companies
+    sales_types = [Company.CompanyType.SALES, Company.CompanyType.BUYER, Company.CompanyType.BOTH, "SALES", "BUYER", "BOTH"]
+    buyer_filter = Q(company_type__in=sales_types, is_deleted=False)
     total_buyer_companies = Company.objects.filter(buyer_filter).count()
-    buyer_only_companies = Company.objects.filter(company_type=Company.CompanyType.BUYER, is_deleted=False).count()
-    both_companies = Company.objects.filter(company_type=Company.CompanyType.BOTH, is_deleted=False).count()
+    buyer_only_companies = Company.objects.filter(company_type__in=[Company.CompanyType.SALES, Company.CompanyType.BUYER, "SALES", "BUYER"], is_deleted=False).count()
+    both_companies = Company.objects.filter(company_type__in=[Company.CompanyType.BOTH, "BOTH"], is_deleted=False).count()
 
     total_requirements = Requirement.objects.filter(is_deleted=False).count()
     total_searches_run = SearchJob.objects.filter(
@@ -2904,10 +2948,10 @@ def admin_panel_buyer_dashboard_view(request):
     ).count()
     total_suppliers_discovered = SearchResult.objects.filter(result_type=SearchResult.ResultType.SUPPLIER).count()
     total_saved_suppliers = SavedItem.objects.filter(
-        company__company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH]
+        company__company_type__in=sales_types
     ).count()
     total_inquiries_sent = Inquiry.objects.filter(
-        company__company_type__in=[Company.CompanyType.BUYER, Company.CompanyType.BOTH]
+        company__company_type__in=sales_types
     ).count()
 
     buyer_subs = Subscription.objects.filter(company__in=Company.objects.filter(buyer_filter))
@@ -3127,10 +3171,11 @@ def admin_panel_seller_dashboard_view(request):
     if active_tab not in ["overview", "modules", "layout", "companies"]:
         active_tab = "overview"
 
-    seller_filter = Q(company_type__in=[Company.CompanyType.SELLER, Company.CompanyType.BOTH], is_deleted=False)
+    vendor_types = [Company.CompanyType.VENDOR, Company.CompanyType.SELLER, Company.CompanyType.BOTH, "VENDOR", "SELLER", "BOTH"]
+    seller_filter = Q(company_type__in=vendor_types, is_deleted=False)
     total_seller_companies = Company.objects.filter(seller_filter).count()
-    seller_only_companies = Company.objects.filter(company_type=Company.CompanyType.SELLER, is_deleted=False).count()
-    both_companies = Company.objects.filter(company_type=Company.CompanyType.BOTH, is_deleted=False).count()
+    seller_only_companies = Company.objects.filter(company_type__in=[Company.CompanyType.VENDOR, Company.CompanyType.SELLER, "VENDOR", "SELLER"], is_deleted=False).count()
+    both_companies = Company.objects.filter(company_type__in=[Company.CompanyType.BOTH, "BOTH"], is_deleted=False).count()
 
     total_products = Product.objects.filter(is_deleted=False).count()
     total_searches_run = SearchJob.objects.filter(
@@ -3138,10 +3183,10 @@ def admin_panel_seller_dashboard_view(request):
     ).count()
     total_leads_discovered = SearchResult.objects.exclude(result_type=SearchResult.ResultType.SUPPLIER).count()
     total_saved_leads = SavedItem.objects.filter(
-        company__company_type__in=[Company.CompanyType.SELLER, Company.CompanyType.BOTH]
+        company__company_type__in=vendor_types
     ).count()
     total_inquiries_received = Inquiry.objects.filter(
-        company__company_type__in=[Company.CompanyType.SELLER, Company.CompanyType.BOTH]
+        company__company_type__in=vendor_types
     ).count()
 
     seller_subs = Subscription.objects.filter(company__in=Company.objects.filter(seller_filter))
@@ -4320,6 +4365,18 @@ def admin_panel_company_impact_summary_api(request, company_id):
         "search_jobs_count": search_jobs_count,
         "is_deleted": company.is_deleted,
     })
+
+
+# Aliases for Sales & Vendor governance
+admin_panel_sales_dashboard_view = admin_panel_buyer_dashboard_view
+admin_panel_sales_module_toggle_view = admin_panel_buyer_module_toggle_view
+admin_panel_sales_module_edit_view = admin_panel_buyer_module_edit_view
+admin_panel_sales_layout_update_view = admin_panel_buyer_layout_update_view
+
+admin_panel_vendor_dashboard_view = admin_panel_seller_dashboard_view
+admin_panel_vendor_module_toggle_view = admin_panel_seller_module_toggle_view
+admin_panel_vendor_module_edit_view = admin_panel_seller_module_edit_view
+admin_panel_vendor_layout_update_view = admin_panel_seller_layout_update_view
 
 
 

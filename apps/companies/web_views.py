@@ -600,11 +600,11 @@ def company_rbac_web_view(request):
             selected_codes = request.POST.getlist("permissions")
             valid_codes = [c for c in selected_codes if c in ["READ", "EDIT", "UPDATE", "DELETE", "IMPORT", "EXPORT"]]
 
-            # Modules to assign based on company type (Buyer, Seller, Both)
+            # Modules to assign based on company type (Sales, Vendor, Both)
             modules_to_assign = ["general"]
-            if company.company_type in [Company.CompanyType.BUYER, Company.CompanyType.BOTH]:
+            if getattr(company, "is_sales_type", company.company_type in [Company.CompanyType.BUYER, Company.CompanyType.BOTH]):
                 modules_to_assign.append("requirements")
-            if company.company_type in [Company.CompanyType.SELLER, Company.CompanyType.BOTH]:
+            if getattr(company, "is_vendor_type", company.company_type in [Company.CompanyType.SELLER, Company.CompanyType.BOTH]):
                 modules_to_assign.extend(["products", "catalog", "leads"])
 
             # Delete old permissions and recreate with checked actions
@@ -1541,7 +1541,7 @@ def seller_roles_web_view(request):
         {"key": "find_buyers", "name": "Find vendors", "icon": "fa-crosshairs", "desc": "AI vendor discovery & targeted web scraping"},
         {"key": "leads", "name": "Vendor list", "icon": "fa-users-viewfinder", "desc": "Discovered enterprise vendors & fit scoring"},
         {"key": "saved_buyers", "name": "Prequalified Vendors", "icon": "fa-bookmark", "desc": "Prequalified vendor pipeline, notes, and assignments"},
-        {"key": "inquiries", "name": "Buyer Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
+        {"key": "inquiries", "name": "Sales Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
         {"key": "export_reports", "name": "Export Reports", "icon": "fa-download", "desc": "CSV downloads & catalog matrix exports"},
         {"key": "matching_parameters", "name": "Matching Parameters", "icon": "fa-sliders", "desc": "AI matching score criteria & rules"},
         {"key": "team", "name": "User Management", "icon": "fa-users-gear", "desc": "Employee management & user assignments"},
@@ -1569,7 +1569,7 @@ SELLER_MODULES_CONFIG = [
     {"key": "find_buyers", "name": "Find vendors", "icon": "fa-crosshairs", "desc": "AI vendor discovery & targeted web scraping"},
     {"key": "leads", "name": "Vendor list", "icon": "fa-users-viewfinder", "desc": "Discovered enterprise vendors & fit scoring"},
     {"key": "saved_buyers", "name": "Prequalified Vendors", "icon": "fa-bookmark", "desc": "Prequalified vendor pipeline, notes, and assignments"},
-    {"key": "inquiries", "name": "Buyer Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
+    {"key": "inquiries", "name": "Sales Inquiries", "icon": "fa-paper-plane", "desc": "Commercial RFQs, proposals, and quote capture"},
     {"key": "export_reports", "name": "Export Reports", "icon": "fa-download", "desc": "CSV downloads & catalog matrix exports"},
     {"key": "matching_parameters", "name": "Matching Parameters", "icon": "fa-sliders", "desc": "AI matching score criteria & rules"},
     {"key": "team", "name": "User Management", "icon": "fa-users-gear", "desc": "Employee management & user assignments"},

@@ -12,9 +12,9 @@
         <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
           {% if rbac.is_super_admin %}
             Admin Dashboard
-          {% elif rbac.is_buyer_only %}
+          {% elif rbac.is_sales_only or rbac.is_buyer_only %}
             Sales Dashboard
-          {% elif rbac.is_seller_only %}
+          {% elif rbac.is_vendor_only or rbac.is_seller_only %}
             Vendor Dashboard
           {% else %}
             Dashboard
@@ -38,11 +38,11 @@
         <i class="fa-solid fa-layer-group text-blue-600"></i>
         <span>Combined Overview</span>
       </a>
-      <a href="?workspace=buyer" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 {% if active_workspace == 'buyer' %}bg-white text-blue-700 shadow-sm border border-slate-200/60{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+      <a href="?workspace=sales" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 {% if active_workspace == 'sales' or active_workspace == 'buyer' %}bg-white text-blue-700 shadow-sm border border-slate-200/60{% else %}text-slate-600 hover:text-slate-900{% endif %}">
         <i class="fa-solid fa-cart-shopping text-emerald-600"></i>
         <span>Sales</span>
       </a>
-      <a href="?workspace=seller" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 {% if active_workspace == 'seller' %}bg-white text-indigo-700 shadow-sm border border-slate-200/60{% else %}text-slate-600 hover:text-slate-900{% endif %}">
+      <a href="?workspace=vendor" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 {% if active_workspace == 'vendor' or active_workspace == 'seller' %}bg-white text-indigo-700 shadow-sm border border-slate-200/60{% else %}text-slate-600 hover:text-slate-900{% endif %}">
         <i class="fa-solid fa-bullhorn text-purple-600"></i>
         <span>Vendor</span>
       </a>
@@ -57,7 +57,7 @@
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
       <div class="space-y-2">
         <span class="text-xs font-semibold text-slate-500 tracking-wide">
-          {% if active_workspace == 'buyer' %}Supplier Searches{% elif active_workspace == 'seller' %}Buyer Searches{% else %}Total Searches{% endif %}
+          {% if active_workspace == 'sales' or active_workspace == 'buyer' %}Supplier Searches{% elif active_workspace == 'vendor' or active_workspace == 'seller' %}Sales Searches{% else %}Total Searches{% endif %}
         </span>
         <div class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ metrics.total_searches }}</div>
         <div class="flex items-center text-xs text-slate-500 font-medium">
@@ -76,7 +76,7 @@
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
       <div class="space-y-2">
         <span class="text-xs font-semibold text-slate-500 tracking-wide">
-          {% if active_workspace == 'seller' %}Products Catalog{% elif active_workspace == 'buyer' %}Found Suppliers{% else %}Active Catalog Products{% endif %}
+          {% if active_workspace == 'vendor' or active_workspace == 'seller' %}Products Catalog{% elif active_workspace == 'sales' or active_workspace == 'buyer' %}Found Suppliers{% else %}Active Catalog Products{% endif %}
         </span>
         <div class="text-3xl font-extrabold text-slate-900 tracking-tight">
           {% if active_workspace == 'combined' %}{{ metrics.real_products_count }}{% else %}{{ metrics.found_suppliers }}{% endif %}
@@ -89,7 +89,7 @@
         </div>
       </div>
       <div class="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 shrink-0">
-        <i class="fa-solid {% if active_workspace == 'seller' or active_workspace == 'combined' %}fa-box-open{% else %}fa-users{% endif %} text-lg"></i>
+        <i class="fa-solid {% if active_workspace == 'vendor' or active_workspace == 'seller' or active_workspace == 'combined' %}fa-box-open{% else %}fa-users{% endif %} text-lg"></i>
       </div>
     </div>
 
@@ -97,7 +97,7 @@
     <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-start justify-between transition hover:shadow-md">
       <div class="space-y-2">
         <span class="text-xs font-semibold text-slate-500 tracking-wide">
-          {% if active_workspace == 'buyer' %}Active Products{% elif active_workspace == 'seller' %}Saved Pipeline Leads{% else %}Active Products{% endif %}
+          {% if active_workspace == 'sales' or active_workspace == 'buyer' %}Active Requirements{% elif active_workspace == 'vendor' or active_workspace == 'seller' %}Saved Pipeline Leads{% else %}Active Requirements{% endif %}
         </span>
         <div class="text-3xl font-extrabold text-slate-900 tracking-tight">
           {% if active_workspace == 'combined' %}{{ metrics.real_requirements_count }}{% else %}{{ metrics.active_leads }}{% endif %}
@@ -110,7 +110,7 @@
         </div>
       </div>
       <div class="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
-        <i class="fa-solid {% if active_workspace == 'buyer' or active_workspace == 'combined' %}fa-cart-plus{% else %}fa-user-group{% endif %} text-lg"></i>
+        <i class="fa-solid {% if active_workspace == 'sales' or active_workspace == 'buyer' or active_workspace == 'combined' %}fa-clipboard-list{% else %}fa-user-group{% endif %} text-lg"></i>
       </div>
     </div>
 
@@ -147,29 +147,29 @@
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       
-      <!-- Buyer Actions: Add Product & Find Suppliers (AI) -->
-      {% if rbac.can_view_buyer or rbac.is_super_admin %}
+      <!-- Sales Actions: Add Requirement & Find Suppliers (AI) -->
+      {% if rbac.can_view_sales or rbac.can_view_buyer or rbac.is_super_admin %}
       <a href="{% url 'requirements-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
-        <i class="fa-solid fa-cart-plus mr-2 text-sm"></i>
-        <span>Add Product</span>
-      </a>
-
-      <a href="{% url 'find-suppliers' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
-        <i class="fa-solid fa-wand-magic-sparkles mr-2 text-sm"></i>
-        <span>Find Customers (AI)</span>
-      </a>
-      {% endif %}
-
-      <!-- Seller Actions: Add Requirement & Find Vendors (AI) -->
-      {% if rbac.can_view_seller or rbac.is_super_admin %}
-      <a href="{% url 'products-create' %}" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
         <i class="fa-solid fa-clipboard-list mr-2 text-sm"></i>
         <span>Add Requirement</span>
       </a>
 
+      <a href="{% url 'find-suppliers' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
+        <i class="fa-solid fa-wand-magic-sparkles mr-2 text-sm"></i>
+        <span>Find Suppliers (AI)</span>
+      </a>
+      {% endif %}
+
+      <!-- Vendor Actions: Add Product & Find Sales Leads (AI) -->
+      {% if rbac.can_view_vendor or rbac.can_view_seller or rbac.is_super_admin %}
+      <a href="{% url 'products-create' %}" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
+        <i class="fa-solid fa-box-open mr-2 text-sm"></i>
+        <span>Add Product</span>
+      </a>
+
       <a href="{% url 'find-buyers' %}" class="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs py-3 px-4 rounded-lg flex items-center justify-center transition shadow-sm hover:shadow text-center">
         <i class="fa-solid fa-crosshairs mr-2 text-sm"></i>
-        <span>Find Vendors (AI)</span>
+        <span>Find Sales Leads (AI)</span>
       </a>
       {% endif %}
 
@@ -306,11 +306,11 @@
       <div class="flex items-center justify-between mb-4">
         <div>
           <h2 class="text-sm font-bold text-slate-900">
-            {% if active_workspace == 'seller' %}Top Discovered Leads{% else %}Top Discovered Suppliers{% endif %}
+            {% if active_workspace == 'vendor' or active_workspace == 'seller' %}Top Discovered Leads{% else %}Top Discovered Suppliers{% endif %}
           </h2>
           <span class="text-[11px] text-slate-400">(Based on AI Match Score)</span>
         </div>
-        <a href="{% if active_workspace == 'seller' %}{% url 'saved-leads' %}{% else %}{% url 'saved-suppliers' %}{% endif %}" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
+        <a href="{% if active_workspace == 'vendor' or active_workspace == 'seller' %}{% url 'saved-leads' %}{% else %}{% url 'saved-suppliers' %}{% endif %}" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
           View all <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
         </a>
       </div>

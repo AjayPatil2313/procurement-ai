@@ -8,7 +8,7 @@ from apps.catalog.models import Product
 class SearchJob(models.Model):
     class JobType(models.TextChoices):
         FIND_SUPPLIERS = "find_suppliers", "Find Suppliers"
-        FIND_BUYERS = "find_buyers", "Find Buyers"
+        FIND_BUYERS = "find_buyers", "Find Sales Leads"
 
     class Status(models.TextChoices):
         QUEUED = "queued", "Queued"
@@ -374,7 +374,7 @@ class PlatformMatchingCriteria(models.Model):
     class TargetDomain(models.TextChoices):
         BOTH = "BOTH", "Both (Sales & Vendor)"
         SALES = "SALES", "Sales (Find Suppliers)"
-        VENDOR = "VENDOR", "Vendor (Find Buyers)"
+        VENDOR = "VENDOR", "Vendor (Find Sales Leads)"
 
     class RuleType(models.TextChoices):
         WEIGHTED = "weighted", "Weighted (Percentage Contribution)"

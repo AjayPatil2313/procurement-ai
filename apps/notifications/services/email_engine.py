@@ -135,9 +135,27 @@ EVENT_BANNER_CONFIGS = {
         "icon": "&#9888;",  # Warning
         "title": "Corporate Account",
         "highlight": "Suspended!",
-        "subtitle": "Security & Governance notice regarding the immediate suspension of your corporate workspace:",
+        "subtitle": "Security & Governance notice regarding the administrative action on corporate workspace:",
+        "cta_text": "Open Super Admin Console",
+        "secondary_cta_text": "Inspect Companies Desk",
+    },
+    "company.suspended": {
+        "theme": "rose",
+        "icon": "&#9888;",  # Warning
+        "title": "Corporate Account",
+        "highlight": "Suspended!",
+        "subtitle": "Platform governance notice regarding the immediate suspension of your corporate organization:",
         "cta_text": "Contact Support Desk",
         "secondary_cta_text": "Platform Helpdesk",
+    },
+    "company.reactivated": {
+        "theme": "emerald",
+        "icon": "&#10004;",  # Checkmark
+        "title": "Corporate Account",
+        "highlight": "Reactivated!",
+        "subtitle": "Your corporate account has been reactivated and full platform access is restored:",
+        "cta_text": "Go to Company Dashboard",
+        "secondary_cta_text": "Manage Workspace",
     },
     "admin.ai_provider_error": {
         "theme": "rose",
@@ -405,6 +423,14 @@ EVENT_BANNER_CONFIGS = {
         "secondary_cta_text": "Access Control Desk",
     },
 }
+
+# Aliases for sales.* and vendor.* event keys
+EVENT_BANNER_CONFIGS["vendor.inquiry_received"] = EVENT_BANNER_CONFIGS.get("seller.inquiry_received", {})
+EVENT_BANNER_CONFIGS["sales.matching_suppliers_found"] = EVENT_BANNER_CONFIGS.get("buyer.matching_suppliers_found", {})
+EVENT_BANNER_CONFIGS["sales.search_completed"] = EVENT_BANNER_CONFIGS.get("buyer.search_completed", {})
+EVENT_BANNER_CONFIGS["vendor.new_buyer_lead"] = EVENT_BANNER_CONFIGS.get("seller.new_buyer_lead", {})
+EVENT_BANNER_CONFIGS["vendor.new_sales_lead"] = EVENT_BANNER_CONFIGS.get("seller.new_buyer_lead", {})
+EVENT_BANNER_CONFIGS["vendor.search_completed"] = EVENT_BANNER_CONFIGS.get("seller.search_completed", {})
 
 
 def ensure_absolute_url(url):
@@ -869,19 +895,34 @@ def trigger_email_notification(
     context = context or {}
     created_logs = []
 
-    # 1. Look up rules matching this event key
-    rules = list(NotificationRule.objects.filter(event_key=event_key).select_related("template"))
+    # 1. Look up rules matching this event key (support both sales.* and buyer.*, vendor.* and seller.*)
+    lookup_keys = [event_key]
+    if event_key.startswith("sales."):
+        lookup_keys.append("buyer." + event_key[6:])
+    elif event_key.startswith("buyer."):
+        lookup_keys.append("sales." + event_key[6:])
+    elif event_key.startswith("vendor."):
+        lookup_keys.append("seller." + event_key[7:])
+    elif event_key.startswith("seller."):
+        lookup_keys.append("vendor." + event_key[7:])
+
+    rules = list(NotificationRule.objects.filter(event_key__in=lookup_keys).select_related("template"))
 
     # If company is provided, filter rules matching company_type scope
     if company:
         c_type = getattr(company, "company_type", "")
-        if c_type:
-            # Rule applies if company_type matches company's type or is ALL
-            rules = [r for r in rules if r.company_type in (c_type, NotificationRule.CompanyTypeScope.ALL)]
+        is_sales = getattr(company, "is_sales_type", c_type in ("BUYER", "SALES"))
+        is_vendor = getattr(company, "is_vendor_type", c_type in ("SELLER", "VENDOR"))
+        allowed_scopes = {NotificationRule.CompanyTypeScope.ALL, NotificationRule.CompanyTypeScope.BOTH}
+        if is_sales:
+            allowed_scopes.update({NotificationRule.CompanyTypeScope.BUYER, "SALES"})
+        if is_vendor:
+            allowed_scopes.update({NotificationRule.CompanyTypeScope.SELLER, "VENDOR"})
+        rules = [r for r in rules if r.company_type in allowed_scopes]
 
     if not rules:
         # Check if a standalone active NotificationTemplate exists for this event_key
-        standalone_tpl = NotificationTemplate.objects.filter(event_key=event_key, is_active=True).first()
+        standalone_tpl = NotificationTemplate.objects.filter(event_key__in=lookup_keys, is_active=True).first()
         if not standalone_tpl:
             logger.info(f"No active notification rule or template found for event '{event_key}'. Skipping dispatch.")
             return []
@@ -1033,18 +1074,19 @@ def trigger_email_notification(
                         in_app_color = theme_color_map.get(theme, "blue")
                         in_app_icon = theme_icon_map.get(theme, "fa-bell")
 
-                        # Duplicate prevention
-                        already_notified = False
-                        if per_rec_idempotency:
-                            already_notified = Notification.objects.filter(
-                                user=user_obj,
-                                event_key=event_key,
-                                created_at__gte=timezone.now() - timezone.timedelta(minutes=15)
-                            ).exists()
+                        summary_msg = str(context.get("summary") or subject_rendered)
+                        cta_nav_link = str(context.get("cta_url") or "")
+
+                        # Duplicate prevention (ensure same item/title is not duplicated within 15 min window)
+                        already_notified = Notification.objects.filter(
+                            user=user_obj,
+                            event_key=event_key,
+                            title=subject_rendered[:250],
+                            link=cta_nav_link[:500],
+                            created_at__gte=timezone.now() - timezone.timedelta(minutes=15)
+                        ).exists()
 
                         if not already_notified:
-                            summary_msg = str(context.get("summary") or subject_rendered)
-                            cta_nav_link = str(context.get("cta_url") or "")
                             Notification.objects.create(
                                 user=user_obj,
                                 company=company or getattr(user_obj, "company", None),
@@ -1146,16 +1188,19 @@ def trigger_email_notification(
     return created_logs
 
 
-def deliver_notification_log(log_id, attachments=None):
+def deliver_notification_log(log_or_id, attachments=None):
     """
     Executes actual email transmission for a given NotificationLog record.
     Logs success or records delivery failure attempt with sanitized traceback.
     Includes RFC 8058 headers and supports binary attachments, CC, and BCC.
     """
-    try:
-        log = NotificationLog.objects.select_related("template").get(id=log_id)
-    except NotificationLog.DoesNotExist:
-        return False
+    if isinstance(log_or_id, NotificationLog):
+        log = log_or_id
+    else:
+        try:
+            log = NotificationLog.objects.select_related("template").get(id=log_or_id)
+        except (NotificationLog.DoesNotExist, ValueError, TypeError):
+            return False
 
     if log.status == NotificationLog.Status.SENT:
         return True
@@ -1166,10 +1211,11 @@ def deliver_notification_log(log_id, attachments=None):
         return False
 
     attempt_number = log.attempts_count + 1
-    connection, _ = get_active_email_connection()
-    from_email = get_default_from_email()
 
     try:
+        connection, _ = get_active_email_connection()
+        from_email = get_default_from_email()
+
         log.status = NotificationLog.Status.SENDING
         log.save(update_fields=["status"])
 
