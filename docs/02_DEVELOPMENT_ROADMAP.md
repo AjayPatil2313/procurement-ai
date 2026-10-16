@@ -19,6 +19,9 @@ timeline
     Phase 8 : Dashboard Governance : Dynamic Module Customization
     Phase 9 : Transactional Communications : SMTP Engine & Outbox
     Phase 10 : AI Failover Gateway : Email Notification Management
+    Phase 11 : In-App Notification Center : Real-Time Polling & Inbox UI
+    Phase 12 : Notification System Audit : Cross-Role Verification & Zero Refused Links
+    Phase 13 : Web Push Notifications : Firebase Cloud Messaging & Service Worker
 ```
 
 ---
@@ -117,6 +120,22 @@ timeline
   - Added `ComprehensiveNotificationSystemAuditTests` covering role-based delivery, tenant data isolation, link relative formatting, duplicate suppression, and outbox persistence.
   - Total notification test suite increased to 57 passing tests; full platform test suite expanded to 216 passing tests (100% pass rate).
 
+### Phase 13: Web Push Notifications (Firebase Cloud Messaging & Service Worker)
+- **Architectural Scope**:
+  - Integrated `firebase-admin` Python SDK into Django backend with lazy initialization (`apps.notifications.services.fcm_service.py`).
+  - Added `DeviceToken` model supporting multiple devices/browsers per user, tracking device type, user agent, IP address, and active state.
+  - Multi-channel delivery rules expanded with `PUSH`, `IN_APP_PUSH`, and `ALL` channels, supporting user-level preferences (`push_enabled`).
+  - Implemented root Service Worker delivery view at `/firebase-messaging-sw.js` with `Service-Worker-Allowed: /` header for universal origin scope.
+  - Delivered 4 dedicated REST endpoints:
+    - `GET /api/notifications/push-config/`: Sanitized Firebase public credentials (VAPID key, project ID, appId, apiKey).
+    - `POST /api/notifications/devices/register/`: Secure device registration & token upsert.
+    - `POST /api/notifications/devices/unregister/`: Device deactivation on logout/toggle.
+    - `POST /api/notifications/test-push/`: Authenticated immediate test push verification.
+  - Client-side integration: Push opt-in banner in notification bell dropdown, foreground toast banner alerts, and background OS notifications with click-through deep-linking.
+  - Multi-tenant tenant isolation: Automatic push suppression for members of suspended/inactive companies.
+  - Automatic stale token pruning on FCM registration errors (`UnregisteredError`, `SenderIdMismatchError`).
+  - Added comprehensive test suite `FirebaseWebPushNotificationTests` (6 tests). Total notification tests: 63; total platform tests: 222 (100% pass rate).
+
 ---
 
 ## 2.3 Verification Matrix of Implemented Milestones
@@ -133,4 +152,5 @@ timeline
 | 21-Event Email Notification Hub | Latest | 43 automated unit/integration tests | Verified |
 | In-App Notification Center & APIs | Latest | 50 automated tests (`apps.notifications.tests`) | Verified |
 | Comprehensive Multi-Tier Notification Audit | Latest | 57 notification tests, 216 total tests | Verified |
+| Firebase Web Push Notifications (FCM) | Latest | 63 notification tests, 222 total platform tests | Verified |
 

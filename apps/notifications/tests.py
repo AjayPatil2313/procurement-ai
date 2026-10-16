@@ -1926,4 +1926,489 @@ class ComprehensiveNotificationSystemAuditTests(TestCase):
         self.assertEqual(EmailDeliveryAttempt.objects.filter(log=outbox_log).count(), 2)
 
 
+class FirebaseWebPushNotificationTests(TestCase):
+    """
+    Comprehensive test suite for Firebase Cloud Messaging (FCM) Web Push:
+    1. Device token registration & unregistration REST APIs.
+    2. Public push-config endpoint safety (no private keys leaked).
+    3. Multicast push dispatch and stale/unregistered token pruning.
+    4. Multi-tenant company isolation: suspended company users receive no push alerts.
+    5. User preference enforcement: push_enabled respected per category; mandatory security protected.
+    6. Unified channel routing: ALL channel sends In-App, Email, and Push simultaneously.
+    7. Root Service Worker endpoint serving valid JS and Service-Worker-Allowed header.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="pushuser@enterprise.com",
+            password="Password123!",
+            first_name="Push",
+            last_name="Tester",
+        )
+        self.company = Company.objects.create(
+            name="Push Co",
+            company_type=Company.CompanyType.BUYER,
+            email="contact@pushco.com",
+            created_by=self.user,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.company,
+            user=self.user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def test_device_token_registration_and_unregistration_api(self):
+        """Verify device registration and unregistration REST APIs."""
+        from apps.notifications.models import DeviceToken
+
+        reg_url = reverse("api-notifications-device-register")
+        res = self.client.post(
+            reg_url,
+            data=json.dumps({
+                "token": "fcm_token_alpha_123",
+                "device_type": "CHROME",
+                "device_name": "Chrome on Windows",
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json().get("success"))
+
+        # Verify database record
+        token_obj = DeviceToken.objects.filter(token="fcm_token_alpha_123").first()
+        self.assertIsNotNone(token_obj)
+        self.assertEqual(token_obj.user, self.user)
+        self.assertEqual(token_obj.company, self.company)
+        self.assertTrue(token_obj.is_active)
+
+        # Unregister
+        unreg_url = reverse("api-notifications-device-unregister")
+        res_unreg = self.client.post(
+            unreg_url,
+            data=json.dumps({"token": "fcm_token_alpha_123"}),
+            content_type="application/json",
+        )
+        self.assertEqual(res_unreg.status_code, 200)
+        self.assertTrue(res_unreg.json().get("success"))
+
+        token_obj.refresh_from_db()
+        self.assertFalse(token_obj.is_active)
+
+    def test_push_config_api_endpoint(self):
+        """Verify push-config returns public settings without leaking private credentials."""
+        url = reverse("api-notifications-push-config")
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("enabled", data)
+        self.assertIn("apiKey", data)
+        self.assertIn("projectId", data)
+        self.assertIn("vapidPublicKey", data)
+        # Ensure private key is never exposed
+        self.assertNotIn("private_key", data)
+        self.assertNotIn("client_email", data)
+
+    def test_fcm_multicast_dispatch_and_stale_token_cleanup(self):
+        """Verify send_user_push sends messages and prunes unregistered tokens."""
+        from apps.notifications.models import DeviceToken
+        from apps.notifications.services.fcm_service import send_user_push
+
+        t1 = DeviceToken.objects.create(
+            user=self.user,
+            company=self.company,
+            token="valid_token_xyz",
+            is_active=True,
+        )
+        t2 = DeviceToken.objects.create(
+            user=self.user,
+            company=self.company,
+            token="stale_token_stale",
+            is_active=True,
+        )
+
+        with patch("apps.notifications.services.fcm_service.get_firebase_app") as mock_app:
+            mock_app.return_value = MagicMock()
+            with patch("firebase_admin.messaging.send_each_for_multicast") as mock_send:
+                from firebase_admin import messaging
+
+                # Mock response: 1 success, 1 UnregisteredError
+                resp_success = MagicMock()
+                resp_success.success = True
+                resp_fail = MagicMock()
+                resp_fail.success = False
+                resp_fail.exception = messaging.UnregisteredError("Requested entity was not found.")
+
+                batch_resp = MagicMock()
+                batch_resp.success_count = 1
+                batch_resp.failure_count = 1
+                batch_resp.responses = [resp_success, resp_fail]
+                mock_send.return_value = batch_resp
+
+                from apps.notifications.services.fcm_service import send_fcm_multicast
+                res = send_fcm_multicast(
+                    tokens=["valid_token_xyz", "stale_token_stale"],
+                    title="Procurement Match Found",
+                    body="AI matched 5 new suppliers for your requirement",
+                    link="/sourcing/results/10/",
+                )
+                self.assertTrue(res.get("success"))
+                self.assertEqual(res.get("sent_count"), 1)
+                self.assertEqual(res.get("failed_count"), 1)
+
+        # Verify stale token t2 was pruned (is_active=False)
+        t2.refresh_from_db()
+        self.assertFalse(t2.is_active)
+        # Verify valid token t1 remains active
+        t1.refresh_from_db()
+        self.assertTrue(t1.is_active)
+
+    def test_push_tenant_isolation_on_company_suspension(self):
+        """Verify push alerts are blocked if company is suspended by platform governance."""
+        from apps.notifications.models import DeviceToken
+        from apps.notifications.services.fcm_service import send_user_push
+
+        DeviceToken.objects.create(
+            user=self.user,
+            company=self.company,
+            token="active_token_1",
+            is_active=True,
+        )
+
+        # Suspend company
+        self.company.is_active = False
+        self.company.save(update_fields=["is_active"])
+
+        with patch("apps.notifications.services.fcm_service.send_fcm_multicast") as mock_multi:
+            res = send_user_push(
+                user_or_users=self.user,
+                title="Suspension Alert",
+                body="Testing governance push suppression",
+            )
+            # send_fcm_multicast should not even be called
+            mock_multi.assert_not_called()
+            self.assertEqual(res.get("sent_count", 0), 0)
+
+    def test_push_notification_preferences_respect(self):
+        """Verify user's push_enabled preference is respected for non-mandatory categories."""
+        from apps.notifications.models import DeviceToken, NotificationPreference
+        from apps.notifications.services.fcm_service import send_user_push
+
+        DeviceToken.objects.create(
+            user=self.user,
+            company=self.company,
+            token="token_pref_test",
+            is_active=True,
+        )
+
+        # Disable push for PROCUREMENT category
+        NotificationPreference.objects.create(
+            user=self.user,
+            company=self.company,
+            category=NotificationPreference.Category.PROCUREMENT,
+            push_enabled=False,
+        )
+
+        with patch("apps.notifications.services.fcm_service.send_fcm_multicast") as mock_multi:
+            res = send_user_push(
+                user_or_users=self.user,
+                title="RFQ Proposal Update",
+                body="New proposal submitted",
+                category=NotificationPreference.Category.PROCUREMENT,
+            )
+            mock_multi.assert_not_called()
+            self.assertEqual(res.get("sent_count", 0), 0)
+
+        # Security category must always be permitted regardless of preference
+        with patch("apps.notifications.services.fcm_service.send_fcm_multicast") as mock_multi:
+            mock_multi.return_value = {"success": True, "sent_count": 1}
+            res_sec = send_user_push(
+                user_or_users=self.user,
+                title="Security Alert",
+                body="Password change initiated",
+                category=NotificationPreference.Category.SECURITY,
+            )
+            mock_multi.assert_called_once()
+
+    def test_service_worker_endpoint_served_at_root(self):
+        """Verify /firebase-messaging-sw.js is served with Service-Worker-Allowed header."""
+        sw_url = reverse("firebase-service-worker")
+        res = self.client.get(sw_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "application/javascript")
+        self.assertEqual(res["Service-Worker-Allowed"], "/")
+        self.assertIn(b"firebase.initializeApp", res.content)
+        self.assertIn(b"onBackgroundMessage", res.content)
+
+
+class NotificationModuleEnhancementAuditTests(TestCase):
+    """
+    Automated verification of enhanced subsystem capabilities:
+    1. Strict email preference suppression for opted-out categories.
+    2. Stalled outbox log self-healing in process_email_outbox.
+    3. Super Admin template syntax validation pre-save error handling.
+    4. Multi-select inbox bulk operations (mark read, unread, archive) with tenant isolation.
+    """
+    def setUp(self):
+        self.user_1 = User.objects.create_user(
+            email="enh_user1@apex.com",
+            password="SecurePass@123",
+            first_name="Ananya",
+            last_name="Deshmukh",
+        )
+        self.user_2 = User.objects.create_user(
+            email="enh_user2@competitor.com",
+            password="SecurePass@123",
+            first_name="Vikram",
+            last_name="Singh",
+        )
+        self.company_1 = Company.objects.create(
+            name="Apex Dynamics Enh",
+            company_type=Company.CompanyType.SALES,
+            created_by=self.user_1,
+            is_active=True,
+        )
+        self.company_2 = Company.objects.create(
+            name="Competitor Corp",
+            company_type=Company.CompanyType.VENDOR,
+            created_by=self.user_2,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.company_1,
+            user=self.user_1,
+            role="ADMIN",
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.company_2,
+            user=self.user_2,
+            role="ADMIN",
+            is_active=True,
+        )
+
+        self.superuser = User.objects.create_superuser(
+            email="admin_enh@platform.com",
+            password="AdminPass@123",
+            first_name="Admin",
+            last_name="Super",
+        )
+
+    def test_email_preference_suppression_for_non_mandatory_category(self):
+        """Verify email outbox creation is suppressed if user disabled email preference for category."""
+        from apps.notifications.models import NotificationPreference, NotificationTemplate, NotificationRule, NotificationLog
+        from apps.notifications.services.email_engine import trigger_email_notification
+
+        # Create rule for SALES category
+        tpl, _ = NotificationTemplate.objects.get_or_create(
+            event_key="sales.test_lead_pref",
+            defaults={
+                "name": "Test Sales Lead Template",
+                "category": NotificationTemplate.Category.SALES,
+                "subject": "New Lead: {{ product_name }}",
+                "html_content": "<p>A new lead has been identified.</p>",
+                "is_active": True,
+            }
+        )
+        NotificationRule.objects.get_or_create(
+            event_key="sales.test_lead_pref",
+            defaults={
+                "name": "Test Sales Rule",
+                "template": tpl,
+                "recipient_type": NotificationRule.RecipientType.ACTING_USER,
+                "channel": NotificationRule.Channel.EMAIL,
+                "is_enabled": True,
+            }
+        )
+
+        # Disable email for SALES category
+        NotificationPreference.objects.create(
+            user=self.user_1,
+            company=self.company_1,
+            category=NotificationPreference.Category.SALES,
+            email_enabled=False,
+        )
+
+        with patch("apps.notifications.services.email_engine.deliver_notification_log") as mock_deliver:
+            logs = trigger_email_notification(
+                event_key="sales.test_lead_pref",
+                user=self.user_1,
+                company=self.company_1,
+                context={"product_name": "Solar Inverter"},
+                async_dispatch=False,
+            )
+            # Expect 0 logs created because email preference is disabled
+            self.assertEqual(len(logs), 0)
+            mock_deliver.assert_not_called()
+
+        # Mandatory SECURITY category must always be permitted
+        tpl_sec, _ = NotificationTemplate.objects.get_or_create(
+            event_key="auth.test_security_pref",
+            defaults={
+                "name": "Security Notice",
+                "category": NotificationTemplate.Category.AUTH,
+                "subject": "Security Alert",
+                "html_content": "<p>Your security settings have changed.</p>",
+                "is_active": True,
+            }
+        )
+        NotificationRule.objects.get_or_create(
+            event_key="auth.test_security_pref",
+            defaults={
+                "name": "Security Notice Rule",
+                "template": tpl_sec,
+                "recipient_type": NotificationRule.RecipientType.ACTING_USER,
+                "channel": NotificationRule.Channel.EMAIL,
+                "is_enabled": True,
+            }
+        )
+        # Attempt to set email_enabled=False for SECURITY
+        NotificationPreference.objects.create(
+            user=self.user_1,
+            company=self.company_1,
+            category=NotificationPreference.Category.SECURITY,
+            email_enabled=False,
+        )
+        with patch("apps.notifications.services.email_engine.deliver_notification_log") as mock_deliver:
+            mock_deliver.return_value = True
+            sec_logs = trigger_email_notification(
+                event_key="auth.test_security_pref",
+                user=self.user_1,
+                company=self.company_1,
+                async_dispatch=False,
+            )
+            self.assertEqual(len(sec_logs), 1)
+
+    def test_process_email_outbox_recovers_stalled_sending_logs(self):
+        """Verify process_email_outbox command reclaims logs stranded in SENDING state > 10m."""
+        from django.core.management import call_command
+        from apps.notifications.models import NotificationLog
+
+        tpl = NotificationTemplate.objects.filter(is_active=True).first()
+        log = NotificationLog.objects.create(
+            event_key="test.stalled_log",
+            template=tpl,
+            company=self.company_1,
+            user=self.user_1,
+            recipient_email="stalled@apex.com",
+            subject="Stalled Transmission Test",
+            html_body="<p>Test</p>",
+            text_body="Test",
+            status=NotificationLog.Status.SENDING,
+            attempts_count=0,
+            max_attempts=3,
+        )
+        # Manually set updated_at to 15 minutes ago
+        past_time = timezone.now() - timezone.timedelta(minutes=15)
+        NotificationLog.objects.filter(id=log.id).update(updated_at=past_time)
+
+        # Run outbox with dry_run=False, mocking SMTP delivery
+        with patch("apps.notifications.services.smtp_service.get_active_email_connection") as mock_conn:
+            mock_smtp = MagicMock()
+            mock_smtp.send_messages.return_value = 1
+            mock_conn.return_value = (mock_smtp, None)
+
+            call_command("process_email_outbox", batch_size=10, dry_run=False)
+
+        log.refresh_from_db()
+        # Should have been recovered and delivered (SENT)
+        self.assertEqual(log.status, NotificationLog.Status.SENT)
+
+    def test_admin_template_syntax_validation(self):
+        """Verify pre-save Django Template syntax validation prevents invalid template syntax."""
+        tpl = NotificationTemplate.objects.create(
+            name="Syntax Test Template",
+            event_key="test.syntax_check",
+            category=NotificationTemplate.Category.SYSTEM,
+            subject="Valid Subject {{ company_name }}",
+            html_content="<p>Hello {{ recipient_name }}</p>",
+            is_active=True,
+            version=1,
+        )
+
+        self.client.force_login(self.superuser)
+
+        # POST invalid template syntax (unclosed if tag)
+        invalid_html = "<p>{% if user_status %}Welcome{% endif"
+        edit_url = reverse("admin-panel-email-template-edit", kwargs={"pk": tpl.id})
+        res_fail = self.client.post(edit_url, {
+            "subject": "Syntax Error Test",
+            "html_content": invalid_html,
+            "text_content": "Text",
+        })
+        self.assertEqual(res_fail.status_code, 200)
+        tpl.refresh_from_db()
+        # Version and content must remain unchanged
+        self.assertEqual(tpl.version, 1)
+        self.assertNotEqual(tpl.html_content, invalid_html)
+
+        # POST valid template syntax
+        valid_html = "<p>{% if user_status %}Welcome{% endif %}</p>"
+        res_ok = self.client.post(edit_url, {
+            "subject": "Valid Subject",
+            "html_content": valid_html,
+            "text_content": "Valid Text",
+        })
+        self.assertEqual(res_ok.status_code, 302)
+        tpl.refresh_from_db()
+        self.assertEqual(tpl.version, 2)
+        self.assertEqual(tpl.html_content, valid_html)
+
+    def test_notifications_bulk_action_view(self):
+        """Verify bulk action endpoint updates user notifications with strict tenant/user boundary isolation."""
+        from apps.dashboard.models import Notification
+
+        # Create 3 notifications for user_1
+        n1 = Notification.objects.create(
+            user=self.user_1, company=self.company_1, title="Alert 1", message="Msg 1", is_read=False
+        )
+        n2 = Notification.objects.create(
+            user=self.user_1, company=self.company_1, title="Alert 2", message="Msg 2", is_read=False
+        )
+        n3 = Notification.objects.create(
+            user=self.user_1, company=self.company_1, title="Alert 3", message="Msg 3", is_read=False
+        )
+        # Create 1 notification for user_2
+        n_other = Notification.objects.create(
+            user=self.user_2, company=self.company_2, title="Other Alert", message="Other Msg", is_read=False
+        )
+
+        self.client.force_login(self.user_1)
+        bulk_url = reverse("notifications-bulk-action")
+
+        # 1. Bulk Mark Read (including attempt on n_other.id)
+        res_read = self.client.post(bulk_url, {
+            "action": "mark_read",
+            "selected_ids": [n1.id, n2.id, n_other.id],
+        })
+        self.assertEqual(res_read.status_code, 302)
+
+        n1.refresh_from_db()
+        n2.refresh_from_db()
+        n3.refresh_from_db()
+        n_other.refresh_from_db()
+
+        self.assertTrue(n1.is_read)
+        self.assertTrue(n2.is_read)
+        self.assertFalse(n3.is_read)
+        # Isolation: user_2's notification must NOT be modified by user_1!
+        self.assertFalse(n_other.is_read)
+
+        # 2. Bulk Archive
+        res_arch = self.client.post(bulk_url, {
+            "action": "archive",
+            "selected_ids": [n1.id, n3.id],
+        })
+        self.assertEqual(res_arch.status_code, 302)
+
+        n1.refresh_from_db()
+        n3.refresh_from_db()
+        self.assertTrue(n1.is_archived)
+        self.assertTrue(n3.is_archived)
+
+
+
 

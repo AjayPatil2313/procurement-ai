@@ -30,9 +30,11 @@ def user_notification_preferences_view(request):
             if cat_code in (NotificationPreference.Category.SECURITY, NotificationPreference.Category.BILLING):
                 email_enabled = True
                 in_app_enabled = True
+                push_enabled = True
             else:
                 email_enabled = request.POST.get(f"email_{cat_code}") == "on"
                 in_app_enabled = request.POST.get(f"in_app_{cat_code}") == "on"
+                push_enabled = request.POST.get(f"push_{cat_code}") == "on"
 
             NotificationPreference.objects.update_or_create(
                 user=request.user,
@@ -41,6 +43,7 @@ def user_notification_preferences_view(request):
                 defaults={
                     "email_enabled": email_enabled,
                     "in_app_enabled": in_app_enabled,
+                    "push_enabled": push_enabled,
                 },
             )
 
@@ -57,6 +60,7 @@ def user_notification_preferences_view(request):
             "label": cat_label,
             "email_enabled": True if is_mandatory else (p.email_enabled if p else True),
             "in_app_enabled": True if is_mandatory else (p.in_app_enabled if p else True),
+            "push_enabled": True if is_mandatory else (getattr(p, "push_enabled", True) if p else True),
             "is_mandatory": is_mandatory,
         })
 

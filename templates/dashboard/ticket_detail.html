@@ -1,0 +1,634 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket #{{ ticket.ticket_number }} — Help &amp; Support — TradeConnect{% endblock %}
+
+{% block content %}
+<div class="space-y-6 pb-16 max-w-7xl mx-auto">
+
+  <!-- Breadcrumbs & Navigation Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1.5">
+        {% if is_super_admin %}
+        <a href="{% url 'admin-panel-dashboard' %}" class="hover:text-blue-600 transition flex items-center gap-1">
+          <i class="fa-solid fa-shield-halved text-[10px]"></i>
+          <span>Admin Panel</span>
+        </a>
+        <span>&bull;</span>
+        <a href="{% url 'admin-panel-support' %}" class="hover:text-blue-600 transition">Help &amp; Support</a>
+        {% else %}
+        <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition flex items-center gap-1">
+          <i class="fa-solid fa-house text-[10px]"></i>
+          <span>Dashboard</span>
+        </a>
+        <span>&bull;</span>
+        <a href="{% url 'help-support' %}" class="hover:text-blue-600 transition">Help &amp; Support</a>
+        {% endif %}
+        <span>&bull;</span>
+        <span class="text-slate-700 font-semibold">Ticket #{{ ticket.ticket_number }}</span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-base shrink-0 shadow-xs">
+            <i class="fa-solid fa-ticket"></i>
+          </span>
+          <span>Ticket #{{ ticket.ticket_number }}</span>
+        </h1>
+
+        <!-- Status Badge -->
+        {% if ticket.status == 'open' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">
+          <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span>Open (Pending Review)</span>
+        </span>
+        {% elif ticket.status == 'in_progress' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-blue-100 text-blue-800 border border-blue-300 shadow-xs">
+          <i class="fa-solid fa-arrows-rotate text-[11px] animate-spin"></i>
+          <span>In Progress</span>
+        </span>
+        {% elif ticket.status == 'resolved' %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+          <i class="fa-solid fa-circle-check text-[11px] text-emerald-600"></i>
+          <span>Resolved</span>
+        </span>
+        {% else %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700 border border-slate-300 shadow-xs">
+          <i class="fa-solid fa-lock text-[10px]"></i>
+          <span>Closed</span>
+        </span>
+        {% endif %}
+
+        <!-- Priority Badge -->
+        {% if ticket.priority == 'urgent' %}
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-200">
+          <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Urgent Priority
+        </span>
+        {% elif ticket.priority == 'high' %}
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+          <i class="fa-solid fa-angles-up text-[10px]"></i> High Priority
+        </span>
+        {% elif ticket.priority == 'medium' %}
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+          <i class="fa-solid fa-minus text-[10px]"></i> Medium Priority
+        </span>
+        {% else %}
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+          <i class="fa-solid fa-arrow-down text-[10px]"></i> Low Priority
+        </span>
+        {% endif %}
+
+        <!-- Category Badge -->
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <i class="fa-solid fa-layer-group text-[10px]"></i> {{ ticket.get_category_display }}
+        </span>
+      </div>
+
+      <p class="text-xs text-slate-500 mt-1.5">
+        Submitted on <span class="font-semibold text-slate-700">{{ ticket.created_at|date:"M d, Y" }} at {{ ticket.created_at|date:"h:i A" }}</span>
+        {% if ticket.updated_at != ticket.created_at %}
+        &bull; Last activity <span class="font-semibold text-slate-700">{{ ticket.updated_at|date:"M d, Y" }} at {{ ticket.updated_at|date:"h:i A" }}</span>
+        {% endif %}
+      </p>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-wrap items-center gap-2.5">
+      <a 
+        href="{% if is_super_admin %}{% url 'admin-panel-support' %}{% else %}{% url 'help-support' %}{% endif %}" 
+        class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-4 py-2.5 rounded-xl border border-slate-300 transition shadow-xs cursor-pointer"
+      >
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Back to Help Desk</span>
+      </a>
+
+      <!-- Edit Ticket Details (Company User or Super Admin) -->
+      <button 
+        type="button" 
+        onclick="openEditTicketModal()" 
+        class="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-bold text-xs px-4 py-2.5 rounded-xl border border-blue-200 transition shadow-xs cursor-pointer"
+      >
+        <i class="fa-solid fa-pen-to-square"></i>
+        <span>Edit Ticket</span>
+      </button>
+
+      {% if is_super_admin or rbac.is_company_admin %}
+      <!-- Super Admin or Company Admin Update Status/Resolution Modal Trigger -->
+      <button 
+        type="button" 
+        onclick="openUpdateTicketModal()" 
+        class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md shadow-purple-600/20 cursor-pointer"
+      >
+        <i class="fa-solid fa-sliders"></i>
+        <span>Update Status / Resolution</span>
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Main Grid Layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left Main Column (8 cols): Subject, Description, Resolution & Timeline -->
+    <div class="lg:col-span-8 space-y-6">
+
+      <!-- 1. Resolution Banner (Prominent when resolved or with resolution notes) -->
+      {% if ticket.resolution %}
+      <div class="rounded-2xl p-6 border shadow-sm {% if ticket.status == 'resolved' or ticket.status == 'closed' %}bg-gradient-to-br from-emerald-50/90 to-emerald-100/40 border-emerald-300/80 text-emerald-950{% else %}bg-gradient-to-br from-blue-50/90 to-blue-100/40 border-blue-300/80 text-blue-950{% endif %}">
+        <div class="flex items-start gap-3.5">
+          <div class="w-10 h-10 rounded-xl {% if ticket.status == 'resolved' or ticket.status == 'closed' %}bg-emerald-600 text-white{% else %}bg-blue-600 text-white{% endif %} flex items-center justify-center text-lg shrink-0 shadow-md">
+            {% if ticket.status == 'resolved' or ticket.status == 'closed' %}
+            <i class="fa-solid fa-check-double"></i>
+            {% else %}
+            <i class="fa-solid fa-headset"></i>
+            {% endif %}
+          </div>
+          <div class="flex-1 space-y-2">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <h2 class="text-base font-black tracking-tight">
+                {% if ticket.status == 'resolved' or ticket.status == 'closed' %}
+                Official Resolution &amp; Solution
+                {% else %}
+                Technical Operations Team Response
+                {% endif %}
+              </h2>
+              <span class="text-[11px] font-semibold opacity-75">
+                Updated {{ ticket.updated_at|date:"M d, Y at h:i A" }}
+              </span>
+            </div>
+            <div class="text-sm font-medium leading-relaxed whitespace-pre-line bg-white/70 p-4 rounded-xl border {% if ticket.status == 'resolved' or ticket.status == 'closed' %}border-emerald-200/80 text-emerald-900{% else %}border-blue-200/80 text-blue-900{% endif %}">
+              {{ ticket.resolution }}
+            </div>
+            {% if ticket.status == 'resolved' %}
+            <p class="text-xs text-emerald-800 font-semibold flex items-center gap-1.5 pt-1">
+              <i class="fa-solid fa-circle-check text-emerald-600"></i>
+              <span>This inquiry has been verified and marked as resolved by technical operations.</span>
+            </p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% elif ticket.status == 'in_progress' %}
+      <div class="rounded-2xl p-5 border bg-blue-50/80 border-blue-200 text-blue-950 shadow-xs flex items-center gap-3.5">
+        <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-arrows-rotate animate-spin"></i>
+        </div>
+        <div class="text-xs">
+          <span class="font-black text-blue-900 block text-sm">Inquiry Under Active Investigation</span>
+          <span class="text-blue-700">Our engineering and operations support team has picked up this ticket. You will receive an automated notification as soon as the resolution notes are posted.</span>
+        </div>
+      </div>
+      {% elif ticket.status == 'open' %}
+      <div class="rounded-2xl p-5 border bg-amber-50/80 border-amber-200 text-amber-950 shadow-xs flex items-center gap-3.5">
+        <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-sm shrink-0">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+        <div class="text-xs">
+          <span class="font-black text-amber-900 block text-sm">Awaiting Review</span>
+          <span class="text-amber-800">Your ticket has been logged into the support queue. Standard response time is within 2 to 4 business hours.</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- 2. Ticket Description & Query Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <div class="border-b border-slate-100 pb-4">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Subject</span>
+            <span class="text-xs font-semibold text-slate-500">
+              Submitted by <span class="text-slate-800 font-bold">{{ ticket.user.get_full_name|default:ticket.user.email }}</span>
+            </span>
+          </div>
+          <h2 class="text-xl font-bold text-slate-900 mt-1.5 leading-snug">
+            {{ ticket.subject }}
+          </h2>
+        </div>
+
+        <div>
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Description &amp; Reported Issue</span>
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-800 text-sm leading-relaxed whitespace-pre-line font-medium min-h-[120px]">
+            {{ ticket.description }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Lifecycle Activity & Status Timeline -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h3 class="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <i class="fa-solid fa-timeline text-blue-600"></i>
+            <span>Ticket Lifecycle &amp; Audit Trail</span>
+          </h3>
+          <span class="text-xs text-slate-400 font-medium">Activity History</span>
+        </div>
+
+        <div class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+          
+          <!-- Event 1: Created -->
+          <div class="relative">
+            <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-white text-[9px] shadow-xs">
+              <i class="fa-solid fa-plus"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-900">Support Ticket Created</span>
+                <span class="text-[11px] text-slate-400">&bull; {{ ticket.created_at|date:"M d, Y at h:i A" }}</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Ticket #{{ ticket.ticket_number }} registered by {{ ticket.user.get_full_name|default:ticket.user.email }} under {{ ticket.get_category_display }}.
+              </p>
+            </div>
+          </div>
+
+          <!-- Event 2: Under Review / In Progress -->
+          {% if ticket.status == 'in_progress' or ticket.status == 'resolved' or ticket.status == 'closed' %}
+          <div class="relative">
+            <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-indigo-600 border-2 border-white flex items-center justify-center text-white text-[9px] shadow-xs">
+              <i class="fa-solid fa-magnifying-glass"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-900">Assigned to Technical Operations</span>
+                <span class="text-[11px] text-slate-400">&bull; In Progress</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Investigating reported behavior and evaluating system diagnostics.
+              </p>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Event 3: Resolved / Closed -->
+          {% if ticket.status == 'resolved' or ticket.status == 'closed' %}
+          <div class="relative">
+            <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-600 border-2 border-white flex items-center justify-center text-white text-[9px] shadow-xs">
+              <i class="fa-solid fa-check"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-emerald-900">
+                  {% if ticket.status == 'closed' %}Ticket Closed{% else %}Ticket Marked Resolved{% endif %}
+                </span>
+                <span class="text-[11px] text-slate-400">&bull; {{ ticket.updated_at|date:"M d, Y at h:i A" }}</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">
+                {% if ticket.resolution %}
+                Resolution applied: {{ ticket.resolution|truncatechars:90 }}
+                {% else %}
+                Inquiry concluded successfully.
+                {% endif %}
+              </p>
+            </div>
+          </div>
+          {% else %}
+          <div class="relative opacity-60">
+            <div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-slate-600 text-[9px] shadow-xs">
+              <i class="fa-solid fa-hourglass-half"></i>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-slate-600">Pending Technical Resolution</span>
+              <p class="text-xs text-slate-400 mt-0.5">
+                Resolution notes will appear upon engineering verification.
+              </p>
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Sidebar Column (4 cols): Meta, Contact Info & Support Channels -->
+    <div class="lg:col-span-4 space-y-6">
+
+      <!-- 1. Ticket Overview Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-blue-600"></i>
+          <span>Ticket Overview</span>
+        </h3>
+
+        <div class="divide-y divide-slate-100 text-xs">
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="text-slate-500 font-medium">Ticket ID</span>
+            <span class="font-mono font-bold text-slate-900">#{{ ticket.ticket_number }}</span>
+          </div>
+
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="text-slate-500 font-medium">Category</span>
+            <span class="font-bold text-slate-800 text-right">{{ ticket.get_category_display }}</span>
+          </div>
+
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="text-slate-500 font-medium">Priority</span>
+            <span class="font-bold text-slate-800">{{ ticket.get_priority_display }}</span>
+          </div>
+
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="text-slate-500 font-medium">Status</span>
+            <span class="font-bold text-slate-800">{{ ticket.get_status_display }}</span>
+          </div>
+
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="text-slate-500 font-medium">Created Date</span>
+            <span class="text-slate-700 font-semibold">{{ ticket.created_at|date:"M d, Y" }}</span>
+          </div>
+
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="text-slate-500 font-medium">Last Modified</span>
+            <span class="text-slate-700 font-semibold">{{ ticket.updated_at|date:"M d, Y" }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Requester & Company Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-building text-blue-600"></i>
+          <span>Submitter &amp; Company</span>
+        </h3>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <span class="text-slate-400 text-[11px] block">Company Name</span>
+            <div class="font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
+              <span class="truncate">{{ ticket.company.name|default:"Individual User" }}</span>
+              {% if ticket.company %}
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                {{ ticket.company.get_company_type_display|default:ticket.company.company_type }}
+              </span>
+              {% endif %}
+            </div>
+            {% if ticket.company.city or ticket.company.country %}
+            <div class="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+              <i class="fa-solid fa-location-dot text-slate-400 text-[10px]"></i>
+              <span>{{ ticket.company.city }}{% if ticket.company.city and ticket.company.country %}, {% endif %}{{ ticket.company.country|default:"India" }}</span>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="border-t border-slate-100 pt-3">
+            <span class="text-slate-400 text-[11px] block">Contact Person</span>
+            <span class="font-bold text-slate-900 block mt-0.5">
+              {{ ticket.user.get_full_name|default:ticket.user.email }}
+            </span>
+          </div>
+
+          <div class="border-t border-slate-100 pt-3">
+            <span class="text-slate-400 text-[11px] block">Contact Email</span>
+            <a 
+              href="mailto:{{ ticket.contact_email }}" 
+              class="font-semibold text-blue-600 hover:underline flex items-center gap-1.5 mt-0.5 break-all"
+            >
+              <i class="fa-regular fa-envelope text-[11px]"></i>
+              <span>{{ ticket.contact_email }}</span>
+            </a>
+          </div>
+
+          {% if ticket.contact_phone %}
+          <div class="border-t border-slate-100 pt-3">
+            <span class="text-slate-400 text-[11px] block">Contact Phone</span>
+            <a 
+              href="tel:{{ ticket.contact_phone }}" 
+              class="font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1.5 mt-0.5"
+            >
+              <i class="fa-solid fa-phone text-[11px] text-slate-400"></i>
+              <span>{{ ticket.contact_phone }}</span>
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- 3. Urgent Assistance / Help Channels -->
+      <div class="bg-slate-900 text-white rounded-2xl p-5 shadow-lg space-y-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-phone-volume"></i>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold">Need Urgent Help?</h4>
+            <p class="text-[11px] text-slate-400">Direct escalation channels</p>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-300 leading-relaxed">
+          For production-critical issues or immediate assistance, reach our operations support directly:
+        </p>
+
+        <div class="space-y-2 pt-1 text-xs font-bold">
+          <a 
+            href="mailto:support@tradeconnect.com?subject=Escalation%20Ticket%20%23{{ ticket.ticket_number }}" 
+            class="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center gap-2 transition"
+          >
+            <i class="fa-regular fa-envelope text-blue-400"></i>
+            <span>Email Operations Desk</span>
+          </a>
+
+          <a 
+            href="https://wa.me/919999999999?text=Hello%20TradeConnect%20Support,%20regarding%20ticket%20%23{{ ticket.ticket_number }}" 
+            target="_blank" 
+            class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/20"
+          >
+            <i class="fa-brands fa-whatsapp text-sm"></i>
+            <span>Chat on WhatsApp</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: EDIT TICKET DETAILS                                                -->
+<!-- ========================================================================= -->
+<div id="editTicketModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">
+          <i class="fa-solid fa-pen-to-square"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-black text-slate-900">Edit Support Ticket</h3>
+          <p class="text-[11px] text-slate-500">Update ticket details for #{{ ticket.ticket_number }}</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeEditTicketModal()" class="w-7 h-7 rounded-lg bg-slate-200/60 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs transition cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'help-ticket-edit' pk=ticket.id %}" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+      
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Subject / Title *</label>
+        <input 
+          type="text" 
+          name="subject" 
+          value="{{ ticket.subject }}" 
+          required 
+          class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        >
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Category</label>
+          <select name="category" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            {% for cat_val, cat_label in categories %}
+            <option value="{{ cat_val }}" {% if ticket.category == cat_val %}selected{% endif %}>{{ cat_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Priority</label>
+          <select name="priority" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            {% for prio_val, prio_label in priorities %}
+            <option value="{{ prio_val }}" {% if ticket.priority == prio_val %}selected{% endif %}>{{ prio_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Contact Email *</label>
+          <input 
+            type="email" 
+            name="contact_email" 
+            value="{{ ticket.contact_email }}" 
+            required 
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Contact Phone</label>
+          <input 
+            type="text" 
+            name="contact_phone" 
+            value="{{ ticket.contact_phone }}" 
+            placeholder="+91 98765 43210" 
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Description &amp; Reported Issue *</label>
+        <textarea 
+          name="description" 
+          rows="4" 
+          required 
+          class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none leading-relaxed"
+        >{{ ticket.description }}</textarea>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button 
+          type="button" 
+          onclick="closeEditTicketModal()" 
+          class="px-4 py-2 rounded-xl border border-slate-300 font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button 
+          type="submit" 
+          class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-md shadow-blue-600/20 cursor-pointer"
+        >
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if is_super_admin or rbac.is_company_admin %}
+<!-- ========================================================================= -->
+<!-- MODAL: UPDATE TICKET STATUS & RESOLUTION                                 -->
+<!-- ========================================================================= -->
+<div id="updateTicketModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold">
+          <i class="fa-solid fa-sliders"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-black text-slate-900">Update Status &amp; Resolution</h3>
+          <p class="text-[11px] text-slate-500">Provide official response for Ticket #{{ ticket.ticket_number }}</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeUpdateTicketModal()" class="w-7 h-7 rounded-lg bg-slate-200/60 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs transition cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{% url 'help-ticket-update' pk=ticket.id %}" class="p-5 space-y-4 text-xs">
+      {% csrf_token %}
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Ticket Status *</label>
+        <select name="status" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+          {% for stat_val, stat_label in statuses %}
+          <option value="{{ stat_val }}" {% if ticket.status == stat_val %}selected{% endif %}>{{ stat_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Official Resolution &amp; Remarks</label>
+        <textarea 
+          name="resolution" 
+          rows="4" 
+          placeholder="Enter official resolution, diagnostic steps taken, or response for the user..." 
+          class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-purple-500 focus:outline-none leading-relaxed"
+        >{{ ticket.resolution }}</textarea>
+        <span class="text-[11px] text-slate-400 mt-1 block">Saving will automatically trigger notifications to the ticket owner.</span>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button 
+          type="button" 
+          onclick="closeUpdateTicketModal()" 
+          class="px-4 py-2 rounded-xl border border-slate-300 font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button 
+          type="submit" 
+          class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition shadow-md shadow-purple-600/20 cursor-pointer"
+        >
+          Update Ticket
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  function openEditTicketModal() {
+    document.getElementById('editTicketModal').classList.remove('hidden');
+  }
+  function closeEditTicketModal() {
+    document.getElementById('editTicketModal').classList.add('hidden');
+  }
+
+  function openUpdateTicketModal() {
+    const modal = document.getElementById('updateTicketModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+  function closeUpdateTicketModal() {
+    const modal = document.getElementById('updateTicketModal');
+    if (modal) modal.classList.add('hidden');
+  }
+</script>
+{% endblock %}

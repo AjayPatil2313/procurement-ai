@@ -878,7 +878,8 @@ def create_support_ticket_view(request):
 @login_required
 def support_ticket_detail_view(request, pk):
     """
-    Returns JSON details of a support ticket for modal inspection.
+    Renders the dedicated support ticket detail UI page for browser navigation,
+    or returns JSON details if requested via AJAX / API modal inspection.
     """
     selected_company_id = request.session.get("active_company_id")
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
@@ -886,27 +887,48 @@ def support_ticket_detail_view(request, pk):
 
     if rbac["is_super_admin"]:
         ticket = get_object_or_404(SupportTicket, pk=pk, is_deleted=False)
-    else:
+    elif company:
         ticket = get_object_or_404(SupportTicket, pk=pk, company=company, is_deleted=False)
+    else:
+        ticket = get_object_or_404(SupportTicket, pk=pk, user=request.user, is_deleted=False)
 
-    return JsonResponse({
-        "success": True,
-        "id": ticket.id,
-        "ticket_number": ticket.ticket_number,
-        "subject": ticket.subject,
-        "description": ticket.description,
-        "category": ticket.category,
-        "category_display": ticket.get_category_display(),
-        "priority": ticket.priority,
-        "priority_display": ticket.get_priority_display(),
-        "status": ticket.status,
-        "status_display": ticket.get_status_display(),
-        "contact_email": ticket.contact_email,
-        "contact_phone": ticket.contact_phone,
-        "resolution": ticket.resolution or "In evaluation by technical operations team.",
-        "created_at": ticket.created_at.strftime("%b %d, %Y at %I:%M %p"),
-        "updated_at": ticket.updated_at.strftime("%b %d, %Y at %I:%M %p"),
-    })
+    wants_json = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or request.GET.get("format") == "json"
+        or request.headers.get("accept") == "application/json"
+    )
+
+    if wants_json:
+        return JsonResponse({
+            "success": True,
+            "id": ticket.id,
+            "ticket_number": ticket.ticket_number,
+            "subject": ticket.subject,
+            "description": ticket.description,
+            "category": ticket.category,
+            "category_display": ticket.get_category_display(),
+            "priority": ticket.priority,
+            "priority_display": ticket.get_priority_display(),
+            "status": ticket.status,
+            "status_display": ticket.get_status_display(),
+            "contact_email": ticket.contact_email,
+            "contact_phone": ticket.contact_phone,
+            "resolution": ticket.resolution or "In evaluation by technical operations team.",
+            "created_at": ticket.created_at.strftime("%b %d, %Y at %I:%M %p"),
+            "updated_at": ticket.updated_at.strftime("%b %d, %Y at %I:%M %p"),
+        })
+
+    context = {
+        "ticket": ticket,
+        "company": company or ticket.company,
+        "rbac": rbac,
+        "is_super_admin": rbac["is_super_admin"],
+        "categories": SupportTicket.Category.choices,
+        "priorities": SupportTicket.Priority.choices,
+        "statuses": SupportTicket.Status.choices,
+        "page_title": f"Support Ticket #{ticket.ticket_number}",
+    }
+    return render(request, "dashboard/ticket_detail.html", context)
 
 
 @login_required

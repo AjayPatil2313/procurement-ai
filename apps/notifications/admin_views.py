@@ -100,6 +100,18 @@ def admin_email_overview_view(request):
     ).count()
     has_attachments_count = NotificationLog.objects.filter(has_attachments=True).count()
 
+    # Category delivery breakdown
+    category_logs = (
+        NotificationLog.objects.filter(template__isnull=False)
+        .values("template__category")
+        .annotate(
+            total=Count("id"),
+            sent=Count("id", filter=Q(status=NotificationLog.Status.SENT)),
+            failed=Count("id", filter=Q(status=NotificationLog.Status.FAILED)),
+        )
+        .order_by("-total")
+    )
+
     context = {
         "page_title": "Email Operations Overview",
         "active_tab": "overview",
@@ -117,6 +129,7 @@ def admin_email_overview_view(request):
         "active_rules_count": active_rules_count,
         "recent_logs": recent_logs,
         "template_categories": template_categories,
+        "category_logs": category_logs,
     }
     return render(request, "admin_panel/email/overview.html", context)
 
@@ -182,20 +195,46 @@ def admin_email_template_edit_view(request, pk):
         elif not html_content:
             messages.error(request, "HTML content is required.")
         else:
-            template_obj.subject = subject
-            template_obj.html_content = html_content
-            template_obj.text_content = text_content
-            template_obj.use_custom_layout = use_custom_layout
-            template_obj.header_html = header_html
-            template_obj.footer_html = footer_html
-            # Guard system templates from being deactivated casually
-            if not template_obj.is_system or is_active:
-                template_obj.is_active = is_active
-            template_obj.version += 1
-            template_obj.save()
+            # Pre-save Django Template Syntax Validation
+            from django.template import Template, TemplateSyntaxError
+            syntax_error = None
+            try:
+                Template(html_content)
+            except TemplateSyntaxError as err:
+                syntax_error = f"HTML Content Syntax Error: {err}"
+            except Exception as err:
+                syntax_error = f"HTML Content Error: {err}"
 
-            messages.success(request, f"Template '{template_obj.name}' updated successfully (v{template_obj.version}).")
-            return redirect("admin-panel-email-templates")
+            if not syntax_error and subject:
+                try:
+                    Template(subject)
+                except TemplateSyntaxError as err:
+                    syntax_error = f"Subject Syntax Error: {err}"
+                except Exception as err:
+                    syntax_error = f"Subject Error: {err}"
+
+            if syntax_error:
+                messages.error(request, syntax_error)
+                template_obj.subject = subject
+                template_obj.html_content = html_content
+                template_obj.text_content = text_content
+                template_obj.header_html = header_html
+                template_obj.footer_html = footer_html
+            else:
+                template_obj.subject = subject
+                template_obj.html_content = html_content
+                template_obj.text_content = text_content
+                template_obj.use_custom_layout = use_custom_layout
+                template_obj.header_html = header_html
+                template_obj.footer_html = footer_html
+                # Guard system templates from being deactivated casually
+                if not template_obj.is_system or is_active:
+                    template_obj.is_active = is_active
+                template_obj.version += 1
+                template_obj.save()
+
+                messages.success(request, f"Template '{template_obj.name}' updated successfully (v{template_obj.version}).")
+                return redirect("admin-panel-email-templates")
 
     context = {
         "page_title": f"Edit Template: {template_obj.name}",

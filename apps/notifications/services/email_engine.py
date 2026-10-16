@@ -4,6 +4,7 @@ import threading
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template import Template, Context
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.html import escape
 
@@ -1038,7 +1039,13 @@ def trigger_email_notification(
             text_rendered = render_string_template(tpl.text_content, merged_context) if tpl.text_content else ""
 
             # --- IN-APP SYSTEM NOTIFICATION CHANNEL ---
-            if rule_channel in (NotificationRule.Channel.IN_APP, NotificationRule.Channel.BOTH) and user_obj:
+            in_app_channels = (
+                NotificationRule.Channel.IN_APP,
+                NotificationRule.Channel.BOTH,
+                NotificationRule.Channel.IN_APP_PUSH,
+                NotificationRule.Channel.ALL,
+            )
+            if rule_channel in in_app_channels and user_obj:
                 try:
                     from apps.dashboard.models import Notification
                     from apps.notifications.models import NotificationPreference
@@ -1071,20 +1078,53 @@ def trigger_email_notification(
                             "purple": "fa-wand-magic-sparkles",
                             "teal": "fa-file-invoice",
                         }
+                        event_icon_map = {
+                            "buyer.rfq_dispatched": "fa-paper-plane",
+                            "sales.rfq_dispatched": "fa-paper-plane",
+                            "seller.inquiry_reply": "fa-reply",
+                            "vendor.inquiry_reply": "fa-reply",
+                            "buyer.quote_recorded": "fa-file-invoice-dollar",
+                            "sales.quote_recorded": "fa-file-invoice-dollar",
+                            "billing.wallet_recharge_success": "fa-wallet",
+                            "billing.wallet_recharged": "fa-wallet",
+                            "billing.invoice_generated": "fa-file-invoice",
+                            "billing.credits_low": "fa-battery-quarter",
+                            "billing.low_wallet_balance": "fa-battery-quarter",
+                            "billing.low_balance": "fa-battery-quarter",
+                            "billing.subscription_expiring": "fa-calendar-clock",
+                            "billing.payment_failed": "fa-credit-card",
+                            "search.ai_completed": "fa-brain",
+                            "sales.matching_suppliers_found": "fa-handshake",
+                            "buyer.matching_suppliers_found": "fa-handshake",
+                            "vendor.new_buyer_lead": "fa-bullhorn",
+                            "seller.new_buyer_lead": "fa-bullhorn",
+                            "company.user_added": "fa-user-plus",
+                            "company.verification_decision": "fa-building-circle-check",
+                            "auth.password_reset": "fa-key",
+                            "auth.password_changed": "fa-shield-halved",
+                            "auth.welcome": "fa-door-open",
+                            "auth.email_verification": "fa-envelope-circle-check",
+                            "admin.critical_system_alert": "fa-triangle-exclamation",
+                            "admin.security_alert": "fa-shield-virus",
+                        }
                         in_app_color = theme_color_map.get(theme, "blue")
-                        in_app_icon = theme_icon_map.get(theme, "fa-bell")
+                        in_app_icon = event_icon_map.get(event_key) or theme_icon_map.get(theme, "fa-bell")
 
                         summary_msg = str(context.get("summary") or subject_rendered)
                         cta_nav_link = str(context.get("cta_url") or "")
 
-                        # Duplicate prevention (ensure same item/title is not duplicated within 15 min window)
-                        already_notified = Notification.objects.filter(
+                        # Enhanced duplicate prevention (ensure same item/action is not duplicated within 15 min window)
+                        dup_filter = Q(
                             user=user_obj,
-                            event_key=event_key,
                             title=subject_rendered[:250],
-                            link=cta_nav_link[:500],
-                            created_at__gte=timezone.now() - timezone.timedelta(minutes=15)
-                        ).exists()
+                            created_at__gte=timezone.now() - timezone.timedelta(minutes=15),
+                        )
+                        if event_key:
+                            dup_filter &= (Q(event_key=event_key) | Q(event_key=""))
+                        if cta_nav_link:
+                            dup_filter &= Q(link=cta_nav_link[:500])
+
+                        already_notified = Notification.objects.filter(dup_filter).exists()
 
                         if not already_notified:
                             Notification.objects.create(
@@ -1102,15 +1142,49 @@ def trigger_email_notification(
                 except Exception as notif_err:
                     logger.warning(f"Error creating in-app notification: {notif_err}")
 
-            # If channel is IN_APP only, skip email outbox log & dispatch!
-            if rule_channel == NotificationRule.Channel.IN_APP:
-                logger.info(f"Notification rule '{rule.name}' delivery is IN_APP only. Email dispatch skipped.")
+            # --- FIREBASE CLOUD MESSAGING (WEB PUSH) CHANNEL ---
+            push_channels = (
+                NotificationRule.Channel.PUSH,
+                NotificationRule.Channel.IN_APP_PUSH,
+                NotificationRule.Channel.ALL,
+            )
+            if rule_channel in push_channels and user_obj:
+                try:
+                    from apps.notifications.services.fcm_service import send_user_push
+                    cat_key = tpl.category if tpl else "SYSTEM"
+                    summary_msg = str(context.get("summary") or subject_rendered)
+                    cta_nav_link = str(context.get("cta_url") or "")
+                    send_user_push(
+                        user_or_users=user_obj,
+                        title=subject_rendered[:250],
+                        body=summary_msg[:500],
+                        link=cta_nav_link,
+                        category=cat_key,
+                    )
+                except Exception as push_err:
+                    logger.warning(f"Error dispatching FCM Web Push: {push_err}")
+
+            # If rule channel does not include email, skip email outbox log & dispatch!
+            non_email_channels = (
+                NotificationRule.Channel.IN_APP,
+                NotificationRule.Channel.PUSH,
+                NotificationRule.Channel.IN_APP_PUSH,
+            )
+            if rule_channel in non_email_channels:
+                logger.info(f"Notification rule '{rule.name}' delivery is {rule_channel}. Email dispatch skipped.")
                 continue
+
+            # Strict User Notification Preference Check for Email Channel
+            cat_key = tpl.category if tpl else "SYSTEM"
+            if user_obj:
+                from apps.notifications.models import NotificationPreference
+                if not NotificationPreference.is_email_permitted(user_obj, cat_key):
+                    logger.info(f"NotificationLog skipped for {email} due to user preference ({cat_key}).")
+                    continue
 
             # Resolve 1-click tokenized unsubscribe URL for recipient
             from apps.notifications.services.unsubscribe_service import generate_unsubscribe_token
             user_for_token = user_obj or user
-            cat_key = tpl.category if tpl else "SYSTEM"
             u_token = generate_unsubscribe_token(user_for_token.id, cat_key) if user_for_token and getattr(user_for_token, "id", None) else ""
             token_unsub_url = ensure_absolute_url(f"/notifications/unsubscribe/?token={u_token}") if u_token else ensure_absolute_url("/company/notification-preferences/")
 

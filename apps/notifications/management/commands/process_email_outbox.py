@@ -43,14 +43,47 @@ class Command(BaseCommand):
             action="store_true",
             help="Simulate outbox processing without opening SMTP connection or sending emails",
         )
+        parser.add_argument(
+            "--recover-stale",
+            action="store_true",
+            default=True,
+            help="Automatically recover logs stuck in SENDING status for > 10 minutes (default: True)",
+        )
 
     def handle(self, *args, **options):
         batch_size = options["batch_size"]
         max_retries = options["max_retries"]
         include_failed = options["include_failed"]
         dry_run = options["dry_run"]
+        recover_stale = options["recover_stale"]
 
         now = timezone.now()
+
+        # Self-healing: Recover logs stranded in SENDING state due to process restarts or timeouts
+        if recover_stale:
+            stale_threshold = now - timezone.timedelta(minutes=10)
+            stale_sending_logs = NotificationLog.objects.filter(
+                status=NotificationLog.Status.SENDING,
+                updated_at__lte=stale_threshold,
+            )
+            stale_count = stale_sending_logs.count()
+            if stale_count > 0:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Found {stale_count} stalled 'SENDING' logs older than 10 mins. Recovering to QUEUED..."
+                    )
+                )
+                if not dry_run:
+                    for s_log in stale_sending_logs:
+                        if s_log.attempts_count < max_retries:
+                            s_log.status = NotificationLog.Status.QUEUED
+                            s_log.last_error = f"Recovered from stalled SENDING state at {now.strftime('%Y-%m-%d %H:%M:%S')}"
+                            s_log.save(update_fields=["status", "last_error"])
+                        else:
+                            s_log.status = NotificationLog.Status.FAILED
+                            s_log.last_error = "Exhausted retries; worker stalled during transmission."
+                            s_log.save(update_fields=["status", "last_error"])
+
         status_filter = [NotificationLog.Status.QUEUED]
         if include_failed:
             status_filter.append(NotificationLog.Status.FAILED)

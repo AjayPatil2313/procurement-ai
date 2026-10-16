@@ -2694,12 +2694,35 @@ class HelpSupportTestCase(TestCase):
             priority="medium",
             contact_email="supportuser@apex.com",
         )
-        response = self.client.get(reverse("help-ticket-detail", args=[ticket.id]))
+        response = self.client.get(
+            reverse("help-ticket-detail", args=[ticket.id]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data["success"])
         self.assertEqual(data["ticket_number"], ticket.ticket_number)
         self.assertEqual(data["subject"], "Test Scraper Issue")
+
+    def test_support_ticket_detail_html_view(self):
+        ticket = SupportTicket.objects.create(
+            company=self.company,
+            user=self.user,
+            subject="UI Test Ticket",
+            description="Testing HTML detail template rendering for browser users.",
+            category="ai_search",
+            priority="high",
+            contact_email="supportuser@apex.com",
+            resolution="Investigated and successfully resolved by engineering.",
+            status="resolved",
+        )
+        response = self.client.get(reverse("help-ticket-detail", args=[ticket.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "dashboard/ticket_detail.html")
+        self.assertContains(response, ticket.ticket_number)
+        self.assertContains(response, "UI Test Ticket")
+        self.assertContains(response, "Testing HTML detail template rendering")
+        self.assertContains(response, "Investigated and successfully resolved")
 
 
 class RealTimeNotificationsTestCase(TestCase):

@@ -179,24 +179,96 @@
     </form>
   </div>
 
-  <!-- 4. Notifications Stream List -->
-  <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-800/80">
-    {% for notif in notifications %}
-    <div 
-      id="inbox-item-{{ notif.id }}"
-      class="p-4 sm:p-5 transition flex flex-col sm:flex-row items-start justify-between gap-4 relative group {% if not notif.is_read %}bg-slate-800/40 border-l-4 border-blue-500{% else %}bg-slate-900/60 hover:bg-slate-800/30{% endif %}"
-    >
-      <div class="flex items-start gap-3.5 min-w-0 flex-1">
-        <!-- Icon badge -->
-        <div class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-sm mt-0.5
-          {% if notif.color == 'emerald' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30
-          {% elif notif.color == 'orange' %}bg-orange-500/20 text-orange-400 border border-orange-500/30
-          {% elif notif.color == 'rose' %}bg-rose-500/20 text-rose-400 border border-rose-500/30
-          {% elif notif.color == 'purple' %}bg-purple-500/20 text-purple-400 border border-purple-500/30
-          {% elif notif.color == 'amber' %}bg-amber-500/20 text-amber-400 border border-amber-500/30
-          {% else %}bg-blue-500/20 text-blue-400 border border-blue-500/30{% endif %}">
-          <i class="fa-solid {{ notif.icon|default:'fa-bell' }}"></i>
-        </div>
+  <!-- 4. Notifications Stream List & Bulk Action Form -->
+  <form id="bulkActionForm" method="POST" action="{% url 'notifications-bulk-action' %}">
+    {% csrf_token %}
+
+    <!-- Bulk Action Toolbar -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-t-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-300 select-none">
+          <input 
+            type="checkbox" 
+            id="selectAllCheckbox" 
+            onchange="toggleSelectAll(this)" 
+            class="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          >
+          <span>Select All</span>
+        </label>
+        <span id="selectedCountBadge" class="hidden px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+          0 Selected
+        </span>
+      </div>
+
+      <div id="bulkActionButtons" class="hidden flex items-center gap-2">
+        <button 
+          type="submit" 
+          name="action" 
+          value="mark_read" 
+          class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+        >
+          <i class="fa-regular fa-envelope-open text-blue-400 text-xs"></i>
+          <span>Mark Read</span>
+        </button>
+        <button 
+          type="submit" 
+          name="action" 
+          value="mark_unread" 
+          class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+        >
+          <i class="fa-regular fa-envelope text-slate-400 text-xs"></i>
+          <span>Mark Unread</span>
+        </button>
+        {% if active_tab == 'archived' %}
+        <button 
+          type="submit" 
+          name="action" 
+          value="restore" 
+          class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/40 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+        >
+          <i class="fa-solid fa-arrow-rotate-left text-xs"></i>
+          <span>Restore to Inbox</span>
+        </button>
+        {% else %}
+        <button 
+          type="submit" 
+          name="action" 
+          value="archive" 
+          class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/40 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+        >
+          <i class="fa-solid fa-box-archive text-xs"></i>
+          <span>Archive Selected</span>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-slate-900 border border-t-0 border-slate-800 rounded-b-2xl shadow-xl overflow-hidden divide-y divide-slate-800/80">
+      {% for notif in notifications %}
+      <div 
+        id="inbox-item-{{ notif.id }}"
+        class="p-4 sm:p-5 transition flex flex-col sm:flex-row items-start justify-between gap-4 relative group {% if not notif.is_read %}bg-slate-800/40 border-l-4 border-blue-500{% else %}bg-slate-900/60 hover:bg-slate-800/30{% endif %}"
+      >
+        <div class="flex items-start gap-3.5 min-w-0 flex-1">
+          <!-- Selection Checkbox -->
+          <input 
+            type="checkbox" 
+            name="selected_ids" 
+            value="{{ notif.id }}" 
+            onchange="updateBulkToolbar()" 
+            class="notif-item-checkbox w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500 mt-2.5 shrink-0 cursor-pointer"
+          >
+
+          <!-- Icon badge -->
+          <div class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-sm mt-0.5
+            {% if notif.color == 'emerald' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30
+            {% elif notif.color == 'orange' %}bg-orange-500/20 text-orange-400 border border-orange-500/30
+            {% elif notif.color == 'rose' %}bg-rose-500/20 text-rose-400 border border-rose-500/30
+            {% elif notif.color == 'purple' %}bg-purple-500/20 text-purple-400 border border-purple-500/30
+            {% elif notif.color == 'amber' %}bg-amber-500/20 text-amber-400 border border-amber-500/30
+            {% else %}bg-blue-500/20 text-blue-400 border border-blue-500/30{% endif %}">
+            <i class="fa-solid {{ notif.icon|default:'fa-bell' }}"></i>
+          </div>
 
         <!-- Notification Details -->
         <div class="min-w-0 flex-1 space-y-1">
@@ -329,7 +401,8 @@
       {% endif %}
     </div>
     {% endfor %}
-  </div>
+    </div>
+  </form>
 
   <!-- 5. Pagination Toolbar -->
   {% if page_obj.has_other_pages %}
@@ -375,4 +448,40 @@
   </div>
   {% endif %}
 </div>
+
+<script>
+  function toggleSelectAll(master) {
+    const checkboxes = document.querySelectorAll('.notif-item-checkbox');
+    checkboxes.forEach(cb => {
+      cb.checked = master.checked;
+    });
+    updateBulkToolbar();
+  }
+
+  function updateBulkToolbar() {
+    const checkboxes = document.querySelectorAll('.notif-item-checkbox');
+    const checked = Array.from(checkboxes).filter(cb => cb.checked);
+    const count = checked.length;
+    
+    const countBadge = document.getElementById('selectedCountBadge');
+    const actionButtons = document.getElementById('bulkActionButtons');
+    const masterCheckbox = document.getElementById('selectAllCheckbox');
+
+    if (count > 0) {
+      if (countBadge) {
+        countBadge.textContent = `${count} Selected`;
+        countBadge.classList.remove('hidden');
+      }
+      if (actionButtons) actionButtons.classList.remove('hidden');
+    } else {
+      if (countBadge) countBadge.classList.add('hidden');
+      if (actionButtons) actionButtons.classList.add('hidden');
+    }
+
+    if (masterCheckbox && checkboxes.length > 0) {
+      masterCheckbox.checked = (count === checkboxes.length);
+      masterCheckbox.indeterminate = (count > 0 && count < checkboxes.length);
+    }
+  }
+</script>
 {% endblock %}

@@ -26,6 +26,7 @@ from apps.notifications.user_views import (
 )
 from apps.notifications.inbox_views import (
     notifications_inbox_view,
+    notifications_bulk_action_view,
     notification_toggle_read_view,
     notification_archive_view,
     notification_restore_view,
@@ -38,7 +39,12 @@ from apps.notifications.api_views import (
     NotificationMarkUnreadAPIView,
     NotificationMarkAllReadAPIView,
     NotificationDeleteArchiveAPIView,
+    PushConfigAPIView,
+    DeviceRegisterAPIView,
+    DeviceUnregisterAPIView,
+    TestPushNotificationAPIView,
 )
+from apps.notifications.service_worker_views import firebase_service_worker_view
 
 urlpatterns = [
     # Super Admin Email Operations & Governance
@@ -69,6 +75,7 @@ urlpatterns = [
 
     # In-App Notification Center Web Views
     path("notifications/inbox/", notifications_inbox_view, name="notifications-inbox"),
+    path("notifications/bulk-action/", notifications_bulk_action_view, name="notifications-bulk-action"),
     path("notifications/<int:pk>/toggle-read/", notification_toggle_read_view, name="notification-toggle-read"),
     path("notifications/<int:pk>/archive/", notification_archive_view, name="notification-archive"),
     path("notifications/<int:pk>/restore/", notification_restore_view, name="notification-restore"),
@@ -82,4 +89,12 @@ urlpatterns = [
     path("api/notifications/mark-all-read/", NotificationMarkAllReadAPIView.as_view(), name="api-notifications-mark-all-read"),
     path("api/notifications/<int:pk>/delete/", NotificationDeleteArchiveAPIView.as_view(), name="api-notification-delete"),
     path("api/notifications/<int:pk>/archive/", NotificationDeleteArchiveAPIView.as_view(), name="api-notification-archive"),
+
+    # Firebase Cloud Messaging (FCM) Web Push APIs & Service Worker
+    path("firebase-messaging-sw.js", firebase_service_worker_view, name="firebase-service-worker"),
+    path("api/notifications/push-config/", PushConfigAPIView.as_view(), name="api-notifications-push-config"),
+    path("api/notifications/devices/register/", DeviceRegisterAPIView.as_view(), name="api-notifications-device-register"),
+    path("api/notifications/devices/unregister/", DeviceUnregisterAPIView.as_view(), name="api-notifications-device-unregister"),
+    path("api/notifications/test-push/", TestPushNotificationAPIView.as_view(), name="api-notifications-test-push"),
 ]
+

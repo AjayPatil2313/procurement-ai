@@ -143,3 +143,47 @@ def notifications_mark_all_read_web_view(request):
     Notification.objects.filter(user=request.user, is_read=False, is_archived=False).update(is_read=True)
     messages.success(request, "All notifications have been marked as read.")
     return redirect(request.META.get("HTTP_REFERER") or reverse("notifications-inbox"))
+
+
+@login_required
+@require_POST
+def notifications_bulk_action_view(request):
+    """
+    Bulk actions on user notifications (mark_read, mark_unread, archive, restore, delete).
+    Strictly scoped to request.user to preserve multi-tenant isolation.
+    """
+    action = request.POST.get("action", "").strip().lower()
+    selected_ids = request.POST.getlist("selected_ids")
+    if not selected_ids:
+        # Check if sent as comma-separated string
+        raw_ids = request.POST.get("ids", "").strip()
+        if raw_ids:
+            selected_ids = [i.strip() for i in raw_ids.split(",") if i.strip().isdigit()]
+
+    if not selected_ids:
+        messages.warning(request, "No notifications were selected for batch operation.")
+        return redirect(request.META.get("HTTP_REFERER") or reverse("notifications-inbox"))
+
+    # Strictly filter by authenticated user
+    qs = Notification.objects.filter(user=request.user, id__in=selected_ids)
+    count = qs.count()
+
+    if action == "mark_read":
+        qs.update(is_read=True)
+        messages.success(request, f"{count} notification{'s' if count != 1 else ''} marked as read.")
+    elif action == "mark_unread":
+        qs.update(is_read=False)
+        messages.info(request, f"{count} notification{'s' if count != 1 else ''} marked as unread.")
+    elif action == "archive":
+        qs.update(is_archived=True)
+        messages.success(request, f"{count} notification{'s' if count != 1 else ''} moved to archive.")
+    elif action == "restore":
+        qs.update(is_archived=False)
+        messages.success(request, f"{count} notification{'s' if count != 1 else ''} restored to inbox.")
+    elif action == "delete":
+        qs.delete()
+        messages.success(request, f"{count} notification{'s' if count != 1 else ''} deleted.")
+    else:
+        messages.error(request, f"Unrecognized batch action: {action}")
+
+    return redirect(request.META.get("HTTP_REFERER") or reverse("notifications-inbox"))

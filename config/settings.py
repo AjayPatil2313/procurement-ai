@@ -327,6 +327,30 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "SAMEORIGIN"
 
+# ============================================================
+# FIREBASE CLOUD MESSAGING (FCM) WEB PUSH
+# ============================================================
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY", "")
+FIREBASE_AUTH_DOMAIN = os.getenv("FIREBASE_AUTH_DOMAIN", "")
+FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "")
+FIREBASE_MESSAGING_SENDER_ID = os.getenv("FIREBASE_MESSAGING_SENDER_ID", "")
+FIREBASE_APP_ID = os.getenv("FIREBASE_APP_ID", "")
+FIREBASE_MEASUREMENT_ID = os.getenv("FIREBASE_MEASUREMENT_ID", "")
+FIREBASE_VAPID_PUBLIC_KEY = os.getenv("FIREBASE_VAPID_PUBLIC_KEY", "")
+
+_cred_path_env = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase-service-account.json").strip()
+if _cred_path_env:
+    if os.path.isabs(_cred_path_env):
+        FIREBASE_CREDENTIALS_PATH = _cred_path_env
+    else:
+        FIREBASE_CREDENTIALS_PATH = str(BASE_DIR / _cred_path_env)
+else:
+    FIREBASE_CREDENTIALS_PATH = ""
+
+FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+
+
 
 
 

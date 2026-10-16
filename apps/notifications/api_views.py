@@ -229,3 +229,101 @@ class NotificationDeleteArchiveAPIView(APIView):
             "is_archived": True,
             "unread_count": unread_count,
         })
+
+
+class PushConfigAPIView(APIView):
+    """
+    GET /api/notifications/push-config/
+    Returns public Firebase configuration and VAPID public key.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.notifications.services.fcm_service import get_firebase_web_config
+        return Response(get_firebase_web_config())
+
+
+class DeviceRegisterAPIView(APIView):
+    """
+    POST /api/notifications/devices/register/
+    Registers an FCM device push token for the authenticated user.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get("token", "").strip()
+        if not token:
+            return Response(
+                {"success": False, "error": "Token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        device_type = request.data.get("device_type", "OTHER")
+        device_name = request.data.get("device_name", "")
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+
+        from apps.notifications.services.fcm_service import register_device_token
+        try:
+            device = register_device_token(
+                user=request.user,
+                token=token,
+                device_type=device_type,
+                device_name=device_name,
+                user_agent=user_agent,
+            )
+            return Response({
+                "success": True,
+                "message": "Device token registered successfully.",
+                "device_id": device.id,
+                "is_active": device.is_active,
+            }, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response(
+                {"success": False, "error": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class DeviceUnregisterAPIView(APIView):
+    """
+    POST /api/notifications/devices/unregister/
+    Deactivates an FCM device token for the authenticated user.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        token = request.data.get("token", "").strip()
+        if not token:
+            return Response(
+                {"success": False, "error": "Token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.notifications.services.fcm_service import unregister_device_token
+        ok = unregister_device_token(request.user, token)
+        return Response({
+            "success": True,
+            "message": "Device token unregistered." if ok else "Token not found.",
+        })
+
+
+class TestPushNotificationAPIView(APIView):
+    """
+    POST /api/notifications/test-push/
+    Dispatches a test push notification to the authenticated user's registered devices.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        title = request.data.get("title", "TradeConnect Notification").strip()
+        body = request.data.get("body", "This is a verified test push notification from TradeConnect.").strip()
+        url = request.data.get("url", "/notifications/inbox/").strip()
+
+        from apps.notifications.services.fcm_service import send_user_push
+        res = send_user_push(
+            user_or_users=request.user,
+            title=title,
+            body=body,
+            link=url,
+        )
+        return Response(res)
+

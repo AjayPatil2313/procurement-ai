@@ -3,6 +3,9 @@ from django.urls import reverse
 from apps.dashboard.models import Notification
 from apps.companies.models import CompanyMember
 
+from django.utils import timezone
+from django.db.models import Q
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,9 +19,11 @@ def create_notification(
     icon="fa-bell",
     color="blue",
     notify_company_members=False,
+    event_key="",
 ):
     """
     Creates real-time notifications for the given user, or for all active members of the company.
+    Includes duplicate suppression within 15-minute window for identical user alerts.
     """
     recipients = set()
     if user:
@@ -33,8 +38,25 @@ def create_notification(
                 recipients.add(m.user)
 
     created_notifications = []
+    now = timezone.now()
+    cutoff = now - timezone.timedelta(minutes=15)
+
     for recipient in recipients:
         try:
+            # Check for existing duplicate notification within 15 mins
+            dup_q = Q(user=recipient) & Q(created_at__gte=cutoff)
+            if title:
+                dup_q &= Q(title=title)
+            if link:
+                dup_q &= Q(link=link)
+            if event_key:
+                dup_q &= (Q(event_key=event_key) | Q(event_key=""))
+
+            existing = Notification.objects.filter(dup_q).first()
+            if existing:
+                created_notifications.append(existing)
+                continue
+
             notif = Notification.objects.create(
                 user=recipient,
                 company=company,
@@ -44,6 +66,7 @@ def create_notification(
                 link=link,
                 icon=icon,
                 color=color,
+                event_key=event_key,
             )
             created_notifications.append(notif)
         except Exception as exc:

@@ -106,7 +106,10 @@ class NotificationRule(models.Model):
     class Channel(models.TextChoices):
         EMAIL = "EMAIL", "Email Only"
         IN_APP = "IN_APP", "In-App Only"
-        BOTH = "BOTH", "Both (Email & In-App)"
+        PUSH = "PUSH", "Web Push Only"
+        BOTH = "BOTH", "Email & In-App"
+        IN_APP_PUSH = "IN_APP_PUSH", "In-App & Web Push"
+        ALL = "ALL", "All Channels (Email, In-App & Web Push)"
 
     class TargetAudience(models.TextChoices):
         USER = "USER", "User / Company User"
@@ -248,6 +251,7 @@ class NotificationPreference(models.Model):
     )
     email_enabled = models.BooleanField(default=True)
     in_app_enabled = models.BooleanField(default=True)
+    push_enabled = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -256,7 +260,7 @@ class NotificationPreference(models.Model):
         verbose_name_plural = "Notification Preferences"
 
     def __str__(self):
-        return f"{self.user.email} - {self.category} (Email: {self.email_enabled})"
+        return f"{self.user.email} - {self.category} (Email: {self.email_enabled}, Push: {self.push_enabled})"
 
     @classmethod
     def is_email_permitted(cls, user, category):
@@ -273,6 +277,14 @@ class NotificationPreference(models.Model):
             return True
         pref = cls.objects.filter(user=user, category=category).first()
         return pref.in_app_enabled if pref else True
+
+    @classmethod
+    def is_push_permitted(cls, user, category):
+        """Mandatory categories (SECURITY, BILLING) are always permitted."""
+        if category in (cls.Category.SECURITY, cls.Category.BILLING):
+            return True
+        pref = cls.objects.filter(user=user, category=category).first()
+        return pref.push_enabled if pref else True
 
 
 class NotificationLog(models.Model):
@@ -555,4 +567,61 @@ class EmailLayoutSetting(models.Model):
                 layout.is_active = True
                 layout.save(update_fields=["is_active"])
         return layout
+
+
+class DeviceToken(models.Model):
+    class DeviceType(models.TextChoices):
+        CHROME = "CHROME", "Google Chrome"
+        EDGE = "EDGE", "Microsoft Edge"
+        FIREFOX = "FIREFOX", "Mozilla Firefox"
+        SAFARI = "SAFARI", "Apple Safari"
+        OTHER = "OTHER", "Other Web Browser"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="device_tokens",
+    )
+    company = models.ForeignKey(
+        "companies.Company",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="device_tokens",
+    )
+    token = models.CharField(
+        max_length=255,
+        unique=True,
+        db_index=True,
+        help_text="FCM registration token issued by browser",
+    )
+    endpoint = models.TextField(blank=True, default="")
+    device_type = models.CharField(
+        max_length=20,
+        choices=DeviceType.choices,
+        default=DeviceType.OTHER,
+    )
+    device_name = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+        help_text="User device or browser summary (e.g. Chrome on Windows 11)",
+    )
+    user_agent = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-last_seen_at"]
+        verbose_name = "Device Push Token"
+        verbose_name_plural = "Device Push Tokens"
+        indexes = [
+            models.Index(fields=["user", "is_active"]),
+            models.Index(fields=["company", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.device_name or self.device_type} (Active: {self.is_active})"
+
 
