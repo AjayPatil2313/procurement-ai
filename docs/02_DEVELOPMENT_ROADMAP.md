@@ -22,6 +22,7 @@ timeline
     Phase 11 : In-App Notification Center : Real-Time Polling & Inbox UI
     Phase 12 : Notification System Audit : Cross-Role Verification & Zero Refused Links
     Phase 13 : Web Push Notifications : Firebase Cloud Messaging & Service Worker
+    Phase 14 : Dynamic Push Subsystem : Event Registry & Direct Logout
 ```
 
 ---
@@ -136,6 +137,19 @@ timeline
   - Automatic stale token pruning on FCM registration errors (`UnregisteredError`, `SenderIdMismatchError`).
   - Added comprehensive test suite `FirebaseWebPushNotificationTests` (6 tests). Total notification tests: 63; total platform tests: 222 (100% pass rate).
 
+### Phase 14: Dynamic In-App & Firebase Browser Push Subsystem
+- **Architectural Scope**:
+  - Maintained strict terminology compliance across modules: **Customer** (Buyer), **Vendor** (Seller), and **Customer + Vendor** (Both).
+  - Kept transactional Email notification engine strictly isolated (email templates, triggers, outbox worker, SMTP logic untouched).
+  - Implemented centralized Dynamic Notification Engine (`apps.notifications.services.dynamic_engine.py`) with an `EVENT_REGISTRY` covering 10 operational business events (`requirement.created`, `vendor_match.found`, `inquiry.created`, `inquiry.status_changed`, `price.changed`, `company.user_added`, `company.verification_updated`, `credits.low`, `subscription.expiring`, `company.registered`).
+  - Added multi-tenant recipient resolution with RBAC enforcement (`resolve_event_recipients`).
+  - Implemented `deduplication_key` on `Notification` model with a 15-minute sliding window to suppress duplicate notification bursts.
+  - Added `PushDeliveryLog` model recording push-specific telemetry (`PENDING`, `SUCCESS`, `FAILED`, attempt counts, error codes, timestamps) separate from in-app read status.
+  - Built Super Admin Push Overview & Telemetry console (`/admin-panel/notifications/push/`).
+  - Decoupled User Notification Preferences UI (`/notifications/preferences/`) to control In-App and Browser Push channels without altering email settings.
+  - Enforced unified direct logout: every user (Company User, Company Admin, Super Admin) redirects directly to `/login/` with a success message (`apps.accounts.web_views.logout_view`).
+  - Added automated test suite `DynamicNotificationAndPushSystemTests` (5 tests). Total notification tests: 72; total platform tests: 231 (100% pass rate).
+
 ---
 
 ## 2.3 Verification Matrix of Implemented Milestones
@@ -153,4 +167,6 @@ timeline
 | In-App Notification Center & APIs | Latest | 50 automated tests (`apps.notifications.tests`) | Verified |
 | Comprehensive Multi-Tier Notification Audit | Latest | 57 notification tests, 216 total tests | Verified |
 | Firebase Web Push Notifications (FCM) | Latest | 63 notification tests, 222 total platform tests | Verified |
+| Dynamic Push Subsystem & Direct Logout | Latest | 72 notification tests, 231 total platform tests | Verified |
+
 

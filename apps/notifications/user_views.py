@@ -23,16 +23,21 @@ def user_notification_preferences_view(request):
         p.category: p
         for p in NotificationPreference.objects.filter(user=request.user, company=company)
     }
-
     if request.method == "POST":
+        has_email_fields = any(k.startswith("email_") for k in request.POST.keys())
         for cat_code, cat_label in categories:
+            p = prefs.get(cat_code)
             # SECURITY and BILLING are mandatory for enterprise account integrity
             if cat_code in (NotificationPreference.Category.SECURITY, NotificationPreference.Category.BILLING):
                 email_enabled = True
                 in_app_enabled = True
                 push_enabled = True
             else:
-                email_enabled = request.POST.get(f"email_{cat_code}") == "on"
+                # If email fields are submitted (legacy/API), honor them; otherwise preserve existing setting
+                if has_email_fields:
+                    email_enabled = request.POST.get(f"email_{cat_code}") == "on"
+                else:
+                    email_enabled = p.email_enabled if p else True
                 in_app_enabled = request.POST.get(f"in_app_{cat_code}") == "on"
                 push_enabled = request.POST.get(f"push_{cat_code}") == "on"
 

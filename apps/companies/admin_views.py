@@ -1211,6 +1211,22 @@ def admin_panel_toggle_company_verification_view(request, pk):
         except Exception:
             pass
 
+        # Trigger dynamic In-App + Firebase Browser Push for Company Admins
+        try:
+            from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+            dispatch_dynamic_notification(
+                event_key="company.verification_updated",
+                context={
+                    "company_name": company.name,
+                    "status_display": "Approved" if company.is_verified else "Revoked",
+                },
+                company=company,
+                actor=request.user,
+                deduplication_key=f"company.verification_updated:{company.id}:{int(timezone.now().timestamp())}",
+            )
+        except Exception:
+            pass
+
         messages.success(request, f"Company '{company.name}' badge updated: {action_name}.")
     return redirect("admin-panel-companies")
 

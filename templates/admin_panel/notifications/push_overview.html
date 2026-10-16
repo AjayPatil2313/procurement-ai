@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Web Push Telemetry &amp; Monitoring — Super Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 mb-3">
+        <i class="fa-brands fa-google mr-1.5 text-amber-400"></i> Firebase Cloud Messaging (FCM)
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black tracking-tight text-white">Browser Push Telemetry &amp; Monitoring</h1>
+      <p class="text-xs md:text-sm text-slate-300 mt-1">
+        Monitor active browser push devices, review FCM delivery telemetry, inspect failure logs, and test real-time push alerts.
+      </p>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex flex-wrap items-center gap-2">
+      <button onclick="document.getElementById('testPushModal').classList.remove('hidden')" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-sm">
+        <i class="fa-solid fa-paper-plane mr-1.5"></i> Send Test Push
+      </button>
+      <a href="{% url 'admin-panel-email-overview' %}" class="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition shadow-sm">
+        <i class="fa-solid fa-envelope mr-1.5 text-blue-400"></i> Email Operations
+      </a>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  {% include "admin_panel/email/nav_tabs.html" %}
+
+  <!-- KPI Overview Metrics -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Active Devices -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Push Devices</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ active_devices_count }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-purple-600 mt-1">
+          <i class="fa-solid fa-mobile-screen mr-1"></i> Paired Browser Tokens
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-bell"></i>
+      </div>
+    </div>
+
+    <!-- Success Rate -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">FCM Success Rate</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ success_rate }}%</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-emerald-600 mt-1">
+          <i class="fa-solid fa-check mr-1"></i> {{ success_push_logs }} Delivered
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-chart-pie"></i>
+      </div>
+    </div>
+
+    <!-- Total Dispatches -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Push Dispatches</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ total_push_logs }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-slate-500 mt-1">
+          All-time Recorded Logs
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-paper-plane"></i>
+      </div>
+    </div>
+
+    <!-- Failed Pushes -->
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Failed Dispatches</p>
+        <h3 class="text-2xl font-black {% if failed_push_logs > 0 %}text-rose-600{% else %}text-slate-900{% endif %} mt-1">{{ failed_push_logs }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold {% if failed_push_logs > 0 %}text-rose-600{% else %}text-slate-500{% endif %} mt-1">
+          <i class="fa-solid {% if failed_push_logs > 0 %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-1"></i>
+          {% if failed_push_logs > 0 %}Action required{% else %}Zero failures{% endif %}
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl {% if failed_push_logs > 0 %}bg-rose-50 text-rose-600{% else %}bg-slate-100 text-slate-400{% endif %} flex items-center justify-center text-lg">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device Breakdown Card -->
+  <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+      <i class="fa-solid fa-laptop-code text-purple-600"></i> Registered Device Token Distribution
+    </h3>
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      {% for b in device_breakdown %}
+      <div class="p-3 rounded-xl border border-slate-100 bg-slate-50 text-center">
+        <p class="text-xs font-semibold text-slate-500 uppercase">{{ b.device_type }}</p>
+        <p class="text-lg font-black text-slate-900 mt-0.5">{{ b.total }}</p>
+      </div>
+      {% empty %}
+      <div class="col-span-full py-4 text-center text-xs text-slate-400">
+        No active browser devices currently registered.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Push Delivery Logs Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Push Delivery Telemetry Logs</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Audit log of real-time browser push dispatches via Firebase Cloud Messaging.</p>
+      </div>
+
+      <!-- Filters Form -->
+      <form method="GET" class="flex flex-wrap items-center gap-2">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search recipient, event, error..." class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none w-48 md:w-64">
+        <select name="status" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 focus:ring-1 focus:ring-purple-500 focus:outline-none">
+          <option value="">All Statuses</option>
+          <option value="SUCCESS" {% if status_filter == 'SUCCESS' %}selected{% endif %}>Success</option>
+          <option value="FAILED" {% if status_filter == 'FAILED' %}selected{% endif %}>Failed</option>
+        </select>
+        <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition">
+          Filter
+        </button>
+      </form>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+            <th class="py-3 px-4">Status</th>
+            <th class="py-3 px-4">Recipient</th>
+            <th class="py-3 px-4">Company</th>
+            <th class="py-3 px-4">Event Key</th>
+            <th class="py-3 px-4">Device</th>
+            <th class="py-3 px-4">Error / Notes</th>
+            <th class="py-3 px-4 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for log in logs %}
+          <tr class="hover:bg-slate-50/70 transition">
+            <td class="py-3 px-4">
+              {% if log.status == 'SUCCESS' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <i class="fa-solid fa-circle-check mr-1 text-[9px]"></i> SUCCESS
+              </span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                <i class="fa-solid fa-circle-xmark mr-1 text-[9px]"></i> FAILED
+              </span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-4 font-semibold text-slate-800">
+              {{ log.user.email }}
+            </td>
+            <td class="py-3 px-4 text-slate-600">
+              {{ log.company.name|default:"Platform / Super Admin" }}
+            </td>
+            <td class="py-3 px-4 font-mono text-[11px] text-purple-700">
+              {{ log.event_key|default:"custom.push" }}
+            </td>
+            <td class="py-3 px-4 text-slate-500">
+              {{ log.device.device_type|default:"Web Browser" }}
+            </td>
+            <td class="py-3 px-4 text-slate-500 max-w-xs truncate" title="{{ log.error_message }}">
+              {{ log.error_message|default:"Delivered without error" }}
+            </td>
+            <td class="py-3 px-4 text-right text-slate-500 whitespace-nowrap">
+              {{ log.created_at|date:"d M Y, H:i" }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="py-8 text-center text-slate-400">
+              <i class="fa-solid fa-bell-slash text-2xl mb-2 block"></i>
+              No push delivery telemetry records found matching current criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+      <div>
+        Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      </div>
+      <div class="flex items-center gap-1">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}" class="px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100 transition">Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if q %}&q={{ q }}{% endif %}" class="px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100 transition">Next</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Test Push Modal -->
+<div id="testPushModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+      <h4 class="text-base font-bold text-slate-900 flex items-center gap-2">
+        <i class="fa-solid fa-paper-plane text-purple-600"></i> Dispatch Test Web Push
+      </h4>
+      <button onclick="document.getElementById('testPushModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-sm">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <form id="adminTestPushForm" class="p-5 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Push Alert Title</label>
+        <input type="text" id="testPushTitle" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none" value="TradeConnect Test Push Alert">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Push Alert Message</label>
+        <textarea id="testPushBody" rows="3" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none">This is a verified test push alert dispatched by Super Admin via Firebase Cloud Messaging.</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Click URL</label>
+        <input type="text" id="testPushUrl" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none" value="/notifications/inbox/">
+      </div>
+      <div id="testPushStatusMsg" class="hidden text-xs p-3 rounded-xl"></div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" onclick="document.getElementById('testPushModal').classList.add('hidden')" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition">
+          Cancel
+        </button>
+        <button type="button" id="submitTestPushBtn" onclick="dispatchAdminTestPush()" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-sm">
+          Send Now
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+async function dispatchAdminTestPush() {
+  const btn = document.getElementById('submitTestPushBtn');
+  const msgBox = document.getElementById('testPushStatusMsg');
+  const title = document.getElementById('testPushTitle').value.trim();
+  const body = document.getElementById('testPushBody').value.trim();
+  const url = document.getElementById('testPushUrl').value.trim();
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  msgBox.classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/notifications/test-push/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      },
+      body: JSON.stringify({ title, body, url })
+    });
+    const data = await res.json();
+    msgBox.classList.remove('hidden');
+    if (data.success) {
+      msgBox.className = 'text-xs p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200';
+      msgBox.textContent = `Push sent successfully! Dispatched to ${data.sent_count} active device(s).`;
+      setTimeout(() => { window.location.reload(); }, 1500);
+    } else {
+      msgBox.className = 'text-xs p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200';
+      msgBox.textContent = `Failed: ${data.errors ? data.errors.join('; ') : 'Unknown error'}`;
+      btn.disabled = false;
+      btn.textContent = 'Send Now';
+    }
+  } catch (err) {
+    msgBox.classList.remove('hidden');
+    msgBox.className = 'text-xs p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200';
+    msgBox.textContent = `Network error: ${err.message}`;
+    btn.disabled = false;
+    btn.textContent = 'Send Now';
+  }
+}
+</script>
+{% endblock %}

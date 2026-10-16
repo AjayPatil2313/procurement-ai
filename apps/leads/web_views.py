@@ -1467,6 +1467,24 @@ def send_rfq_view(request, result_id):
         # Dispatch real-time in-app notification
         notify_proposal_sent(inquiry, user=request.user)
 
+        # Trigger dynamic In-App + Firebase Browser Push
+        try:
+            from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+            dispatch_dynamic_notification(
+                event_key="inquiry.created",
+                context={
+                    "id": inquiry.id,
+                    "subject": inquiry.subject,
+                    "customer_name": company.name,
+                    "item_name": result.product_title if result else "Product",
+                },
+                company=company,
+                actor=request.user,
+                deduplication_key=f"inquiry.created:{inquiry.id}",
+            )
+        except Exception:
+            pass
+
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({
                 "success": True,

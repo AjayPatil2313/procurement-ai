@@ -266,6 +266,23 @@ def register_view(request):
         except Exception as exc:
             pass
 
+        # Trigger dynamic In-App + Firebase Browser Push for Super Admins
+        try:
+            from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+            dispatch_dynamic_notification(
+                event_key="company.registered",
+                context={
+                    "id": company.id,
+                    "company_name": company.name,
+                    "company_type": company.get_company_type_display(),
+                },
+                company=company,
+                actor=user,
+                deduplication_key=f"company.registered:{company.id}",
+            )
+        except Exception:
+            pass
+
         messages.success(
             request,
             f"Welcome to AI Procurement & Sales Platform, {user.first_name}! Your company workspace '{company.name}' is now active."
@@ -278,13 +295,9 @@ def register_view(request):
 
 
 def logout_view(request):
-    user_name = ""
-    if request.user.is_authenticated:
-        user_name = request.user.get_full_name() or request.user.email
     logout(request)
-    return render(request, "auth/logout.html", {
-        "user_name": user_name,
-    })
+    messages.success(request, "You have been logged out successfully.")
+    return redirect("login")
 
 
 @rate_limit(rate=10, period=60, key_type="ip")

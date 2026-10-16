@@ -21,4 +21,7 @@
   <a href="{% url 'admin-panel-email-alerts' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'alerts' %}bg-red-600 text-white shadow-sm shadow-red-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
     <i class="fa-solid fa-triangle-exclamation text-[11px]"></i> Platform Alerts
   </a>
+  <a href="{% url 'admin-panel-push-overview' %}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {% if active_tab == 'push_telemetry' %}bg-purple-600 text-white shadow-sm shadow-purple-500/20{% else %}bg-white text-slate-700 hover:bg-slate-100 border border-slate-200{% endif %}">
+    <i class="fa-solid fa-mobile-screen text-[11px] text-purple-500"></i> Web Push Telemetry
+  </a>
 </div>

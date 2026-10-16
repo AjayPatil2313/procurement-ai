@@ -19,6 +19,7 @@ from apps.notifications.admin_views import (
     admin_email_log_retry_view,
     admin_email_logs_retry_all_view,
     admin_email_alerts_view,
+    admin_push_notifications_overview_view,
 )
 from apps.notifications.user_views import (
     user_notification_preferences_view,
@@ -68,6 +69,7 @@ urlpatterns = [
     path("admin-panel/email/logs/<int:pk>/detail/", admin_email_log_detail_api, name="admin-panel-email-log-detail"),
     path("admin-panel/email/logs/<int:pk>/retry/", admin_email_log_retry_view, name="admin-panel-email-log-retry"),
     path("admin-panel/email/alerts/", admin_email_alerts_view, name="admin-panel-email-alerts"),
+    path("admin-panel/notifications/push/", admin_push_notifications_overview_view, name="admin-panel-push-overview"),
 
     # Tenant User Preferences & 1-Click Unsubscribe (RFC 8058)
     path("company/notification-preferences/", user_notification_preferences_view, name="user-notification-preferences"),

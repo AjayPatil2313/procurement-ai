@@ -20,6 +20,8 @@ from apps.notifications.models import (
     EmailDeliveryAttempt,
     SMTPSetting,
     EmailLayoutSetting,
+    DeviceToken,
+    PushDeliveryLog,
 )
 from apps.notifications.services.email_engine import (
     render_string_template,
@@ -1209,3 +1211,64 @@ def admin_email_alerts_view(request):
         "alert_logs": alert_logs,
     }
     return render(request, "admin_panel/email/alerts.html", context)
+
+
+@login_required
+@superadmin_required
+def admin_push_notifications_overview_view(request):
+    """
+    Super Admin Web Push Notification Telemetry & Monitoring:
+    Inspect active devices, browser breakdown, delivery logs, failure reasons, and test push.
+    """
+    active_devices_count = DeviceToken.objects.filter(is_active=True).count()
+    device_breakdown = (
+        DeviceToken.objects.filter(is_active=True)
+        .values("device_type")
+        .annotate(total=Count("id"))
+        .order_by("-total")
+    )
+
+    total_push_logs = PushDeliveryLog.objects.count()
+    success_push_logs = PushDeliveryLog.objects.filter(status=PushDeliveryLog.Status.SUCCESS).count()
+    failed_push_logs = PushDeliveryLog.objects.filter(status=PushDeliveryLog.Status.FAILED).count()
+    success_rate = (
+        round((success_push_logs / total_push_logs) * 100, 1)
+        if total_push_logs > 0
+        else 100.0
+    )
+
+    logs_qs = PushDeliveryLog.objects.select_related("user", "company", "device").order_by("-created_at")
+
+    # Status filter
+    status_filter = request.GET.get("status", "").strip().upper()
+    if status_filter in [PushDeliveryLog.Status.SUCCESS, PushDeliveryLog.Status.FAILED]:
+        logs_qs = logs_qs.filter(status=status_filter)
+
+    # Search filter
+    q = request.GET.get("q", "").strip()
+    if q:
+        logs_qs = logs_qs.filter(
+            Q(user__email__icontains=q)
+            | Q(event_key__icontains=q)
+            | Q(error_message__icontains=q)
+        )
+
+    page_obj, pagination_context = paginate_and_preserve(request, logs_qs, per_page=15)
+
+    context = {
+        "page_title": "Web Push Telemetry & Monitoring",
+        "active_tab": "push_telemetry",
+        "active_devices_count": active_devices_count,
+        "device_breakdown": device_breakdown,
+        "total_push_logs": total_push_logs,
+        "success_push_logs": success_push_logs,
+        "failed_push_logs": failed_push_logs,
+        "success_rate": success_rate,
+        "page_obj": page_obj,
+        "logs": page_obj.object_list,
+        "pagination": pagination_context,
+        "status_filter": status_filter,
+        "q": q,
+    }
+    return render(request, "admin_panel/notifications/push_overview.html", context)
+

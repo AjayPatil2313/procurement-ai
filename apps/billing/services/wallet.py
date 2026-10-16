@@ -1606,3 +1606,16 @@ class CompanyWalletService:
             except Exception as exc:
                 logger.warning(f"Failed to trigger low balance email: {exc}")
 
+            try:
+                from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+                dispatch_dynamic_notification(
+                    event_key="credits.low",
+                    context={
+                        "balance": f"₹{wallet.available_balance:,.2f}",
+                    },
+                    company=company,
+                    deduplication_key=f"credits.low:{company.id}:{timezone.now().strftime('%Y%m%d')}",
+                )
+            except Exception:
+                pass
+

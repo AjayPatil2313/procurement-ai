@@ -181,6 +181,13 @@ class Notification(models.Model):
         default="",
         db_index=True,
     )
+    deduplication_key = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Idempotency key to suppress duplicate notification bursts.",
+    )
     title = models.CharField(max_length=255)
     message = models.TextField()
     link = models.CharField(max_length=500, blank=True)

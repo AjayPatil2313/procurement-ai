@@ -625,3 +625,63 @@ class DeviceToken(models.Model):
         return f"{self.user.email} - {self.device_name or self.device_type} (Active: {self.is_active})"
 
 
+class PushDeliveryLog(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending Dispatch"
+        SUCCESS = "SUCCESS", "Delivered to FCM"
+        FAILED = "FAILED", "Failed Delivery"
+
+    notification = models.ForeignKey(
+        "dashboard.Notification",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="push_delivery_logs",
+    )
+    device = models.ForeignKey(
+        DeviceToken,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="push_delivery_logs",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="push_delivery_logs",
+    )
+    company = models.ForeignKey(
+        "companies.Company",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="push_delivery_logs",
+    )
+    event_key = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    attempt_count = models.IntegerField(default=1)
+    error_code = models.CharField(max_length=100, blank=True, default="")
+    error_message = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Push Delivery Log"
+        verbose_name_plural = "Push Delivery Logs"
+        indexes = [
+            models.Index(fields=["user", "status", "-created_at"]),
+            models.Index(fields=["company", "status"]),
+            models.Index(fields=["event_key", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"PushLog #{self.id} for {self.user.email} - {self.status}"
+
+
+

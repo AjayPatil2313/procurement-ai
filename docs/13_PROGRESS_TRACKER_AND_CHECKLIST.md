@@ -86,20 +86,17 @@ pie title TradeConnect Implementation Breakdown
 - [x] Multi-channel delivery rules: `IN_APP`, `EMAIL`, and `BOTH` with role and user preferences.
 - [x] Strict tenant and user data isolation preventing cross-company visibility.
 
-### 9. Web Push Notification Subsystem (Firebase Cloud Messaging)
-- [x] Firebase Admin SDK integrated with environment configuration and lazy initialization.
-- [x] Multi-device token management via `DeviceToken` model (user, browser/OS user agent, IP address, active status).
-- [x] Unified delivery channels: `EMAIL`, `IN_APP`, `PUSH`, `BOTH`, `IN_APP_PUSH`, and `ALL`.
-- [x] Dedicated REST APIs: push public config, device token registration, device unregistration, and authorized test push.
-- [x] Root Service Worker served via Django view (`/firebase-messaging-sw.js`) with `Service-Worker-Allowed: /` header.
-- [x] UI desktop opt-in banner in notification bell dropdown with permission request handler.
-- [x] Foreground toast banner alerts and background OS notifications with click-through navigation.
-- [x] Multi-tenant isolation: Push suppression for inactive/suspended companies.
-- [x] Automatic stale token pruning on FCM deregistration errors.
-- [x] User-level notification preferences with independent Web Push toggle control.
-
-### 10. Testing & Quality Assurance
-- [x] Complete notification app test suite passing (67 verified tests, 0 failures, 0 regressions).
+### 9. Dynamic In-App & Firebase Browser Push Subsystem
+- [x] Strict terminology adherence: `Customer` (Buyer), `Vendor` (Seller), and `Customer + Vendor` (Both).
+- [x] Complete architectural separation between dynamic In-App/Push channels and the existing Email system (Email templates, triggers, outbox worker, and SMTP delivery completely untouched).
+- [x] Centralized Event Registry (`apps/notifications/services/dynamic_engine.py`) covering 10 business events (`requirement.created`, `vendor_match.found`, `inquiry.created`, `inquiry.status_changed`, `price.changed`, `company.user_added`, `company.verification_updated`, `credits.low`, `subscription.expiring`, `company.registered`).
+- [x] Dynamic recipient resolver with role-based audience gating and multi-tenant isolation.
+- [x] Spam burst suppression via `deduplication_key` with a 15-minute sliding window on `Notification` model.
+- [x] Dedicated `PushDeliveryLog` model tracking push telemetry separate from in-app `is_read` status (notification, device, user, company, event_key, status `PENDING`/`SUCCESS`/`FAILED`, attempt count, error codes, and sent timestamp).
+- [x] Super Admin Push Telemetry & Monitoring Dashboard (`/admin-panel/notifications/push/`) with filterable delivery status, company breakdowns, device statistics, and error logs.
+- [x] Clean decoupled User Notification Preferences UI (`/notifications/preferences/`) displaying In-App and Push controls without mixing email settings.
+- [x] Unified Direct Logout: All users (Company User, Company Admin, Super Admin) redirect directly to `/login/` with a success message (eliminated intermediate `auth/logout.html`).
+- [x] Comprehensive test coverage with `DynamicNotificationAndPushSystemTests` (5 verified tests) and updated platform suite (72 notification tests passing).
 - [x] Full platform regression suite passing (227 tests across companies, catalog, leads, dashboard, notifications).
 - [x] Multi-tier role verification: User/Company User, Company Admin, Super Admin.
 - [x] Company-type verification: Sales/Buyer, Vendor/Seller, Both.

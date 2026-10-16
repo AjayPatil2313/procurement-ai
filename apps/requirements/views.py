@@ -66,6 +66,33 @@ class RequirementListCreateAPIView(APIView):
             company=company,
             created_by=request.user,
         )
+
+        # Trigger dynamic In-App + Firebase Browser Push for relevant vendors
+        try:
+            from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+            from apps.companies.models import Company
+            vendor_companies = Company.objects.filter(
+                company_type__in=[Company.CompanyType.VENDOR, Company.CompanyType.BOTH],
+                is_active=True,
+            ).exclude(id=company.id)[:10]
+
+            dispatch_dynamic_notification(
+                event_key="requirement.created",
+                context={
+                    "id": req.id,
+                    "item_name": req.item_name,
+                    "company_name": company.name,
+                    "quantity": req.quantity,
+                    "unit": req.unit,
+                    "target_vendor_companies": list(vendor_companies),
+                },
+                company=company,
+                actor=request.user,
+                deduplication_key=f"requirement.created:{req.id}",
+            )
+        except Exception:
+            pass
+
         return Response(
             RequirementSerializer(req).data,
             status=status.HTTP_201_CREATED,

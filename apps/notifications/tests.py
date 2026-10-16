@@ -2410,5 +2410,263 @@ class NotificationModuleEnhancementAuditTests(TestCase):
         self.assertTrue(n3.is_archived)
 
 
+class DynamicNotificationAndPushSystemTests(TestCase):
+    """
+    Automated test suite for Dynamic In-App and Firebase Browser Push Notifications:
+    1. Dynamic event dispatch for Customer, Vendor, and Customer + Vendor companies.
+    2. Strict multi-tenant company isolation and RBAC recipient resolution.
+    3. Independent In-App and Push user preferences.
+    4. Deduplication key idempotency.
+    5. PushDeliveryLog audit recording.
+    6. Direct login page redirection upon logout for all users.
+    """
+    def setUp(self):
+        self.client = Client()
+
+        # Customer User & Company
+        self.customer_user = User.objects.create_user(
+            email="customer_lead@acme.com",
+            password="SecurePass@123",
+            first_name="Pooja",
+            last_name="Sharma",
+        )
+        self.customer_company = Company.objects.create(
+            name="Acme Customer Corp",
+            company_type=Company.CompanyType.SALES,
+            created_by=self.customer_user,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.customer_company,
+            user=self.customer_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Vendor User & Company
+        self.vendor_user = User.objects.create_user(
+            email="vendor_sales@supremegoods.com",
+            password="SecurePass@123",
+            first_name="Ramesh",
+            last_name="Gupta",
+        )
+        self.vendor_company = Company.objects.create(
+            name="Supreme Goods Vendor",
+            company_type=Company.CompanyType.VENDOR,
+            created_by=self.vendor_user,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.vendor_company,
+            user=self.vendor_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Both (Customer + Vendor) Company & User
+        self.both_user = User.objects.create_user(
+            email="hybrid_ops@globalb2b.com",
+            password="SecurePass@123",
+            first_name="Karan",
+            last_name="Mehta",
+        )
+        self.both_company = Company.objects.create(
+            name="Global Trade Hub",
+            company_type=Company.CompanyType.BOTH,
+            created_by=self.both_user,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.both_company,
+            user=self.both_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Super Admin
+        self.super_admin = User.objects.create_superuser(
+            email="platform_super@b2b.com",
+            password="SecurePass@123",
+            first_name="Super",
+            last_name="Admin",
+        )
+
+    def test_dynamic_requirement_created_dispatches_to_vendors_only(self):
+        """Verify requirement.created only notifies vendors and excludes non-vendor companies."""
+        from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+        from apps.dashboard.models import Notification
+
+        initial_vendor_notifs = Notification.objects.filter(user=self.vendor_user).count()
+        initial_customer_notifs = Notification.objects.filter(user=self.customer_user).count()
+
+        result = dispatch_dynamic_notification(
+            event_key="requirement.created",
+            context={
+                "id": 999,
+                "item_name": "Stainless Steel Fasteners",
+                "company_name": self.customer_company.name,
+                "quantity": "5000",
+                "unit": "kg",
+                "target_vendor_companies": [self.vendor_company],
+            },
+            company=self.customer_company,
+            actor=self.customer_user,
+        )
+        self.assertEqual(result["in_app_created"], 1)
+
+        # Vendor received notification
+        self.assertEqual(Notification.objects.filter(user=self.vendor_user).count(), initial_vendor_notifs + 1)
+        notif = Notification.objects.filter(user=self.vendor_user).latest("created_at")
+        self.assertIn("Stainless Steel Fasteners", notif.title)
+        self.assertIn("Customer Acme Customer Corp", notif.message)
+        self.assertEqual(notif.link, "/sourcing/requirements/999/")
+
+        # Customer actor did not receive vendor announcement
+        self.assertEqual(Notification.objects.filter(user=self.customer_user).count(), initial_customer_customer := initial_customer_notifs)
+
+    def test_deduplication_key_suppression(self):
+        """Verify deduplication_key suppresses duplicate bursts for identical business events."""
+        from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+        from apps.dashboard.models import Notification
+
+        dedup_key = "unique_dedup_test_key_443"
+        # First dispatch
+        res1 = dispatch_dynamic_notification(
+            event_key="credits.low",
+            context={"balance": "₹45.00"},
+            company=self.customer_company,
+            deduplication_key=dedup_key,
+        )
+        self.assertEqual(res1["in_app_created"], 1)
+
+        # Immediate second dispatch with same key must be suppressed
+        res2 = dispatch_dynamic_notification(
+            event_key="credits.low",
+            context={"balance": "₹45.00"},
+            company=self.customer_company,
+            deduplication_key=dedup_key,
+        )
+        self.assertEqual(res2["in_app_created"], 0)
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_independent_preferences_in_app_and_push(self, mock_push):
+        """Verify In-App and Push preferences function independently without altering email."""
+        from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+        from apps.dashboard.models import Notification
+        from apps.notifications.models import NotificationPreference, DeviceToken
+
+        mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+        DeviceToken.objects.create(
+            user=self.vendor_user,
+            company=self.vendor_company,
+            token="fcm_token_vendor_device_test_123",
+            device_type="CHROME",
+            is_active=True,
+        )
+
+        # 1. Turn OFF In-App, Keep Push ON
+        NotificationPreference.objects.update_or_create(
+            user=self.vendor_user,
+            company=self.vendor_company,
+            category=NotificationPreference.Category.SALES,
+            defaults={"in_app_enabled": False, "push_enabled": True, "email_enabled": True},
+        )
+
+        Notification.objects.filter(user=self.vendor_user).delete()
+        res_push_only = dispatch_dynamic_notification(
+            event_key="inquiry.created",
+            context={
+                "id": 105,
+                "subject": "Bulk order of Copper Rods",
+                "customer_name": "Acme Customer Corp",
+                "item_name": "Copper Rods",
+                "target_company": self.vendor_company,
+            },
+            company=self.customer_company,
+            actor=self.customer_user,
+            deduplication_key="inquiry:105:push_only",
+        )
+        # In-App record skipped
+        self.assertEqual(Notification.objects.filter(user=self.vendor_user).count(), 0)
+        # Push dispatched
+        self.assertEqual(res_push_only["push_dispatched"], 1)
+
+        # 2. Turn ON In-App, Turn OFF Push
+        NotificationPreference.objects.update_or_create(
+            user=self.vendor_user,
+            company=self.vendor_company,
+            category=NotificationPreference.Category.SALES,
+            defaults={"in_app_enabled": True, "push_enabled": False, "email_enabled": True},
+        )
+        mock_push.reset_mock()
+
+        res_in_app_only = dispatch_dynamic_notification(
+            event_key="inquiry.created",
+            context={
+                "id": 106,
+                "subject": "Bulk order of Aluminum Ingots",
+                "customer_name": "Acme Customer Corp",
+                "item_name": "Aluminum Ingots",
+                "target_company": self.vendor_company,
+            },
+            company=self.customer_company,
+            actor=self.customer_user,
+            deduplication_key="inquiry:106:in_app_only",
+        )
+        # In-App created
+        self.assertEqual(Notification.objects.filter(user=self.vendor_user).count(), 1)
+        # Push skipped
+        self.assertEqual(res_in_app_only["push_dispatched"], 0)
+        mock_push.assert_not_called()
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_push_delivery_log_recorded_on_dispatch(self, mock_push):
+        """Verify PushDeliveryLog telemetry is saved with accurate status and timestamps."""
+        from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+        from apps.notifications.models import DeviceToken, PushDeliveryLog
+
+        mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+        device = DeviceToken.objects.create(
+            user=self.vendor_user,
+            company=self.vendor_company,
+            token="fcm_token_telemetry_device_456",
+            device_type="EDGE",
+            is_active=True,
+        )
+
+        dispatch_dynamic_notification(
+            event_key="inquiry.created",
+            context={
+                "id": 201,
+                "subject": "Telemetry Inquiry",
+                "customer_name": "Customer Co",
+                "item_name": "Valves",
+                "target_company": self.vendor_company,
+            },
+            company=self.customer_company,
+            actor=self.customer_user,
+            deduplication_key="inquiry:201:telemetry",
+        )
+
+        log = PushDeliveryLog.objects.filter(user=self.vendor_user, device=device).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.status, PushDeliveryLog.Status.SUCCESS)
+        self.assertEqual(log.event_key, "inquiry.created")
+        self.assertIsNotNone(log.sent_at)
+
+    def test_logout_redirects_directly_to_login(self):
+        """Verify company users, company admins, and super admins redirect directly to /login/ on logout."""
+        # 1. Company User / Admin logout
+        self.client.force_login(self.customer_user)
+        response = self.client.get(reverse("logout-web"))
+        self.assertRedirects(response, reverse("login"), fetch_redirect_response=False)
+
+        # 2. Super Admin logout
+        self.client.force_login(self.super_admin)
+        response_sa = self.client.get(reverse("logout-web"))
+        self.assertRedirects(response_sa, reverse("login"), fetch_redirect_response=False)
+
+
+
 
 

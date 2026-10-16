@@ -242,12 +242,12 @@ class RBACTestCase(TestCase):
         self.assertIn("/dashboard", resp_good.url)
 
     def test_logout_screen_renders(self):
-        """Verify logging out clears session and displays dedicated logout confirmation screen"""
+        """Verify logging out clears session and redirects directly to login screen with message"""
         self.client.login(email="admin@abctrading.com", password="Password@123")
-        resp = self.client.get(reverse("logout-web"))
+        resp = self.client.get(reverse("logout-web"), follow=True)
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Logged Out Successfully")
-        self.assertContains(resp, "Sign In Again")
+        self.assertIn("/login", resp.request["PATH_INFO"])
+        self.assertContains(resp, "You have been logged out successfully.")
 
     def test_root_redirect_flow(self):
         """Root URL redirects unauthenticated visitors to login screen, and authenticated users to dashboard"""

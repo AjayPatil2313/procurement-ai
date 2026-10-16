@@ -111,6 +111,22 @@ class CreateCompanyUserAPIView(APIView):
 
         user = serializer.save()
 
+        try:
+            from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+            dispatch_dynamic_notification(
+                event_key="company.user_added",
+                context={
+                    "member_name": user.get_full_name() or user.email,
+                    "role": CompanyMember.Role.USER,
+                    "company_name": membership.company.name,
+                },
+                company=membership.company,
+                actor=request.user,
+                deduplication_key=f"company.user_added:{membership.company.id}:{user.id}",
+            )
+        except Exception:
+            pass
+
         return Response(
             {
                 "message": "Company user created successfully.",

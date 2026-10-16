@@ -45,9 +45,9 @@
             {% if pref.code == 'PROCUREMENT' %}
               Notifications for RFQ dispatches, received quotations, and requirement status changes.
             {% elif pref.code == 'SALES' %}
-              Alerts for new buyer inquiries, commercial proposals, and deal progressions.
+              Alerts for new customer inquiries, commercial proposals, and deal progressions.
             {% elif pref.code == 'AI_SEARCH' %}
-              Results from AI supplier discovery and prospective buyer matching searches.
+              Results from AI supplier discovery and prospective customer matching searches.
             {% elif pref.code == 'BILLING' %}
               Tax invoices, wallet top-ups, low balance warnings, and payment receipts.
             {% elif pref.code == 'SECURITY' %}
@@ -59,22 +59,16 @@
         </div>
 
         <div class="flex items-center gap-6 shrink-0">
-          <!-- Email Checkbox -->
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="email_{{ pref.code }}" {% if pref.email_enabled %}checked{% endif %} {% if pref.is_mandatory %}disabled checked{% endif %} class="w-4 h-4 text-blue-600 rounded">
-            <span class="text-xs font-semibold text-slate-700">Email Alerts</span>
-          </label>
-
           <!-- In-App Checkbox -->
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" name="in_app_{{ pref.code }}" {% if pref.in_app_enabled %}checked{% endif %} {% if pref.is_mandatory %}disabled checked{% endif %} class="w-4 h-4 text-blue-600 rounded">
-            <span class="text-xs font-semibold text-slate-700">In-App Center</span>
+            <span class="text-xs font-semibold text-slate-700">In-App Notifications</span>
           </label>
 
           <!-- Web Push Checkbox -->
           <label class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" name="push_{{ pref.code }}" {% if pref.push_enabled %}checked{% endif %} {% if pref.is_mandatory %}disabled checked{% endif %} class="w-4 h-4 text-purple-600 rounded">
-            <span class="text-xs font-semibold text-slate-700">Web Push</span>
+            <span class="text-xs font-semibold text-slate-700">Firebase Browser Push</span>
           </label>
         </div>
       </div>

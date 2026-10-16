@@ -170,16 +170,23 @@ def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=Non
     # Firebase messaging data values must all be strings
     sanitized_data = {str(k): str(v) for k, v in custom_data.items()}
 
-    webpush_config = messaging.WebpushConfig(
-        notification=messaging.WebpushNotification(
+    fcm_options = None
+    if clean_url and clean_url.startswith("https://"):
+        fcm_options = messaging.WebpushFCMOptions(link=clean_url)
+
+    webpush_kwargs = {
+        "notification": messaging.WebpushNotification(
             title=title[:250],
             body=body[:500],
             icon=icon or "/static/images/logo.png",
             badge=badge or "/static/images/favicon.ico",
         ),
-        fcm_options=messaging.WebpushFCMOptions(link=clean_url),
-        data=sanitized_data,
-    )
+        "data": sanitized_data,
+    }
+    if fcm_options:
+        webpush_kwargs["fcm_options"] = fcm_options
+
+    webpush_config = messaging.WebpushConfig(**webpush_kwargs)
 
     message = messaging.MulticastMessage(
         tokens=list(tokens),
