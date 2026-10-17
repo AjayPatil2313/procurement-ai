@@ -39,47 +39,17 @@
 
   <!-- Product Filter & Selector Bar -->
   <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3.5">
-    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+    <div>
       
-      <!-- Option A: Standard 1-Click Dropdown -->
-      <div class="md:col-span-6">
-        <label for="leads_product_select" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
-          <span class="flex items-center gap-1.5">
-            <i class="fa-solid fa-list-check text-orange-500"></i>
-            <span>Select Product (1-Click)</span>
-          </span>
-          <span class="text-slate-400 font-medium normal-case">
-            {{ products|length }} Products
-          </span>
-        </label>
-        <select 
-          id="leads_product_select" 
-          onchange="if(this.value) window.location.href=this.value;" 
-          class="w-full text-xs font-semibold rounded-xl border border-slate-300 py-2.5 px-3 bg-slate-50 hover:bg-white focus:bg-white focus:ring-2 focus:ring-orange-500 text-slate-800 transition cursor-pointer"
-        >
-          <option value="">-- Choose a Product to View Vendors --</option>
-          {% for p in products %}
-          <option value="{% url 'leads-list' %}?product_id={{ p.id }}" {% if selected_product and selected_product.id == p.id %}selected{% endif %}>
-            {{ p.name }} &bull; {{ p.category.name|default:"General" }} ({{ p.lead_count }} Vendors)
-          </option>
-          {% endfor %}
-          {% if unassigned_count > 0 %}
-          <option value="{% url 'leads-list' %}?product_id=unassigned" {% if is_unassigned_view %}selected{% endif %}>
-            Other / Custom Search Vendors ({{ unassigned_count }} Vendors)
-          </option>
-          {% endif %}
-        </select>
-      </div>
-
-      <!-- Option B: Type-to-Search Combobox -->
-      <div class="md:col-span-6 relative" id="leads-product-combobox">
-        <label for="product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+      <!-- Type-to-Search Combobox (Single Unified Search Bar) -->
+      <div class="w-full relative" id="leads-product-combobox">
+        <label for="product_filter_input" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
           <span class="flex items-center gap-1.5">
             <i class="fa-solid fa-magnifying-glass text-orange-500"></i>
             <span>Search & Filter Product</span>
           </span>
-          <span class="text-slate-400 font-normal normal-case text-[10px]">
-            Press Enter to select
+          <span class="text-slate-400 font-medium normal-case text-xs">
+            {{ products|length }} Products in Catalog &bull; Click to switch
           </span>
         </label>
 
@@ -881,7 +851,7 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       if (dropdownMenu.classList.contains('hidden')) {
-        filterOptions(filterInput.value);
+        filterOptions('');
         openDropdown();
       } else {
         closeDropdown();
@@ -891,8 +861,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (filterInput) {
     filterInput.addEventListener('focus', function() {
-      filterOptions(filterInput.value);
+      this.select();
+      filterOptions('');
       openDropdown();
+    });
+
+    filterInput.addEventListener('click', function() {
+      if (dropdownMenu.classList.contains('hidden')) {
+        filterOptions('');
+        openDropdown();
+      }
     });
 
     filterInput.addEventListener('input', function() {

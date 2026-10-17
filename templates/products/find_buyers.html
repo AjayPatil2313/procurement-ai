@@ -55,12 +55,14 @@
       <input type="hidden" name="has_criteria_payload" value="1">
       <input type="hidden" name="product_id" id="selected_product_id" value="{% if selected_product %}{{ selected_product.id }}{% elif selected_product_id %}{{ selected_product_id }}{% endif %}">
 
-      <!-- Top Row: Shortened Search Bar + Apply Criteria + Launch Button -->
-      <div class="flex flex-col md:flex-row items-stretch md:items-end justify-between gap-3">
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 flex-1">
+      <!-- Top Row: Responsive Product Search + Dynamic Criteria + Launch Actions -->
+      <div class="flex flex-col xl:flex-row items-stretch xl:items-end justify-between gap-3.5">
+        
+        <!-- Left & Middle: Product Combobox & Config Controls -->
+        <div class="flex flex-wrap items-end gap-2.5 flex-1 min-w-0">
           
           <!-- Shortened Product Combobox -->
-          <div class="w-full sm:w-72 md:w-80 lg:w-96 relative shrink-0" id="searchable-combobox-wrapper">
+          <div class="w-full sm:w-72 lg:w-80 relative shrink-0" id="searchable-combobox-wrapper">
             <label for="product_search_input" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
               <span class="flex items-center gap-1.5">
                 <i class="fa-solid fa-boxes-stacked text-orange-500"></i>
@@ -149,12 +151,13 @@
             </div>
           </div>
 
-          <!-- Apply Criteria Button (Directly Next to Search Bar) -->
-          <div class="shrink-0">
+          <!-- Controls Group: Criteria + Scope + Save -->
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <!-- Apply Criteria Button -->
             <button 
               type="button" 
               id="toggle_criteria_btn" 
-              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-900 font-bold text-xs transition shadow-xs hover:border-orange-300 cursor-pointer"
+              class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-900 font-bold text-xs transition shadow-xs hover:border-orange-300 cursor-pointer"
               title="Configure Dynamic Field Criteria and evaluation parameters"
             >
               <i class="fa-solid fa-sliders text-orange-600"></i>
@@ -164,29 +167,25 @@
               </span>
               <i class="fa-solid fa-chevron-down text-[10px] text-orange-500 transition-transform duration-200" id="criteria_chevron"></i>
             </button>
-          </div>
 
-          <!-- Search Scope Selector (Local / National / Global) -->
-          <div class="shrink-0">
+            <!-- Search Scope Selector (Local / National / Global) -->
             <select 
               name="search_scope" 
               id="search_scope_select" 
-              class="w-full sm:w-auto text-xs font-bold rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-950 px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition cursor-pointer shadow-xs"
+              class="text-xs font-bold rounded-xl border border-orange-200 bg-orange-50/90 hover:bg-orange-100 text-orange-950 px-3 py-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition cursor-pointer shadow-xs"
               title="Select geographic reach: Local, National, or Global"
             >
               <option value="national" {% if search_scope == 'national' or not search_scope %}selected{% endif %}>🇮🇳 National Scope</option>
               <option value="local" {% if search_scope == 'local' %}selected{% endif %}>📍 Local Scope</option>
               <option value="global" {% if search_scope == 'global' %}selected{% endif %}>🌐 Global Scope</option>
             </select>
-          </div>
 
-          <!-- Save Criteria Button -->
-          <div class="shrink-0">
+            <!-- Save Criteria Button -->
             <button 
               type="button" 
               id="save_criteria_top_btn" 
               onclick="submitSaveCriteria()" 
-              class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs transition shadow-xs cursor-pointer"
+              class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs transition shadow-xs cursor-pointer"
               title="Save current criteria settings to database"
             >
               <i class="fa-regular fa-floppy-disk text-slate-500"></i>
@@ -195,20 +194,20 @@
           </div>
         </div>
 
-        <!-- Right Side: Launch Button & Clear Filter -->
-        <div class="flex items-center gap-2 shrink-0">
+        <!-- Right Side: Dedicated Launch Action Container (No overlap) -->
+        <div class="flex items-center gap-2 shrink-0 xl:self-end pt-1 xl:pt-0">
           <button 
             type="submit" 
             id="launch_search_btn" 
             {% if not selected_product %}disabled title="Please select a product first"{% elif subscription and subscription.credits_remaining <= 0 %}disabled title="Search disabled: AI credits exhausted"{% endif %}
-            class="flex-1 sm:flex-initial {% if not selected_product %}bg-slate-200 text-slate-400 cursor-not-allowed opacity-60{% elif subscription and subscription.credits_remaining <= 0 %}bg-slate-300 text-slate-500 cursor-not-allowed opacity-60{% else %}{% if has_db_results %}bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20{% else %}bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30 ring-2 ring-orange-400/50 animate-pulse{% endif %}{% endif %} font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
+            class="flex-1 sm:flex-initial {% if not selected_product %}bg-slate-200 text-slate-400 cursor-not-allowed opacity-60{% elif subscription and subscription.credits_remaining <= 0 %}bg-slate-300 text-slate-500 cursor-not-allowed opacity-60{% else %}{% if has_db_results %}bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20{% else %}bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30 ring-2 ring-orange-400/50 animate-pulse{% endif %}{% endif %} font-bold text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap"
           >
             <i class="fa-solid {% if has_db_results %}fa-arrows-rotate{% else %}fa-wand-magic-sparkles{% endif %}"></i>
             <span>{% if has_db_results %}Re-run AI Discovery{% else %}Launch AI Vendor Search{% endif %}</span>
           </button>
 
           {% if selected_product_id %}
-          <a href="{% url 'find-buyers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition shrink-0" title="Reset search">
+          <a href="{% url 'find-buyers' %}" class="text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition shrink-0 whitespace-nowrap" title="Reset search">
             Clear Filter
           </a>
           {% endif %}

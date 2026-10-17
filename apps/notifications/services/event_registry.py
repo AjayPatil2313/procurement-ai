@@ -667,6 +667,7 @@ EVENT_REGISTRY = {
 # Preserves compatibility with existing event keys in older modules/tests
 EVENT_ALIASES = {
     "requirement.created": "requirement.changed",
+    "inquiry.status_changed": "inquiry.message_received",
     "vendor_match.found": "ai.matches.found",
     "company.user_added": "company.member_added",
     "company.verification_updated": "company.verification_status_changed",
@@ -688,26 +689,96 @@ EVENT_ALIASES = {
     "admin.new_company": "platform.company_registered",
     "admin.verification_pending": "platform.company_verification_pending",
     "admin.verification_decision": "platform.company_verification_decided",
+    "admin.new_user": "platform.user_registered",
+    "admin.company_suspended": "platform.company_status_changed",
+    "admin.subscription_change": "platform.subscription_status_changed",
+    "admin.payment_issue": "platform.billing_issue",
     "admin.email_delivery_failure": "platform.email_delivery_failure",
     "admin.security_alert": "platform.security_alert",
     "admin.ticket_filed": "platform.critical_exception",
 }
 
 
+# =========================================================================
+# BACKWARD-COMPATIBLE LEGACY EVENT DEFINITIONS
+# =========================================================================
+# Preserves legacy templates, categories, and relative paths for existing modules
+LEGACY_EVENT_DEFS = {
+    "requirement.created": {
+        "title_template": "New Customer Requirement: {item_name}",
+        "message_template": "Customer {company_name} is sourcing {quantity} {unit} of '{item_name}'. Review specifications and submit quote.",
+        "category": NotificationPreference.Category.SALES,
+        "priority": Notification.Priority.INFO,
+        "audience": "VENDORS",
+        "default_url": "/sourcing/requirements/{id}/",
+        "channels": ["in_app", "push"],
+        "icon": "fa-bullhorn",
+        "color": "blue",
+        "cooldown_minutes": 15,
+        "is_mandatory": False,
+    },
+    "vendor_match.found": {
+        "title_template": "AI Vendor Matches Discovered: {item_name}",
+        "message_template": "Our AI matching engine discovered {match_count} verified vendors for '{item_name}'. Review supplier responses.",
+        "category": NotificationPreference.Category.PROCUREMENT,
+        "priority": Notification.Priority.SUCCESS,
+        "audience": "CUSTOMER",
+        "default_url": "/sourcing/requirements/{id}/",
+        "channels": ["in_app", "push"],
+        "icon": "fa-handshake",
+        "color": "emerald",
+        "cooldown_minutes": 15,
+        "is_mandatory": False,
+    },
+    "inquiry.status_changed": {
+        "title_template": "Inquiry Updated: {subject}",
+        "message_template": "Status updated to '{status_display}' by {acting_party}.",
+        "category": NotificationPreference.Category.SALES,
+        "priority": Notification.Priority.INFO,
+        "audience": "INQUIRY_PARTICIPANTS",
+        "default_url": "/leads/inquiries/{id}/",
+        "channels": ["in_app", "push"],
+        "icon": "fa-arrow-progress",
+        "color": "indigo",
+        "cooldown_minutes": 5,
+        "is_mandatory": False,
+    },
+    "price.changed": {
+        "title_template": "Price Update: {product_title}",
+        "message_template": "Vendor {vendor_name} updated pricing for '{product_title}'.",
+        "category": NotificationPreference.Category.PROCUREMENT,
+        "priority": Notification.Priority.INFO,
+        "audience": "CUSTOMER",
+        "default_url": "/catalog/products/{id}/",
+        "channels": ["in_app", "push"],
+        "icon": "fa-tag",
+        "color": "amber",
+        "cooldown_minutes": 15,
+        "is_mandatory": False,
+    },
+}
+
+
 def get_event_definition(event_key):
     """
-    Looks up event definition by primary code or legacy alias.
+    Looks up event definition by primary code, legacy definition, or legacy alias.
     Returns (resolved_key, definition_dict).
     """
     if not event_key:
         return "", {}
 
     key = str(event_key).strip()
+    if key in LEGACY_EVENT_DEFS:
+        return key, LEGACY_EVENT_DEFS[key]
+
     if key in EVENT_REGISTRY:
         return key, EVENT_REGISTRY[key]
 
     alias_key = EVENT_ALIASES.get(key)
-    if alias_key and alias_key in EVENT_REGISTRY:
-        return alias_key, EVENT_REGISTRY[alias_key]
+    if alias_key:
+        if alias_key in LEGACY_EVENT_DEFS:
+            return alias_key, LEGACY_EVENT_DEFS[alias_key]
+        if alias_key in EVENT_REGISTRY:
+            return alias_key, EVENT_REGISTRY[alias_key]
 
     return key, {}

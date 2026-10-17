@@ -93,6 +93,51 @@
     </div>
   </div>
 
+  <!-- Synchronized Multi-Channel Telemetry (In-App & FCM Push) -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <!-- In-App / System Notifications -->
+    <div class="bg-gradient-to-br from-indigo-50/70 to-white rounded-2xl p-5 border border-indigo-100 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-indigo-700 uppercase tracking-wider">System In-App Alerts</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ total_in_app_count }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-indigo-600 mt-1">
+          <i class="fa-solid fa-bell mr-1"></i> {{ unread_in_app_count }} unread in bell centers
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-bell"></i>
+      </div>
+    </div>
+
+    <!-- FCM Push Notifications -->
+    <div class="bg-gradient-to-br from-amber-50/70 to-white rounded-2xl p-5 border border-amber-100 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-amber-800 uppercase tracking-wider">Firebase Web Push</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ push_sent_count }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-amber-700 mt-1">
+          <i class="fa-solid fa-paper-plane mr-1"></i> {{ total_push_logs }} total push attempts
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+      </div>
+    </div>
+
+    <!-- Registered Push Devices -->
+    <div class="bg-gradient-to-br from-emerald-50/70 to-white rounded-2xl p-5 border border-emerald-100 shadow-sm flex items-center justify-between">
+      <div>
+        <p class="text-xs font-bold text-emerald-800 uppercase tracking-wider">Active Push Devices</p>
+        <h3 class="text-2xl font-black text-slate-900 mt-1">{{ active_devices_count }}</h3>
+        <span class="inline-flex items-center text-[11px] font-semibold text-emerald-700 mt-1">
+          <i class="fa-solid fa-signal mr-1"></i> FCM device tokens active
+        </span>
+      </div>
+      <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-laptop"></i>
+      </div>
+    </div>
+  </div>
+
   <!-- Operational Configuration Status -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Active SMTP Health Card -->

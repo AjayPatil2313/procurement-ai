@@ -92,5 +92,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_short_name(self):
         return self.first_name if self.first_name else self.email
 
+    @property
+    def company(self):
+        try:
+            return self.company_membership.company
+        except Exception:
+            return None
+
     def __str__(self):
         return self.email

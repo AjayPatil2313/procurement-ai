@@ -41,22 +41,22 @@
 
   <!-- Audience Category Filter Tabs -->
   <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-    <a href="?{% if selected_mode %}mode={{ selected_mode }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
+    <a href="?{% if selected_mode %}mode={{ selected_mode }}&{% endif %}{% if selected_module %}module={{ selected_module }}&{% endif %}{% if selected_company_type %}company_type={{ selected_company_type }}&{% endif %}{% if selected_channel %}channel={{ selected_channel }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if not selected_audience %}bg-slate-900 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
       <i class="fa-solid fa-layer-group text-[11px]"></i> All Categories
       <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if not selected_audience %}bg-slate-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ total_count }}</span>
     </a>
-    <a href="?audience=USER{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?audience=USER{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if selected_module %}&module={{ selected_module }}{% endif %}{% if selected_company_type %}&company_type={{ selected_company_type }}{% endif %}{% if selected_channel %}&channel={{ selected_channel }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if selected_audience == 'USER' %}bg-emerald-600 text-white shadow-sm shadow-emerald-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
       <i class="fa-solid fa-user text-[11px]"></i> User / Company User
       <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if selected_audience == 'USER' %}bg-emerald-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ user_count }}</span>
     </a>
-    <a href="?audience=COMPANY_ADMIN{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?audience=COMPANY_ADMIN{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if selected_module %}&module={{ selected_module }}{% endif %}{% if selected_company_type %}&company_type={{ selected_company_type }}{% endif %}{% if selected_channel %}&channel={{ selected_channel }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if selected_audience == 'COMPANY_ADMIN' %}bg-blue-600 text-white shadow-sm shadow-blue-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
       <i class="fa-solid fa-building-user text-[11px]"></i> Company Admin
       <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if selected_audience == 'COMPANY_ADMIN' %}bg-blue-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ company_admin_count }}</span>
     </a>
-    <a href="?audience=SUPER_ADMIN{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?audience=SUPER_ADMIN{% if selected_mode %}&mode={{ selected_mode }}{% endif %}{% if selected_module %}&module={{ selected_module }}{% endif %}{% if selected_company_type %}&company_type={{ selected_company_type }}{% endif %}{% if selected_channel %}&channel={{ selected_channel }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {% if selected_audience == 'SUPER_ADMIN' %}bg-purple-600 text-white shadow-sm shadow-purple-500/20{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
       <i class="fa-solid fa-shield-halved text-[11px]"></i> Super Admin Platform Alerts
       <span class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] {% if selected_audience == 'SUPER_ADMIN' %}bg-purple-700 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">{{ super_admin_count }}</span>
@@ -64,45 +64,84 @@
   </div>
 
   <!-- Filters Toolbar -->
-  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <!-- Mode Filters -->
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Delivery Mode:</span>
-      <a href="?{% if selected_audience %}audience={{ selected_audience }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
-         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if not selected_mode %}bg-indigo-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-        All Modes
-      </a>
-      <a href="?mode=AUTOMATIC{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'AUTOMATIC' %}bg-cyan-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-        <i class="fa-solid fa-bolt-auto mr-1"></i> Automatic Only
-      </a>
-      <a href="?mode=MANUAL{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'MANUAL' %}bg-purple-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-        <i class="fa-solid fa-hand mr-1"></i> Manual Only
-      </a>
-      <a href="?mode=BOTH{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'BOTH' %}bg-emerald-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
-        <i class="fa-solid fa-arrows-split-up-and-left mr-1"></i> Both (Auto &amp; Manual)
-      </a>
-    </div>
-
-    <!-- Search Toolbar Form -->
-    <form method="GET" class="flex items-center gap-2 w-full md:w-auto">
-      {% if selected_audience %}<input type="hidden" name="audience" value="{{ selected_audience }}">{% endif %}
-      {% if selected_mode %}<input type="hidden" name="mode" value="{{ selected_mode }}">{% endif %}
-      <div class="relative w-full md:w-72">
-        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, event, subject..."
-               class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+  <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+    <!-- Row 1: Mode Filters & Reset -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Delivery Mode:</span>
+        <a href="?{% if selected_audience %}audience={{ selected_audience }}&{% endif %}{% if selected_module %}module={{ selected_module }}&{% endif %}{% if selected_company_type %}company_type={{ selected_company_type }}&{% endif %}{% if selected_channel %}channel={{ selected_channel }}&{% endif %}{% if search_query %}q={{ search_query }}{% endif %}"
+           class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if not selected_mode %}bg-indigo-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+          All Modes
+        </a>
+        <a href="?mode=AUTOMATIC{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if selected_module %}&module={{ selected_module }}{% endif %}{% if selected_company_type %}&company_type={{ selected_company_type }}{% endif %}{% if selected_channel %}&channel={{ selected_channel }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'AUTOMATIC' %}bg-cyan-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+          <i class="fa-solid fa-bolt-auto mr-1"></i> Automatic Only
+        </a>
+        <a href="?mode=MANUAL{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if selected_module %}&module={{ selected_module }}{% endif %}{% if selected_company_type %}&company_type={{ selected_company_type }}{% endif %}{% if selected_channel %}&channel={{ selected_channel }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'MANUAL' %}bg-purple-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+          <i class="fa-solid fa-hand mr-1"></i> Manual Only
+        </a>
+        <a href="?mode=BOTH{% if selected_audience %}&audience={{ selected_audience }}{% endif %}{% if selected_module %}&module={{ selected_module }}{% endif %}{% if selected_company_type %}&company_type={{ selected_company_type }}{% endif %}{% if selected_channel %}&channel={{ selected_channel }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if selected_mode == 'BOTH' %}bg-emerald-600 text-white shadow-sm{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+          <i class="fa-solid fa-arrows-split-up-and-left mr-1"></i> Both (Auto &amp; Manual)
+        </a>
       </div>
-      <button type="submit" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition">
-        Filter
-      </button>
-      {% if search_query or selected_mode or selected_audience %}
-      <a href="{% url 'admin-panel-email-triggers' %}" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition" title="Clear all filters">
-        Reset
+
+      {% if search_query or selected_mode or selected_audience or selected_module or selected_company_type or selected_channel or selected_status %}
+      <a href="{% url 'admin-panel-email-triggers' %}" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-rotate-left text-[10px]"></i> Reset All Filters
       </a>
       {% endif %}
+    </div>
+
+    <!-- Row 2: Module, Scope, Channel Dropdowns & Search -->
+    <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 items-center pt-2 border-t border-slate-100">
+      {% if selected_audience %}<input type="hidden" name="audience" value="{{ selected_audience }}">{% endif %}
+      {% if selected_mode %}<input type="hidden" name="mode" value="{{ selected_mode }}">{% endif %}
+
+      <!-- Module Selector -->
+      <div>
+        <select name="module" onchange="this.form.submit()" class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Business Modules</option>
+          {% for code, label in modules %}
+          <option value="{{ code }}" {% if selected_module == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Company Scope Selector -->
+      <div>
+        <select name="company_type" onchange="this.form.submit()" class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Org Scopes</option>
+          {% for code, label in company_types %}
+          <option value="{{ code }}" {% if selected_company_type == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Channel Selector -->
+      <div>
+        <select name="channel" onchange="this.form.submit()" class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Delivery Channels</option>
+          {% for code, label in channels %}
+          <option value="{{ code }}" {% if selected_channel == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Search Input -->
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search name, event..."
+               class="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+      </div>
+
+      <!-- Filter Button -->
+      <div>
+        <button type="submit" class="w-full py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-filter text-[10px]"></i> Apply Filters
+        </button>
+      </div>
     </form>
   </div>
 
@@ -130,11 +169,33 @@
               <div class="flex items-start gap-2">
                 <div>
                   <span class="font-extrabold text-slate-900 block text-xs leading-snug">{{ r.name }}</span>
-                  <div class="flex items-center gap-1.5 mt-1">
+                  <div class="flex items-center gap-1.5 mt-1 flex-wrap">
                     <code class="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded font-mono font-semibold border border-indigo-100">{{ r.event_key }}</code>
                     {% if r.is_mandatory_auth %}
                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Mandatory Security Authentication Notification — Cannot be casually disabled">
                       <i class="fa-solid fa-lock mr-1 text-[8px]"></i> Mandatory Auth
+                    </span>
+                    {% endif %}
+                    <!-- Module Badge -->
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200" title="Business Module">
+                      {{ r.get_module_display }}
+                    </span>
+                    <!-- Scope Badge -->
+                    {% if r.company_type == 'BUYER' %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200" title="Customer (Buyer) Scoped">
+                      Customer (Buyer)
+                    </span>
+                    {% elif r.company_type == 'SELLER' %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Vendor (Seller) Scoped">
+                      Vendor (Seller)
+                    </span>
+                    {% elif r.company_type == 'BOTH' %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Customer + Vendor Both">
+                      Customer + Vendor
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-50 text-slate-600 border border-slate-200" title="All Organizations">
+                      All Orgs
                     </span>
                     {% endif %}
                   </div>
@@ -145,7 +206,7 @@
               </div>
             </td>
 
-            <!-- 2. Target Audience & Delivery Mode -->
+            <!-- 2. Target Audience & Delivery Mode & Channel -->
             <td class="p-3.5 whitespace-nowrap">
               <div class="space-y-1">
                 <div>
@@ -179,16 +240,28 @@
                   {% endif %}
                 </div>
                 <div class="mt-0.5">
-                  {% if r.channel == 'BOTH' %}
-                  <span class="inline-flex items-center text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                  {% if r.channel == 'ALL' %}
+                  <span class="inline-flex items-center text-[10px] font-black text-indigo-800 bg-indigo-100/90 px-2 py-0.5 rounded-full border border-indigo-300" title="Delivers to In-App, Email, and Push">
+                    <i class="fa-solid fa-tower-broadcast mr-1 text-[9px] text-indigo-600"></i> All Channels (3-Way)
+                  </span>
+                  {% elif r.channel == 'IN_APP_PUSH' %}
+                  <span class="inline-flex items-center text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200" title="Delivers to In-App and Push">
+                    <i class="fa-solid fa-mobile-screen mr-1 text-[9px]"></i> In-App &amp; Push
+                  </span>
+                  {% elif r.channel == 'BOTH' %}
+                  <span class="inline-flex items-center text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200" title="Delivers to In-App and Email">
                     <i class="fa-solid fa-layer-group mr-1 text-[9px]"></i> In-App &amp; Email
                   </span>
                   {% elif r.channel == 'IN_APP' %}
-                  <span class="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  <span class="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200" title="In-App Bell Only">
                     <i class="fa-solid fa-bell mr-1 text-[9px]"></i> In-App Only
                   </span>
+                  {% elif r.channel == 'PUSH' %}
+                  <span class="inline-flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200" title="FCM Push Notification Only">
+                    <i class="fa-solid fa-mobile-screen-button mr-1 text-[9px]"></i> Push Only
+                  </span>
                   {% elif r.channel == 'EMAIL' %}
-                  <span class="inline-flex items-center text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                  <span class="inline-flex items-center text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200" title="Transactional Email Only">
                     <i class="fa-solid fa-envelope mr-1 text-[9px]"></i> Email Only
                   </span>
                   {% endif %}
@@ -343,6 +416,8 @@
               "target_audience": "{{ r.target_audience|escapejs }}",
               "delivery_mode": "{{ r.delivery_mode|escapejs }}",
               "channel": "{{ r.channel|default:'BOTH'|escapejs }}",
+              "module": "{{ r.module|default:''|escapejs }}",
+              "company_type": "{{ r.company_type|default:'ALL'|escapejs }}",
               "template_id": {% if r.template %}{{ r.template.id }}{% else %}null{% endif %},
               "recipient_type": "{{ r.recipient_type|escapejs }}",
               "custom_recipients": "{{ r.custom_recipients|escapejs }}",
@@ -454,7 +529,29 @@
             <option value="{{ code }}">{{ label }}</option>
             {% endfor %}
           </select>
-          <span class="text-[10px] text-slate-500 mt-1 block">Notification channels: In-App, Email, or Both.</span>
+          <span class="text-[10px] text-slate-500 mt-1 block">Channels: All (3-Way), In-App, Push, Email, etc.</span>
+        </div>
+
+        <!-- Business Module -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Business Module</label>
+          <select name="module" id="cfg_module" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+            {% for code, label in modules %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <span class="text-[10px] text-slate-500 mt-1 block">Platform module (Procurement, Sales, AI Search, etc.)</span>
+        </div>
+
+        <!-- Organization Scope (Customer / Vendor) -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Company Scope</label>
+          <select name="company_type" id="cfg_company_type" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500">
+            {% for code, label in company_types %}
+            <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <span class="text-[10px] text-slate-500 mt-1 block">Target org scope: Customer, Vendor, Both, or All.</span>
         </div>
 
         <!-- Template Selector -->
@@ -605,14 +702,14 @@
 
 
 <!-- ========================================================================= -->
-<!-- MODAL 3: SEND TEST EMAIL MODAL -->
+<!-- MODAL 3: MULTI-CHANNEL TEST DISPATCH MODAL -->
 <!-- ========================================================================= -->
 <div id="testSendModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
     
     <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
       <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
-        <i class="fa-solid fa-paper-plane text-amber-500"></i> Dispatch Test Email
+        <i class="fa-solid fa-paper-plane text-amber-500"></i> Multi-Channel Test Dispatch
       </h3>
       <button type="button" onclick="closeTestSendModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
         <i class="fa-solid fa-xmark text-sm"></i>
@@ -622,20 +719,55 @@
     <form id="testSendForm" method="POST" action="" class="p-5 space-y-4 text-xs">
       {% csrf_token %}
       <p class="text-slate-600">
-        Dispatches an immediate live test transmission of <strong id="testSendRuleName" class="text-slate-900"></strong> via active SMTP credentials.
+        Dispatches an immediate live test transmission of <strong id="testSendRuleName" class="text-slate-900"></strong> across configured channels.
       </p>
 
+      <!-- Target Channel Selection -->
       <div>
-        <label class="block font-bold text-slate-700 mb-1">Target Test Email Address</label>
-        <input type="email" name="target_email" value="{{ request.user.email }}" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-semibold">
+        <label class="block font-bold text-slate-700 mb-1">Select Delivery Channel</label>
+        <select name="channel" id="test_channel" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800">
+          <option value="ALL">All Active Channels (System In-App + Email + FCM Web Push)</option>
+          <option value="IN_APP">System In-App Notification (Bell Icon) Only</option>
+          <option value="EMAIL">Transactional Email (SMTP) Only</option>
+          <option value="PUSH">Firebase Cloud Messaging (FCM Push) Only</option>
+          <option value="IN_APP_PUSH">System In-App + FCM Push</option>
+          <option value="BOTH">System In-App + Transactional Email</option>
+        </select>
       </div>
+
+      <!-- Target User Selection -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Target Platform User</label>
+        <select name="target_user_id" id="test_target_user_id" onchange="updateTestEmail(this)" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium">
+          <option value="{{ request.user.id }}" data-email="{{ request.user.email }}">
+            Current Operator: {{ request.user.get_full_name|default:request.user.email }} (Super Admin)
+          </option>
+          {% for u in sample_users %}
+            {% if u.id != request.user.id %}
+            <option value="{{ u.id }}" data-email="{{ u.email }}">
+              {{ u.get_full_name|default:u.email }} {% if u.company %}— {{ u.company.name }} ({{ u.company.get_company_type_display }}){% endif %}
+            </option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Destination Email -->
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Destination Email Address</label>
+        <input type="email" name="target_email" id="test_target_email" value="{{ request.user.email }}" required class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-semibold font-mono">
+      </div>
+
+      <!-- Live AJAX Result Banner (Hidden initially) -->
+      <div id="testSendResultBanner" class="hidden rounded-xl p-3 text-xs border"></div>
 
       <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
         <button type="button" onclick="closeTestSendModal()" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
-          Cancel
+          Close
         </button>
-        <button type="submit" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-md shadow-amber-600/20 transition flex items-center gap-1.5">
-          <i class="fa-solid fa-paper-plane text-[10px]"></i> Send Test Now
+        <button type="submit" id="testSendBtn" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-md shadow-amber-600/20 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane text-[10px]" id="testSendIcon"></i>
+          <span id="testSendBtnText">Send Test Now</span>
         </button>
       </div>
     </form>
@@ -742,6 +874,8 @@
     document.getElementById('cfg_target_audience').value = rule.target_audience || 'USER';
     document.getElementById('cfg_delivery_mode').value = rule.delivery_mode || 'AUTOMATIC';
     document.getElementById('cfg_channel').value = rule.channel || 'BOTH';
+    document.getElementById('cfg_module').value = rule.module || '';
+    document.getElementById('cfg_company_type').value = rule.company_type || 'ALL';
     if (rule.template_id) {
       document.getElementById('cfg_template_id').value = rule.template_id;
     }
@@ -814,10 +948,32 @@
     modal.classList.remove('flex');
   }
 
-  // 3. Send Test Modal
+  // 3. Send Test Modal & AJAX Handler
+  function updateTestEmail(selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    const email = opt.getAttribute('data-email');
+    if (email) {
+      document.getElementById('test_target_email').value = email;
+    }
+  }
+
   function openTestSendModal(ruleId, ruleName) {
     document.getElementById('testSendRuleName').textContent = ruleName;
     document.getElementById('testSendForm').action = '/admin-panel/email/triggers/' + ruleId + '/test-send/';
+    
+    // Reset status banner
+    const banner = document.getElementById('testSendResultBanner');
+    if (banner) {
+      banner.classList.add('hidden');
+      banner.innerHTML = '';
+    }
+    const btn = document.getElementById('testSendBtn');
+    if (btn) {
+      btn.disabled = false;
+      document.getElementById('testSendBtnText').textContent = 'Send Test Now';
+      document.getElementById('testSendIcon').className = 'fa-solid fa-paper-plane text-[10px]';
+    }
+
     const modal = document.getElementById('testSendModal');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -828,6 +984,55 @@
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
+
+  // Intercept testSendForm with AJAX fetch for instant status reporting
+  document.getElementById('testSendForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const btn = document.getElementById('testSendBtn');
+    const btnText = document.getElementById('testSendBtnText');
+    const icon = document.getElementById('testSendIcon');
+    const banner = document.getElementById('testSendResultBanner');
+
+    btn.disabled = true;
+    btnText.textContent = 'Transmitting...';
+    icon.className = 'fa-solid fa-spinner fa-spin text-[10px]';
+    banner.classList.add('hidden');
+
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      }
+    })
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btnText.textContent = 'Send Test Now';
+      icon.className = 'fa-solid fa-paper-plane text-[10px]';
+
+      banner.classList.remove('hidden');
+      if (data.status === 'success') {
+        banner.className = 'rounded-xl p-3 text-xs bg-emerald-50 border border-emerald-200 text-emerald-900';
+        banner.innerHTML = '<div class="font-bold flex items-center gap-1.5 mb-1"><i class="fa-solid fa-circle-check text-emerald-600"></i> Dispatch Succeeded</div><p>' + data.message + '</p>';
+      } else {
+        banner.className = 'rounded-xl p-3 text-xs bg-amber-50 border border-amber-200 text-amber-900';
+        banner.innerHTML = '<div class="font-bold flex items-center gap-1.5 mb-1"><i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Dispatch Result</div><p>' + data.message + '</p>';
+      }
+    })
+    .catch(err => {
+      btn.disabled = false;
+      btnText.textContent = 'Send Test Now';
+      icon.className = 'fa-solid fa-paper-plane text-[10px]';
+
+      banner.classList.remove('hidden');
+      banner.className = 'rounded-xl p-3 text-xs bg-rose-50 border border-rose-200 text-rose-900';
+      banner.innerHTML = '<div class="font-bold flex items-center gap-1.5 mb-1"><i class="fa-solid fa-circle-xmark text-rose-600"></i> Transmission Failed</div><p>' + err.message + '</p>';
+    });
+  });
 
   // 4. Manual Send Modal
   function openManualSendModal(ruleId, ruleName, deliveryMode) {

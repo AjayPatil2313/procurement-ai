@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Product Catalog — AI Sales Platform{% endblock %}
+{% block title %}Add Requirement — AI Sales Platform{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -9,17 +9,19 @@
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-        <i class="fa-solid fa-box-open text-orange-500"></i>
-        <span>Product Catalog</span>
+        <i class="fa-solid fa-clipboard-list text-blue-600"></i>
+        <span>Add Requirement</span>
       </h1>
       <p class="text-xs text-slate-500 mt-1">
-        Manage commercial products, SKUs, and technical specifications to match with verified B2B customers
+        Manage requirements and specifications to match with verified B2B vendors
       </p>
     </div>
     <div class="flex items-center flex-wrap gap-2">
+
+
       {% if can_create %}
-      <a href="{% url 'products-create' %}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center shadow-md shadow-orange-500/20 transition">
-        <i class="fa-solid fa-plus mr-2"></i> Add Product
+      <a href="{% url 'products-create' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center shadow-md shadow-blue-500/20 transition">
+        <i class="fa-solid fa-plus mr-2"></i> Add Requirement
       </a>
       {% endif %}
     </div>
@@ -27,10 +29,10 @@
 
   <!-- Metric Stats Cards -->
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-    <!-- Total Products -->
+    <!-- Total Requirements -->
     <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
       <div>
-        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Products</div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Requirements</div>
         <div class="text-2xl font-black text-slate-900 mt-1">{{ total_count }}</div>
       </div>
       <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
@@ -273,57 +275,82 @@
               </span>
             </td>
 
-            <!-- Actions -->
+            <!-- Actions (3-Dots Dropdown) -->
             <td class="py-3.5 px-4 text-right whitespace-nowrap">
-              <div class="flex items-center justify-end space-x-1.5">
-                {% if is_archived_view %}
-                  <!-- Restore Action -->
-                  {% if can_edit or can_delete %}
-                  <form method="POST" action="{% url 'product-restore' p.id %}" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition shadow-xs cursor-pointer" title="Restore this product to active catalog">
-                      <i class="fa-solid fa-rotate-left text-xs"></i>
-                      <span>Restore</span>
-                    </button>
-                  </form>
+              <div class="relative inline-block text-left" id="prod-action-wrapper-{{ p.id }}">
+                <button 
+                  type="button" 
+                  onclick="toggleProductActionDropdown('{{ p.id }}', event)" 
+                  class="w-8 h-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer shadow-xs focus:ring-2 focus:ring-blue-500"
+                  title="Actions menu"
+                  id="prod-action-btn-{{ p.id }}"
+                >
+                  <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
+                </button>
+
+                <div 
+                  id="prod-action-menu-{{ p.id }}" 
+                  class="hidden absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-40 text-left divide-y divide-slate-100"
+                >
+                  {% if is_archived_view %}
+                    {% if can_edit or can_delete %}
+                    <div class="py-1">
+                      <form method="POST" action="{% url 'product-restore' p.id %}" class="block">
+                        {% csrf_token %}
+                        <button type="submit" class="w-full text-left px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer transition">
+                          <i class="fa-solid fa-rotate-left w-4 text-emerald-600"></i>
+                          <span>Restore Product</span>
+                        </button>
+                      </form>
+                    </div>
+                    {% else %}
+                    <div class="px-3.5 py-2 text-xs text-slate-400 italic">Archived (No actions)</div>
+                    {% endif %}
                   {% else %}
-                  <span class="text-xs text-slate-400 italic">Archived</span>
+                    <div class="py-1">
+                      <!-- Find Vendors AI -->
+                      <a href="{% url 'find-buyers' %}?product_id={{ p.id }}" class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-orange-700 hover:bg-orange-50 transition">
+                        <i class="fa-solid fa-crosshairs w-4 text-orange-500"></i>
+                        <span>Find Vendors (AI)</span>
+                      </a>
+
+                      <!-- 1-Click Duplicate -->
+                      <a href="{% url 'products-create' %}?duplicate_id={{ p.id }}" class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 transition">
+                        <i class="fa-solid fa-clone w-4 text-indigo-500"></i>
+                        <span>Duplicate Product</span>
+                      </a>
+
+                      <!-- View Detail -->
+                      <a href="{% url 'product-detail' p.id %}" class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition">
+                        <i class="fa-solid fa-eye w-4 text-blue-500"></i>
+                        <span>View Specifications</span>
+                      </a>
+
+                      <!-- Edit (if permitted) -->
+                      {% if can_edit %}
+                      <a href="{% url 'product-edit' p.id %}" class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition">
+                        <i class="fa-solid fa-pen-to-square w-4 text-blue-500"></i>
+                        <span>Edit Product</span>
+                      </a>
+                      {% endif %}
+                    </div>
+
+                    <!-- Soft Delete (if permitted) -->
+                    {% if can_delete %}
+                    <div class="py-1">
+                      <button 
+                        type="button" 
+                        onclick="closeAllProductActionDropdowns(); openSoftDeleteProductModal('{{ p.id }}', '{{ p.name|escapejs }}');" 
+                        class="w-full text-left flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition cursor-pointer" 
+                        title="Soft Delete Product"
+                      >
+                        <i class="fa-solid fa-trash-can w-4 text-rose-500"></i>
+                        <span>Delete Product</span>
+                      </button>
+                    </div>
+                    {% endif %}
                   {% endif %}
-                {% else %}
-                  <!-- Find Vendors AI -->
-                  <a href="{% url 'find-buyers' %}?product_id={{ p.id }}" class="p-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg border border-orange-200 transition" title="Find Vendors (AI Matching)">
-                    <i class="fa-solid fa-crosshairs text-xs"></i>
-                  </a>
-
-                  <!-- 1-Click Duplicate -->
-                  <a href="{% url 'products-create' %}?duplicate_id={{ p.id }}" class="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg border border-indigo-200 transition" title="Duplicate Product">
-                    <i class="fa-solid fa-clone text-xs"></i>
-                  </a>
-
-                  <!-- View Detail -->
-                  <a href="{% url 'product-detail' p.id %}" class="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-slate-200 transition" title="View Specifications">
-                    <i class="fa-solid fa-eye text-xs"></i>
-                  </a>
-
-                  <!-- Edit (if permitted) -->
-                  {% if can_edit %}
-                  <a href="{% url 'product-edit' p.id %}" class="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg border border-blue-200 transition" title="Edit Product">
-                    <i class="fa-solid fa-pen-to-square text-xs"></i>
-                  </a>
-                  {% endif %}
-
-                  <!-- Soft Delete (if permitted) -->
-                  {% if can_delete %}
-                  <button 
-                    type="button" 
-                    onclick="openSoftDeleteProductModal('{{ p.id }}', '{{ p.name|escapejs }}')" 
-                    class="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg border border-rose-200 transition cursor-pointer" 
-                    title="Soft Delete Product"
-                  >
-                    <i class="fa-solid fa-trash-can text-xs"></i>
-                  </button>
-                  {% endif %}
-                {% endif %}
+                </div>
               </div>
             </td>
           </tr>
@@ -535,9 +562,34 @@
     }
   }
 
-  // Close menus on outside click
+  // 4. Product Row 3-Dots Action Dropdown
+  function toggleProductActionDropdown(id, event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById(`prod-action-menu-${id}`);
+    const isHidden = menu ? menu.classList.contains('hidden') : true;
+    closeAllProductActionDropdowns();
+    if (menu && isHidden) {
+      menu.classList.remove('hidden');
+    }
+  }
+
+  function closeAllProductActionDropdowns() {
+    document.querySelectorAll('[id^="prod-action-menu-"]').forEach(m => m.classList.add('hidden'));
+  }
+
+  // Close menus on outside click or Escape
   document.addEventListener('click', (e) => {
     if (!e.target.closest('[id^="avail-wrapper-"]')) {
+      document.querySelectorAll('[id^="avail-menu-"]').forEach(m => m.classList.add('hidden'));
+    }
+    if (!e.target.closest('[id^="prod-action-wrapper-"]')) {
+      closeAllProductActionDropdowns();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeAllProductActionDropdowns();
       document.querySelectorAll('[id^="avail-menu-"]').forEach(m => m.classList.add('hidden'));
     }
   });

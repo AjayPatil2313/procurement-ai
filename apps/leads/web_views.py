@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 from apps.leads.models import SavedItem, Inquiry, PriceHistory, InquiryMessage
 from apps.leads.services.email_service import send_inquiry_email
-from apps.ai_search.models import SearchResult
+from apps.ai_search.models import SearchResult, SearchJob
 from apps.catalog.models import Product
 from apps.requirements.models import Requirement
 from apps.companies.rbac import get_user_rbac_context
@@ -39,7 +39,7 @@ def save_lead_toggle_view(request, result_id):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_seller"] or rbac["can_view_vendor"] or rbac["is_super_admin"]):
         messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
@@ -93,7 +93,7 @@ def batch_save_leads_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_seller"] or rbac["can_view_buyer"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_seller"] or rbac["can_view_vendor"] or rbac["can_view_buyer"] or rbac["is_super_admin"]):
         return JsonResponse({"success": False, "message": "Permission denied: Module access required."}, status=403)
 
     if request.method != "POST":
@@ -379,7 +379,7 @@ def update_saved_lead_view(request, item_id):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_seller"] or rbac["can_view_vendor"] or rbac["is_super_admin"]):
         messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
@@ -458,7 +458,7 @@ def delete_saved_lead_view(request, item_id):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_seller"] or rbac["can_view_vendor"] or rbac["is_super_admin"]):
         messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
@@ -488,7 +488,7 @@ def export_saved_leads_csv_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_seller"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_seller"] or rbac["can_view_vendor"] or rbac["is_super_admin"]):
         messages.error(request, "Access restricted: Sales module permission required.")
         return redirect("dashboard")
 
@@ -600,7 +600,8 @@ def leads_list_view(request):
     # Base query of all qualified buyer leads for this company
     base_leads_qs = SearchResult.objects.filter(
         search_job__company=company,
-        result_type=SearchResult.ResultType.LEAD,
+    ).filter(
+        Q(result_type=SearchResult.ResultType.LEAD) | Q(search_job__job_type=SearchJob.JobType.FIND_BUYERS)
     ).filter(
         Q(search_job__product__is_deleted=False) | Q(search_job__product__isnull=True)
     ).select_related(
@@ -621,6 +622,12 @@ def leads_list_view(request):
     counts_map = {item["search_job__product_id"]: item["total"] for item in lead_counts}
     for p in products:
         p.lead_count = counts_map.get(p.id, 0)
+        # Also include leads matching product title if product_id was not explicitly linked in older records
+        if p.lead_count == 0:
+            title_matches = base_leads_qs.filter(
+                Q(product_title__iexact=p.name) | Q(search_job__search_query__iexact=p.name)
+            ).values("external_company_id").distinct().count()
+            p.lead_count = title_matches
 
     unassigned_count = (
         base_leads_qs
@@ -644,7 +651,11 @@ def leads_list_view(request):
         selected_product = Product.objects.filter(id=int(product_id_str), company=company, is_deleted=False).first()
         if selected_product:
             is_single_product = True
-            raw_leads = list(base_leads_qs.filter(search_job__product=selected_product))
+            raw_leads = list(base_leads_qs.filter(
+                Q(search_job__product=selected_product) |
+                Q(product_title__iexact=selected_product.name) |
+                Q(search_job__search_query__iexact=selected_product.name)
+            ))
             seen_cids = set()
             for l in raw_leads:
                 cid = l.external_company_id
@@ -666,8 +677,10 @@ def leads_list_view(request):
                 seen_cids.add(cid)
             leads.append(l)
     else:
-        # Initial page load with no product selected:
-        # No vendor data is loaded until the user explicitly selects 1 product.
+        # Initial page load with no product specified:
+        # Show prompt to select a product from the single combobox
+        selected_product = None
+        is_single_product = False
         leads = []
         product_groups = []
         unassigned_group = None
@@ -1164,7 +1177,7 @@ def update_saved_supplier_view(request, item_id):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_buyer"] or rbac["can_view_sales"] or rbac["is_super_admin"]):
         return JsonResponse({"success": False, "error": "Access restricted"}, status=403)
 
     item = get_object_or_404(SavedItem, id=item_id, company=company)
@@ -1244,7 +1257,7 @@ def export_saved_suppliers_csv_view(request):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_buyer"] or rbac["can_view_sales"] or rbac["is_super_admin"]):
         messages.error(request, "Access restricted: Procurement module permission required.")
         return redirect("dashboard")
 
@@ -1350,7 +1363,7 @@ def delete_saved_supplier_view(request, item_id):
     rbac = get_user_rbac_context(request.user, company_id=selected_company_id)
     company = rbac["company"]
 
-    if not (rbac["can_view_buyer"] or rbac["is_super_admin"]):
+    if not (rbac["can_view_buyer"] or rbac["can_view_sales"] or rbac["is_super_admin"]):
         messages.error(request, "Access restricted: Procurement module permission required.")
         return redirect("dashboard")
 

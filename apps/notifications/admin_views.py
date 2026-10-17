@@ -114,8 +114,17 @@ def admin_email_overview_view(request):
         .order_by("-total")
     )
 
+    # System In-App and Push telemetry
+    from apps.dashboard.models import Notification
+    total_in_app_count = Notification.objects.count()
+    unread_in_app_count = Notification.objects.filter(is_read=False).count()
+    total_push_logs = PushDeliveryLog.objects.count()
+    push_sent_count = PushDeliveryLog.objects.filter(status=PushDeliveryLog.Status.SUCCESS).count()
+    push_failed_count = PushDeliveryLog.objects.filter(status=PushDeliveryLog.Status.FAILED).count()
+    active_devices_count = DeviceToken.objects.filter(is_active=True).count()
+
     context = {
-        "page_title": "Email Operations Overview",
+        "page_title": "Centralized Notification Operations Hub",
         "active_tab": "overview",
         "total_logs": total_logs,
         "sent_count": sent_count,
@@ -132,6 +141,12 @@ def admin_email_overview_view(request):
         "recent_logs": recent_logs,
         "template_categories": template_categories,
         "category_logs": category_logs,
+        "total_in_app_count": total_in_app_count,
+        "unread_in_app_count": unread_in_app_count,
+        "total_push_logs": total_push_logs,
+        "push_sent_count": push_sent_count,
+        "push_failed_count": push_failed_count,
+        "active_devices_count": active_devices_count,
     }
     return render(request, "admin_panel/email/overview.html", context)
 
@@ -618,6 +633,21 @@ def admin_email_triggers_view(request):
     if mode_filter in ["AUTOMATIC", "MANUAL", "BOTH"]:
         rules_qs = rules_qs.filter(delivery_mode=mode_filter)
 
+    # Module filter
+    module_filter = request.GET.get("module", "").strip().upper()
+    if module_filter in dict(NotificationRule.ModuleType.choices):
+        rules_qs = rules_qs.filter(module=module_filter)
+
+    # Company Type Scope filter
+    company_type_filter = request.GET.get("company_type", "").strip().upper()
+    if company_type_filter in dict(NotificationRule.CompanyTypeScope.choices):
+        rules_qs = rules_qs.filter(company_type=company_type_filter)
+
+    # Channel filter
+    channel_filter = request.GET.get("channel", "").strip().upper()
+    if channel_filter in dict(NotificationRule.Channel.choices):
+        rules_qs = rules_qs.filter(channel=channel_filter)
+
     # Search query
     q = request.GET.get("q", "").strip()
     if q:
@@ -650,7 +680,7 @@ def admin_email_triggers_view(request):
     from django.contrib.auth import get_user_model
     User = get_user_model()
     companies = Company.objects.filter(is_deleted=False).order_by("name")[:30]
-    sample_users = User.objects.filter(is_active=True).select_related("company").order_by("first_name", "last_name")[:30]
+    sample_users = User.objects.filter(is_active=True).select_related("company_membership__company").order_by("first_name", "last_name")[:30]
 
     context = {
         "page_title": "Centralized Notification Management",
@@ -660,6 +690,9 @@ def admin_email_triggers_view(request):
         "query_string": query_string,
         "selected_audience": audience_filter,
         "selected_mode": mode_filter,
+        "selected_module": module_filter,
+        "selected_company_type": company_type_filter,
+        "selected_channel": channel_filter,
         "selected_status": status_filter,
         "search_query": q,
         "total_count": total_count,
@@ -671,6 +704,8 @@ def admin_email_triggers_view(request):
         "delivery_modes": delivery_modes,
         "target_audiences": target_audiences,
         "channels": NotificationRule.Channel.choices,
+        "modules": NotificationRule.ModuleType.choices,
+        "company_types": NotificationRule.CompanyTypeScope.choices,
         "severities": severities,
         "priorities": priorities,
         "companies": companies,
@@ -729,6 +764,14 @@ def admin_email_trigger_edit_view(request, pk):
     chan = request.POST.get("channel", rule.channel)
     if chan in dict(NotificationRule.Channel.choices):
         rule.channel = chan
+
+    mod = request.POST.get("module", rule.module)
+    if mod in dict(NotificationRule.ModuleType.choices):
+        rule.module = mod
+
+    comp_type = request.POST.get("company_type", rule.company_type)
+    if comp_type in dict(NotificationRule.CompanyTypeScope.choices):
+        rule.company_type = comp_type
 
     aud = request.POST.get("target_audience", rule.target_audience)
     if aud in dict(NotificationRule.TargetAudience.choices):
@@ -936,42 +979,80 @@ def admin_email_trigger_preview_api(request, pk):
 @require_POST
 def admin_email_trigger_test_send_api(request, pk):
     """
-    Sends an immediate live test email for this notification rule to the logged-in admin.
+    Sends an immediate live test transmission for this notification rule across
+    the selected channels (System In-App, Email, FCM Web Push, or All).
     """
     rule = get_object_or_404(NotificationRule, pk=pk)
     target_email = request.POST.get("target_email", "").strip() or request.user.email
+    target_user_id = request.POST.get("target_user_id", "").strip()
+    channel_choice = request.POST.get("channel", "ALL").strip().upper()
 
-    from apps.notifications.services.email_engine import trigger_email_notification
-    logs = trigger_email_notification(
-        event_key=rule.event_key,
-        company=None,
-        user=request.user,
-        is_manual=True,
-        sent_by=request.user,
-        custom_recipient_emails=[target_email],
-        context={
-            "user_name": request.user.get_full_name() or "Admin Tester",
-            "recipient_name": request.user.get_full_name() or "Admin Tester",
-            "company_name": "TradeConnect Test Workspace",
-            "cta_url": request.build_absolute_uri("/dashboard/"),
-        },
-        async_dispatch=False,
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    target_user = request.user
+    if target_user_id:
+        found_u = User.objects.filter(id=target_user_id, is_active=True).first()
+        if found_u:
+            target_user = found_u
+
+    if channel_choice == "EMAIL":
+        requested_channels = ["email"]
+    elif channel_choice == "IN_APP":
+        requested_channels = ["in_app"]
+    elif channel_choice == "PUSH":
+        requested_channels = ["push"]
+    elif channel_choice == "IN_APP_PUSH":
+        requested_channels = ["in_app", "push"]
+    elif channel_choice == "BOTH":
+        requested_channels = ["email", "in_app"]
+    else:
+        requested_channels = ["email", "in_app", "push"]
+
+    from apps.notifications.services.notification_engine import notify_event
+    test_data = {
+        "user_name": target_user.get_full_name() or "Admin Tester",
+        "recipient_name": target_user.get_full_name() or "Admin Tester",
+        "company_name": target_user.company.name if getattr(target_user, "company", None) else "TradeConnect Demo Org",
+        "cta_url": request.build_absolute_uri("/dashboard/"),
+        "requirement_title": "Test Sourcing Item #101",
+        "product_name": "Test Industrial Component",
+        "inquiry_id": "TEST-INQ-001",
+        "is_manual": True,
+    }
+
+    notify_res = notify_event(
+        event=rule.event_key,
+        recipient=target_user,
+        company=getattr(target_user, "company", None),
+        data=test_data,
+        channels=requested_channels,
+        actor=request.user,
+        async_push=False,
     )
 
     is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", "")
 
-    if logs and any(l.status == NotificationLog.Status.SENT for l in logs):
-        msg = f"Test email for '{rule.name}' successfully sent to {target_email}!"
-        if is_ajax:
-            return JsonResponse({"status": "success", "message": msg})
-        messages.success(request, msg)
-    else:
-        err = logs[0].last_error if logs else "No dispatch log created"
-        msg = f"Test email initiated for {target_email}. Status: {logs[0].status if logs else 'None'}. Info: {err}"
-        if is_ajax:
-            return JsonResponse({"status": "warning", "message": msg})
-        messages.warning(request, msg)
+    summary_parts = []
+    if "in_app" in requested_channels:
+        in_app_status = f"In-App: {notify_res.get('in_app_created', 0)} created"
+        summary_parts.append(in_app_status)
+    if "email" in requested_channels:
+        email_status = f"Email: {notify_res.get('email_sent_count', 0)} sent ({target_email})"
+        summary_parts.append(email_status)
+    if "push" in requested_channels:
+        push_status = f"Push: {notify_res.get('push_sent_count', 0)} delivered to device(s)"
+        summary_parts.append(push_status)
 
+    msg = f"Test dispatch completed for '{rule.name}'! " + " • ".join(summary_parts)
+
+    if is_ajax:
+        return JsonResponse({
+            "status": "success" if notify_res.get("success") else "warning",
+            "message": msg,
+            "details": notify_res,
+        })
+
+    messages.success(request, msg)
     return redirect("admin-panel-email-triggers")
 
 

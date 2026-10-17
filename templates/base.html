@@ -47,27 +47,18 @@
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased h-screen overflow-hidden flex flex-col">
 
-  <div class="flex flex-1 h-full min-h-0 overflow-hidden relative">
-    <!-- MOBILE SIDEBAR BACKDROP -->
-    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-40 hidden md:hidden transition-opacity duration-300"></div>
-
+  <div class="flex flex-1 h-full min-h-0 overflow-hidden">
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 h-full bg-darknav text-slate-300 flex flex-col shrink-0 border-r border-slate-800 custom-scrollbar overflow-y-auto transform -translate-x-full md:translate-x-0 md:static transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none">
+    <aside id="sidebar" class="w-64 h-full bg-darknav text-slate-300 flex flex-col shrink-0 border-r border-slate-800 custom-scrollbar overflow-y-auto transition-all duration-200">
       <!-- Brand Header -->
-      <div class="h-16 flex items-center justify-between px-5 border-b border-slate-800/80 bg-slate-900/60">
-        <div class="flex items-center">
-          <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20 mr-3 shrink-0">
-            <i class="fa-solid fa-hexagon-nodes text-lg"></i>
-          </div>
-          <div>
-            <div class="font-bold text-white text-sm tracking-tight leading-tight">AI Procurement &amp; Sales</div>
-            <div class="text-[11px] text-slate-400 tracking-wide font-medium">B2B Platform</div>
-          </div>
+      <div class="h-16 flex items-center px-5 border-b border-slate-800/80 bg-slate-900/60">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20 mr-3">
+          <i class="fa-solid fa-hexagon-nodes text-lg"></i>
         </div>
-        <!-- Close button visible only on mobile -->
-        <button id="closeMobileSidebarBtn" class="md:hidden text-slate-400 hover:text-white p-1 rounded transition focus:outline-none" title="Close Menu">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
+        <div>
+          <div class="font-bold text-white text-sm tracking-tight leading-tight">AI Procurement & Sales</div>
+          <div class="text-[11px] text-slate-400 tracking-wide font-medium">B2B Platform</div>
+        </div>
       </div>
 
       <!-- Navigation Links -->
@@ -76,17 +67,17 @@
         <div>
           <a href="{% if rbac.is_super_admin %}{% url 'admin-panel-dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" class="flex items-center px-3 py-2.5 rounded-lg text-sm font-semibold transition {% if rbac.is_super_admin %}{% if request.path == '/admin-panel/' or request.path == '/admin-panel/dashboard/' %}bg-red-600 text-white shadow-md shadow-red-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}{% else %}{% if request.path == '/dashboard/' or request.path == '/' %}bg-blue-600 text-white shadow-md shadow-blue-600/30{% else %}text-slate-300 hover:bg-slate-800/80 hover:text-white{% endif %}{% endif %}">
             <i class="fa-solid {% if rbac.is_super_admin %}fa-chart-line{% else %}fa-house{% endif %} w-5 text-center mr-2.5"></i>
-            <span>{% if rbac.is_super_admin %}Admin Dashboard{% elif rbac.is_buyer_only %}Customer Dashboard{% elif rbac.is_seller_only %}Vendor Dashboard{% else %}Dashboard{% endif %}</span>
+            <span>{% if rbac.is_super_admin %}Admin Dashboard{% elif rbac.is_buyer_only %}Sales Dashboard{% elif rbac.is_seller_only %}Vendor Dashboard{% else %}Dashboard{% endif %}</span>
           </a>
         </div>
 
         {% if not rbac.is_super_admin %}
-        <!-- Customer / Procurement Section -->
+        <!-- Sales Section -->
         {% if rbac.can_view_buyer %}
         <div>
-          <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-blue-400 mb-2 flex items-center justify-between">
-            <span>CUSTOMER (PROCUREMENT)</span>
-            <i class="fa-solid fa-cart-shopping text-blue-500 text-[10px]"></i>
+          <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+            <span>SALES</span>
+            <i class="fa-solid fa-cart-shopping text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
             {% if rbac.buyer_modules.my_requirements != False %}
@@ -98,23 +89,23 @@
             {% if rbac.buyer_modules.find_suppliers != False %}
             <a href="{% url 'find-suppliers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/find-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-magnifying-glass-chart w-5 text-center text-xs"></i>
-              <span>Find Vendors (AI)</span>
+              <span>Find Customers</span>
             </a>
             <a href="{% url 'customers-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/customers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-users-viewfinder w-5 text-center text-xs"></i>
-              <span>Vendor Directory</span>
+              <span>Customer list</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.saved_suppliers != False %}
             <a href="{% url 'saved-suppliers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/saved-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-regular fa-bookmark w-5 text-center text-xs"></i>
-              <span>Prequalified Vendors</span>
+              <span>Prequalified Customers</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.inquiries != False %}
             <a href="{% url 'inquiries-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-regular fa-paper-plane w-5 text-center text-xs"></i>
-              <span>Inquiries &amp; RFQs</span>
+              <span>Inquiries</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.export_reports != False %}
@@ -127,12 +118,12 @@
         </div>
         {% endif %}
 
-        <!-- Vendor / Sales Section -->
+        <!-- Vendor Section -->
         {% if rbac.can_view_seller %}
         <div>
-          <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-orange-400 mb-2 flex items-center justify-between">
-            <span>VENDOR (SALES)</span>
-            <i class="fa-solid fa-bullhorn text-orange-500 text-[10px]"></i>
+          <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+            <span>VENDOR</span>
+            <i class="fa-solid fa-bullhorn text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
             {% if rbac.seller_modules.my_products != False %}
@@ -144,25 +135,25 @@
             {% if rbac.seller_modules.find_buyers != False %}
             <a href="{% url 'find-buyers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/find-buyers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-crosshairs w-5 text-center text-xs"></i>
-              <span>Find Customers (AI)</span>
+              <span>Find vendors</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.buyer_leads != False %}
             <a href="{% url 'leads-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-users-viewfinder w-5 text-center text-xs"></i>
-              <span>Customer Leads</span>
+              <span>Vendor list</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.saved_buyers != False %}
             <a href="{% url 'saved-leads' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/saved-leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-regular fa-bookmark w-5 text-center text-xs"></i>
-              <span>Prequalified Customers</span>
+              <span>Prequalified Vendors</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.seller_inquiries != False %}
             <a href="{% url 'sales-inquiries-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/inquiries/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-regular fa-paper-plane w-5 text-center text-xs"></i>
-              <span>Received Inquiries</span>
+              <span>Inquiries</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.seller_export_reports != False %}
@@ -1072,43 +1063,11 @@
     // Responsive sidebar toggle
     const toggleBtn = document.getElementById('toggleSidebarBtn');
     const sidebar = document.getElementById('sidebar');
-    const closeMobileSidebarBtn = document.getElementById('closeMobileSidebarBtn');
-    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
-
-    function openMobileSidebar() {
-      if (sidebar) sidebar.classList.remove('-translate-x-full');
-      if (sidebarBackdrop) sidebarBackdrop.classList.remove('hidden');
-    }
-
-    function closeMobileSidebar() {
-      if (sidebar) sidebar.classList.add('-translate-x-full');
-      if (sidebarBackdrop) sidebarBackdrop.classList.add('hidden');
-    }
-
     if (toggleBtn && sidebar) {
-      toggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (window.innerWidth < 768) {
-          if (sidebar.classList.contains('-translate-x-full')) {
-            openMobileSidebar();
-          } else {
-            closeMobileSidebar();
-          }
-        } else {
-          // Desktop toggle: collapse / expand
-          sidebar.classList.toggle('md:w-64');
-          sidebar.classList.toggle('md:w-0');
-          sidebar.classList.toggle('md:overflow-hidden');
-          sidebar.classList.toggle('md:border-r-0');
-        }
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('-translate-x-full');
+        sidebar.classList.toggle('hidden');
       });
-    }
-
-    if (closeMobileSidebarBtn) {
-      closeMobileSidebarBtn.addEventListener('click', closeMobileSidebar);
-    }
-    if (sidebarBackdrop) {
-      sidebarBackdrop.addEventListener('click', closeMobileSidebar);
     }
 
     // Profile & Company dropdown toggle
