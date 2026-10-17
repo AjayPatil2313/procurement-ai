@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -105,12 +105,19 @@ def requirements_list_view(request):
     else:
         queryset = Requirement.objects.filter(company=company, is_deleted=False).select_related("category", "created_by")
 
-    # Metric counts
-    active_count = Requirement.objects.filter(company=company, is_deleted=False).count()
-    archived_count = Requirement.objects.filter(company=company, is_deleted=True).count()
-    searching_count = Requirement.objects.filter(company=company, is_deleted=False, status=Requirement.Status.SEARCHING).count()
-    completed_count = Requirement.objects.filter(company=company, is_deleted=False, status=Requirement.Status.COMPLETED).count()
-    draft_count = Requirement.objects.filter(company=company, is_deleted=False, status=Requirement.Status.DRAFT).count()
+    # Metric counts consolidated in single aggregation query
+    metric_counts = Requirement.objects.filter(company=company).aggregate(
+        active=Count("id", filter=Q(is_deleted=False)),
+        archived=Count("id", filter=Q(is_deleted=True)),
+        searching=Count("id", filter=Q(is_deleted=False, status=Requirement.Status.SEARCHING)),
+        completed=Count("id", filter=Q(is_deleted=False, status=Requirement.Status.COMPLETED)),
+        draft=Count("id", filter=Q(is_deleted=False, status=Requirement.Status.DRAFT)),
+    )
+    active_count = metric_counts["active"]
+    archived_count = metric_counts["archived"]
+    searching_count = metric_counts["searching"]
+    completed_count = metric_counts["completed"]
+    draft_count = metric_counts["draft"]
 
     # Search filter
     q = request.GET.get("q", "").strip()
@@ -176,7 +183,7 @@ def requirements_list_view(request):
         "selected_scope": scope_val,
         "status_choices": Requirement.Status.choices,
         "scope_choices": Requirement.SearchScope.choices,
-        "page_title": "Archived Products" if is_archived_view else "Add Product",
+        "page_title": "Archived Requirements" if is_archived_view else "Requirements",
     })
 
 
@@ -678,14 +685,58 @@ def requirement_create_view(request):
         except Exception as exc:
             pass
 
-        messages.success(request, f"Product '{req.item_name}' added successfully!")
+        # Real-time In-App & Firebase Browser Push for the user / company
+        try:
+            from apps.dashboard.services.notification_service import create_notification
+            create_notification(
+                user=request.user,
+                company=company,
+                notification_type="system",
+                title=f"Sourcing Requirement Created: {req.item_name}",
+                message=f"Requirement for '{req.item_name}' ({req.quantity} {req.unit}) has been recorded and published.",
+                link=reverse("requirements-list"),
+                icon="fa-bullhorn",
+                color="blue",
+                event_key="buyer.requirement_created",
+            )
+        except Exception as exc:
+            pass
+
+        # Dynamic notification dispatch to matching vendor companies
+        try:
+            from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+            from apps.companies.models import Company
+
+            vendor_companies = list(Company.objects.filter(
+                is_active=True,
+                company_type__in=[Company.CompanyType.VENDOR, Company.CompanyType.BOTH],
+            ).exclude(id=company.id if company else None)[:15])
+
+            dispatch_dynamic_notification(
+                event_key="requirement.created",
+                context={
+                    "id": req.id,
+                    "item_name": req.item_name,
+                    "company_name": company.name if company else "Customer",
+                    "quantity": str(req.quantity),
+                    "unit": req.unit,
+                    "target_vendor_companies": vendor_companies,
+                },
+                company=company,
+                actor=request.user,
+                deduplication_key=f"requirement.created:{req.id}",
+            )
+        except Exception as exc:
+            pass
+
+        messages.success(request, f"Requirement '{req.item_name}' created successfully!")
         return redirect("requirement-detail", pk=req.id)
 
     return render(request, "requirements/create.html", {
         "categories": categories,
         "company": company,
         "rbac": rbac,
-        "page_title": "Add Product",
+        "page_title": "Create Requirement",
     })
 
 

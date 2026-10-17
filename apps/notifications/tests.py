@@ -14,6 +14,8 @@ from apps.notifications.models import (
     EmailDeliveryAttempt,
     SMTPSetting,
     EmailLayoutSetting,
+    DeviceToken,
+    PushDeliveryLog,
 )
 from apps.notifications.services.email_engine import (
     render_string_template,
@@ -27,6 +29,9 @@ from apps.notifications.services.smtp_service import (
     get_active_email_connection,
     test_smtp_connection,
 )
+
+from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+from apps.dashboard.models import Notification
 
 User = get_user_model()
 
@@ -2665,6 +2670,615 @@ class DynamicNotificationAndPushSystemTests(TestCase):
         self.client.force_login(self.super_admin)
         response_sa = self.client.get(reverse("logout-web"))
         self.assertRedirects(response_sa, reverse("login"), fetch_redirect_response=False)
+
+
+class ComprehensiveNotificationAndSecurityAuditTests(TestCase):
+    """
+    Exhaustive End-to-End Test Suite for In-App & Firebase Browser Push Notifications:
+    - Covers all User/Company User, Company Admin, and Super Admin business events.
+    - Tests multi-tenant isolation (Customer vs Vendor vs Customer + Vendor).
+    - Tests security edge cases (inactive accounts, preference gates, token deactivation).
+    - Verifies email delivery failure alerting to Super Admin without mixing email into dynamic engine.
+    - Verifies direct logout redirect to /login/.
+    """
+    def setUp(self):
+        self.client = Client()
+
+        # Super Admin
+        self.super_admin = User.objects.create_superuser(
+            email="platform_superadmin@tradeconnect.com",
+            password="SecureAdmin@999",
+            first_name="Platform",
+            last_name="SuperAdmin",
+        )
+
+        # Company 1: Customer (SALES type)
+        self.cust_admin = User.objects.create_user(
+            email="cust_admin@alphacorp.com",
+            password="SecurePass@123",
+            first_name="Anita",
+            last_name="Desai",
+        )
+        self.cust_member = User.objects.create_user(
+            email="cust_member@alphacorp.com",
+            password="SecurePass@123",
+            first_name="Karan",
+            last_name="Mehta",
+        )
+        self.cust_company = Company.objects.create(
+            name="Alpha Customer Corp",
+            company_type=Company.CompanyType.SALES,
+            created_by=self.cust_admin,
+            is_active=True,
+        )
+        CompanyMember.objects.create(company=self.cust_company, user=self.cust_admin, role=CompanyMember.Role.ADMIN, is_active=True)
+        CompanyMember.objects.create(company=self.cust_company, user=self.cust_member, role=CompanyMember.Role.USER, is_active=True)
+
+        # Company 2: Vendor (VENDOR type)
+        self.vend_admin = User.objects.create_user(
+            email="vend_admin@betasupplies.com",
+            password="SecurePass@123",
+            first_name="Vikram",
+            last_name="Patel",
+        )
+        self.vend_company = Company.objects.create(
+            name="Beta Vendor Ltd",
+            company_type=Company.CompanyType.VENDOR,
+            created_by=self.vend_admin,
+            is_active=True,
+        )
+        CompanyMember.objects.create(company=self.vend_company, user=self.vend_admin, role=CompanyMember.Role.ADMIN, is_active=True)
+
+        # Company 3: Both (Customer + Vendor)
+        self.hybrid_admin = User.objects.create_user(
+            email="hybrid_admin@gammatraders.com",
+            password="SecurePass@123",
+            first_name="Sanjay",
+            last_name="Verma",
+        )
+        self.hybrid_company = Company.objects.create(
+            name="Gamma Hybrid Traders",
+            company_type=Company.CompanyType.BOTH,
+            created_by=self.hybrid_admin,
+            is_active=True,
+        )
+        CompanyMember.objects.create(company=self.hybrid_company, user=self.hybrid_admin, role=CompanyMember.Role.ADMIN, is_active=True)
+
+        # Inactive User
+        self.inactive_user = User.objects.create_user(
+            email="inactive_user@alphacorp.com",
+            password="SecurePass@123",
+            first_name="Inactive",
+            last_name="User",
+            is_active=False,
+        )
+        CompanyMember.objects.create(company=self.cust_company, user=self.inactive_user, role=CompanyMember.Role.USER, is_active=False)
+
+        # Register Device Tokens for push
+        self.cust_admin_device = DeviceToken.objects.create(
+            user=self.cust_admin,
+            token="fcm_token_cust_admin_chrome_01",
+            device_type=DeviceToken.DeviceType.CHROME,
+            is_active=True,
+        )
+        self.vend_admin_device = DeviceToken.objects.create(
+            user=self.vend_admin,
+            token="fcm_token_vend_admin_edge_01",
+            device_type=DeviceToken.DeviceType.EDGE,
+            is_active=True,
+        )
+        self.super_admin_device = DeviceToken.objects.create(
+            user=self.super_admin,
+            token="fcm_token_super_admin_chrome_01",
+            device_type=DeviceToken.DeviceType.CHROME,
+            is_active=True,
+        )
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_all_user_events_coverage(self, mock_push):
+        """Audit & verify all 6 User / Company User notification events."""
+        mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+
+        user_events = [
+            ("auth.welcome", {"user_name": "Anita"}),
+            ("auth.email_verification", {}),
+            ("auth.password_reset", {}),
+            ("auth.password_changed", {}),
+            ("user.activation_deactivation", {"status_display": "Active"}),
+            ("billing.subscription_expiry_user", {"plan_name": "Enterprise Pro", "days_left": "7"}),
+        ]
+
+        for event_key, ctx in user_events:
+            ctx_payload = dict(ctx)
+            ctx_payload["user"] = self.cust_member
+            res = dispatch_dynamic_notification(
+                event_key=event_key,
+                context=ctx_payload,
+                company=self.cust_company,
+                actor=self.cust_admin,
+                deduplication_key=f"user_test:{event_key}:{self.cust_member.id}",
+            )
+            # Verify recipient received in-app notification
+            self.assertEqual(res["in_app_created"], 1, f"Failed in-app creation for {event_key}")
+            notif = Notification.objects.filter(user=self.cust_member, event_key=event_key).latest("id")
+            self.assertEqual(notif.user, self.cust_member)
+            self.assertEqual(notif.event_key, event_key)
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_all_company_admin_events_coverage(self, mock_push):
+        """Audit & verify all 6 Company Admin notification events."""
+        mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+
+        admin_events = [
+            ("company.user_added", {"member_name": "Karan Mehta", "role": "Member", "company_name": "Alpha Customer Corp"}),
+            ("company.verification_decision", {"company_name": "Alpha Customer Corp", "status_display": "Approved"}),
+            ("billing.credits_low", {"balance": "15"}),
+            ("billing.subscription_expiring_admin", {"plan_name": "Enterprise Plus", "days_left": "3"}),
+            ("billing.payment_failed", {"invoice_number": "INV-8001", "amount": "999", "currency": "INR", "error_reason": "Card Expired"}),
+            ("company.profile_updated", {"company_name": "Alpha Customer Corp", "updated_by": "Anita Desai"}),
+        ]
+
+        for event_key, ctx in admin_events:
+            Notification.objects.filter(company=self.cust_company, event_key=event_key).delete()
+            res = dispatch_dynamic_notification(
+                event_key=event_key,
+                context=ctx,
+                company=self.cust_company,
+                actor=self.cust_admin,
+                deduplication_key=f"admin_test:{event_key}:{self.cust_company.id}",
+            )
+            # Company Admin receives in-app and push
+            self.assertTrue(res["in_app_created"] >= 1, f"Admin in-app missing for {event_key}")
+            self.assertTrue(Notification.objects.filter(user=self.cust_admin, event_key=event_key).exists(), f"Admin not received for {event_key}")
+
+            # Non-admin member should NOT receive company admin events
+            self.assertFalse(Notification.objects.filter(user=self.cust_member, event_key=event_key).exists(), f"Member incorrectly received admin event {event_key}")
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_all_super_admin_events_coverage(self, mock_push):
+        """Audit & verify all 9 Super Admin platform notification events."""
+        mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+
+        super_admin_events = [
+            ("admin.new_company", {"company_name": "Brand New Corp", "company_type": "Vendor", "id": "101"}),
+            ("admin.verification_pending", {"company_name": "Brand New Corp", "id": "101"}),
+            ("admin.verification_decision", {"company_name": "Brand New Corp", "status_display": "Approved", "operator": "Admin", "id": "101"}),
+            ("admin.new_user", {"user_email": "newbie@tradeconnect.com", "user_name": "Newbie", "id": "505"}),
+            ("admin.company_suspended", {"company_name": "Risky Corp", "status_display": "Suspended", "operator": "Compliance", "id": "102"}),
+            ("admin.subscription_change", {"company_name": "Alpha Customer Corp", "plan_name": "Enterprise Pro", "billing_cycle": "Yearly"}),
+            ("admin.payment_issue", {"company_name": "Alpha Customer Corp", "amount": "4999", "currency": "INR", "error_reason": "Bank Gateway Timeout"}),
+            ("admin.email_delivery_failure", {"recipient_email": "bounced@target.com", "log_id": "901", "failed_event": "auth.welcome", "attempts_count": "3", "error_message": "Mailbox does not exist"}),
+            ("admin.security_alert", {"alert_type": "Excessive Failed Logins", "ip_address": "203.0.113.42", "user_email": "target@domain.com"}),
+        ]
+
+        for event_key, ctx in super_admin_events:
+            Notification.objects.filter(event_key=event_key).delete()
+            res = dispatch_dynamic_notification(
+                event_key=event_key,
+                context=ctx,
+                actor=self.cust_admin,
+                deduplication_key=f"sa_test:{event_key}",
+            )
+            self.assertTrue(res["in_app_created"] >= 1, f"Super Admin missing in-app for {event_key}")
+            self.assertTrue(Notification.objects.filter(user=self.super_admin, event_key=event_key).exists(), f"Super Admin not in recipients for {event_key}")
+
+            # Neither Customer nor Vendor should receive Super Admin platform alerts
+            self.assertFalse(Notification.objects.filter(user=self.cust_admin, event_key=event_key).exists(), f"Customer leaked super admin event {event_key}")
+            self.assertFalse(Notification.objects.filter(user=self.vend_admin, event_key=event_key).exists(), f"Vendor leaked super admin event {event_key}")
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_multi_tenant_isolation_customer_vendor_both(self, mock_push):
+        """Verify strict multi-tenant company isolation and company_type filtering."""
+        mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+
+        # Event: Customer creates requirement -> Only Vendor & Both companies receive it
+        Notification.objects.filter(deduplication_key="req:777:isolation").delete()
+        res_req = dispatch_dynamic_notification(
+            event_key="requirement.created",
+            context={
+                "id": "777",
+                "item_name": "Industrial Fasteners",
+                "company_name": "Alpha Customer Corp",
+                "quantity": "5000",
+                "unit": "Units",
+                "target_vendor_companies": [self.vend_company, self.hybrid_company, self.cust_company],
+            },
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key="req:777:isolation",
+        )
+        recip_users = list(Notification.objects.filter(deduplication_key="req:777:isolation").values_list("user_id", flat=True))
+        self.assertIn(self.vend_admin.id, recip_users, "Vendor should receive requirement")
+        self.assertIn(self.hybrid_admin.id, recip_users, "Customer + Vendor (Both) should receive requirement")
+        self.assertNotIn(self.cust_admin.id, recip_users, "Customer-only company must NOT receive vendor requirement")
+
+        # Event: Inquiry created for Vendor B -> Vendor A must NOT receive it
+        Notification.objects.filter(deduplication_key="inq:888:isolation").delete()
+        res_inq = dispatch_dynamic_notification(
+            event_key="inquiry.created",
+            context={
+                "id": "888",
+                "subject": "Quote for Bearings",
+                "customer_name": "Alpha Customer Corp",
+                "item_name": "Bearings",
+                "target_company": self.vend_company,
+            },
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key="inq:888:isolation",
+        )
+        inq_users = list(Notification.objects.filter(deduplication_key="inq:888:isolation").values_list("user_id", flat=True))
+        self.assertIn(self.vend_admin.id, inq_users, "Target vendor must receive inquiry")
+        self.assertNotIn(self.hybrid_admin.id, inq_users, "Unrelated vendor must NOT receive inquiry")
+        self.assertNotIn(self.cust_admin.id, inq_users, "Customer sender must not receive own vendor-facing inquiry alert")
+
+    def test_inactive_and_deactivated_accounts_rejected(self):
+        """Negative test: Inactive accounts must NEVER receive notifications or push dispatches."""
+        res = dispatch_dynamic_notification(
+            event_key="auth.welcome",
+            context={"user": self.inactive_user, "user_name": "Inactive"},
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key="inactive:welcome:01",
+        )
+        self.assertEqual(res["in_app_created"], 0, "Inactive user must not receive in-app notifications")
+        self.assertEqual(res["push_dispatched"], 0, "Inactive user must not receive push logs")
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_preference_gating_and_mandatory_preservation(self, mock_push):
+        """Test independent In-App and Push preference suppression with mandatory preservation."""
+        mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+
+        # 1. Disable in-app for SALES; keep push enabled
+        NotificationPreference.objects.update_or_create(
+            user=self.cust_admin,
+            company=self.cust_company,
+            category=NotificationPreference.Category.SALES,
+            defaults={"in_app_enabled": False, "push_enabled": True},
+        )
+        res_sales = dispatch_dynamic_notification(
+            event_key="inquiry.status_changed",
+            context={"id": "991", "subject": "Inquiry Update", "status_display": "Quoted", "acting_party": "Vendor", "target_user": self.cust_admin},
+            company=self.cust_company,
+            actor=self.vend_admin,
+            deduplication_key="sales:pref:in_app_off",
+        )
+        self.assertEqual(res_sales["in_app_created"], 0, "In-app must be suppressed when in_app_enabled=False")
+        self.assertEqual(res_sales["push_dispatched"], 1, "Push must succeed when push_enabled=True")
+
+        # 2. Disable push for PROCUREMENT; keep in-app enabled
+        NotificationPreference.objects.update_or_create(
+            user=self.cust_admin,
+            company=self.cust_company,
+            category=NotificationPreference.Category.PROCUREMENT,
+            defaults={"in_app_enabled": True, "push_enabled": False},
+        )
+        res_proc = dispatch_dynamic_notification(
+            event_key="vendor_match.found",
+            context={"id": "992", "item_name": "Motors", "match_count": "5", "created_by": self.cust_admin},
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key="proc:pref:push_off",
+        )
+        self.assertEqual(res_proc["in_app_created"], 1, "In-app must succeed when in_app_enabled=True")
+        self.assertEqual(res_proc["push_dispatched"], 0, "Push must be suppressed when push_enabled=False")
+
+        # 3. Mandatory SECURITY category cannot be suppressed
+        NotificationPreference.objects.update_or_create(
+            user=self.cust_admin,
+            company=self.cust_company,
+            category=NotificationPreference.Category.SECURITY,
+            defaults={"in_app_enabled": False, "push_enabled": False},
+        )
+        res_sec = dispatch_dynamic_notification(
+            event_key="auth.password_changed",
+            context={"user": self.cust_admin},
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key="sec:pref:mandatory",
+        )
+        self.assertEqual(res_sec["in_app_created"], 1, "Mandatory SECURITY in-app must always deliver")
+        self.assertEqual(res_sec["push_dispatched"], 1, "Mandatory SECURITY push must always deliver")
+
+    def test_deduplication_sliding_window_suppression(self):
+        """Test deduplication_key suppresses duplicate bursts within 15-minute sliding window."""
+        dedup_key = "burst_lock:item_44:cust_admin"
+        res1 = dispatch_dynamic_notification(
+            event_key="billing.credits_low",
+            context={"balance": "20"},
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key=dedup_key,
+        )
+        self.assertEqual(res1["in_app_created"], 1, "Initial dispatch must succeed")
+
+        # Duplicate burst within sliding window -> Suppressed
+        res2 = dispatch_dynamic_notification(
+            event_key="billing.credits_low",
+            context={"balance": "19"},
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key=dedup_key,
+        )
+        self.assertEqual(res2["in_app_created"], 0, "Duplicate burst within 15 minutes must be suppressed")
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_firebase_push_failure_recorded_in_push_delivery_log(self, mock_push):
+        """Test PushDeliveryLog captures FAILED status and error code when FCM fails."""
+        mock_push.return_value = {
+            "success": False,
+            "sent_count": 0,
+            "failed_count": 1,
+            "errors": ["Device registration token is not valid."],
+        }
+        PushDeliveryLog.objects.filter(event_key="inquiry.created").delete()
+        res = dispatch_dynamic_notification(
+            event_key="inquiry.created",
+            context={"id": "555", "subject": "Test Push Error", "customer_name": "Alpha", "item_name": "Pipes", "target_company": self.vend_company},
+            company=self.cust_company,
+            actor=self.cust_admin,
+            deduplication_key="push_fail:555",
+        )
+        failed_log = PushDeliveryLog.objects.filter(event_key="inquiry.created", user=self.vend_admin).latest("id")
+        self.assertEqual(failed_log.status, PushDeliveryLog.Status.FAILED)
+        self.assertEqual(failed_log.error_code, "FCM_DISPATCH_FAIL")
+
+    def test_super_admin_push_overview_rbac(self):
+        """Security test: Super Admin push overview requires superuser authentication."""
+        # 1. Unauthenticated -> 302 to login
+        resp_unauth = self.client.get(reverse("admin-panel-push-overview"))
+        self.assertEqual(resp_unauth.status_code, 302)
+        self.assertIn("/login", resp_unauth.url)
+
+        # 2. Company Member -> 403 Forbidden (requires superuser)
+        self.client.force_login(self.cust_member)
+        resp_member = self.client.get(reverse("admin-panel-push-overview"))
+        self.assertEqual(resp_member.status_code, 403)
+
+        # 3. Company Admin -> 403 Forbidden (requires superuser)
+        self.client.force_login(self.cust_admin)
+        resp_cadmin = self.client.get(reverse("admin-panel-push-overview"))
+        self.assertEqual(resp_cadmin.status_code, 403)
+
+        # 4. Super Admin -> 200 OK
+        self.client.force_login(self.super_admin)
+        resp_super = self.client.get(reverse("admin-panel-push-overview"))
+        self.assertEqual(resp_super.status_code, 200)
+        self.assertContains(resp_super, "Browser Push Telemetry")
+
+
+class FirebasePushOptimizationAndHardeningTests(TestCase):
+    """
+    Automated Verification Suite for Firebase Push Hardening & Optimization:
+    1. Per-device telemetry result mapping in FCM multicast.
+    2. Webpush urgency headers for high priority alerts.
+    3. Token deactivation on logout.
+    4. 1-Click Super Admin push log retry API & RBAC.
+    5. Test push audience targeting (Self, All Admins, Specific User).
+    6. Prune push tokens management command.
+    """
+    def setUp(self):
+        self.client = Client()
+
+        # Super Admin
+        self.super_admin = User.objects.create_superuser(
+            email="sa_opt@tradeconnect.com",
+            password="SecurePass@123",
+            first_name="Super",
+            last_name="Admin",
+        )
+
+        # Standard User
+        self.test_user = User.objects.create_user(
+            email="regular_user@company.com",
+            password="SecurePass@123",
+            first_name="Regular",
+            last_name="User",
+        )
+        self.company = Company.objects.create(
+            name="Opt Enterprise",
+            company_type=Company.CompanyType.SALES,
+            created_by=self.test_user,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.company,
+            user=self.test_user,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # 2 Devices for User
+        self.dev_chrome = DeviceToken.objects.create(
+            user=self.test_user,
+            company=self.company,
+            token="fcm_tok_chrome_opt_01",
+            device_type=DeviceToken.DeviceType.CHROME,
+            is_active=True,
+        )
+        self.dev_edge = DeviceToken.objects.create(
+            user=self.test_user,
+            company=self.company,
+            token="fcm_tok_edge_opt_02",
+            device_type=DeviceToken.DeviceType.EDGE,
+            is_active=True,
+        )
+
+    @patch("firebase_admin.messaging.send_each_for_multicast")
+    @patch("apps.notifications.services.fcm_service.get_firebase_app")
+    def test_per_device_telemetry_multicast_mapping(self, mock_get_app, mock_send):
+        """Verify send_fcm_multicast records per-device status and error code accurately."""
+        mock_get_app.return_value = MagicMock()
+
+        # Mock responses: dev_chrome succeeds, dev_edge fails with unregistered
+        resp_chrome = MagicMock(success=True, message_id="projects/msg/chrome_01", exception=None)
+        resp_edge = MagicMock(
+            success=False,
+            message_id=None,
+            exception=Exception("Requested entity was not found. Unregistered token."),
+        )
+        mock_batch = MagicMock()
+        mock_batch.responses = [resp_chrome, resp_edge]
+        mock_batch.success_count = 1
+        mock_batch.failure_count = 1
+        mock_send.return_value = mock_batch
+
+        from apps.notifications.services.fcm_service import send_fcm_multicast
+        res = send_fcm_multicast(
+            tokens=[self.dev_chrome.token, self.dev_edge.token],
+            title="Quote Ready",
+            body="Your quote has arrived",
+        )
+
+        self.assertIn("device_results", res)
+        dev_res = res["device_results"]
+
+        # Chrome success
+        self.assertTrue(dev_res[self.dev_chrome.token]["success"])
+        self.assertEqual(dev_res[self.dev_chrome.token]["message_id"], "projects/msg/chrome_01")
+
+        # Edge failure & automatic deactivation
+        self.assertFalse(dev_res[self.dev_edge.token]["success"])
+        self.assertEqual(dev_res[self.dev_edge.token]["error_code"], "UNREGISTERED")
+
+        # Verify Edge token was marked inactive in database
+        self.dev_edge.refresh_from_db()
+        self.assertFalse(self.dev_edge.is_active)
+
+    @patch("firebase_admin.messaging.send_each_for_multicast")
+    @patch("apps.notifications.services.fcm_service.get_firebase_app")
+    def test_webpush_urgency_headers_set_on_critical_priority(self, mock_get_app, mock_send):
+        """Verify critical/warning priorities configure Webpush urgency: high header."""
+        mock_get_app.return_value = MagicMock()
+        mock_batch = MagicMock(responses=[], success_count=0, failure_count=0)
+        mock_send.return_value = mock_batch
+
+        from apps.notifications.services.fcm_service import send_user_push
+        send_user_push(
+            user_or_users=self.test_user,
+            title="Suspension Warning",
+            body="Immediate payment required",
+            priority="CRITICAL",
+        )
+
+        self.assertTrue(mock_send.called)
+        call_args = mock_send.call_args[0][0]
+        self.assertEqual(call_args.webpush.headers.get("Urgency"), "high")
+
+    def test_logout_view_deactivates_fcm_token(self):
+        """Verify calling logout_view with fcm_token deactivates the device token."""
+        self.client.force_login(self.test_user)
+        self.assertTrue(self.dev_chrome.is_active)
+
+        # User logs out while passing browser FCM token
+        resp = self.client.get(reverse("logout-web"), {"fcm_token": self.dev_chrome.token})
+        self.assertEqual(resp.status_code, 302)
+
+        self.dev_chrome.refresh_from_db()
+        self.assertFalse(self.dev_chrome.is_active, "Device token must be deactivated upon logout.")
+
+    @patch("apps.notifications.services.fcm_service.send_fcm_multicast")
+    def test_admin_push_log_retry_endpoint(self, mock_send):
+        """Verify Super Admin can re-trigger a failed push from the dashboard."""
+        mock_send.return_value = {"success": True, "sent_count": 1, "failed_count": 0, "errors": []}
+
+        notif = Notification.objects.create(
+            user=self.test_user,
+            company=self.company,
+            title="Failed Push",
+            message="Please retry me",
+            link="/dashboard/",
+        )
+        failed_log = PushDeliveryLog.objects.create(
+            notification=notif,
+            device=self.dev_chrome,
+            user=self.test_user,
+            company=self.company,
+            event_key="test.retry",
+            status=PushDeliveryLog.Status.FAILED,
+            attempt_count=1,
+            error_code="FCM_TIMEOUT",
+            error_message="Gateway timeout",
+        )
+
+        retry_url = reverse("admin-panel-push-log-retry", kwargs={"pk": failed_log.id})
+
+        # 1. Non-superadmin forbidden
+        self.client.force_login(self.test_user)
+        resp_unauth = self.client.post(retry_url)
+        self.assertEqual(resp_unauth.status_code, 403)
+
+        # 2. Superadmin success
+        self.client.force_login(self.super_admin)
+        resp_admin = self.client.post(retry_url)
+        self.assertEqual(resp_admin.status_code, 200)
+
+        failed_log.refresh_from_db()
+        self.assertEqual(failed_log.status, PushDeliveryLog.Status.SUCCESS)
+        self.assertEqual(failed_log.attempt_count, 2)
+        self.assertIsNotNone(failed_log.sent_at)
+
+    @patch("apps.notifications.services.fcm_service.send_user_push")
+    def test_test_push_audience_targeting(self, mock_send):
+        """Verify TestPushNotificationAPIView supports audience targeting for super admins."""
+        mock_send.return_value = {"success": True, "sent_count": 1, "failed_count": 0}
+        self.client.force_login(self.super_admin)
+
+        # 1. Target: all_admins
+        resp1 = self.client.post(
+            reverse("api-notifications-test-push"),
+            json.dumps({"target_audience": "all_admins", "title": "Platform Alert"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp1.status_code, 200)
+        self.assertTrue(mock_send.called)
+        users_targeted = mock_send.call_args[1]["user_or_users"]
+        self.assertIn(self.super_admin, users_targeted)
+
+        # 2. Target: specific user
+        mock_send.reset_mock()
+        resp2 = self.client.post(
+            reverse("api-notifications-test-push"),
+            json.dumps({"target_audience": "user", "target_email": self.test_user.email, "title": "Direct Test"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp2.status_code, 200)
+        users_targeted_2 = mock_send.call_args[1]["user_or_users"]
+        self.assertEqual(users_targeted_2, [self.test_user])
+
+    def test_prune_push_tokens_command(self):
+        """Verify prune_push_tokens deletes old inactive tokens and historical logs."""
+        from django.core.management import call_command
+        from datetime import timedelta
+
+        old_date = timezone.now() - timedelta(days=120)
+
+        # Inactive token older than 90 days
+        stale_token = DeviceToken.objects.create(
+            user=self.test_user,
+            token="stale_fcm_token_to_purge",
+            is_active=False,
+        )
+        DeviceToken.objects.filter(pk=stale_token.pk).update(last_seen_at=old_date)
+
+        # Old log
+        old_log = PushDeliveryLog.objects.create(
+            user=self.test_user,
+            status=PushDeliveryLog.Status.SUCCESS,
+        )
+        PushDeliveryLog.objects.filter(pk=old_log.pk).update(created_at=old_date)
+
+        # Run command with --days=90
+        call_command("prune_push_tokens", days=90)
+
+        # Stale token and old log should be purged
+        self.assertFalse(DeviceToken.objects.filter(pk=stale_token.pk).exists())
+        self.assertFalse(PushDeliveryLog.objects.filter(pk=old_log.pk).exists())
+
+        # Active tokens must remain preserved
+        self.assertTrue(DeviceToken.objects.filter(pk=self.dev_chrome.pk).exists())
+
+
 
 
 

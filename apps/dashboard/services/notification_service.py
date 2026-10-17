@@ -20,10 +20,12 @@ def create_notification(
     color="blue",
     notify_company_members=False,
     event_key="",
+    priority=None,
 ):
     """
     Creates real-time notifications for the given user, or for all active members of the company.
     Includes duplicate suppression within 15-minute window for identical user alerts.
+    Automatically dispatches Firebase Web Push notification to recipients with active devices.
     """
     recipients = set()
     if user:
@@ -67,8 +69,55 @@ def create_notification(
                 icon=icon,
                 color=color,
                 event_key=event_key,
+                priority=priority or Notification.Priority.INFO,
             )
             created_notifications.append(notif)
+
+            # Trigger Firebase Web Push dispatch if user has active registered devices
+            try:
+                from apps.notifications.models import DeviceToken, PushDeliveryLog
+                from apps.notifications.services.fcm_service import send_user_push
+
+                active_devices = list(DeviceToken.objects.filter(user=recipient, is_active=True))
+                if active_devices:
+                    push_res = send_user_push(
+                        user_or_users=recipient,
+                        title=title,
+                        body=message[:500] if message else title,
+                        link=link,
+                        priority=priority or Notification.Priority.INFO,
+                    )
+                    device_results = push_res.get("device_results", {})
+                    for device in active_devices:
+                        dev_res = device_results.get(device.token, {})
+                        is_dev_success = dev_res.get("success", push_res.get("success", False))
+                        dev_status = (
+                            PushDeliveryLog.Status.SUCCESS
+                            if is_dev_success
+                            else PushDeliveryLog.Status.FAILED
+                        )
+                        dev_err_code = dev_res.get("error_code") or ("" if is_dev_success else "FCM_DISPATCH_FAIL")
+                        dev_err_msg = dev_res.get("error_message") or ("; ".join(push_res.get("errors", [])) if not is_dev_success else "")
+
+                        user_company = company
+                        if not user_company and hasattr(recipient, "company_membership") and recipient.company_membership:
+                            user_company = recipient.company_membership.company
+
+                        PushDeliveryLog.objects.create(
+                            notification=notif,
+                            device=device,
+                            user=recipient,
+                            company=user_company,
+                            event_key=event_key or "system.notification",
+                            status=dev_status,
+                            attempt_count=1,
+                            error_code=dev_err_code,
+                            error_message=dev_err_msg,
+                            sent_at=timezone.now() if dev_status == PushDeliveryLog.Status.SUCCESS else None,
+                        )
+            except Exception as push_err:
+                logger.warning(f"Failed to dispatch FCM push for notification {notif.id}: {push_err}")
+
         except Exception as exc:
             logger.warning(f"Failed to create notification for {recipient}: {exc}")
 
@@ -101,6 +150,7 @@ def notify_proposal_sent(inquiry, user=None):
         icon = "fa-paper-plane"
         color = "blue"
 
+    event_key = "seller.inquiry_reply" if is_seller else "buyer.rfq_dispatched"
     notifs = create_notification(
         user=user,
         company=company,
@@ -111,11 +161,11 @@ def notify_proposal_sent(inquiry, user=None):
         icon=icon,
         color=color,
         notify_company_members=True,
+        event_key=event_key,
     )
 
     try:
         from apps.notifications.services.email_engine import trigger_email_notification
-        event_key = "seller.inquiry_reply" if is_seller else "buyer.rfq_dispatched"
         trigger_email_notification(
             event_key=event_key,
             company=company,
@@ -160,6 +210,7 @@ def notify_quote_recorded(inquiry, user=None):
     link_name = "sales-inquiry-detail" if is_seller else "inquiry-detail"
     link = reverse(link_name, kwargs={"pk": inquiry.id})
 
+    event_key = "buyer.quote_received"
     notifs = create_notification(
         user=user,
         company=company,
@@ -170,6 +221,7 @@ def notify_quote_recorded(inquiry, user=None):
         icon="fa-calculator",
         color="emerald",
         notify_company_members=True,
+        event_key=event_key,
     )
 
     try:
@@ -231,6 +283,7 @@ def notify_status_changed(inquiry, old_status_display, user=None):
         icon = "fa-arrows-rotate"
         color = "blue"
 
+    event_key = "seller.deal_status_changed" if is_seller else "buyer.deal_status_changed"
     notifs = create_notification(
         user=user,
         company=company,
@@ -241,11 +294,11 @@ def notify_status_changed(inquiry, old_status_display, user=None):
         icon=icon,
         color=color,
         notify_company_members=True,
+        event_key=event_key,
     )
 
     try:
         from apps.notifications.services.email_engine import trigger_email_notification
-        event_key = "seller.deal_status_changed" if is_seller else "buyer.deal_status_changed"
         trigger_email_notification(
             event_key=event_key,
             company=company,

@@ -340,23 +340,23 @@ def get_user_rbac_context(user, company_id=None):
     navigation = {}
     if is_buyer_only:
         b_nav_items = [
-            {"name": "Sales Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "buyer_dashboard"},
+            {"name": "Customer Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "buyer_dashboard"},
             {"name": "My Requirements", "url": "/procurement/requirements/", "icon": "fa-clipboard-list", "key": "my_requirements"},
-            {"name": "Find Customers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
-            {"name": "Saved Customers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
+            {"name": "Find Suppliers", "url": "/procurement/find-suppliers/", "icon": "fa-magnifying-glass-chart", "key": "find_suppliers"},
+            {"name": "Saved Suppliers", "url": "/procurement/saved-suppliers/", "icon": "fa-bookmark", "key": "saved_suppliers"},
             {"name": "Inquiries", "url": "/procurement/inquiries/", "icon": "fa-paper-plane", "key": "inquiries"},
         ]
         navigation = {
-            "title": "Sales Dashboard",
+            "title": "Customer Dashboard",
             "modules": [item for item in b_nav_items if buyer_modules_map.get(item["key"], True)],
         }
     elif is_seller_only:
         s_nav_items = [
             {"name": "Vendor Dashboard", "url": "/dashboard/", "icon": "fa-house", "key": "seller_dashboard"},
-            {"name": "Add Requirement", "url": "/sales/products/", "icon": "fa-clipboard-list", "key": "my_products"},
-            {"name": "Find vendors", "url": "/sales/find-buyers/", "icon": "fa-crosshairs", "key": "find_buyers"},
-            {"name": "Vendor list", "url": "/sales/leads/", "icon": "fa-users-viewfinder", "key": "buyer_leads"},
-            {"name": "Prequalified Vendors", "url": "/sales/saved-leads/", "icon": "fa-bookmark", "key": "saved_buyers"},
+            {"name": "Product Catalog", "url": "/sales/products/", "icon": "fa-clipboard-list", "key": "my_products"},
+            {"name": "Find Customers", "url": "/sales/find-buyers/", "icon": "fa-crosshairs", "key": "find_buyers"},
+            {"name": "Customer Leads", "url": "/sales/leads/", "icon": "fa-users-viewfinder", "key": "buyer_leads"},
+            {"name": "Saved Customers", "url": "/sales/saved-leads/", "icon": "fa-bookmark", "key": "saved_buyers"},
             {"name": "Inquiries", "url": "/sales/inquiries/", "icon": "fa-paper-plane", "key": "seller_inquiries"},
         ]
         if (is_company_admin or is_super_admin) and seller_modules_map.get("seller_roles", True):

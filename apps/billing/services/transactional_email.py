@@ -2,6 +2,7 @@ import logging
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.utils.html import strip_tags
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 

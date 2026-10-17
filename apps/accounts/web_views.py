@@ -295,6 +295,13 @@ def register_view(request):
 
 
 def logout_view(request):
+    token = request.GET.get("fcm_token", "").strip() or request.POST.get("fcm_token", "").strip()
+    if token and request.user.is_authenticated:
+        try:
+            from apps.notifications.services.fcm_service import unregister_device_token
+            unregister_device_token(request.user, token)
+        except Exception:
+            pass
     logout(request)
     messages.success(request, "You have been logged out successfully.")
     return redirect("login")

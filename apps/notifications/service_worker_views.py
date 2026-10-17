@@ -26,11 +26,17 @@ self.addEventListener('message', (event) => {
             const messaging = firebase.messaging();
             messaging.onBackgroundMessage((payload) => {
                 const notifTitle = payload.notification?.title || payload.data?.title || 'TradeConnect Platform Alert';
+                const isCritical = payload.data?.priority === 'CRITICAL' || payload.data?.priority === 'WARNING';
                 const notifOptions = {
                     body: payload.notification?.body || payload.data?.body || 'You have an important update.',
                     icon: payload.notification?.icon || '/static/images/logo.png',
                     badge: '/static/images/favicon.ico',
-                    tag: payload.data?.tag || 'tradeconnect-alert',
+                    tag: payload.data?.tag || payload.data?.event_key || 'tradeconnect-alert',
+                    requireInteraction: isCritical,
+                    actions: [
+                        { action: 'view', title: 'Open', icon: '/static/images/favicon.ico' },
+                        { action: 'dismiss', title: 'Dismiss' }
+                    ],
                     data: {
                         url: payload.data?.url || payload.data?.click_action || '/dashboard/'
                     }
@@ -41,20 +47,37 @@ self.addEventListener('message', (event) => {
     }
 });
 
-// Handle push notification click: focus open tab or open relative target URL
+// Handle push notification click: smart tab focus, action support, or open new window
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
+
+    if (event.action === 'dismiss') {
+        return;
+    }
+
     const targetUrl = event.notification.data?.url || '/dashboard/';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            // 1. If a window is already at this exact URL, focus it
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
-                if ('focus' in client) {
+                if (client.url && client.url.includes(targetUrl) && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+
+            // 2. If a window is idle at the dashboard, navigate and focus it
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                const clientPath = new URL(client.url).pathname;
+                if ((clientPath === '/dashboard/' || clientPath === '/') && 'focus' in client) {
                     client.navigate(targetUrl);
                     return client.focus();
                 }
             }
+
+            // 3. Otherwise, open a fresh window to prevent overwriting active user work
             if (clients.openWindow) {
                 return clients.openWindow(targetUrl);
             }

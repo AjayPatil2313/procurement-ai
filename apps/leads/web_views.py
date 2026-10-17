@@ -1470,6 +1470,14 @@ def send_rfq_view(request, result_id):
         # Trigger dynamic In-App + Firebase Browser Push
         try:
             from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+            from apps.companies.models import Company
+            target_vendor_company = None
+            if result and result.external_company:
+                target_vendor_company = Company.objects.filter(
+                    Q(name__iexact=result.external_company.name) | Q(email__iexact=sent_to_email),
+                    is_active=True,
+                ).first()
+
             dispatch_dynamic_notification(
                 event_key="inquiry.created",
                 context={
@@ -1477,6 +1485,7 @@ def send_rfq_view(request, result_id):
                     "subject": inquiry.subject,
                     "customer_name": company.name,
                     "item_name": result.product_title if result else "Product",
+                    "target_company": target_vendor_company,
                 },
                 company=company,
                 actor=request.user,

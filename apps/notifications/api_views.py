@@ -309,7 +309,8 @@ class DeviceUnregisterAPIView(APIView):
 class TestPushNotificationAPIView(APIView):
     """
     POST /api/notifications/test-push/
-    Dispatches a test push notification to the authenticated user's registered devices.
+    Dispatches a test push notification.
+    If superuser, supports targeting 'self', 'all_admins', or a specific 'email'.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -317,10 +318,29 @@ class TestPushNotificationAPIView(APIView):
         title = request.data.get("title", "TradeConnect Notification").strip()
         body = request.data.get("body", "This is a verified test push notification from TradeConnect.").strip()
         url = request.data.get("url", "/notifications/inbox/").strip()
+        target_audience = request.data.get("target_audience", "self").strip()
+        target_email = request.data.get("target_email", "").strip()
 
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
         from apps.notifications.services.fcm_service import send_user_push
+
+        target_users = [request.user]
+        if request.user.is_superuser:
+            if target_audience == "all_admins":
+                target_users = list(User.objects.filter(is_superuser=True, is_active=True))
+            elif target_audience == "user" and target_email:
+                matched_user = User.objects.filter(email__iexact=target_email, is_active=True).first()
+                if matched_user:
+                    target_users = [matched_user]
+                else:
+                    return Response({
+                        "success": False,
+                        "error": f"Active user with email '{target_email}' not found.",
+                    }, status=status.HTTP_404_NOT_FOUND)
+
         res = send_user_push(
-            user_or_users=request.user,
+            user_or_users=target_users,
             title=title,
             body=body,
             link=url,

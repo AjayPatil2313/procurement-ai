@@ -1272,3 +1272,67 @@ def admin_push_notifications_overview_view(request):
     }
     return render(request, "admin_panel/notifications/push_overview.html", context)
 
+
+@login_required
+@superadmin_required
+@require_POST
+def admin_push_log_retry_view(request, pk):
+    """
+    Super Admin Push Retry:
+    Re-dispatches an individual failed push notification to the user's active device(s).
+    """
+    log = get_object_or_404(PushDeliveryLog, pk=pk)
+    device = log.device
+    target_token = device.token if device and device.is_active else None
+
+    # If original device is inactive or missing, try finding any active device for this user
+    if not target_token:
+        active_dev = DeviceToken.objects.filter(user=log.user, is_active=True).first()
+        if active_dev:
+            target_token = active_dev.token
+            device = active_dev
+
+    if not target_token:
+        return JsonResponse({
+            "success": False,
+            "error": "No active device token found for this user to retry delivery.",
+        }, status=400)
+
+    title = log.notification.title if log.notification else "TradeConnect Alert"
+    body = log.notification.message if log.notification else "Operational platform alert."
+    link = log.notification.clean_link if log.notification else "/dashboard/"
+
+    from apps.notifications.services.fcm_service import send_fcm_multicast
+    result = send_fcm_multicast(
+        tokens=[target_token],
+        title=title,
+        body=body,
+        link=link,
+    )
+
+    log.attempt_count += 1
+    if result.get("success"):
+        log.status = PushDeliveryLog.Status.SUCCESS
+        log.error_code = ""
+        log.error_message = ""
+        log.sent_at = timezone.now()
+        log.device = device
+        log.save()
+        return JsonResponse({
+            "success": True,
+            "message": "Push notification successfully redelivered via FCM.",
+            "status": log.status,
+            "attempt_count": log.attempt_count,
+        })
+    else:
+        err_msg = "; ".join(result.get("errors", [])) or "FCM dispatch rejected."
+        log.status = PushDeliveryLog.Status.FAILED
+        log.error_code = "FCM_RETRY_FAIL"
+        log.error_message = err_msg
+        log.save()
+        return JsonResponse({
+            "success": False,
+            "error": err_msg,
+            "attempt_count": log.attempt_count,
+        }, status=400)
+

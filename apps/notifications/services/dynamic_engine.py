@@ -130,6 +130,248 @@ EVENT_REGISTRY = {
         "default_url": "/admin-panel/companies/{id}/",
         "audience": "SUPER_ADMINS",
     },
+    # 11. Welcome & Onboarding (User)
+    "auth.welcome": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.INFO,
+        "icon": "fa-user-check",
+        "color": "emerald",
+        "default_title": "Welcome to TradeConnect, {user_name}!",
+        "default_message": "Your enterprise account is ready. Discover verified suppliers, create sourcing requirements, or manage your product catalog.",
+        "default_url": "/dashboard/",
+        "audience": "USER",
+    },
+    # 12. Email Verification Reminder (User)
+    "auth.email_verification": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-envelope-circle-check",
+        "color": "indigo",
+        "default_title": "Verify Your Email Address",
+        "default_message": "Please confirm your email address to unlock unrestricted B2B trading and RFQ inquiries.",
+        "default_url": "/dashboard/",
+        "audience": "USER",
+    },
+    # 13. Password Reset Security Notice (User)
+    "auth.password_reset": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-key",
+        "color": "amber",
+        "default_title": "Password Reset Requested",
+        "default_message": "A security reset link was generated for your account. If you did not request this, secure your account immediately.",
+        "default_url": "/login/",
+        "audience": "USER",
+    },
+    # 14. Password Changed Confirmation (User)
+    "auth.password_changed": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.INFO,
+        "icon": "fa-lock",
+        "color": "emerald",
+        "default_title": "Password Changed Successfully",
+        "default_message": "Your account password was updated successfully. If this wasn't you, report unauthorized access immediately.",
+        "default_url": "/login/",
+        "audience": "USER",
+    },
+    # 15. Account Activation / Deactivation (User)
+    "user.activation_deactivation": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-user-shield",
+        "color": "rose",
+        "default_title": "Account Status Updated: {status_display}",
+        "default_message": "Your user account status has been changed to '{status_display}'. Contact your company administrator for questions.",
+        "default_url": "/help/",
+        "audience": "USER",
+    },
+    # 16. Subscription Expiry Reminder (User)
+    "billing.subscription_expiry_user": {
+        "category": NotificationPreference.Category.BILLING,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-calendar-clock",
+        "color": "amber",
+        "default_title": "Company Subscription Renewal Notice",
+        "default_message": "Your organization's '{plan_name}' subscription expires in {days_left} days. Contact your company administrator to maintain active access.",
+        "default_url": "/billing/subscription/",
+        "audience": "USER",
+    },
+    # 17. Company Verification Decision (Company Admin)
+    "company.verification_decision": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-building-circle-check",
+        "color": "purple",
+        "default_title": "Company Verification: {status_display}",
+        "default_message": "Verification documents for {company_name} evaluated as '{status_display}'.",
+        "default_url": "/company/profile/",
+        "audience": "COMPANY_ADMINS",
+    },
+    # 18. Billing Low Credits (Company Admin)
+    "billing.credits_low": {
+        "category": NotificationPreference.Category.BILLING,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-battery-quarter",
+        "color": "rose",
+        "default_title": "Low AI Credits Warning",
+        "default_message": "Your credit balance ({balance}) has fallen below threshold. Recharge your wallet to avoid disruption.",
+        "default_url": "/billing/wallet/",
+        "audience": "COMPANY_ADMINS",
+    },
+    # 19. Subscription Expiring (Company Admin)
+    "billing.subscription_expiring_admin": {
+        "category": NotificationPreference.Category.BILLING,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-calendar-clock",
+        "color": "rose",
+        "default_title": "Subscription Expiring Soon: {plan_name}",
+        "default_message": "Your company's {plan_name} subscription expires in {days_left} days. Renew now to preserve trade access.",
+        "default_url": "/billing/subscription/",
+        "audience": "COMPANY_ADMINS",
+    },
+    # 20. Payment Failed (Company Admin)
+    "billing.payment_failed": {
+        "category": NotificationPreference.Category.BILLING,
+        "priority": Notification.Priority.CRITICAL,
+        "icon": "fa-triangle-exclamation",
+        "color": "rose",
+        "default_title": "Payment Failed: {invoice_number}",
+        "default_message": "A billing transaction of {amount} {currency} failed. Reason: {error_reason}. Update payment method to prevent account disruption.",
+        "default_url": "/billing/invoices/",
+        "audience": "COMPANY_ADMINS",
+    },
+    # 21. Company Profile / Verification Update (Company Admin)
+    "company.profile_updated": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.INFO,
+        "icon": "fa-building-gear",
+        "color": "blue",
+        "default_title": "Company Profile Updated",
+        "default_message": "Profile and operational information for {company_name} was updated by {updated_by}.",
+        "default_url": "/company/profile/",
+        "audience": "COMPANY_ADMINS",
+    },
+    # 22. Company Suspended (Company Admin)
+    "company.suspended": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.CRITICAL,
+        "icon": "fa-ban",
+        "color": "rose",
+        "default_title": "Company Account Suspended",
+        "default_message": "Your organization '{company_name}' has been suspended due to governance or compliance review.",
+        "default_url": "/help/",
+        "audience": "COMPANY_ADMINS",
+    },
+    # 23. Company Reactivated (Company Admin)
+    "company.reactivated": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.SUCCESS,
+        "icon": "fa-circle-check",
+        "color": "emerald",
+        "default_title": "Company Account Reactivated",
+        "default_message": "Your organization '{company_name}' has been reactivated. Full trading privileges restored.",
+        "default_url": "/dashboard/",
+        "audience": "COMPANY_ADMINS",
+    },
+    # 24. Super Admin: New Company Registration
+    "admin.new_company": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.INFO,
+        "icon": "fa-shield-halved",
+        "color": "teal",
+        "default_title": "New Company Registered: {company_name}",
+        "default_message": "Company '{company_name}' ({company_type}) has registered on the platform. Review pending verification.",
+        "default_url": "/admin-panel/companies/{id}/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 25. Super Admin: Company Verification Pending
+    "admin.verification_pending": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.WARNING,
+        "icon": "fa-file-invoice",
+        "color": "amber",
+        "default_title": "Verification Pending: {company_name}",
+        "default_message": "Company '{company_name}' submitted legal verification credentials. Audit review required.",
+        "default_url": "/admin-panel/companies/{id}/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 26. Super Admin: Company Verification Decision
+    "admin.verification_decision": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.INFO,
+        "icon": "fa-clipboard-check",
+        "color": "blue",
+        "default_title": "Verification Audited: {company_name}",
+        "default_message": "Verification status for '{company_name}' updated to '{status_display}' by {operator}.",
+        "default_url": "/admin-panel/companies/{id}/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 27. Super Admin: New User Registration
+    "admin.new_user": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.INFO,
+        "icon": "fa-user-plus",
+        "color": "teal",
+        "default_title": "New User Registered: {user_email}",
+        "default_message": "User {user_name} ({user_email}) has created an account on the platform.",
+        "default_url": "/admin-panel/users/{id}/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 28. Super Admin: Company Suspended / Status Change
+    "admin.company_suspended": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.CRITICAL,
+        "icon": "fa-ban",
+        "color": "rose",
+        "default_title": "Company Governance Action: {company_name}",
+        "default_message": "Company '{company_name}' status updated to '{status_display}' by {operator}.",
+        "default_url": "/admin-panel/companies/{id}/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 29. Super Admin: Subscription Purchased / Cancelled
+    "admin.subscription_change": {
+        "category": NotificationPreference.Category.BILLING,
+        "priority": Notification.Priority.INFO,
+        "icon": "fa-credit-card",
+        "color": "emerald",
+        "default_title": "Subscription Update: {company_name}",
+        "default_message": "Company '{company_name}' updated subscription to plan '{plan_name}' ({billing_cycle}).",
+        "default_url": "/admin-panel/billing/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 30. Super Admin: Payment Failure / Billing Issue
+    "admin.payment_issue": {
+        "category": NotificationPreference.Category.BILLING,
+        "priority": Notification.Priority.CRITICAL,
+        "icon": "fa-circle-xmark",
+        "color": "rose",
+        "default_title": "Platform Billing Failure: {company_name}",
+        "default_message": "Transaction failure reported for '{company_name}' ({amount} {currency}). Gateway error: {error_reason}.",
+        "default_url": "/admin-panel/billing/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 31. Super Admin: Email Delivery Failure
+    "admin.email_delivery_failure": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.CRITICAL,
+        "icon": "fa-triangle-exclamation",
+        "color": "rose",
+        "default_title": "Email Delivery Failure: {recipient_email}",
+        "default_message": "Outbox email #{log_id} ({failed_event}) to {recipient_email} exhausted all retry attempts: {error_message}.",
+        "default_url": "/admin-panel/email/logs/",
+        "audience": "SUPER_ADMINS",
+    },
+    # 32. Super Admin: Repeated Security / Auth Alert
+    "admin.security_alert": {
+        "category": NotificationPreference.Category.SECURITY,
+        "priority": Notification.Priority.CRITICAL,
+        "icon": "fa-shield-virus",
+        "color": "rose",
+        "default_title": "Security Alert: {alert_type}",
+        "default_message": "Repeated security anomalies detected ({alert_type}) from IP {ip_address} targeting {user_email}.",
+        "default_url": "/admin-panel/security/",
+        "audience": "SUPER_ADMINS",
+    },
 }
 
 
@@ -216,6 +458,12 @@ def resolve_event_recipients(event_key, context, company=None, actor=None):
 
     if audience == "INQUIRY_PARTICIPANTS":
         target_user = context.get("target_user")
+        if target_user and getattr(target_user, "is_active", False):
+            recipients.add(target_user)
+        return recipients
+
+    if audience == "USER":
+        target_user = context.get("user") or context.get("recipient") or actor
         if target_user and getattr(target_user, "is_active", False):
             recipients.add(target_user)
         return recipients
@@ -322,8 +570,8 @@ def dispatch_dynamic_notification(
         # 2. FIREBASE BROWSER PUSH CHANNEL (Strictly separate from Email)
         push_allowed = NotificationPreference.is_push_permitted(recipient, category)
         if push_allowed:
-            active_devices = DeviceToken.objects.filter(user=recipient, is_active=True)
-            if active_devices.exists():
+            active_devices = list(DeviceToken.objects.filter(user=recipient, is_active=True))
+            if active_devices:
                 from apps.notifications.services.fcm_service import send_user_push
                 push_res = send_user_push(
                     user_or_users=recipient,
@@ -331,28 +579,34 @@ def dispatch_dynamic_notification(
                     body=rendered_message[:500],
                     link=rendered_url,
                     category=category,
+                    priority=priority,
                 )
                 push_results.append(push_res)
 
-                # Record PushDeliveryLog for audit and telemetry
+                # Record PushDeliveryLog for audit and telemetry with per-device precision
+                device_results = push_res.get("device_results", {})
                 for device in active_devices:
-                    status = (
+                    dev_res = device_results.get(device.token, {})
+                    is_dev_success = dev_res.get("success", push_res.get("success", False))
+                    dev_status = (
                         PushDeliveryLog.Status.SUCCESS
-                        if push_res.get("success")
+                        if is_dev_success
                         else PushDeliveryLog.Status.FAILED
                     )
-                    error_msg = "; ".join(push_res.get("errors", [])) if not push_res.get("success") else ""
+                    dev_err_code = dev_res.get("error_code") or ("" if is_dev_success else "FCM_DISPATCH_FAIL")
+                    dev_err_msg = dev_res.get("error_message") or ("; ".join(push_res.get("errors", [])) if not is_dev_success else "")
+
                     PushDeliveryLog.objects.create(
                         notification=notif_obj,
                         device=device,
                         user=recipient,
                         company=user_company,
                         event_key=event_key,
-                        status=status,
+                        status=dev_status,
                         attempt_count=1,
-                        error_code="FCM_DISPATCH_FAIL" if error_msg else "",
-                        error_message=error_msg,
-                        sent_at=timezone.now() if status == PushDeliveryLog.Status.SUCCESS else None,
+                        error_code=dev_err_code,
+                        error_message=dev_err_msg,
+                        sent_at=timezone.now() if dev_status == PushDeliveryLog.Status.SUCCESS else None,
                     )
 
     return {

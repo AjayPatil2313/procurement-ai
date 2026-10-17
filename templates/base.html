@@ -76,30 +76,30 @@
         {% if rbac.can_view_buyer %}
         <div>
           <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-            <span>SALES</span>
+            <span>CUSTOMER (PROCUREMENT)</span>
             <i class="fa-solid fa-cart-shopping text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
             {% if rbac.buyer_modules.my_requirements != False %}
             <a href="{% url 'requirements-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/requirements/' or '/procurement/requirements/' in request.path %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <i class="fa-solid fa-cart-plus w-5 text-center text-xs"></i>
-              <span>Add Product</span>
+              <i class="fa-solid fa-clipboard-list w-5 text-center text-xs"></i>
+              <span>My Requirements</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.find_suppliers != False %}
             <a href="{% url 'find-suppliers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/find-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-magnifying-glass-chart w-5 text-center text-xs"></i>
-              <span>Find Customers</span>
+              <span>Find Suppliers</span>
             </a>
             <a href="{% url 'customers-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/customers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-users-viewfinder w-5 text-center text-xs"></i>
-              <span>Customer list</span>
+              <span>Suppliers List</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.saved_suppliers != False %}
             <a href="{% url 'saved-suppliers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/procurement/saved-suppliers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-regular fa-bookmark w-5 text-center text-xs"></i>
-              <span>Prequalified Customers</span>
+              <span>Saved Suppliers</span>
             </a>
             {% endif %}
             {% if rbac.buyer_modules.inquiries != False %}
@@ -122,32 +122,32 @@
         {% if rbac.can_view_seller %}
         <div>
           <div class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-            <span>VENDOR</span>
+            <span>VENDOR (SALES)</span>
             <i class="fa-solid fa-bullhorn text-slate-500 text-[10px]"></i>
           </div>
           <div class="space-y-0.5">
             {% if rbac.seller_modules.my_products != False %}
             <a href="{% url 'products-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/products/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
-              <i class="fa-solid fa-clipboard-list w-5 text-center text-xs"></i>
-              <span>Add Requirement</span>
+              <i class="fa-solid fa-box-open w-5 text-center text-xs"></i>
+              <span>Product Catalog</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.find_buyers != False %}
             <a href="{% url 'find-buyers' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/find-buyers/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-crosshairs w-5 text-center text-xs"></i>
-              <span>Find vendors</span>
+              <span>Find Customers</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.buyer_leads != False %}
             <a href="{% url 'leads-list' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-solid fa-users-viewfinder w-5 text-center text-xs"></i>
-              <span>Vendor list</span>
+              <span>Customer Leads</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.saved_buyers != False %}
             <a href="{% url 'saved-leads' %}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if request.path == '/sales/saved-leads/' %}bg-blue-600/20 text-blue-400 font-medium{% else %}text-slate-400 hover:text-slate-200 hover:bg-slate-800/60{% endif %}">
               <i class="fa-regular fa-bookmark w-5 text-center text-xs"></i>
-              <span>Prequalified Vendors</span>
+              <span>Saved Customers</span>
             </a>
             {% endif %}
             {% if rbac.seller_modules.seller_inquiries != False %}
@@ -1470,7 +1470,11 @@
 
         if (currentToken) {
           const cachedToken = localStorage.getItem('tc_fcm_token');
-          if (cachedToken !== currentToken || isUserGesture) {
+          const lastRegisteredAt = parseInt(localStorage.getItem('tc_fcm_registered_at') || '0', 10);
+          const nowMs = Date.now();
+          const shouldRefresh = (nowMs - lastRegisteredAt) > 86400000; // 24 hours
+
+          if (cachedToken !== currentToken || isUserGesture || shouldRefresh) {
             await fetch('/api/notifications/devices/register/', {
               method: 'POST',
               headers: {
@@ -1484,6 +1488,7 @@
               }),
             });
             localStorage.setItem('tc_fcm_token', currentToken);
+            localStorage.setItem('tc_fcm_registered_at', nowMs.toString());
           }
 
           fcmMessaging.onMessage((payload) => {
@@ -1497,6 +1502,27 @@
       }
     }
 
+    async function unregisterPushOnLogout() {
+      const token = localStorage.getItem('tc_fcm_token');
+      if (token) {
+        try {
+          await fetch('/api/notifications/devices/unregister/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ token: token }),
+            keepalive: true,
+          });
+          localStorage.removeItem('tc_fcm_token');
+          localStorage.removeItem('tc_fcm_registered_at');
+        } catch (e) {
+          console.warn('Logout push deactivation skipped:', e);
+        }
+      }
+    }
+
     function loadScript(src) {
       return new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -1507,9 +1533,12 @@
       });
     }
 
-    // Initialize web push client on DOM load
+    // Initialize web push client on DOM load and attach logout deactivator
     document.addEventListener('DOMContentLoaded', () => {
       initWebPushClient();
+      document.querySelectorAll('a[href*="/logout/"]').forEach(el => {
+        el.addEventListener('click', unregisterPushOnLogout);
+      });
     });
   </script>
 

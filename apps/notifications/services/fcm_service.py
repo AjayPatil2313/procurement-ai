@@ -130,22 +130,39 @@ def unregister_device_token(user, token):
     return updated > 0
 
 
-def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=None):
+def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=None, urgency="normal"):
     """
     Sends Web Push notifications to a list of registration tokens using FCM HTTP v1.
+    Tracks exact per-device outcome in device_results.
     Automatically identifies invalid or unregistered tokens and marks them is_active=False.
     """
     if not tokens:
-        return {"success": False, "sent_count": 0, "failed_count": 0, "errors": ["No tokens provided"]}
+        return {
+            "success": False,
+            "sent_count": 0,
+            "failed_count": 0,
+            "errors": ["No tokens provided"],
+            "device_results": {},
+        }
 
     app = get_firebase_app()
     if not app:
         logger.info("Firebase Admin SDK is not initialized. Skipping push dispatch.")
+        fail_map = {
+            t: {
+                "success": False,
+                "message_id": "",
+                "error_code": "FIREBASE_NOT_CONFIGURED",
+                "error_message": "Firebase Admin SDK is not configured",
+            }
+            for t in tokens
+        }
         return {
             "success": False,
             "sent_count": 0,
             "failed_count": len(tokens),
             "errors": ["Firebase not configured"],
+            "device_results": fail_map,
         }
 
     from firebase_admin import messaging
@@ -174,7 +191,13 @@ def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=Non
     if clean_url and clean_url.startswith("https://"):
         fcm_options = messaging.WebpushFCMOptions(link=clean_url)
 
+    # Configure WebPush headers including Urgency (high vs normal)
+    webpush_headers = {
+        "Urgency": "high" if urgency == "high" else "normal"
+    }
+
     webpush_kwargs = {
+        "headers": webpush_headers,
         "notification": messaging.WebpushNotification(
             title=title[:250],
             body=body[:500],
@@ -194,25 +217,62 @@ def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=Non
         webpush=webpush_config,
     )
 
+    device_results = {}
     try:
         response = messaging.send_each_for_multicast(message)
     except Exception as exc:
         logger.error(f"FCM multicast dispatch failed with exception: {exc}")
-        return {"success": False, "sent_count": 0, "failed_count": len(tokens), "errors": [str(exc)]}
+        for t in tokens:
+            device_results[t] = {
+                "success": False,
+                "message_id": "",
+                "error_code": "FCM_DISPATCH_FAIL",
+                "error_message": str(exc),
+            }
+        return {
+            "success": False,
+            "sent_count": 0,
+            "failed_count": len(tokens),
+            "errors": [str(exc)],
+            "device_results": device_results,
+        }
 
     stale_tokens = []
     errors = []
     for idx, resp in enumerate(response.responses):
-        if not resp.success:
+        t = tokens[idx]
+        if resp.success:
+            device_results[t] = {
+                "success": True,
+                "message_id": getattr(resp, "message_id", "") or "",
+                "error_code": "",
+                "error_message": "",
+            }
+        else:
             err = resp.exception
-            errors.append(str(err))
-            # Catch unregistered / revoked tokens
-            if (
-                isinstance(err, (messaging.UnregisteredError, messaging.SenderIdMismatchError))
-                or "not found" in str(err).lower()
-                or "unregistered" in str(err).lower()
-            ):
-                stale_tokens.append(tokens[idx])
+            err_str = str(err)
+            errors.append(err_str)
+
+            err_code = "FCM_DISPATCH_FAIL"
+            if isinstance(err, messaging.UnregisteredError) or "unregistered" in err_str.lower():
+                err_code = "UNREGISTERED"
+            elif isinstance(err, messaging.SenderIdMismatchError):
+                err_code = "SENDER_ID_MISMATCH"
+            elif isinstance(err, messaging.QuotaExceededError):
+                err_code = "QUOTA_EXCEEDED"
+            elif "not found" in err_str.lower():
+                err_code = "TOKEN_NOT_FOUND"
+
+            device_results[t] = {
+                "success": False,
+                "message_id": "",
+                "error_code": err_code,
+                "error_message": err_str,
+            }
+
+            # Mark stale tokens for deactivation
+            if err_code in ["UNREGISTERED", "TOKEN_NOT_FOUND", "SENDER_ID_MISMATCH"]:
+                stale_tokens.append(t)
 
     if stale_tokens:
         logger.info(f"Deactivating {len(stale_tokens)} stale FCM tokens.")
@@ -223,15 +283,17 @@ def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=Non
         "sent_count": response.success_count,
         "failed_count": response.failure_count,
         "errors": errors,
+        "device_results": device_results,
     }
 
 
-def send_user_push(user_or_users, title, body, link="", icon="", badge="", data=None, category=None):
+def send_user_push(user_or_users, title, body, link="", icon="", badge="", data=None, category=None, priority=None):
     """
     Central push dispatch function:
     - Resolves active tokens for user(s).
     - Checks user preferences (push_enabled).
     - Checks company suspension (skips suspended tenants).
+    - Configures urgency header based on notification priority.
     - Calls send_fcm_multicast.
     """
     if not isinstance(user_or_users, (list, tuple, set)):
@@ -263,7 +325,16 @@ def send_user_push(user_or_users, title, body, link="", icon="", badge="", data=
         active_tokens.extend(user_tokens)
 
     if not active_tokens:
-        return {"success": True, "sent_count": 0, "failed_count": 0, "message": "No active devices"}
+        return {
+            "success": True,
+            "sent_count": 0,
+            "failed_count": 0,
+            "message": "No active devices",
+            "device_results": {},
+        }
+
+    # High urgency for critical or warning notifications
+    urgency = "high" if priority in ["CRITICAL", "WARNING"] or (data and str(data.get("priority", "")).upper() in ["CRITICAL", "WARNING"]) else "normal"
 
     return send_fcm_multicast(
         tokens=active_tokens,
@@ -273,4 +344,5 @@ def send_user_push(user_or_users, title, body, link="", icon="", badge="", data=
         icon=icon,
         badge=badge,
         data=data,
+        urgency=urgency,
     )

@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.db.models.functions import Lower
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -100,11 +100,17 @@ def products_list_view(request):
     else:
         queryset = Product.objects.filter(company=company, is_deleted=False).select_related("category", "created_by").prefetch_related("images")
 
-    # Metrics
-    active_count = Product.objects.filter(company=company, is_deleted=False).count()
-    archived_count = Product.objects.filter(company=company, is_deleted=True).count()
-    in_stock_count = Product.objects.filter(company=company, is_deleted=False, availability=Product.Availability.IN_STOCK).count()
-    made_to_order_count = Product.objects.filter(company=company, is_deleted=False, availability=Product.Availability.MADE_TO_ORDER).count()
+    # Metrics consolidated in single aggregation query
+    metric_counts = Product.objects.filter(company=company).aggregate(
+        active=Count("id", filter=Q(is_deleted=False)),
+        archived=Count("id", filter=Q(is_deleted=True)),
+        in_stock=Count("id", filter=Q(is_deleted=False, availability=Product.Availability.IN_STOCK)),
+        made_to_order=Count("id", filter=Q(is_deleted=False, availability=Product.Availability.MADE_TO_ORDER)),
+    )
+    active_count = metric_counts["active"]
+    archived_count = metric_counts["archived"]
+    in_stock_count = metric_counts["in_stock"]
+    made_to_order_count = metric_counts["made_to_order"]
 
     # Filters
     q = request.GET.get("q", "").strip()
@@ -164,7 +170,7 @@ def products_list_view(request):
         "selected_category": category_id,
         "selected_availability": availability_val,
         "availability_choices": Product.Availability.choices,
-        "page_title": "Archived Requirements" if is_archived_view else "Add Requirement",
+        "page_title": "Archived Products" if is_archived_view else "Products",
     })
 
 
@@ -297,9 +303,9 @@ def product_create_view(request):
             )
 
         if duplicate_exists:
-            messages.warning(request, f"Requirement '{name}' created. Note: Another item with this exact name already exists in your catalog.")
+            messages.warning(request, f"Product '{name}' created. Note: Another item with this exact name already exists in your catalog.")
         else:
-            messages.success(request, f"Requirement '{name}' was created successfully!")
+            messages.success(request, f"Product '{name}' was created successfully!")
 
         try:
             from apps.notifications.services.email_engine import trigger_email_notification
@@ -324,6 +330,23 @@ def product_create_view(request):
         except Exception:
             pass
 
+        # Real-time In-App & Firebase Browser Push for the user / company
+        try:
+            from apps.dashboard.services.notification_service import create_notification
+            create_notification(
+                user=request.user,
+                company=company,
+                notification_type="system",
+                title=f"Product Added: {product.name}",
+                message=f"Product '{product.name}' was successfully added to your catalog.",
+                link=reverse("product-detail", kwargs={"pk": product.pk}),
+                icon="fa-box",
+                color="emerald",
+                event_key="seller.product_created",
+            )
+        except Exception:
+            pass
+
         return redirect("product-detail", pk=product.pk)
 
     return render(request, "products/create.html", {
@@ -332,7 +355,7 @@ def product_create_view(request):
         "rbac": rbac,
         "form_data": form_data,
         "availability_choices": Product.Availability.choices,
-        "page_title": "Add Requirement",
+        "page_title": "Add Product",
     })
 
 

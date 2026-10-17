@@ -144,11 +144,12 @@
             <th class="py-3 px-4">Device</th>
             <th class="py-3 px-4">Error / Notes</th>
             <th class="py-3 px-4 text-right">Timestamp</th>
+            <th class="py-3 px-4 text-center">Action</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
           {% for log in logs %}
-          <tr class="hover:bg-slate-50/70 transition">
+          <tr class="hover:bg-slate-50/70 transition" id="push-log-row-{{ log.id }}">
             <td class="py-3 px-4">
               {% if log.status == 'SUCCESS' %}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -178,10 +179,25 @@
             <td class="py-3 px-4 text-right text-slate-500 whitespace-nowrap">
               {{ log.created_at|date:"d M Y, H:i" }}
             </td>
+            <td class="py-3 px-4 text-center whitespace-nowrap">
+              {% if log.status == 'FAILED' %}
+              <button 
+                type="button" 
+                onclick="retryPushLog('{{ log.id }}')" 
+                id="retry-btn-{{ log.id }}"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition"
+                title="Retry push dispatch via FCM"
+              >
+                <i class="fa-solid fa-rotate-right text-[10px]"></i> Retry
+              </button>
+              {% else %}
+              <span class="text-slate-400 text-xs">—</span>
+              {% endif %}
+            </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="py-8 text-center text-slate-400">
+            <td colspan="8" class="py-8 text-center text-slate-400">
               <i class="fa-solid fa-bell-slash text-2xl mb-2 block"></i>
               No push delivery telemetry records found matching current criteria.
             </td>
@@ -225,6 +241,18 @@
     <form id="adminTestPushForm" class="p-5 space-y-4">
       {% csrf_token %}
       <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Audience</label>
+        <select id="testPushAudience" onchange="toggleTestEmailField()" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none bg-white">
+          <option value="self">Myself (Current Browser)</option>
+          <option value="all_admins">All Active Platform Super Admins</option>
+          <option value="user">Specific User by Email</option>
+        </select>
+      </div>
+      <div id="targetEmailContainer" class="hidden">
+        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Recipient User Email</label>
+        <input type="email" id="testPushTargetEmail" placeholder="e.g. user@company.com" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none">
+      </div>
+      <div>
         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Push Alert Title</label>
         <input type="text" id="testPushTitle" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none" value="TradeConnect Test Push Alert">
       </div>
@@ -250,12 +278,56 @@
 </div>
 
 <script>
+function toggleTestEmailField() {
+  const audience = document.getElementById('testPushAudience').value;
+  const container = document.getElementById('targetEmailContainer');
+  if (audience === 'user') {
+    container.classList.remove('hidden');
+  } else {
+    container.classList.add('hidden');
+  }
+}
+
+async function retryPushLog(logId) {
+  const btn = document.getElementById(`retry-btn-${logId}`);
+  if (!btn) return;
+
+  const originalContent = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i>';
+
+  try {
+    const res = await fetch(`/admin-panel/notifications/push/logs/${logId}/retry/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      }
+    });
+    const data = await res.json();
+    if (data.success) {
+      btn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200';
+      btn.innerHTML = '<i class="fa-solid fa-check text-[10px]"></i> Sent';
+      setTimeout(() => { window.location.reload(); }, 1200);
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = originalContent;
+      alert(`Retry Failed: ${data.error || 'FCM dispatch error'}`);
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = originalContent;
+    alert(`Network Error: ${err.message}`);
+  }
+}
+
 async function dispatchAdminTestPush() {
   const btn = document.getElementById('submitTestPushBtn');
   const msgBox = document.getElementById('testPushStatusMsg');
   const title = document.getElementById('testPushTitle').value.trim();
   const body = document.getElementById('testPushBody').value.trim();
   const url = document.getElementById('testPushUrl').value.trim();
+  const target_audience = document.getElementById('testPushAudience').value;
+  const target_email = document.getElementById('testPushTargetEmail') ? document.getElementById('testPushTargetEmail').value.trim() : '';
 
   btn.disabled = true;
   btn.textContent = 'Sending...';
@@ -268,7 +340,7 @@ async function dispatchAdminTestPush() {
         'Content-Type': 'application/json',
         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
       },
-      body: JSON.stringify({ title, body, url })
+      body: JSON.stringify({ title, body, url, target_audience, target_email })
     });
     const data = await res.json();
     msgBox.classList.remove('hidden');
@@ -278,7 +350,7 @@ async function dispatchAdminTestPush() {
       setTimeout(() => { window.location.reload(); }, 1500);
     } else {
       msgBox.className = 'text-xs p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200';
-      msgBox.textContent = `Failed: ${data.errors ? data.errors.join('; ') : 'Unknown error'}`;
+      msgBox.textContent = `Failed: ${data.errors ? data.errors.join('; ') : (data.error || 'Unknown error')}`;
       btn.disabled = false;
       btn.textContent = 'Send Now';
     }
