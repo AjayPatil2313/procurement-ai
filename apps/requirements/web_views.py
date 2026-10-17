@@ -294,6 +294,18 @@ def requirements_export_csv_view(request):
             r.created_at.strftime("%Y-%m-%d %H:%M"),
         ])
 
+    try:
+        from apps.notifications.services.notification_engine import notify_event
+        notify_event(
+            event="data_transfer.completed",
+            recipient=request.user,
+            company=company,
+            data={"job_type": "Requirements Export", "count": str(requirements.count())},
+            dedupe_key=f"data_exp_req_{company.id}_{int(timezone.now().timestamp() // 60)}",
+        )
+    except Exception:
+        pass
+
     return response
 
 
@@ -846,6 +858,21 @@ def requirement_edit_view(request, pk):
             req.status = status_val
 
         req.save()
+        try:
+            from apps.notifications.services.notification_engine import notify_event
+            notify_event(
+                event="requirement.changed",
+                company=company,
+                recipient=req.created_by,
+                data={
+                    "requirement_title": req.item_name,
+                    "status_display": req.get_status_display() or req.status,
+                },
+                dedupe_key=f"req_chg_{req.id}_{req.status}",
+            )
+        except Exception:
+            pass
+
         messages.success(request, f"Requirement '{req.item_name}' updated successfully.")
         return redirect("requirement-detail", pk=req.id)
 
@@ -986,9 +1013,40 @@ def find_suppliers_view(request):
             job = run_find_suppliers_search(target_req, request.user, company, search_scope=search_scope)
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
+                try:
+                    from apps.notifications.services.notification_engine import notify_event
+                    notify_event(
+                        event="ai.search.failed",
+                        recipient=request.user,
+                        company=company,
+                        data={"query": target_req.item_name, "error_reason": job.error_message},
+                    )
+                    notify_event(
+                        event="platform.ai_provider_failure",
+                        data={"provider_name": "Supplier Discovery Pipeline", "error_code": "DISCOVERY_ERR", "error_message": job.error_message},
+                    )
+                except Exception:
+                    pass
             else:
                 deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
                 messages.success(request, f"Supplier discovery complete! Found {job.total_results} matching suppliers for '{target_req.item_name}'. ({deduction_notice})")
+                try:
+                    from apps.notifications.services.notification_engine import notify_event
+                    notify_event(
+                        event="ai.supplier_search.completed",
+                        recipient=request.user,
+                        company=company,
+                        data={"query": target_req.item_name, "results_count": job.total_results, "search_id": job.id},
+                    )
+                    if job.total_results > 0:
+                        notify_event(
+                            event="ai.matches.found",
+                            recipient=request.user,
+                            company=company,
+                            data={"matches_count": job.total_results},
+                        )
+                except Exception:
+                    pass
             return redirect(f"{reverse('find-suppliers')}?requirement_id={target_req.id}&search_scope={search_scope}")
         else:
             messages.error(request, "Please select an active requirement to find suppliers.")

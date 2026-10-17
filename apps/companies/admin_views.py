@@ -1084,6 +1084,17 @@ def admin_panel_toggle_company_status_view(request, pk):
                 color="rose",
             )
 
+            try:
+                from apps.notifications.services.notification_engine import notify_event
+                notify_event(
+                    event="platform.company_status_changed",
+                    company=company,
+                    data={"company_name": company.name, "status_display": "Suspended"},
+                    dedupe_key=f"plat_comp_susp_{company.id}",
+                )
+            except Exception:
+                pass
+
             messages.warning(
                 request,
                 f"Company '{company.name}' has been suspended. Reason: {remark}. "
@@ -1148,6 +1159,17 @@ def admin_panel_toggle_company_status_view(request, pk):
                 icon_type="building-circle-check",
                 color="emerald",
             )
+            try:
+                from apps.notifications.services.notification_engine import notify_event
+                notify_event(
+                    event="platform.company_status_changed",
+                    company=company,
+                    data={"company_name": company.name, "status_display": "Active"},
+                    dedupe_key=f"plat_comp_react_{company.id}",
+                )
+            except Exception:
+                pass
+
             messages.success(request, f"Company '{company.name}' has been reactivated. Team members may now log in and notification email dispatched.")
 
     return redirect(request.POST.get("next") or "admin-panel-companies")
@@ -1223,6 +1245,20 @@ def admin_panel_toggle_company_verification_view(request, pk):
                 company=company,
                 actor=request.user,
                 deduplication_key=f"company.verification_updated:{company.id}:{int(timezone.now().timestamp())}",
+            )
+        except Exception:
+            pass
+
+        try:
+            from apps.notifications.services.notification_engine import notify_event
+            notify_event(
+                event="platform.company_verification_decided",
+                company=company,
+                data={
+                    "company_name": company.name,
+                    "decision_status": "Approved" if company.is_verified else "Revoked",
+                },
+                dedupe_key=f"plat_verif_dec_{company.id}_{int(timezone.now().timestamp())}",
             )
         except Exception:
             pass

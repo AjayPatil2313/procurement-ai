@@ -136,6 +136,7 @@ def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=Non
     Tracks exact per-device outcome in device_results.
     Automatically identifies invalid or unregistered tokens and marks them is_active=False.
     """
+    tokens = list(dict.fromkeys(tokens))
     if not tokens:
         return {
             "success": False,
@@ -213,6 +214,10 @@ def send_fcm_multicast(tokens, title, body, link="", icon="", badge="", data=Non
 
     message = messaging.MulticastMessage(
         tokens=list(tokens),
+        notification=messaging.Notification(
+            title=title[:250],
+            body=body[:500],
+        ),
         data=sanitized_data,
         webpush=webpush_config,
     )

@@ -902,6 +902,20 @@ def find_buyers_view(request):
             if job.status == SearchJob.Status.FAILED:
                 messages.error(request, f"Search failed: {job.error_message}")
                 try:
+                    from apps.notifications.services.notification_engine import notify_event
+                    notify_event(
+                        event="ai.search.failed",
+                        recipient=request.user,
+                        company=company,
+                        data={"query": target_prod.name, "error_reason": job.error_message},
+                    )
+                    notify_event(
+                        event="platform.ai_provider_failure",
+                        data={"provider_name": "Buyer Leads Discovery Pipeline", "error_code": "DISCOVERY_ERR", "error_message": job.error_message},
+                    )
+                except Exception:
+                    pass
+                try:
                     from apps.notifications.services.email_engine import trigger_email_notification
                     trigger_email_notification(
                         event_key="admin.ai_provider_error",
@@ -917,6 +931,23 @@ def find_buyers_view(request):
             else:
                 deduction_notice = "1 AI credit debited" if credits_avail > 0 else f"₹{needed_cash:.2f} debited from wallet"
                 messages.success(request, f"Found {job.total_results} buyer leads with contact details for '{target_prod.name}' evaluated against {len(active_params)} criteria! ({deduction_notice})")
+                try:
+                    from apps.notifications.services.notification_engine import notify_event
+                    notify_event(
+                        event="ai.buyer_search.completed",
+                        recipient=request.user,
+                        company=company,
+                        data={"query": target_prod.name, "results_count": job.total_results, "search_id": job.id},
+                    )
+                    if job.total_results > 0:
+                        notify_event(
+                            event="ai.matches.found",
+                            recipient=request.user,
+                            company=company,
+                            data={"matches_count": job.total_results},
+                        )
+                except Exception:
+                    pass
                 try:
                     from apps.notifications.services.email_engine import trigger_email_notification
                     trigger_email_notification(

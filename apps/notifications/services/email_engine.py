@@ -1376,6 +1376,21 @@ def deliver_notification_log(log_or_id, attachments=None):
         # Trigger admin alert if max retry reached and not already an admin alert
         if log.status == NotificationLog.Status.FAILED and not log.event_key.startswith("admin."):
             try:
+                from apps.notifications.services.notification_engine import notify_event
+                notify_event(
+                    event="platform.email_delivery_failure",
+                    data={
+                        "log_id": str(log.id),
+                        "event_key": log.event_key,
+                        "recipient_email": log.recipient_email,
+                        "last_error": err_msg[:200],
+                    },
+                    dedupe_key=f"fail_alert_{log.id}",
+                )
+            except Exception:
+                pass
+
+            try:
                 trigger_email_notification(
                     event_key="admin.email_delivery_failure",
                     context={

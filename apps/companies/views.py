@@ -69,6 +69,23 @@ class CompanyProfileAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
+        try:
+            from apps.notifications.services.notification_engine import notify_event
+            notify_event(
+                event="company.profile_verification_updated",
+                company=membership.company,
+                data={"company_name": membership.company.name},
+                dedupe_key=f"comp_prof_upd_{membership.company.id}",
+            )
+            notify_event(
+                event="platform.company_verification_pending",
+                company=membership.company,
+                data={"company_name": membership.company.name},
+                dedupe_key=f"plat_comp_verif_{membership.company.id}",
+            )
+        except Exception:
+            pass
+
         return Response({
             "message": "Company profile updated successfully.",
             "company": serializer.data,
@@ -275,6 +292,24 @@ class CompanyUserDetailUpdateAPIView(APIView):
                 return Response({"error": "You cannot deactivate your own account."}, status=status.HTTP_400_BAD_REQUEST)
             target_member.is_active = val_data["is_active"]
             target_member.user.is_active = val_data["is_active"]
+            try:
+                from apps.notifications.services.notification_engine import notify_event
+                st_disp = "Active" if target_member.is_active else "Inactive"
+                notify_event(
+                    event="company.member_status_changed",
+                    company=membership.company,
+                    data={"member_name": target_member.user.get_full_name() or target_member.user.email, "status_display": st_disp},
+                    dedupe_key=f"comp_mem_st_{membership.company.id}_{target_member.user.id}_{st_disp}",
+                )
+                notify_event(
+                    event="user.account_status_changed",
+                    recipient=target_member.user,
+                    company=membership.company,
+                    data={"status_display": st_disp},
+                    dedupe_key=f"user_st_{target_member.user.id}_{st_disp}",
+                )
+            except Exception:
+                pass
 
         if "first_name" in val_data:
             target_member.user.first_name = val_data["first_name"]
@@ -403,6 +438,24 @@ class AssignPermissionsAPIView(APIView):
                 for permission in permission_objects
             ]
         )
+
+        try:
+            from apps.notifications.services.notification_engine import notify_event
+            notify_event(
+                event="company.member_permission_changed",
+                recipient=target_member.user,
+                company=membership.company,
+                data={"company_name": membership.company.name},
+                dedupe_key=f"mem_perm_{membership.company.id}_{target_member.user.id}",
+            )
+            notify_event(
+                event="company.member_permission_changed_admin",
+                company=membership.company,
+                data={"member_name": target_member.user.get_full_name() or target_member.user.email},
+                dedupe_key=f"admin_mem_perm_{membership.company.id}_{target_member.user.id}",
+            )
+        except Exception:
+            pass
 
         return Response(
             {

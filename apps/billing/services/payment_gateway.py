@@ -360,6 +360,34 @@ class PaymentGatewayService:
             except Exception as e:
                 logger.warning("Could not send invoice email for payment #%s: %s", payment.id, e)
 
+        try:
+            from apps.notifications.services.notification_engine import notify_event
+            inv_num = invoice.invoice_number if invoice else str(payment.id)
+            notify_event(
+                event="billing.payment_confirmed",
+                recipient=user,
+                company=company,
+                data={
+                    "invoice_number": inv_num,
+                    "amount": str(payment.amount),
+                    "currency": payment.currency or "INR",
+                },
+                dedupe_key=f"pay_conf_{payment.id}",
+            )
+            notify_event(
+                event="billing.invoice_generated",
+                company=company,
+                data={
+                    "invoice_number": inv_num,
+                    "amount": str(payment.amount),
+                    "currency": payment.currency or "INR",
+                    "company_name": company.name if company else "",
+                },
+                dedupe_key=f"inv_gen_{payment.id}",
+            )
+        except Exception as e:
+            logger.warning("Could not dispatch payment confirmation notification: %s", e)
+
         return True
 
     @classmethod
@@ -375,3 +403,32 @@ class PaymentGatewayService:
             invoice.save(update_fields=["status"])
 
         logger.warning("Payment #%s marked as FAILED: %s", payment.id, reason)
+
+        try:
+            from apps.notifications.services.notification_engine import notify_event
+            inv_num = invoice.invoice_number if invoice else str(payment.id)
+            comp = payment.company
+            notify_event(
+                event="billing.payment_failed",
+                company=comp,
+                data={
+                    "invoice_number": inv_num,
+                    "amount": str(payment.amount),
+                    "currency": payment.currency or "INR",
+                    "error_reason": reason or "Transaction declined",
+                },
+                dedupe_key=f"pay_fail_{payment.id}",
+            )
+            notify_event(
+                event="platform.billing_issue",
+                data={
+                    "company_name": comp.name if comp else "Unknown",
+                    "amount": str(payment.amount),
+                    "currency": payment.currency or "INR",
+                    "payment_id": str(payment.id),
+                    "error_reason": reason or "Gateway decline",
+                },
+                dedupe_key=f"admin_pay_fail_{payment.id}",
+            )
+        except Exception as e:
+            logger.warning("Could not dispatch payment failure notification: %s", e)

@@ -468,6 +468,23 @@ class CreditWalletService:
             except Exception as exc:
                 logger.warning(f"Failed to trigger subscription change notification: {exc}")
 
+            try:
+                from apps.notifications.services.notification_engine import notify_event
+                notify_event(
+                    event="company.subscription.status_changed",
+                    company=company,
+                    data={"status_display": f"Active ({plan_tier.name})"},
+                    dedupe_key=f"comp_sub_{company.id}_{plan_tier.code}_{int(timezone.now().timestamp() // 3600)}",
+                )
+                notify_event(
+                    event="platform.subscription_status_changed",
+                    company=company,
+                    data={"company_name": company.name, "plan_name": plan_tier.name},
+                    dedupe_key=f"plat_sub_{company.id}_{plan_tier.code}_{int(timezone.now().timestamp() // 3600)}",
+                )
+            except Exception:
+                pass
+
     @classmethod
     def adjust_credits_admin(cls, company, delta, reason="Super Admin Adjustment", admin_user=None):
         """
@@ -819,6 +836,23 @@ class CreditWalletService:
                     )
                 except Exception as exc:
                     logger.warning(f"Failed to trigger credits_low notification email: {exc}")
+
+                try:
+                    from apps.notifications.services.notification_engine import notify_event
+                    notify_event(
+                        event="credits.threshold_reached",
+                        company=company,
+                        data={"remaining_credits": str(wallet.total_available)},
+                        dedupe_key=f"cred_thresh_{company.id}_{timezone.now().strftime('%Y%m%d')}",
+                    )
+                    notify_event(
+                        event="company.credits.low",
+                        company=company,
+                        data={"remaining_credits": str(wallet.total_available)},
+                        dedupe_key=f"comp_cred_low_{company.id}_{timezone.now().strftime('%Y%m%d')}",
+                    )
+                except Exception:
+                    pass
 
 
 class CompanyWalletService:

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Find Customers — AI Customer Discovery Engine{% endblock %}
+{% block title %}Find Vendors — AI Vendor Discovery Engine{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -11,17 +11,17 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">Add Product</a>
+        <a href="{% url 'requirements-list' %}" class="hover:text-blue-600 transition">My Requirements</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">AI Supplier Discovery</span>
+        <span class="text-slate-600 font-semibold">Find Vendors (AI)</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
         </span>
-        <span>AI Supplier Discovery</span>
+        <span>Find Vendors (AI)</span>
       </h1>
-      <p class="text-xs text-slate-500 mt-1">Live web search and scraping engine discovering verified supplier and manufacturer matches, factory pricing, contact info, and MOQ.</p>
+      <p class="text-xs text-slate-500 mt-1">Live web search and scraping engine discovering verified vendor and manufacturer matches, factory pricing, contact info, and MOQ.</p>
     </div>
     <div class="flex items-center gap-2">
       {% if current_company.wallet %}
@@ -35,7 +35,7 @@
       </a>
       {% endif %}
       <a href="{% url 'saved-suppliers' %}" class="inline-flex items-center px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-sm transition">
-        <i class="fa-solid fa-bookmark mr-1.5 text-blue-600"></i> Prequalified Customers
+        <i class="fa-solid fa-bookmark mr-1.5 text-blue-600"></i> Prequalified Vendors
       </a>
     </div>
   </div>

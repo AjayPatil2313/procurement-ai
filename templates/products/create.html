@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Add Requirement — AI Sales Platform{% endblock %}
+{% block title %}Add Product — AI Sales Platform{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-6">
@@ -11,20 +11,20 @@
       <div class="flex items-center space-x-2 text-xs text-slate-400 mb-1">
         <a href="{% url 'dashboard' %}" class="hover:text-blue-600 transition">Dashboard</a>
         <span>&bull;</span>
-        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Add Requirement</a>
+        <a href="{% url 'products-list' %}" class="hover:text-blue-600 transition">Product Catalog</a>
         <span>&bull;</span>
-        <span class="text-slate-600 font-semibold">New Requirement</span>
+        <span class="text-slate-600 font-semibold">New Product</span>
       </div>
       <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-        <i class="fa-solid fa-plus-circle text-blue-600"></i>
-        <span>Add Requirement</span>
+        <i class="fa-solid fa-box-open text-orange-500"></i>
+        <span>Add Product</span>
       </h1>
       <p class="text-xs text-slate-500 mt-0.5">
-        Register a requirement in your catalog for company: <strong class="text-slate-700">{{ company.name }}</strong>
+        Register a new product in your catalog for company: <strong class="text-slate-700">{{ company.name }}</strong>
       </p>
     </div>
     <a href="{% url 'products-list' %}" class="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-xl bg-white border border-slate-200 transition">
-      <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Requirements
+      <i class="fa-solid fa-arrow-left mr-1.5"></i> Back to Catalog
     </a>
   </div>
 

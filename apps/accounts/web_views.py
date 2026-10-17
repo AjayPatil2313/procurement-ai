@@ -82,6 +82,27 @@ def login_view(request):
                 except Exception:
                     pass
 
+                try:
+                    from apps.notifications.services.notification_engine import notify_event
+                    notify_event(
+                        event="security.suspicious_user_activity",
+                        data={
+                            "activity_details": f"Repeated failed logins ({attempts} attempts) for {email}",
+                            "source_ip": request.META.get("REMOTE_ADDR", "Recorded"),
+                        },
+                        dedupe_key=f"sec_susp_{email}_{attempts}",
+                    )
+                    notify_event(
+                        event="platform.security_alert",
+                        data={
+                            "alert_type": "Brute Force Threshold Exceeded",
+                            "source_ip": request.META.get("REMOTE_ADDR", "Recorded"),
+                        },
+                        dedupe_key=f"sec_plat_{email}_{attempts}",
+                    )
+                except Exception:
+                    pass
+
             existing_user = User.objects.filter(email=email).first()
             if existing_user and existing_user.check_password(password) and not existing_user.is_active:
                 messages.error(request, "This account is inactive. Please contact your company administrator.")
@@ -266,19 +287,34 @@ def register_view(request):
         except Exception as exc:
             pass
 
-        # Trigger dynamic In-App + Firebase Browser Push for Super Admins
+        # Trigger dynamic In-App + Firebase Browser Push for Super Admins and User
         try:
-            from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
-            dispatch_dynamic_notification(
-                event_key="company.registered",
-                context={
-                    "id": company.id,
+            from apps.notifications.services.notification_engine import notify_event
+            notify_event(
+                event="user.registered",
+                recipient=user,
+                company=company,
+                data={"user_name": user.get_full_name() or user.first_name},
+                dedupe_key=f"user.registered:{user.id}",
+            )
+            notify_event(
+                event="platform.company_registered",
+                company=company,
+                data={
                     "company_name": company.name,
                     "company_type": company.get_company_type_display(),
+                    "admin_email": user.email,
                 },
+                dedupe_key=f"platform.company_registered:{company.id}",
+            )
+            notify_event(
+                event="platform.user_registered",
                 company=company,
-                actor=user,
-                deduplication_key=f"company.registered:{company.id}",
+                data={
+                    "user_name": user.get_full_name() or user.first_name,
+                    "company_name": company.name,
+                },
+                dedupe_key=f"platform.user_registered:{user.id}",
             )
         except Exception:
             pass
@@ -348,22 +384,36 @@ def forgot_password_view(request):
                     severity="CRITICAL",
                 )
             except Exception:
-                try:
-                    send_mail(
-                        subject="Reset your Procurement AI password",
-                        message=(
-                            f"Hello {user.first_name or 'User'},\n\n"
-                            f"We received a request to reset your password. Use the link below to set a new password:\n\n"
-                            f"{reset_url}\n\n"
-                            f"This link is valid for 1 hour.\n\n"
-                            f"If you did not request this, please ignore this email."
-                        ),
-                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@procurement.ai"),
-                        recipient_list=[user.email],
-                        fail_silently=True,
-                    )
-                except Exception:
-                    pass
+                pass
+
+            try:
+                from apps.notifications.services.notification_engine import notify_event
+                notify_event(
+                    event="user.password_reset_requested",
+                    recipient=user,
+                    company=getattr(user, "company", None),
+                    data={"user_name": user.get_full_name() or user.first_name},
+                    dedupe_key=f"pwd_reset_req_{user.id}_{int(timezone.now().timestamp() // 300)}",
+                )
+            except Exception:
+                pass
+
+            try:
+                send_mail(
+                    subject="Reset your Procurement AI password",
+                    message=(
+                        f"Hello {user.first_name or 'User'},\n\n"
+                        f"We received a request to reset your password. Use the link below to set a new password:\n\n"
+                        f"{reset_url}\n\n"
+                        f"This link is valid for 1 hour.\n\n"
+                        f"If you did not request this, please ignore this email."
+                    ),
+                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@procurement.ai"),
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
 
             messages.success(
                 request,
@@ -448,6 +498,18 @@ def reset_password_view(request, token):
                     "support_url": request.build_absolute_uri("/help-support/"),
                 },
                 idempotency_key=f"pwd_changed_{user.id}_{int(timezone.now().timestamp())}",
+            )
+        except Exception:
+            pass
+
+        try:
+            from apps.notifications.services.notification_engine import notify_event
+            notify_event(
+                event="user.password_changed",
+                recipient=user,
+                company=getattr(user, "company", None),
+                data={"user_name": user.get_full_name() or user.first_name},
+                dedupe_key=f"pwd_changed_{user.id}_{int(timezone.now().timestamp())}",
             )
         except Exception:
             pass

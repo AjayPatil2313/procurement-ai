@@ -5,6 +5,7 @@ from apps.companies.models import CompanyMember
 
 from django.utils import timezone
 from django.db.models import Q
+from apps.notifications.services.notification_engine import notify_event
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +249,17 @@ def notify_quote_recorded(inquiry, user=None):
     except Exception as exc:
         logger.warning(f"Failed to trigger quote email: {exc}")
 
+    try:
+        from apps.notifications.services.notification_engine import notify_event
+        notify_event(
+            event="quotation.status_changed",
+            company=company,
+            data={"status_display": "Recorded", "price": price_str},
+            dedupe_key=f"quote_rec_{inquiry.id}_{price_str}",
+        )
+    except Exception:
+        pass
+
     return notifs
 
 
@@ -320,6 +332,17 @@ def notify_status_changed(inquiry, old_status_display, user=None):
     except Exception as exc:
         logger.warning(f"Failed to trigger status change email: {exc}")
 
+    try:
+        from apps.notifications.services.notification_engine import notify_event
+        notify_event(
+            event="quotation.status_changed",
+            company=company,
+            data={"status_display": inquiry.get_status_display()},
+            dedupe_key=f"inq_status_chg_{inquiry.id}_{inquiry.status}",
+        )
+    except Exception:
+        pass
+
     return notifs
 
 
@@ -341,6 +364,18 @@ def notify_message_logged(inquiry, inquiry_msg, user=None):
 
     title = f"New Message: {inquiry.subject[:40]}"
     msg = f"{sender}: {body_snippet}"
+
+    try:
+        from apps.notifications.services.notification_engine import notify_event
+        msg_id_str = str(inquiry_msg.id) if hasattr(inquiry_msg, 'id') and inquiry_msg.id else str(inquiry.id)
+        notify_event(
+            event="inquiry.message_received",
+            company=company,
+            data={"inquiry_id": str(inquiry.id), "sender_name": sender},
+            dedupe_key=f"inq_msg_{msg_id_str}",
+        )
+    except Exception:
+        pass
 
     return create_notification(
         user=user,

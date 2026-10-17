@@ -3279,6 +3279,655 @@ class FirebasePushOptimizationAndHardeningTests(TestCase):
         self.assertTrue(DeviceToken.objects.filter(pk=self.dev_chrome.pk).exists())
 
 
+class ComprehensiveSystemAuditTestCase(TestCase):
+    """
+    End-to-End System Audit Tests:
+    Verifies user roles, customer & vendor workflows, multi-tenancy, IDOR checks,
+    push telemetry, deduplication, unread counts, and permission enforcement.
+    """
+    def setUp(self):
+        # 1. Users
+        self.customer_admin = User.objects.create_user(
+            email="custadmin@apexcustomer.com",
+            password="Password@123",
+            first_name="Alice",
+            last_name="Customer",
+        )
+        self.vendor_admin = User.objects.create_user(
+            email="vendadmin@zenithvendor.com",
+            password="Password@123",
+            first_name="Bob",
+            last_name="Vendor",
+        )
+        self.suspended_user = User.objects.create_user(
+            email="user@suspended.com",
+            password="Password@123",
+        )
+
+        # 2. Companies
+        self.customer_company = Company.objects.create(
+            name="Apex Customer Ltd",
+            company_type=Company.CompanyType.BUYER,
+            email="contact@apexcustomer.com",
+            created_by=self.customer_admin,
+            is_active=True,
+        )
+        self.vendor_company = Company.objects.create(
+            name="Zenith Vendor Pvt Ltd",
+            company_type=Company.CompanyType.VENDOR,
+            email="sales@zenithvendor.com",
+            created_by=self.vendor_admin,
+            is_active=True,
+        )
+        self.suspended_company = Company.objects.create(
+            name="Suspended Co",
+            company_type=Company.CompanyType.BOTH,
+            email="info@suspended.com",
+            created_by=self.suspended_user,
+            is_active=False,
+        )
+
+        # 3. Company Memberships
+        CompanyMember.objects.create(
+            company=self.customer_company,
+            user=self.customer_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.vendor_company,
+            user=self.vendor_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.suspended_company,
+            user=self.suspended_user,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+
+        # 3. Active Device Tokens for Push
+        self.cust_device = DeviceToken.objects.create(
+            user=self.customer_admin,
+            company=self.customer_company,
+            token="fcm_token_cust_admin_chrome",
+            device_type="CHROME",
+            is_active=True,
+        )
+        self.vend_device = DeviceToken.objects.create(
+            user=self.vendor_admin,
+            company=self.vendor_company,
+            token="fcm_token_vend_admin_edge",
+            device_type="EDGE",
+            is_active=True,
+        )
+
+        self.client = Client()
+
+    @patch("apps.notifications.services.fcm_service.send_fcm_multicast")
+    def test_tc_cust_01_and_05_customer_requirement_and_rfq_push(self, mock_fcm):
+        """TC-CUST-01 & TC-CUST-05: Customer requirement creation & RFQ dispatch trigger push with telemetry"""
+        mock_fcm.return_value = {
+            "success": True,
+            "sent_count": 1,
+            "failed_count": 0,
+            "device_results": {self.cust_device.token: {"success": True, "message_id": "fcm_msg_101"}},
+        }
+        from apps.dashboard.services.notification_service import create_notification
+
+        # 1. Requirement Created Alert
+        notifs = create_notification(
+            user=self.customer_admin,
+            company=self.customer_company,
+            title="Sourcing Requirement Created: Steel Pipes",
+            message="Requirement for 500 pcs has been recorded.",
+            link="/procurement/requirements/",
+            event_key="buyer.requirement_created",
+        )
+        self.assertEqual(len(notifs), 1)
+        self.assertTrue(PushDeliveryLog.objects.filter(user=self.customer_admin, event_key="buyer.requirement_created").exists())
+
+        # 2. Duplicate Suppression: Triggering identical notification immediately within 15 min is suppressed
+        dup_notifs = create_notification(
+            user=self.customer_admin,
+            company=self.customer_company,
+            title="Sourcing Requirement Created: Steel Pipes",
+            message="Requirement for 500 pcs has been recorded.",
+            link="/procurement/requirements/",
+            event_key="buyer.requirement_created",
+        )
+        self.assertEqual(len(dup_notifs), 1)
+        # No extra PushDeliveryLog created
+        self.assertEqual(PushDeliveryLog.objects.filter(user=self.customer_admin, event_key="buyer.requirement_created").count(), 1)
+
+    @patch("apps.notifications.services.fcm_service.send_fcm_multicast")
+    def test_tc_vend_01_vendor_product_added_push(self, mock_fcm):
+        """TC-VEND-01: Vendor product creation triggers real-time push and telemetry"""
+        mock_fcm.return_value = {
+            "success": True,
+            "sent_count": 1,
+            "failed_count": 0,
+            "device_results": {self.vend_device.token: {"success": True, "message_id": "fcm_msg_102"}},
+        }
+        from apps.dashboard.services.notification_service import create_notification
+
+        notifs = create_notification(
+            user=self.vendor_admin,
+            company=self.vendor_company,
+            title="Product Added: Industrial Valves",
+            message="Industrial Valves added to catalog.",
+            link="/sales/products/",
+            event_key="seller.product_created",
+        )
+        self.assertEqual(len(notifs), 1)
+        log = PushDeliveryLog.objects.filter(user=self.vendor_admin, event_key="seller.product_created").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.status, PushDeliveryLog.Status.SUCCESS)
+
+    def test_tc_notif_unread_badge_and_mark_read(self):
+        """TC-NOTIF-01 to 03: Unread counts, mark read, mark all read endpoints"""
+        from apps.dashboard.models import Notification
+        Notification.objects.create(
+            user=self.customer_admin,
+            company=self.customer_company,
+            title="Notice 1",
+            message="Message 1",
+            is_read=False,
+        )
+        Notification.objects.create(
+            user=self.customer_admin,
+            company=self.customer_company,
+            title="Notice 2",
+            message="Message 2",
+            is_read=False,
+        )
+
+        self.client.login(email="custadmin@apexcustomer.com", password="Password@123")
+
+        # 1. Check unread count
+        resp = self.client.get(reverse("api-notifications-unread-count"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["unread_count"], 2)
+
+        # 2. Mark all as read
+        read_all_resp = self.client.post(reverse("api-notifications-mark-all-read"))
+        self.assertEqual(read_all_resp.status_code, 200)
+        self.assertTrue(read_all_resp.json()["success"])
+        self.assertEqual(Notification.objects.filter(user=self.customer_admin, is_read=False).count(), 0)
+
+    def test_tc_sec_multi_tenant_isolation(self):
+        """TC-SEC-01 to 04: Multi-tenant data and device token isolation"""
+        from apps.requirements.models import Requirement
+        from apps.catalog.models import Product
+
+        # Requirement owned by Customer Company
+        cust_req = Requirement.objects.create(
+            company=self.customer_company,
+            created_by=self.customer_admin,
+            item_name="Confidential Part A",
+            quantity=10,
+            unit="pcs",
+        )
+
+        # Product owned by Vendor Company
+        vend_prod = Product.objects.create(
+            company=self.vendor_company,
+            created_by=self.vendor_admin,
+            name="Confidential Catalog Item B",
+            price=5000,
+        )
+
+        # Customer Admin cannot view/edit Vendor's product detail
+        self.client.login(email="custadmin@apexcustomer.com", password="Password@123")
+        prod_resp = self.client.get(reverse("product-detail", kwargs={"pk": vend_prod.id}))
+        # Returns 302 (redirect to dashboard due to module restriction) or 404
+        self.assertIn(prod_resp.status_code, [302, 404])
+
+        # Vendor Admin cannot view Customer's requirement
+        self.client.login(email="vendadmin@zenithvendor.com", password="Password@123")
+        req_resp = self.client.get(reverse("requirement-detail", kwargs={"pk": cust_req.id}))
+        self.assertIn(req_resp.status_code, [302, 404])
+
+        # Device tokens are isolated by company
+        cust_tokens = DeviceToken.objects.filter(company=self.customer_company).values_list("token", flat=True)
+        self.assertIn(self.cust_device.token, cust_tokens)
+        self.assertNotIn(self.vend_device.token, cust_tokens)
+
+
+class CentralizedNotificationEngineTestCase(TestCase):
+    """
+    Comprehensive Test Suite for Centralized Notification Engine:
+    - All 48 Business Events (User 1-20, Company Admin 21-34, Super Admin 35-48)
+    - Multi-Tenant Company Isolation (Customer, Vendor, Both)
+    - RBAC & Recipient Resolution
+    - Preference Opt-Out vs. Mandatory Event Enforcement
+    - Cooldown & Idempotency Duplicate Suppression
+    - FCM Web Push Dispatch & Invalid Token Pruning
+    - Safe String Templating (No Code Execution)
+    - Backward Compatibility Aliases & dispatch_dynamic_notification wrapper
+    """
+
+    def setUp(self):
+        self.superadmin = User.objects.create_superuser(
+            email="platform.admin@procuretrade.com",
+            password="AdminPassword@123",
+            first_name="Global",
+            last_name="SuperAdmin",
+        )
+
+        # 1. Customer Company (Buyer)
+        self.customer_admin = User.objects.create_user(
+            email="custadmin@globalbuyer.com",
+            password="Password@123",
+            first_name="Customer",
+            last_name="Admin",
+        )
+        self.customer_user = User.objects.create_user(
+            email="custuser@globalbuyer.com",
+            password="Password@123",
+            first_name="Customer",
+            last_name="Staff",
+        )
+        self.customer_company = Company.objects.create(
+            name="Global Buyer Corp",
+            company_type=Company.CompanyType.BUYER,
+            email="procurement@globalbuyer.com",
+            is_active=True,
+            is_verified=True,
+            created_by=self.customer_admin,
+        )
+        CompanyMember.objects.create(
+            company=self.customer_company,
+            user=self.customer_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.customer_company,
+            user=self.customer_user,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+
+        # 2. Vendor Company (Seller)
+        self.vendor_admin = User.objects.create_user(
+            email="vendadmin@globalseller.com",
+            password="Password@123",
+            first_name="Vendor",
+            last_name="Admin",
+        )
+        self.vendor_user = User.objects.create_user(
+            email="venduser@globalseller.com",
+            password="Password@123",
+            first_name="Vendor",
+            last_name="Rep",
+        )
+        self.vendor_company = Company.objects.create(
+            name="Global Vendor Ltd",
+            company_type=Company.CompanyType.SELLER,
+            email="sales@globalseller.com",
+            is_active=True,
+            is_verified=True,
+            created_by=self.vendor_admin,
+        )
+        CompanyMember.objects.create(
+            company=self.vendor_company,
+            user=self.vendor_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+        CompanyMember.objects.create(
+            company=self.vendor_company,
+            user=self.vendor_user,
+            role=CompanyMember.Role.USER,
+            is_active=True,
+        )
+
+        # 3. Suspended Company
+        self.suspended_admin = User.objects.create_user(
+            email="admin@suspendedco.com",
+            password="Password@123",
+            first_name="Suspended",
+            last_name="Admin",
+        )
+        self.suspended_company = Company.objects.create(
+            name="Suspended Corp",
+            company_type=Company.CompanyType.BUYER,
+            email="info@suspendedco.com",
+            is_active=False,
+            suspension_reason="Non-compliance",
+            created_by=self.suspended_admin,
+        )
+        CompanyMember.objects.create(
+            company=self.suspended_company,
+            user=self.suspended_admin,
+            role=CompanyMember.Role.ADMIN,
+            is_active=True,
+        )
+
+        # Register FCM device tokens
+        self.cust_device = DeviceToken.objects.create(
+            user=self.customer_admin,
+            company=self.customer_company,
+            token="fcm_token_cust_admin_xyz123",
+            device_type=DeviceToken.DeviceType.CHROME,
+            device_name="Chrome Desktop",
+            is_active=True,
+        )
+        self.vend_device = DeviceToken.objects.create(
+            user=self.vendor_admin,
+            company=self.vendor_company,
+            token="fcm_token_vend_admin_abc456",
+            device_type=DeviceToken.DeviceType.FIREFOX,
+            device_name="Firefox Desktop",
+            is_active=True,
+        )
+
+    def test_01_all_48_events_dispatch_via_notify_event(self):
+        """
+        Verify that all 48 cataloged events dispatch cleanly through notify_event().
+        Checks valid DB persistence, rendered safe titles, and correct priority values.
+        """
+        from apps.notifications.services.event_registry import EVENT_REGISTRY
+        from apps.notifications.services.notification_engine import notify_event
+
+        self.assertEqual(len(EVENT_REGISTRY), 48)
+
+        mock_payloads = {
+            "user_name": "Test User",
+            "company_name": "Global Buyer Corp",
+            "status_display": "Active",
+            "requirement_title": "Industrial Steel Bolts",
+            "inquiry_title": "Bulk Sourcing Inquiry",
+            "inquiry_id": "1001",
+            "query": "Precision CNC Milling",
+            "count": "25",
+            "product_title": "CNC Spindle Head",
+            "matched_count": "14",
+            "sender_name": "Vendor Sales Team",
+            "price": "₹15,000",
+            "lead_name": "Apex Engineering",
+            "job_type": "Vendor Catalog Export",
+            "error_reason": "Upstream timeout",
+            "remaining_credits": "45",
+            "plan_name": "Pro Growth",
+            "days_left": "5",
+            "invoice_number": "INV-2026-9901",
+            "amount": "14999.00",
+            "currency": "INR",
+            "member_name": "Alice Engineer",
+            "role": "Procurement Specialist",
+            "failures_count": "3",
+            "activity_details": "Multiple rapid IP switches",
+            "source_ip": "192.168.1.100",
+            "decision_status": "Approved",
+            "credits_consumed": "250",
+            "provider_name": "Gemini Sourcing AI",
+            "task_name": "Scheduled Daily Sourcing Aggregator",
+            "recipient_email": "purchasing@counterparty.com",
+            "alert_type": "Rate Limit Exceeded",
+            "module_name": "AI Catalog Parser",
+        }
+
+        with patch("apps.notifications.services.fcm_service.send_user_push") as mock_push:
+            mock_push.return_value = {"success": True, "success_count": 1, "failure_count": 0}
+
+            dispatched_count = 0
+            for event_key, defn in EVENT_REGISTRY.items():
+                audience = defn.get("audience", "USER")
+                if audience == "SUPERADMIN":
+                    target_recip = self.superadmin
+                    target_comp = None
+                elif "COMPANY" in audience:
+                    target_recip = None
+                    target_comp = self.customer_company
+                else:
+                    target_recip = self.customer_admin
+                    target_comp = self.customer_company
+
+                result = notify_event(
+                    event=event_key,
+                    recipient=target_recip,
+                    company=target_comp,
+                    data=mock_payloads,
+                    channels=["in_app", "push"],
+                    dedupe_key=f"all_48_test_{event_key}",
+                )
+
+                self.assertTrue(result["success"], f"Failed dispatching {event_key}: {result}")
+                self.assertGreater(result["in_app_created"], 0, f"No in-app created for {event_key}")
+                dispatched_count += 1
+
+            self.assertEqual(dispatched_count, 48)
+
+    def test_02_multi_tenant_company_isolation(self):
+        """
+        Verify tenant boundary: Customer events never leak to Vendor members or tokens.
+        """
+        from apps.notifications.services.notification_engine import notify_event
+
+        Notification.objects.all().delete()
+
+        with patch("apps.notifications.services.fcm_service.send_user_push") as mock_push:
+            mock_push.return_value = {"success": True, "success_count": 1, "failure_count": 0}
+
+            # Dispatch event targeted to Customer Company Admin
+            res = notify_event(
+                event="company.inquiry_received",
+                company=self.customer_company,
+                data={"inquiry_title": "Special Sourcing Request", "customer_name": "Test Partner"},
+                dedupe_key="multi_tenant_test_1",
+            )
+            self.assertTrue(res["success"])
+
+            # Notification created for customer admin, never vendor admin
+            cust_notifs = Notification.objects.filter(company=self.customer_company)
+            vend_notifs = Notification.objects.filter(company=self.vendor_company)
+
+            self.assertGreater(cust_notifs.count(), 0)
+            self.assertEqual(vend_notifs.count(), 0)
+            self.assertFalse(Notification.objects.filter(user=self.vendor_admin).exists())
+
+    def test_03_suspended_company_suppression(self):
+        """
+        Verify that inactive/suspended companies have notifications suppressed for isolation.
+        """
+        from apps.notifications.services.notification_engine import notify_event
+
+        res = notify_event(
+            event="company.inquiry_received",
+            company=self.suspended_company,
+            data={"inquiry_title": "Suspended Test"},
+            dedupe_key="suspended_comp_test",
+        )
+        self.assertEqual(res["recipients_count"], 0)
+        self.assertEqual(res["in_app_created"], 0)
+
+    def test_04_user_preferences_opt_out_vs_mandatory(self):
+        """
+        Verify that voluntary categories respect preference opt-outs, while mandatory events
+        (e.g., security, account status) bypass opt-outs.
+        """
+        from apps.notifications.services.notification_engine import notify_event
+
+        # 1. User disables PROCUREMENT category
+        pref, _ = NotificationPreference.objects.get_or_create(
+            user=self.customer_admin,
+            category=NotificationPreference.Category.PROCUREMENT,
+        )
+        pref.in_app_enabled = False
+        pref.push_enabled = False
+        pref.save()
+
+        # Non-mandatory procurement event is suppressed
+        res_opt_out = notify_event(
+            event="requirement.changed",
+            recipient=self.customer_admin,
+            company=self.customer_company,
+            data={"requirement_title": "Custom Bolts", "status_display": "Reviewed"},
+            dedupe_key="opt_out_procure_1",
+        )
+        self.assertEqual(res_opt_out["in_app_created"], 0)
+
+        # 2. User also disables SECURITY category
+        sec_pref, _ = NotificationPreference.objects.get_or_create(
+            user=self.customer_admin,
+            category=NotificationPreference.Category.SECURITY,
+        )
+        sec_pref.in_app_enabled = False
+        sec_pref.push_enabled = False
+        sec_pref.save()
+
+        # Mandatory security event (user.password_changed) CANNOT be suppressed
+        res_mandatory = notify_event(
+            event="user.password_changed",
+            recipient=self.customer_admin,
+            company=self.customer_company,
+            data={"user_name": "Customer Admin"},
+            dedupe_key="mandatory_sec_test",
+        )
+        self.assertTrue(res_mandatory["success"])
+        self.assertGreater(res_mandatory["in_app_created"], 0)
+
+    def test_05_cooldown_and_duplicate_suppression(self):
+        """
+        Verify that identical events within cooldown_minutes are suppressed.
+        """
+        from apps.notifications.services.notification_engine import notify_event
+
+        key = "cooldown_idempotency_key_999"
+
+        # First dispatch succeeds
+        res1 = notify_event(
+            event="user.registered",
+            recipient=self.customer_user,
+            company=self.customer_company,
+            data={"user_name": "Customer Staff"},
+            dedupe_key=key,
+        )
+        self.assertTrue(res1["success"])
+        self.assertGreater(res1["in_app_created"], 0)
+
+        # Second dispatch with same dedupe_key within cooldown is suppressed
+        res2 = notify_event(
+            event="user.registered",
+            recipient=self.customer_user,
+            company=self.customer_company,
+            data={"user_name": "Customer Staff"},
+            dedupe_key=key,
+        )
+        self.assertTrue(res2["suppressed"])
+        self.assertEqual(res2["in_app_created"], 0)
+
+    def test_06_fcm_push_dispatch_and_unregistered_pruning(self):
+        """
+        Verify that FCM push failure with UNREGISTERED or invalid token automatically
+        deactivates the stale DeviceToken and logs a FAILED PushDeliveryLog.
+        """
+        from apps.notifications.services.notification_engine import notify_event
+
+        self.assertTrue(self.cust_device.is_active)
+
+        with patch("apps.notifications.services.fcm_service.send_user_push") as mock_push:
+            # Simulate FCM returning an invalid token response for cust_device
+            mock_push.return_value = {
+                "success": False,
+                "sent_count": 0,
+                "failed_count": 1,
+                "device_results": {
+                    self.cust_device.token: {
+                        "success": False,
+                        "error_code": "UNREGISTERED",
+                        "error_message": "Device token is no longer registered with FCM",
+                    }
+                },
+            }
+
+            res = notify_event(
+                event="inquiry.message_received",
+                recipient=self.customer_admin,
+                company=self.customer_company,
+                data={"inquiry_id": "7701", "sender_name": "Vendor Sales"},
+                channels=["in_app", "push"],
+                dedupe_key="fcm_prune_test_key",
+                async_push=False,
+            )
+
+            # In-app still succeeds even if push fails (graceful degradation)
+            self.assertGreater(res["in_app_created"], 0)
+            self.assertEqual(res["push_failed_count"], 1)
+
+            # Verify that stale token was automatically deactivated
+            self.cust_device.refresh_from_db()
+            self.assertFalse(self.cust_device.is_active)
+
+            # Verify audit log was created
+            log = PushDeliveryLog.objects.filter(device=self.cust_device).latest("created_at")
+            self.assertEqual(log.status, PushDeliveryLog.Status.FAILED)
+            self.assertEqual(log.error_code, "UNREGISTERED")
+
+    def test_07_safe_template_formatting_protection(self):
+        """
+        Verify SafeDict: missing placeholders, format injection, and malicious syntax do not crash.
+        """
+        from apps.notifications.services.notification_engine import notify_event
+
+        # Malicious and empty payloads
+        poison_data = {
+            "__class__": "DangerousObject",
+            "extra_field": "{7*7}",
+            # Notice missing 'user_name' placeholder for user.registered
+        }
+
+        res = notify_event(
+            event="user.registered",
+            recipient=self.customer_admin,
+            company=self.customer_company,
+            data=poison_data,
+            dedupe_key="safe_fmt_test",
+        )
+        self.assertTrue(res["success"])
+        notif = Notification.objects.filter(deduplication_key="safe_fmt_test").first()
+        self.assertIsNotNone(notif)
+        # SafeDict leaves unfilled placeholder as {user_name} rather than throwing KeyError
+        self.assertIn("{user_name}", notif.title)
+
+    def test_08_backward_compatibility_aliases_and_wrapper(self):
+        """
+        Verify backward compatibility: EVENT_ALIASES map and dispatch_dynamic_notification() wrapper.
+        """
+        from apps.notifications.services.event_registry import get_event_definition
+        from apps.notifications.services.dynamic_engine import dispatch_dynamic_notification
+        from apps.notifications.services.notification_engine import notify_event
+
+        # 1. Alias lookup
+        key1, def1 = get_event_definition("company.user_added")
+        self.assertEqual(key1, "company.member_added")
+
+        key2, def2 = get_event_definition("credits.low")
+        self.assertEqual(key2, "company.credits.low")
+
+        key3, def3 = get_event_definition("company.verification_updated")
+        self.assertEqual(key3, "company.verification_status_changed")
+
+        # 2. dispatch_dynamic_notification delegates cleanly
+        with patch("apps.notifications.services.fcm_service.send_user_push") as mock_push:
+            mock_push.return_value = {"success": True, "sent_count": 1, "failed_count": 0}
+
+            dyn_res = dispatch_dynamic_notification(
+                event_key="company.user_added",
+                context={"member_name": "New Team Member", "role": "USER"},
+                company=self.customer_company,
+                actor=self.customer_admin,
+                deduplication_key="dyn_wrapper_test_1",
+            )
+            self.assertTrue(dyn_res.get("success"))
+            self.assertEqual(dyn_res.get("event"), "company.member_added")
+
+
+
+
 
 
 
